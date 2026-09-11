@@ -85,7 +85,7 @@ namespace GameplayEffects.Runtime
     /// All rules state for one game: entities, zones, listeners, modifiers, clock, RNG, history
     /// and scheduled work. Presentation state lives in the game, never here.
     /// </summary>
-    public sealed class GameState
+    public sealed partial class GameState
     {
         private readonly List<Entity> _entities = new List<Entity>();
         private readonly Dictionary<int, Entity> _byId = new Dictionary<int, Entity>();
@@ -478,6 +478,8 @@ namespace GameplayEffects.Runtime
 
             foreach (var zone in _zones.OrderBy(z => z.Key.Owner).ThenBy(z => z.Key.Zone, StringComparer.Ordinal))
             {
+                // An emptied zone and a zone that never existed are the same game state.
+                if (zone.Value.Count == 0) continue;
                 Mix(zone.Key.Owner);
                 MixText(zone.Key.Zone);
                 foreach (Entity entity in zone.Value) Mix(entity.Id);

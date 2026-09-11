@@ -282,11 +282,14 @@ namespace GameplayEffects.Runtime
                         break;
 
                     case ModifierLayer.Override:
+                        // The most recently created source wins. Creation order rather than
+                        // registration order, because a snapshot restore re-registers everything
+                        // and must not change which override wins.
                         (Modifier Modifier, Value Amount)? winner = null;
                         foreach (var entry in applicable)
                         {
                             if (entry.Modifier.Layer != ModifierLayer.Override) continue;
-                            if (winner == null || entry.Modifier.Order > winner.Value.Modifier.Order) winner = entry;
+                            if (winner == null || IsLater(entry.Modifier, winner.Value.Modifier)) winner = entry;
                         }
                         if (winner != null)
                         {
@@ -299,6 +302,12 @@ namespace GameplayEffects.Runtime
             }
 
             return value;
+        }
+
+        private static bool IsLater(Modifier candidate, Modifier current)
+        {
+            if (candidate.Owner.Sequence != current.Owner.Sequence) return candidate.Owner.Sequence > current.Owner.Sequence;
+            return candidate.Order > current.Order;
         }
     }
 }

@@ -586,6 +586,53 @@ namespace GameplayEffects
             if (State.InBattle) CheckBattleOver();
         }
 
+        // Save and load -------------------------------------------------------------------------
+
+        private BlockAddressBook? _addresses;
+        private int _addressGeneration = -1;
+
+        private BlockAddressBook Addresses
+        {
+            get
+            {
+                if (_addresses == null || _addressGeneration != Content.Generation)
+                {
+                    _addresses = BlockAddressBook.Build(Content);
+                    _addressGeneration = Content.Generation;
+                }
+                return _addresses;
+            }
+        }
+
+        /// <summary>
+        /// Captures the full rules state. Only valid between actions; the returned object is plain
+        /// data that any serializer can store.
+        /// </summary>
+        public GameSnapshot Capture()
+        {
+            if (Interpreter.HasPendingWork) throw new InvalidOperationException("Cannot snapshot while effects are still resolving.");
+
+            GameSnapshot snapshot = State.Capture(Addresses);
+            snapshot.NextChainRoot = Interpreter.ChainCounter;
+            snapshot.Won = Won;
+            snapshot.SkipNextDraw = _skipNextDraw;
+            return snapshot;
+        }
+
+        /// <summary>
+        /// Replaces the current state with a snapshot. The runtime must have the same content
+        /// loaded; the next inputs then play out exactly as they would have in the original game.
+        /// </summary>
+        public void Restore(GameSnapshot snapshot)
+        {
+            if (Interpreter.HasPendingWork) throw new InvalidOperationException("Cannot restore while effects are still resolving.");
+
+            State.Restore(snapshot, Addresses);
+            Interpreter.ChainCounter = snapshot.NextChainRoot;
+            Won = snapshot.Won;
+            _skipNextDraw = snapshot.SkipNextDraw;
+        }
+
         // Ad hoc execution ---------------------------------------------------------------------
 
         /// <summary>

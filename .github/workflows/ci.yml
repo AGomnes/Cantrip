@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    # Both platforms, because determinism across machines is a product requirement:
+    # the same seed and inputs must produce the same game everywhere.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Build
+        run: dotnet build GameplayEffects.sln -c Release
+
+      - name: Unit tests
+        run: dotnet test tests/GameplayEffects.Core.Tests -c Release --no-build
+
+      - name: DSL tests (samples/basic)
+        run: dotnet run --project src/GameplayEffects.Cli -c Release --no-build -- test samples/basic
+
+      - name: DSL tests (samples/corpus)
+        if: hashFiles('samples/corpus/**') != ''
+        run: dotnet run --project src/GameplayEffects.Cli -c Release --no-build -- test samples/corpus

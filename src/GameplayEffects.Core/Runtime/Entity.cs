@@ -50,6 +50,9 @@ namespace GameplayEffects.Runtime
 
         private Team _team;
 
+        /// <summary>The stored team, before falling back to the controller's. Snapshots save this.</summary>
+        internal Team RawTeam => _team;
+
         /// <summary>
         /// Where the entity lives: <c>hand</c>, <c>draw</c>, <c>discard</c>, <c>exhaust</c>,
         /// <c>board</c>, <c>relics</c>, <c>attached</c>, or empty for "nowhere in particular".
