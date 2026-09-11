@@ -1,0 +1,414 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using GameplayEffects.Diagnostics;
+using GameplayEffects.Syntax;
+
+namespace GameplayEffects.Content
+{
+    /// <summary>Status flags from section 3.9.</summary>
+    [Flags]
+    public enum StatusFlags
+    {
+        None = 0,
+        Buff = 1 << 0,
+        Debuff = 1 << 1,
+        Dispellable = 1 << 2,
+        Persistent = 1 << 3,
+        Hidden = 1 << 4,
+        UniquePerSource = 1 << 5,
+    }
+
+    public enum EnemyPatternKind
+    {
+        /// <summary>Moves in order, then loop.</summary>
+        Cycle,
+
+        /// <summary>Uniform random move each turn.</summary>
+        Random,
+
+        /// <summary>Uniform random, never the same move twice in a row.</summary>
+        RandomNoRepeat,
+    }
+
+    /// <summary>A named enemy move: <c>move "Chomp": deal 11 to player</c>.</summary>
+    public sealed class MoveDefinition
+    {
+        public MoveDefinition(string name, BlockNode body, Num weight)
+        {
+            Name = name;
+            Body = body;
+            Weight = weight;
+        }
+
+        public string Name { get; }
+        public BlockNode Body { get; }
+        public Num Weight { get; }
+    }
+
+    /// <summary>
+    /// Loaded, validated content: one card, status, relic, enemy, keyword or resource. Built once
+    /// from the syntax tree and shared by every entity instantiated from it.
+    /// </summary>
+    public sealed class EntityDefinition
+    {
+        private readonly Dictionary<string, PropertyNode> _properties;
+        private readonly Dictionary<string, Num> _stats;
+
+        internal EntityDefinition(EntityDeclNode syntax, DiagnosticBag diagnostics)
+        {
+            Syntax = syntax;
+            Name = syntax.Name;
+            KindName = syntax.Kind;
+            Kind = ParseKind(syntax.Kind);
+
+            _properties = new Dictionary<string, PropertyNode>(StringComparer.OrdinalIgnoreCase);
+            _stats = new Dictionary<string, Num>(StringComparer.OrdinalIgnoreCase);
+            var tags = new List<string>();
+            var listeners = new List<ListenerNode>();
+            var modifiers = new List<ModifyNode>();
+            var blocks = new Dictionary<string, BlockMemberNode>(StringComparer.OrdinalIgnoreCase);
+            var moves = new List<MoveDefinition>();
+
+            foreach (MemberNode member in syntax.Members)
+            {
+                switch (member)
+                {
+                    case ListenerNode listener:
+                        listeners.Add(listener);
+                        break;
+
+                    case ModifyNode modify:
+                        modifiers.Add(modify);
+                        break;
+
+                    case BlockMemberNode block when block.Name == "move":
+                        moves.Add(ReadMove(block, diagnostics));
+                        break;
+
+                    case BlockMemberNode block:
+                        if (blocks.ContainsKey(block.Name))
+                            diagnostics.Warn("GE0101", $"`{Name}` defines `{block.Name}:` more than once; the last one wins.", block.Span);
+                        blocks[block.Name] = block;
+                        break;
+
+                    case PropertyNode property when property.Name == "tags" || property.Name == "tag":
+                        foreach (ExprNode value in property.Values) tags.AddRange(ReadWords(value));
+                        break;
+
+                    case PropertyNode property:
+                        _properties[property.Name] = property;
+                        if (property.Values.Count == 1 && property.Values[0] is NumberExpr number && !IsConfigProperty(property.Name))
+                            _stats[property.Name] = number.Value;
+                        else if (property.Values.Count == 1 && property.Values[0] is UnaryExpr { Operator: UnaryOperator.Negate, Operand: NumberExpr negative } && !IsConfigProperty(property.Name))
+                            _stats[property.Name] = -negative.Value;
+                        break;
+                }
+            }
+
+            Tags = tags.Select(t => t.ToLowerInvariant()).Distinct().ToArray();
+            Listeners = listeners;
+            Modifiers = modifiers;
+            Blocks = blocks;
+            Moves = moves;
+
+            // An enemy's hp doubles as its max_hp unless both are given.
+            if (_stats.ContainsKey("hp") && !_stats.ContainsKey("max_hp")) _stats["max_hp"] = _stats["hp"];
+
+            ReadStatusConfig(diagnostics);
+            ReadPattern(diagnostics);
+        }
+
+        public EntityDeclNode Syntax { get; }
+        public string Name { get; }
+
+        /// <summary>The keyword it was declared with: <c>card</c>, <c>status</c>, <c>relic</c>...</summary>
+        public string KindName { get; }
+
+        public EntityKind Kind { get; }
+        public IReadOnlyList<string> Tags { get; }
+        public IReadOnlyList<ListenerNode> Listeners { get; }
+        public IReadOnlyList<ModifyNode> Modifiers { get; }
+        public IReadOnlyDictionary<string, BlockMemberNode> Blocks { get; }
+        public IReadOnlyList<MoveDefinition> Moves { get; }
+        public IReadOnlyDictionary<string, PropertyNode> Properties => _properties;
+
+        /// <summary>Numeric properties that become base stats on instantiation (<c>cost</c>, <c>hp</c>...).</summary>
+        public IReadOnlyDictionary<string, Num> Stats => _stats;
+
+        public BlockNode? Effect => Blocks.TryGetValue("effect", out BlockMemberNode? block) ? block.Body : null;
+
+        // Status configuration ------------------------------------------------------------
+
+        public StackingMode Stacking { get; private set; } = StackingMode.Intensity;
+        public int? MaxStacks { get; private set; }
+        public StatusFlags Flags { get; private set; }
+
+        /// <summary>How many stacks are lost when <see cref="DecayOn"/> fires. Zero means no decay.</summary>
+        public Num DecayAmount { get; private set; }
+
+        /// <summary>The event that triggers decay, typically <c>turn_end</c>.</summary>
+        public string? DecayOn { get; private set; }
+
+        // Enemy configuration -------------------------------------------------------------
+
+        public EnemyPatternKind Pattern { get; private set; } = EnemyPatternKind.Cycle;
+
+        /// <summary>Move names in pattern order. Empty means "all moves, in declaration order".</summary>
+        public IReadOnlyList<string> PatternMoves { get; private set; } = new string[0];
+
+        // Presentation --------------------------------------------------------------------
+
+        /// <summary>Custom rules text with live <c>{placeholders}</c> (description level 2).</summary>
+        public string? Text => ReadString("text");
+
+        /// <summary>Plain text with no live values (description level 3).</summary>
+        public string? TextOverride => ReadString("text_override");
+
+        public string? Flavour => ReadString("flavour") ?? ReadString("flavor");
+
+        public bool HasTag(string tag) => Tags.Contains(tag, StringComparer.OrdinalIgnoreCase);
+
+        public PropertyNode? Property(string name) => _properties.TryGetValue(name, out PropertyNode? node) ? node : null;
+
+        /// <summary>First word of a property, for enum-like settings such as <c>target enemy</c>.</summary>
+        public string? Word(string property)
+        {
+            PropertyNode? node = Property(property);
+            if (node == null || node.Values.Count == 0) return null;
+            return ReadWords(node.Values[0]).FirstOrDefault()?.ToLowerInvariant();
+        }
+
+        public string? ReadString(string property)
+        {
+            PropertyNode? node = Property(property);
+            if (node == null) return null;
+            return node.Values.Count > 0 && node.Values[0] is StringExpr text ? text.Value : null;
+        }
+
+        public override string ToString() => $"{KindName} \"{Name}\"";
+
+        private static EntityKind ParseKind(string kind) => kind switch
+        {
+            "card" => EntityKind.Card,
+            "status" => EntityKind.Status,
+            "relic" => EntityKind.Relic,
+            "ability" => EntityKind.Ability,
+            "keyword" => EntityKind.Keyword,
+            "item" => EntityKind.Item,
+            "enemy" => EntityKind.Actor,
+            "actor" => EntityKind.Actor,
+            _ => EntityKind.Global,
+        };
+
+        /// <summary>Properties that configure behaviour and must not be mistaken for stats.</summary>
+        private static bool IsConfigProperty(string name) => name switch
+        {
+            "max_stacks" => true,
+            "decay" => true,
+            "priority" => true,
+            "weight" => true,
+            _ => false,
+        };
+
+        /// <summary>Reads bare identifiers out of an expression, flattening <c>a, b</c> juxtapositions.</summary>
+        internal static IEnumerable<string> ReadWords(ExprNode value)
+        {
+            switch (value)
+            {
+                case NameExpr name:
+                    yield return name.Name;
+                    break;
+                case StringExpr text:
+                    yield return text.Value;
+                    break;
+                case QualifiedExpr qualified:
+                    yield return qualified.Name;
+                    break;
+            }
+        }
+
+        private MoveDefinition ReadMove(BlockMemberNode block, DiagnosticBag diagnostics)
+        {
+            string name = "<unnamed move>";
+            Num weight = Num.One;
+
+            if (block.Arguments.Count > 0)
+            {
+                string? word = ReadWords(block.Arguments[0]).FirstOrDefault();
+                if (word != null) name = word;
+            }
+            else
+            {
+                diagnostics.Error("GE0102", $"`move` in `{Name}` needs a name, as in `move \"Chomp\":`.", block.Span);
+            }
+
+            // `move "Chomp" weight 2:` - an optional weight for random patterns.
+            for (int i = 1; i + 1 < block.Arguments.Count; i++)
+            {
+                if (block.Arguments[i] is NameExpr { Name: "weight" } && block.Arguments[i + 1] is NumberExpr w) weight = w.Value;
+            }
+
+            return new MoveDefinition(name, block.Body, weight);
+        }
+
+        private void ReadStatusConfig(DiagnosticBag diagnostics)
+        {
+            string? stacking = Word("stacking");
+            if (stacking != null)
+            {
+                switch (stacking)
+                {
+                    case "intensity": Stacking = StackingMode.Intensity; break;
+                    case "duration": Stacking = StackingMode.Duration; break;
+                    case "both": Stacking = StackingMode.Both; break;
+                    case "none": Stacking = StackingMode.None; break;
+                    case "refresh": Stacking = StackingMode.Refresh; break;
+                    case "separate": Stacking = StackingMode.Separate; break;
+                    default:
+                        diagnostics.Error(
+                            "GE0103",
+                            $"Unknown stacking mode `{stacking}`.",
+                            Property("stacking")!.Span,
+                            Suggest.Closest(stacking, new[] { "intensity", "duration", "both", "none", "refresh", "separate" }));
+                        break;
+                }
+            }
+
+            PropertyNode? max = Property("max_stacks");
+            if (max?.First is NumberExpr maxValue) MaxStacks = maxValue.Value.ToInt();
+
+            // `decay 1 on turn_end` parses as `1 on turn_end`; `decay 1` alone decays at turn end.
+            PropertyNode? decay = Property("decay");
+            if (decay?.First != null)
+            {
+                switch (decay.First)
+                {
+                    case NumberExpr amount:
+                        DecayAmount = amount.Value;
+                        DecayOn = "turn_end";
+                        break;
+                    case BinaryExpr { Operator: BinaryOperator.On, Left: NumberExpr amount, Right: NameExpr trigger }:
+                        DecayAmount = amount.Value;
+                        DecayOn = trigger.Name.ToLowerInvariant();
+                        break;
+                    default:
+                        diagnostics.Error("GE0104", "`decay` expects a number, optionally followed by `on <event>`.", decay.Span);
+                        break;
+                }
+            }
+            else if (Stacking == StackingMode.Duration || Stacking == StackingMode.Refresh)
+            {
+                // Duration-stacked statuses tick down by default; that is what the mode means.
+                DecayAmount = Num.One;
+                DecayOn = "turn_end";
+            }
+
+            StatusFlags flags = StatusFlags.None;
+            PropertyNode? flagList = Property("flags");
+            if (flagList != null)
+            {
+                foreach (ExprNode value in flagList.Values)
+                {
+                    foreach (string word in ReadWords(value))
+                    {
+                        switch (word.ToLowerInvariant())
+                        {
+                            case "buff": flags |= StatusFlags.Buff; break;
+                            case "debuff": flags |= StatusFlags.Debuff; break;
+                            case "dispellable": flags |= StatusFlags.Dispellable; break;
+                            case "persistent": flags |= StatusFlags.Persistent; break;
+                            case "hidden": flags |= StatusFlags.Hidden; break;
+                            case "unique": flags |= StatusFlags.UniquePerSource; break;
+                            default:
+                                diagnostics.Warn("GE0105", $"Unknown status flag `{word}`.", flagList.Span,
+                                    Suggest.Closest(word, new[] { "buff", "debuff", "dispellable", "persistent", "hidden", "unique" }));
+                                break;
+                        }
+                    }
+                }
+            }
+
+            // Tags double as flags so `tags debuff, dot` works without a separate `flags` line.
+            if (HasTag("buff")) flags |= StatusFlags.Buff;
+            if (HasTag("debuff")) flags |= StatusFlags.Debuff;
+            Flags = flags;
+        }
+
+        private void ReadPattern(DiagnosticBag diagnostics)
+        {
+            PropertyNode? pattern = Property("pattern");
+            if (pattern == null || pattern.Values.Count == 0) return;
+
+            var words = pattern.Values.SelectMany(ReadWords).ToList();
+            if (words.Count == 0) return;
+
+            switch (words[0].ToLowerInvariant())
+            {
+                case "cycle": Pattern = EnemyPatternKind.Cycle; words.RemoveAt(0); break;
+                case "random": Pattern = EnemyPatternKind.Random; words.RemoveAt(0); break;
+                case "random_no_repeat": Pattern = EnemyPatternKind.RandomNoRepeat; words.RemoveAt(0); break;
+            }
+
+            foreach (string move in words)
+            {
+                if (!Moves.Any(m => string.Equals(m.Name, move, StringComparison.OrdinalIgnoreCase)))
+                {
+                    diagnostics.Error("GE0106", $"Pattern of `{Name}` names unknown move `{move}`.", pattern.Span,
+                        Suggest.Closest(move, Moves.Select(m => m.Name)));
+                }
+            }
+
+            PatternMoves = words;
+        }
+    }
+
+    /// <summary>A content-defined verb: <c>verb shatter(t): ...</c>.</summary>
+    public sealed class VerbDefinition
+    {
+        internal VerbDefinition(VerbDeclNode syntax)
+        {
+            Syntax = syntax;
+        }
+
+        public VerbDeclNode Syntax { get; }
+        public string Name => Syntax.Name;
+        public IReadOnlyList<string> Parameters => Syntax.Parameters;
+        public BlockNode Body => Syntax.Body;
+    }
+
+    /// <summary>
+    /// Bounds and reset behaviour for a stat treated as a resource, per "resources as data" in
+    /// section 3.10. Declared with <c>resource "energy"</c>; common ones are built in.
+    /// </summary>
+    public sealed class ResourceRule
+    {
+        public ResourceRule(string stat) => Stat = stat;
+
+        public string Stat { get; }
+
+        /// <summary>Lower bound, or null for none.</summary>
+        public ExprNode? Min { get; set; }
+
+        /// <summary>Upper bound, or null for none. May name another stat, as in <c>max max_hp</c>.</summary>
+        public ExprNode? Max { get; set; }
+
+        /// <summary>Value restored when <see cref="ResetOn"/> fires.</summary>
+        public ExprNode? ResetTo { get; set; }
+
+        /// <summary>Event that resets the resource for its owner, such as <c>turn_start</c>.</summary>
+        public string? ResetOn { get; set; }
+
+        internal static ResourceRule FromDefinition(EntityDefinition definition)
+        {
+            var rule = new ResourceRule(definition.Name.ToLowerInvariant())
+            {
+                Min = definition.Property("min")?.First,
+                Max = definition.Property("max")?.First,
+                ResetTo = definition.Property("reset_to")?.First,
+                ResetOn = definition.Word("reset_on"),
+            };
+            return rule;
+        }
+    }
+}

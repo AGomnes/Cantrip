@@ -1,0 +1,47 @@
+## .NET
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+artifacts/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+project.lock.json
+project.fragment.lock.json
+
+## Test / coverage
+[Tt]est[Rr]esult*/
+coverage*.json
+coverage*.xml
+coverage*.info
+*.coverage
+*.coveragexml
+
+## Rider / VS / VS Code
+.vs/
+.idea/
+*.DotSettings.user
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.sample
+
+## Godot
+.godot/
+.import/
+export_presets.cfg
+*.translation
+
+## OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+## Local scratch
+scratch/
+*.local.*
