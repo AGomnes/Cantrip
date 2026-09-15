@@ -367,6 +367,15 @@ namespace GameplayEffects.Linting
 
         private void CheckNames(Body body)
         {
+            // `emit sparked` and `use Chomp` name an event and a move, not values. GE304/GE305 and
+            // GE312 check those words instead.
+            foreach (CommandNode command in body.Facts.Commands)
+            {
+                bool namesSomething = string.Equals(command.Verb, "emit", StringComparison.OrdinalIgnoreCase)
+                                   || string.Equals(command.Verb, "use", StringComparison.OrdinalIgnoreCase);
+                if (namesSomething && command.Arguments.FirstOrDefault() is NameExpr word) _reported.Add(word);
+            }
+
             // Positions where only a definition makes sense are errors: the runtime will fail there.
             foreach (CommandNode command in body.Facts.Commands)
             {

@@ -170,6 +170,30 @@ namespace GameplayEffects.Tests.Linting
         }
 
         [Fact]
+        public void Event_and_move_names_are_not_mistaken_for_values()
+        {
+            IReadOnlyList<Diagnostic> diagnostics = Lint("""
+                card "Spark"
+                  cost 0
+                  effect:
+                    emit sparked 1
+
+                relic "Capacitor"
+                  on sparked:
+                    gain 1 energy
+
+                enemy "Worm"
+                  hp 20
+                  on self.damaged:
+                    use Chomp
+                  move "Chomp":
+                    deal 5 to player
+                """);
+
+            None(diagnostics, Linter.UnknownName);
+        }
+
+        [Fact]
         public void Reading_an_undefined_status_on_a_target_is_an_error()
         {
             Diagnostic d = Single(Lint("""

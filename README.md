@@ -1,0 +1,195 @@
+# Gameplay Effects DSL
+
+*Working title.*
+
+A C# library for writing cards, statuses, relics, enemies and abilities as short text files instead of code. It targets Godot/.NET, keeps the rules engine free of engine references, and runs the same content turn-based or in real time.
+
+```
+card "Fireball"
+  cost 2
+  target enemy
+  tags attack, fire
+  effect:
+    deal 6 to target
+    deal 2 to adjacent(target)
+    if target.dead: draw 1
+  text: "Hurl a ball of flame for {damage} damage. Kill it to draw {draw}."
+
+status "Frozen"
+  tags control, ice
+  on owner.damaged(tag:fire):
+    remove Frozen from owner
+    deal 10 to owner
+
+relic "Kindling"
+  on status_removed(tag:ice):
+    apply Burn 2 to event.target
+
+test "Fireball kills a 6 HP enemy"
+  setup: enemy hp 6
+  play Fireball on enemy
+  expect enemy.dead
+```
+
+The design notes are in [gameplay-effects-dsl.md](gameplay-effects-dsl.md). This README describes what exists today.
+
+## Status
+
+An early MVP of the core, per step 1 of the plan in the design notes. It is not yet a Godot plugin.
+
+**Working now**
+
+- The DSL: cards, statuses, relics, enemies with move patterns, abilities, keywords, resources, rulesets, content-defined verbs, and test blocks
+- Everything is an entity: statuses are entities attached to their host, so `stacks -1` and `remove tag:dot` need no special cases
+- Events with `before`, `instead` and `after` phases, deterministic listener ordering, loop protection and `once per turn/battle/run/chain` limits
+- A layered modifier pipeline (add, multiply, clamp, override) with sensible default scopes and explicit `of` scopes
+- A tree-walking interpreter, a battle runtime (turns, card play, draw, enemy intents) and a fixed-timestep tick clock for real time
+- Deterministic fixed-point math and RNG, state hashing, and save/load snapshots that replay exactly
+- A causality trace, a static linter, generated and custom descriptions with live values, and a DSL test runner
+- The `gedsl` command-line tool
+
+**Not yet**: the Godot adapter and editor plugin, hot reload of live entities, the compiled backend, spatial selectors (`within` needs a host), resolving a player choice across a save, the VS Code extension, and the full coverage corpus. See [Roadmap](#roadmap).
+
+## Building
+
+Requires the .NET 9 SDK or later.
+
+```
+dotnet build GameplayEffects.sln
+dotnet test tests/GameplayEffects.Core.Tests
+dotnet run --project src/GameplayEffects.Cli -- test samples/basic
+```
+
+The core library targets `netstandard2.1` and C# 9, to keep Unity possible later. The CLI and tests target `net9.0`.
+
+## Command line
+
+```
+gedsl validate <path>...                 parse and load content, report problems
+gedsl lint <path>... [--suppress codes]  static checks (GE301-GE312, GE401-GE403)
+gedsl test <path>... [--filter text] [--trace]
+gedsl describe <path>... [--name name]   print generated descriptions
+gedsl repl <path>...                     run DSL statements against a live game
+```
+
+Paths are files or folders; folders load every `*.ge` file recursively. Exit code 0 means success, 1 means content errors or failing tests, 2 means bad usage.
+
+## Using it from C#
+
+Load content and play a battle:
+
+```csharp
+var content = new ContentLibrary();
+content.LoadFolder("content");
+content.Diagnostics.ThrowIfErrors();
+
+var runtime = new CardRuntime(content, new RuntimeOptions { Seed = 12345 });
+Entity player = runtime.CreatePlayer(hp: 80, maxEnergy: 3);
+runtime.AddDeck("Strike", "Strike", "Defend", "Fireball");
+runtime.AddRelic("Kindling");
+Entity worm = runtime.SpawnEnemy("Jaw Worm");
+
+runtime.StartBattle();
+PlayResult result = runtime.Play("Fireball", worm);   // Played, NotEnoughEnergy, InvalidTarget...
+runtime.EndTurn();
+```
+
+Verbs implemented in C#:
+
+```csharp
+runtime.RegisterVerb("corrupt", call =>
+{
+    Num amount = call.Number(0, Num.One);
+    foreach (Entity target in call.Targets("to"))
+        target.SetBase("corruption", target.GetBase("corruption") + amount);
+});
+```
+
+A host supplies what the library cannot know, such as presentation or spatial queries. Every member is optional:
+
+```csharp
+sealed class GameHost : EffectHostBase
+{
+    public override void OnEvent(GameEvent gameEvent)
+    {
+        // Presentation hangs off events; the rules have already resolved.
+        if (gameEvent.Name == "damaged" && gameEvent.Target != null)
+            ShowDamageNumber(gameEvent.Target, gameEvent.Amount.ToInt());
+    }
+
+    public override bool TryCall(string function, IReadOnlyList<Value> arguments, EvalContext context, out Value value)
+    {
+        // Answer `enemies within 5m` from the game's own world state here.
+        value = Value.None;
+        return false;
+    }
+}
+
+var runtime = new CardRuntime(content, new RuntimeOptions { Host = new GameHost() });
+```
+
+Choices (targets, `choose`, `discard 2`) go through a pluggable `IChoiceProvider`: `FirstOptionChooser` (the default), `RandomChooser`, `ScriptedChooser`, or your UI.
+
+```csharp
+runtime.Chooser = new RandomChooser(seed: 7);
+```
+
+Save and load. A snapshot is plain data, taken between actions; restoring it into a runtime with the same content continues the game exactly:
+
+```csharp
+GameSnapshot save = runtime.Capture();
+string json = JsonSerializer.Serialize(save);
+runtime.Restore(JsonSerializer.Deserialize<GameSnapshot>(json)!);
+```
+
+Descriptions with live values, for card frames and tooltips:
+
+```csharp
+Description text = new DescriptionBuilder(content).Describe(card, runtime, target: worm);
+text.ToPlainText();   // "Hurl a ball of flame for 9 damage. Kill it to draw 1."
+text.ToMarkup();      // "Hurl a ball of flame for ~~6~~ 9 damage. ..."
+```
+
+Tracing, linting and DSL tests:
+
+```csharp
+var traced = new CardRuntime(content, new RuntimeOptions { Trace = true });
+// ... play ...
+Console.WriteLine(traced.State.Trace.FormatTree());
+
+IReadOnlyList<Diagnostic> problems = Linter.Lint(content);
+IReadOnlyList<DslTestResult> results = new DslTestRunner(content).RunAll();
+```
+
+## Documentation
+
+- [docs/language.md](docs/language.md): the DSL reference
+- [docs/architecture.md](docs/architecture.md): how the library is put together, and where to extend it
+- [docs/coverage.md](docs/coverage.md): which reference effects the language can express today
+- [gameplay-effects-dsl.md](gameplay-effects-dsl.md): the design notes this project follows
+
+## Project layout
+
+| Path | Contents |
+|---|---|
+| `src/GameplayEffects.Core` | Parser, content loading, entities, events, modifiers, interpreter, runtime, linter, descriptions, test runner |
+| `src/GameplayEffects.Cli` | The `gedsl` tool |
+| `tests/GameplayEffects.Core.Tests` | Unit tests |
+| `samples/basic` | Every example from the design notes, with DSL tests |
+| `samples/corpus` | Reference effects from existing games, with DSL tests |
+
+## Roadmap
+
+Following section 7 of the design notes:
+
+1. **MVP core**: done (entities, events, statuses, modifiers, turn clock, tree-walk interpreter, trace log).
+2. **Save/load and deterministic math**: done.
+3. **Validate turn-based**: build inside a real roguelite.
+4. **Validate real-time**: the tick clock exists; it needs a real-time project, spatial selectors and allocation-free event paths.
+5. **Coverage corpus**: 23 Slay the Spire effects so far ([docs/coverage.md](docs/coverage.md)); Balatro, Monster Train, Hearthstone and Dota 2 are still to do.
+6. **Release**: Godot plugin, hot reload, docs site, cookbook, sample game.
+7. **Project setup**: the name is still to be chosen.
+
+## License
+
+MIT. Copyright (c) 2026 Alexander Gomnæs. See [LICENSE](LICENSE).

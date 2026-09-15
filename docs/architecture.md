@@ -1,0 +1,124 @@
+# Architecture
+
+How the library is put together, what each part is responsible for, and where to extend it. The language itself is described in [language.md](language.md).
+
+## Layers
+
+```
+ .ge files ──► Syntax ──► Content ──► Runtime + Interpreter ──► CardRuntime ──► your game
+                 │           │              │
+                 └───────────┴──── Tools ───┘   (Linter, Descriptions, DslTestRunner, gedsl)
+```
+
+Everything lives in `GameplayEffects.Core`, which references no engine. `GameplayEffects.Cli` is a thin command-line wrapper.
+
+| Namespace | Responsibility |
+|---|---|
+| `GameplayEffects` | `Num` (fixed-point), `Rng`, shared enums, `CardRuntime` |
+| `GameplayEffects.Syntax` | `Lexer`, `Parser`, AST nodes, `AstPrinter`, `AstWalker` |
+| `GameplayEffects.Content` | `ContentLibrary`, `EntityDefinition`, `VerbDefinition`, `ResourceRule` |
+| `GameplayEffects.Runtime` | `GameState`, `Entity`, `EventBus`, `ModifierPipeline`, clocks, `TraceLog`, snapshots, `Interpreter` |
+| `GameplayEffects.Linting` | `Linter` |
+| `GameplayEffects.Descriptions` | `DescriptionBuilder`, localization |
+| `GameplayEffects.Testing` | `DslTestRunner` |
+| `GameplayEffects.Diagnostics` | `SourceSpan`, `Diagnostic`, "did you mean" suggestions |
+
+## Syntax
+
+The lexer turns indentation into `Indent` and `Dedent` tokens, so the parser never guesses where a block ends. It lexes `tag:fire` as one token (only for a closed set of qualifier prefixes, which is what keeps it apart from a block's colon), and `x1.5` as multiplication.
+
+The parser is recursive descent. Its main design choice is that **it knows nothing about verbs**: a statement is a verb name, positional arguments, named clauses (`to`, `from`, `for`...) and trailing flags. Verb implementations interpret those. That is what lets content and games add verbs without touching the grammar.
+
+Errors are collected, not thrown, with recovery to the end of the line or block, so a file with several mistakes reports all of them. Nesting deeper than 256 levels is a diagnostic rather than a stack overflow.
+
+## Content
+
+`ContentLibrary` parses files and registers definitions keyed by kind and name. Loading a file again replaces exactly what it contributed, which is the basis for hot reload. Diagnostics are kept per file.
+
+`EntityDefinition` is built once from the syntax tree: numeric properties become stats, and listeners, modifiers, blocks, moves and status configuration are pulled out. Every entity created from it shares it.
+
+## Runtime
+
+**`GameState`** holds all rules state: entities, zones, activation, history counters, scheduled work, the clock and the RNG. It carries a `Version` that every mutation increments; caches compare against it instead of tracking dependencies. Presentation state never lives here.
+
+**Entities.** Actors, cards, relics, statuses and keywords are all `Entity`. A status is an entity attached to its host, with `stacks` as an ordinary stat. An entity's listeners and modifiers are registered while it is **active**, which depends on its zone: actors on the board, cards in hand (powers only once played), relics in the relics zone, statuses while their host is active.
+
+**`EventBus`** stores listeners by event name and answers which ones hear an event, in the ruleset's deterministic order. It executes nothing.
+
+**`ModifierPipeline`** stores modifiers by channel and computes a value through the ruleset's layers. The interpreter implements `IModifierEvaluator`, which decides whether a modifier applies (scope and filter) and evaluates its amount.
+
+**Clocks.** `IGameClock` exposes whole units only. `TurnClock` advances once per round, `TickClock` once per fixed step, so durations, cooldowns and scheduling share one code path.
+
+**`TraceLog`** records steps with parent ids when enabled, and costs one branch per recording site when not.
+
+**Snapshots.** `GameState.Capture` produces plain data. Scheduled blocks are stored by content address (`card:Prepare/effect/0.body`), not object reference, so a save stays valid across processes. `Restore` rebuilds entities, zones and scheduled work, then re-registers listeners and modifiers in creation order and restores listener limit windows.
+
+## Interpreter
+
+`Interpreter` is one class split across files:
+
+| File | Contents |
+|---|---|
+| `Interpreter.cs` | statements, assignments, content verb calls, scheduling, modifier scope evaluation |
+| `Interpreter.Expressions.cs` | names, members, calls, operators, selectors, qualifier tests |
+| `Interpreter.Events.cs` | `Raise`, dispatch, filters, loop protection, limits, the work queue |
+| `Interpreter.Actions.cs` | the primitives: `ChangeStat`, `ApplyStatus`, `DealDamage`, `Kill`, `Draw`, `MoveCard`, `Create`, decay, until-reverts, intents |
+| `Interpreter.Verbs.cs` | the built-in verb table |
+
+### Execution model
+
+Statements execute immediately, in order, so `if target.dead` sees the damage dealt on the line before. Every primitive raises its event through `Raise`:
+
+```
+Raise(event, action):
+  before listeners run now            (may change event.amount or cancel)
+  committed()                         (card play pays its cost here)
+  instead listeners run now           (if any fire, the action is skipped)
+  action()
+  resources with reset_on <event> reset
+  after listeners are queued          (or run now, with triggers: immediate)
+  decay and until-reverts for <event> are queued behind them
+  host.OnEvent(event)
+```
+
+`CardRuntime` wraps every top-level operation (play, a turn phase, `Execute`) in `Run`, which starts a new causal chain, resets the step budget, drains the queue, and drops queued work if the operation fails.
+
+### Playing Fireball
+
+1. `CardRuntime.Play` checks energy through `CostOf` (the `cost` channel) and resolves the target.
+2. It raises `card_played`. The committed step pays the cost and moves the card to `play`.
+3. The action runs the effect block. `deal 6 to target` calls `DealDamage`, which computes the amount through the `damage` channel (Pyromancer's Codex multiplies it), then `damage_taken`, then raises `damaged`. Frozen's `on owner.damaged(tag:fire)` is queued.
+4. `if target.dead: draw 1` reads the state that step 3 already changed.
+5. The card moves to the discard pile, the queue drains (Frozen removes itself, raising `status_removed`, which queues Kindling), and the battle checks whether it is over.
+
+### Loop protection
+
+Each queued trigger carries its `Chain`: an immutable list of the listeners that led to it. A listener already in its own chain is skipped, and chains stop at `max_depth`. So a listener cannot re-trigger itself forever, but "whenever an enemy dies, deal 1 to all" can still fire once per death in a chain reaction. Content verb calls have a separate depth limit, and every top-level action has a step budget.
+
+## Determinism
+
+- `Num` is a 64-bit fixed-point value with six decimal places. Multiplication splits integer and fractional parts so no intermediate overflows for values up to about ±1 million.
+- `Rng` is xoshiro256** seeded through splitmix64, with rejection sampling for bounded values. Its full state is saved in snapshots.
+- Anything that could depend on hash order is sorted: listener candidates, resource resets, zone and history hashing.
+- `GameState.ComputeHash` covers entities, zones, RNG, clock, history, scheduled work and listener limits. Tests play a hundred random battles twice each, and play a battle side by side with a saved-and-restored copy of itself, comparing hashes after every step.
+
+## Tools
+
+**Linter.** Walks every body (effects, listeners, modifiers, verbs, tests) with an `AstWalker`, gathers global facts (verbs, stats, tags, emitted and listened events), then checks each body and the event graph. `BuiltinEvents` is the single catalogue of built-in events and which verbs raise them; unit tests keep it in step with the sources.
+
+**Descriptions.** One walk over a definition both writes the automatic text and names each value (`damage`, `damage2`, `Poison`...), which is what links a writer's placeholders to the effect. Live descriptions evaluate values without side effects (anything involving ranges or `random` is shown symbolically) and pass them through the same modifier queries the rules use.
+
+**DslTestRunner.** Creates a fresh `CardRuntime` per test and registers test-only verbs from a single table, which the linter also reads.
+
+## Extending
+
+| To add | Do this |
+|---|---|
+| A verb in C# | `runtime.RegisterVerb(name, call => ...)`. Use `call.Argument`, `call.Number`, `call.Clause`, `call.Targets` and the interpreter's primitives so events and modifiers still apply. |
+| A verb in content | `verb name(params):` |
+| Names or functions the rules cannot know | Implement `IEffectHost.TryResolveName` or `TryCall` (subclass `EffectHostBase`). |
+| Presentation | `IEffectHost.OnEvent` sees every resolved event. |
+| A decision maker | Implement `IChoiceProvider`. |
+| A clock | Implement `IGameClock`, advance it from the engine's fixed step, and pass it in `RuntimeOptions.Clock`. |
+| Translations | Implement `IDescriptionLocalizer` or subclass `EnglishDescriptions`. |
+| Lint rules for your game | Pass `LintOptions` with host verbs, events and names, or suppress codes. |
