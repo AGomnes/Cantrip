@@ -87,11 +87,13 @@ namespace GameplayEffects.Testing
             }
 
             var session = new Session(runtime, chooser);
+            SourceSpan at = test.Syntax.Span;
 
             try
             {
                 foreach (StatementNode statement in body.Statements)
                 {
+                    at = statement.Span;
                     if (!session.Started && !IsSetup(statement)) session.Start();
                     session.Run(statement);
                 }
@@ -108,6 +110,16 @@ namespace GameplayEffects.Testing
             catch (DslException error)
             {
                 return new DslTestResult(test, false, error.Message, error.Diagnostics.FirstOrDefault()?.Span ?? test.Syntax.Span, null);
+            }
+            catch (Exception error) when (error is ArgumentException || error is InvalidOperationException)
+            {
+                // The runtime API's own complaints ("No card named Strke. Did you mean Strike?")
+                // fail this test only, instead of aborting the whole run.
+                return new DslTestResult(test, false, error.Message, at, Trace ? runtime.State.Trace.FormatTree() : null);
+            }
+            catch (Exception error) when (!(error is OutOfMemoryException))
+            {
+                return new DslTestResult(test, false, $"internal error ({error.GetType().Name}): {error.Message}", at, Trace ? runtime.State.Trace.FormatTree() : null);
             }
         }
 
@@ -220,8 +232,9 @@ namespace GameplayEffects.Testing
                     enemy.SetBase("block", 0);
                 }
 
+                // SpawnEnemy already rolled an intent if the battle is running; rolling again here
+                // would make a cycling enemy skip its opening move.
                 SetStats(enemy, call, index);
-                if (State.InBattle) _runtime.RollIntent(enemy);
 
                 _enemies++;
                 if (_enemies == 1) _context.SetLocal("enemy", Value.FromEntity(enemy));

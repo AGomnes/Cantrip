@@ -35,20 +35,37 @@ namespace GameplayEffects.Runtime
         public EntityKind Kind { get; }
         public EntityDefinition? Definition { get; }
 
+        // Every property a modifier filter could read bumps GameState.Version when it changes, so
+        // the stat cache can never serve a value computed against stale state.
+        private Entity? _owner;
+        private Entity? _source;
+        private Team _team;
+        private string _zone = string.Empty;
+        private int _position;
+        private bool _isDead;
+        private bool _isRemoved;
+        private string? _intent;
+
         /// <summary>The entity this one belongs to: a card's or status's actor, a relic's holder.</summary>
-        public Entity? Owner { get; internal set; }
+        public Entity? Owner
+        {
+            get => _owner;
+            internal set => Set(ref _owner, value);
+        }
 
         /// <summary>The entity that created or applied this one, when that matters (status sources).</summary>
-        public Entity? Source { get; internal set; }
+        public Entity? Source
+        {
+            get => _source;
+            internal set => Set(ref _source, value);
+        }
 
         /// <summary>Side for actors. Other entities report their controller's team.</summary>
         public Team Team
         {
             get => Kind == EntityKind.Actor || Owner == null ? _team : Controller.Team;
-            internal set => _team = value;
+            internal set => Set(ref _team, value);
         }
-
-        private Team _team;
 
         /// <summary>The stored team, before falling back to the controller's. Snapshots save this.</summary>
         internal Team RawTeam => _team;
@@ -57,15 +74,31 @@ namespace GameplayEffects.Runtime
         /// Where the entity lives: <c>hand</c>, <c>draw</c>, <c>discard</c>, <c>exhaust</c>,
         /// <c>board</c>, <c>relics</c>, <c>attached</c>, or empty for "nowhere in particular".
         /// </summary>
-        public string Zone { get; internal set; }
+        public string Zone
+        {
+            get => _zone;
+            internal set => Set(ref _zone, value ?? string.Empty);
+        }
 
-        /// <summary>Slot on the board, used by adjacency selectors.</summary>
-        public int Position { get; internal set; }
+        /// <summary>Slot on the board, used by adjacency selectors. Unique among an actor's live teammates.</summary>
+        public int Position
+        {
+            get => _position;
+            internal set => Set(ref _position, value);
+        }
 
-        public bool IsDead { get; internal set; }
+        public bool IsDead
+        {
+            get => _isDead;
+            internal set => Set(ref _isDead, value);
+        }
 
         /// <summary>True once the entity has left the game entirely. Removed entities never fire listeners.</summary>
-        public bool IsRemoved { get; internal set; }
+        public bool IsRemoved
+        {
+            get => _isRemoved;
+            internal set => Set(ref _isRemoved, value);
+        }
 
         /// <summary>Activation order, used for the deterministic "play order" tie-break between listeners.</summary>
         public long Sequence { get; internal set; }
@@ -75,7 +108,18 @@ namespace GameplayEffects.Runtime
         internal string? LastMove { get; set; }
 
         /// <summary>The move this enemy will use on its next turn, once intents have been rolled.</summary>
-        public string? Intent { get; internal set; }
+        public string? Intent
+        {
+            get => _intent;
+            internal set => Set(ref _intent, value);
+        }
+
+        private void Set<T>(ref T field, T value)
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value)) return;
+            field = value;
+            State.Touch();
+        }
 
         /// <summary>
         /// The actor this entity ultimately answers to. An actor controls itself; a card, status or
@@ -166,6 +210,27 @@ namespace GameplayEffects.Runtime
             }
             return null;
         }
+
+        /// <summary>
+        /// The number a status "has" when content names it, as in <c>enemy.Vulnerable</c>: its
+        /// remaining duration for duration and refresh statuses, its stacks otherwise. Reads and
+        /// writes of <c>host.Status</c> both use this counter, so a self-assignment is a no-op.
+        /// </summary>
+        public int CounterOf(string statusName)
+        {
+            Num total = Num.Zero;
+            for (int i = 0; i < _attached.Count; i++)
+            {
+                Entity child = _attached[i];
+                if (child.IsRemoved || !string.Equals(child.Name, statusName, StringComparison.OrdinalIgnoreCase)) continue;
+                total += child.Get(CounterStat(child));
+            }
+            return total.ToInt();
+        }
+
+        /// <summary>Which stat counts a status down: <c>duration</c> or <c>stacks</c>.</summary>
+        internal static string CounterStat(Entity status) =>
+            status.Definition?.Stacking is StackingMode.Duration or StackingMode.Refresh ? "duration" : "stacks";
 
         /// <summary>Total stacks of a named status, summed across separate instances.</summary>
         public int StacksOf(string statusName)

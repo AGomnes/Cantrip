@@ -36,10 +36,55 @@ namespace GameplayEffects.Syntax
             "card", "status", "relic", "ability", "enemy", "keyword", "item", "event", "encounter", "actor", "resource",
         };
 
+        /// <summary>Words that open a selector when something to select from follows them.</summary>
+        private static readonly HashSet<string> SelectorPrefixes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "all", "random", "other", "lowest", "highest",
+        };
+
+        /// <summary>
+        /// Words that continue an expression rather than start an operand. A selector prefix
+        /// followed by one of these is an ordinary name, as in <c>pattern random</c>.
+        /// </summary>
+        private static readonly HashSet<string> OperatorWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "where", "in", "on", "and", "or", "per", "has", "is", "not", "within", "then", "else", "times",
+            "to", "from", "for", "with", "at", "by", "into", "over", "as", "of", "against", "using", "onto",
+        };
+
+        /// <summary>Unit words that may follow a number after a space: <c>3 seconds</c> means <c>3s</c>.</summary>
+        private static readonly HashSet<string> UnitWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "sec", "secs", "second", "seconds", "ms", "tick", "ticks", "turn", "turns",
+        };
+
+        /// <summary>Members that only ever hold statements, so <c>effect: deal 6 to target</c> is an inline block.</summary>
+        private static readonly HashSet<string> BlockOnlyMembers = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "effect",
+        };
+
+        private static readonly (string Prefix, EventPhase Phase)[] PhasePrefixes =
+        {
+            ("before_", EventPhase.Before),
+            ("instead_of_", EventPhase.Instead),
+            ("after_", EventPhase.After),
+        };
+
+        /// <summary>
+        /// Recursion guard. Hostile or generated content can nest parentheses or blocks thousands
+        /// deep; past this depth the parser reports a diagnostic instead of overflowing the stack.
+        /// </summary>
+        private const int MaxNesting = 256;
+
         private readonly IReadOnlyList<Token> _tokens;
         private readonly DiagnosticBag _diagnostics;
         private readonly string _file;
         private int _index;
+        private int _depth;
+
+        /// <summary>Set after a nesting error, so the unwinding does not report a cascade of follow-on errors.</summary>
+        private bool _abortLine;
 
         public Parser(IReadOnlyList<Token> tokens, string file, DiagnosticBag diagnostics)
         {
@@ -88,10 +133,28 @@ namespace GameplayEffects.Syntax
 
         private Token Expect(TokenKind kind, string description)
         {
-            if (Check(kind)) return Advance();
+            if (Check(kind))
+            {
+                if (kind == TokenKind.Newline) _abortLine = false;
+                return Advance();
+            }
 
-            _diagnostics.Error("GE0010", $"Expected {description} but found {Current}.", Current.Span);
+            if (!_abortLine) _diagnostics.Error("GE0010", $"Expected {description} but found {Current}.", Current.Span);
             return new Token(kind, string.Empty, Current.Span);
+        }
+
+        /// <summary>Reports excessive nesting once and skips the rest of the line.</summary>
+        private ExprNode TooDeep()
+        {
+            Token at = Current;
+            if (!_abortLine)
+            {
+                _diagnostics.Error("GE0028", $"This is nested more than {MaxNesting} levels deep.", at.Span);
+                _abortLine = true;
+            }
+
+            while (!Check(TokenKind.Newline) && !Check(TokenKind.EndOfFile) && !Check(TokenKind.Dedent)) _index++;
+            return new NumberExpr(Num.Zero, null, at.Span);
         }
 
         private void SkipNewlines()
@@ -341,6 +404,10 @@ namespace GameplayEffects.Syntax
             if (keyword == "on") return ParseListener();
             if (keyword == "modify") return ParseModify();
 
+            // `effect: deal 6 to target` keeps its body on the same line. Without this it would
+            // parse as a property whose values happen to look like a statement, and do nothing.
+            if (BlockOnlyMembers.Contains(keyword) && Peek().Kind == TokenKind.Colon) return ParseBlockMember();
+
             // A line whose last token is a colon opens a nested block: `effect:` or
             // `move "Chomp":`. Anything else is a plain `name value...` property.
             if (LineEndsWithColon()) return ParseBlockMember();
@@ -488,13 +555,32 @@ namespace GameplayEffects.Syntax
         /// </summary>
         internal static (string Name, EventPhase Phase) NormalizeEventName(string raw)
         {
-            if (raw.StartsWith("before_", StringComparison.OrdinalIgnoreCase))
-                return (raw.Substring("before_".Length), EventPhase.Before);
-            if (raw.StartsWith("instead_of_", StringComparison.OrdinalIgnoreCase))
-                return (raw.Substring("instead_of_".Length), EventPhase.Instead);
-            if (raw.StartsWith("after_", StringComparison.OrdinalIgnoreCase))
-                return (raw.Substring("after_".Length), EventPhase.After);
+            // The phase may lead the whole name (`before_owner.damaged`) or just the event part
+            // after the scope (`owner.before_damaged`). Both mean the same thing.
+            if (TryStripPhase(raw, out string stripped, out EventPhase phase)) return (stripped, phase);
+
+            int dot = raw.LastIndexOf('.');
+            if (dot >= 0 && TryStripPhase(raw.Substring(dot + 1), out string eventPart, out phase))
+                return (raw.Substring(0, dot + 1) + eventPart, phase);
+
             return (raw, EventPhase.After);
+        }
+
+        private static bool TryStripPhase(string name, out string stripped, out EventPhase phase)
+        {
+            foreach (var (prefix, candidate) in PhasePrefixes)
+            {
+                if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    stripped = name.Substring(prefix.Length);
+                    phase = candidate;
+                    return true;
+                }
+            }
+
+            stripped = name;
+            phase = EventPhase.After;
+            return false;
         }
 
         /// <summary>
@@ -575,6 +661,27 @@ namespace GameplayEffects.Syntax
         {
             SourceSpan span = Current.Span;
 
+            if (_depth >= MaxNesting)
+            {
+                TooDeep();
+                RecoverToBlockEnd();
+                _abortLine = false;
+                return BlockNode.Empty(span);
+            }
+
+            _depth++;
+            try
+            {
+                return ParseBlockBody(span);
+            }
+            finally
+            {
+                _depth--;
+            }
+        }
+
+        private BlockNode ParseBlockBody(SourceSpan span)
+        {
             if (!Check(TokenKind.Newline))
             {
                 StatementNode? inline = ParseStatement();
@@ -895,7 +1002,20 @@ namespace GameplayEffects.Syntax
         // Expressions, lowest precedence first
         // -----------------------------------------------------------------------------------
 
-        public ExprNode ParseExpression() => ParseOr();
+        public ExprNode ParseExpression()
+        {
+            if (_depth >= MaxNesting) return TooDeep();
+
+            _depth++;
+            try
+            {
+                return ParseOr();
+            }
+            finally
+            {
+                _depth--;
+            }
+        }
 
         private ExprNode ParseOr()
         {
@@ -925,8 +1045,17 @@ namespace GameplayEffects.Syntax
         {
             if (CheckKeyword("not"))
             {
+                if (_depth >= MaxNesting) return TooDeep();
                 Token op = Advance();
-                return new UnaryExpr(UnaryOperator.Not, ParseNot(), op.Span);
+                _depth++;
+                try
+                {
+                    return new UnaryExpr(UnaryOperator.Not, ParseNot(), op.Span);
+                }
+                finally
+                {
+                    _depth--;
+                }
             }
             return ParseComparison();
         }
@@ -1041,82 +1170,81 @@ namespace GameplayEffects.Syntax
 
         private ExprNode ParseUnary()
         {
-            if (Check(TokenKind.Minus))
+            if (_depth >= MaxNesting) return TooDeep();
+
+            _depth++;
+            try
             {
-                Token op = Advance();
-                return new UnaryExpr(UnaryOperator.Negate, ParseUnary(), op.Span);
+                if (Check(TokenKind.Minus))
+                {
+                    Token op = Advance();
+                    return new UnaryExpr(UnaryOperator.Negate, ParseUnary(), op.Span);
+                }
+
+                // Unary plus is accepted and ignored, so `+stacks` reads the way designers write it.
+                if (Match(TokenKind.Plus)) return ParseUnary();
+
+                return ParseSelector();
             }
-
-            // Unary plus is accepted and ignored, so `+stacks` reads the way designers write it.
-            if (Match(TokenKind.Plus)) return ParseUnary();
-
-            return ParseSelector();
+            finally
+            {
+                _depth--;
+            }
         }
 
         /// <summary>Selector prefixes: <c>all enemies</c>, <c>random 2 cards</c>, <c>lowest hp enemy</c>.</summary>
         private ExprNode ParseSelector()
         {
-            if (!Check(TokenKind.Identifier)) return ParsePostfix();
+            // A prefix word only selects when something to select from follows it, so
+            // `pattern random` and a stat that happens to be called `highest` stay plain names.
+            if (!Check(TokenKind.Identifier) || !SelectorPrefixes.Contains(Current.Text) || !StartsOperand(Peek()))
+                return ParsePostfix();
 
-            SelectorExpr selector;
-
-            switch (Current.Text.ToLowerInvariant())
+            Token keyword = Advance();
+            switch (keyword.Text.ToLowerInvariant())
             {
                 case "all":
-                {
-                    Token keyword = Advance();
-                    selector = new SelectorExpr(SelectorModifier.All, ParsePostfix(), null, null, keyword.Span);
-                    break;
-                }
+                    return new SelectorExpr(SelectorModifier.All, ParseSelectorSource(), null, null, keyword.Span);
+
+                case "other":
+                    return new SelectorExpr(SelectorModifier.Other, ParseSelectorSource(), null, null, keyword.Span);
 
                 case "random":
                 {
-                    Token keyword = Advance();
-                    ExprNode? count = Check(TokenKind.Number) ? ParsePostfix() : null;
-                    ExprNode source = ParsePostfix();
-                    selector = new SelectorExpr(SelectorModifier.Random, source, count, null, keyword.Span);
-                    break;
-                }
-
-                case "other":
-                {
-                    Token keyword = Advance();
-                    selector = new SelectorExpr(SelectorModifier.Other, ParsePostfix(), null, null, keyword.Span);
-                    break;
-                }
-
-                case "lowest":
-                case "highest":
-                {
-                    Token keyword = Advance();
-                    SelectorModifier modifier = keyword.Text.ToLowerInvariant() == "lowest"
-                        ? SelectorModifier.Lowest
-                        : SelectorModifier.Highest;
-
-                    // `lowest hp enemy` names the stat first, then the group. When only one name
-                    // follows (`lowest enemy`) it is the group and the stat defaults to hp.
-                    string key = "hp";
-                    if (Check(TokenKind.Identifier) && Peek().Kind == TokenKind.Identifier) key = Advance().Text;
-
-                    ExprNode source = ParsePostfix();
-                    selector = new SelectorExpr(modifier, source, null, key, keyword.Span);
-                    break;
+                    ExprNode? count = Check(TokenKind.Number) ? ParsePrimary() : null;
+                    return new SelectorExpr(SelectorModifier.Random, ParseSelectorSource(), count, null, keyword.Span);
                 }
 
                 default:
-                    return ParsePostfix();
-            }
+                {
+                    SelectorModifier modifier = string.Equals(keyword.Text, "lowest", StringComparison.OrdinalIgnoreCase)
+                        ? SelectorModifier.Lowest
+                        : SelectorModifier.Highest;
 
-            // `where` binds looser than the selector prefix, so `all enemies where x` filters the
-            // whole group rather than just the last name in it.
-            ExprNode result = selector;
-            while (CheckKeyword("where"))
-            {
-                Token where = Advance();
-                result = new WhereExpr(result, ParseExpression(), where.Span);
+                    // `lowest hp enemies` names the stat first, then the group. With one name
+                    // (`lowest enemies`, `lowest enemies where ...`) it is the group and the stat is hp.
+                    string key = "hp";
+                    if (Check(TokenKind.Identifier) && Peek().Kind == TokenKind.Identifier && StartsOperand(Peek()))
+                        key = Advance().Text;
+
+                    return new SelectorExpr(modifier, ParseSelectorSource(), null, key, keyword.Span);
+                }
             }
-            return result;
         }
+
+        /// <summary>
+        /// The group a selector picks from. It binds as loosely as <c>in</c>, so
+        /// <c>random 2 cards in hand</c> picks two cards from the hand rather than picking two of
+        /// every card and then keeping whichever happen to be in hand.
+        /// </summary>
+        private ExprNode ParseSelectorSource() => ParseOn();
+
+        private static bool StartsOperand(Token token) => token.Kind switch
+        {
+            TokenKind.Identifier => !OperatorWords.Contains(token.Text),
+            TokenKind.QualifiedName or TokenKind.Number or TokenKind.String or TokenKind.LeftParen => true,
+            _ => false,
+        };
 
         private ExprNode ParsePostfix()
         {
@@ -1189,8 +1317,15 @@ namespace GameplayEffects.Syntax
             switch (token.Kind)
             {
                 case TokenKind.Number:
+                {
                     _index++;
-                    return new NumberExpr(token.Value, token.Unit, token.Span);
+                    string? unit = token.Unit;
+                    // `3 seconds` means `3s`. Without this the unit would become a stray argument
+                    // that nothing reads, and the duration would silently be three ticks.
+                    if (unit == null && Check(TokenKind.Identifier) && UnitWords.Contains(Current.Text))
+                        unit = Advance().Text.ToLowerInvariant();
+                    return new NumberExpr(token.Value, unit, token.Span);
+                }
 
                 case TokenKind.String:
                     _index++;
@@ -1220,8 +1355,10 @@ namespace GameplayEffects.Syntax
                 }
 
                 default:
-                    _diagnostics.Error("GE0024", $"Expected a value but found {token}.", token.Span);
-                    _index++;
+                    if (!_abortLine) _diagnostics.Error("GE0024", $"Expected a value but found {token}.", token.Span);
+                    // Leave line and block structure for the caller, so one missing value does not
+                    // also produce an "expected end of line" error.
+                    if (!Check(TokenKind.Newline) && !Check(TokenKind.Dedent) && !Check(TokenKind.EndOfFile)) _index++;
                     return new NumberExpr(Num.Zero, null, token.Span);
             }
         }

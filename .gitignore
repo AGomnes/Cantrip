@@ -45,3 +45,6 @@ desktop.ini
 ## Local scratch
 scratch/
 *.local.*
+
+## Claude Code personal settings
+.claude/settings.local.json

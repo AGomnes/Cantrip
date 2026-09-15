@@ -21,7 +21,21 @@ namespace GameplayEffects.Runtime
             || State.Events.HasListeners(eventName, EventPhase.Instead)
             || State.Events.HasListeners(eventName, EventPhase.After);
 
-        private static EvalContext SystemContext(Entity? self) => new EvalContext(self) { Source = self };
+        /// <summary>
+        /// Context for work the engine does on its own behalf: decay, resets, expiry. Each gets a
+        /// causal chain of its own, so <c>once per chain</c> treats separate turns as separate chains.
+        /// </summary>
+        private EvalContext SystemContext(Entity? self) => new EvalContext(self) { Source = self, Chain = NewChain() };
+
+        /// <summary>
+        /// Two definitions are the same content when their kind and name match. Comparing by
+        /// reference would treat a hot-reloaded status as a different one from its live instances.
+        /// </summary>
+        internal static bool SameDefinition(EntityDefinition? a, EntityDefinition? b) =>
+            a != null && b != null
+            && (ReferenceEquals(a, b)
+                || (string.Equals(a.KindName, b.KindName, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(a.Name, b.Name, StringComparison.OrdinalIgnoreCase)));
 
         // Stats and resources ---------------------------------------------------------------
 
@@ -41,18 +55,27 @@ namespace GameplayEffects.Runtime
 
             Num applied = Num.Zero;
             string eventName = stat + "_changed";
+            GameEvent? gameEvent = null;
 
             void Apply()
             {
+                // Before listeners may have changed the amount: apply what the event says now.
+                Num delta = gameEvent?.Amount ?? desired - current;
                 Num before = entity.GetBase(stat);
-                Num after = Clamp(entity, stat, before + (desired - current));
+                Num after = Clamp(entity, stat, before + delta);
                 entity.SetBase(stat, after);
                 applied = after - before;
+
+                if (gameEvent != null)
+                {
+                    gameEvent.Amount = applied;
+                    gameEvent.Data["new"] = Value.FromNumber(after);
+                }
             }
 
             if (HasAnyListeners(eventName))
             {
-                var gameEvent = new GameEvent(eventName)
+                gameEvent = new GameEvent(eventName)
                 {
                     Source = context.Source,
                     Target = entity,
@@ -71,8 +94,11 @@ namespace GameplayEffects.Runtime
             if (applied.IsZero) return applied;
 
             // Changes made inside `until` are undone at the deadline. Pools such as hp are
-            // excluded: damage taken during a temporary buff is not refunded when it ends.
-            if (context.UndoScope != null && Content.Resource(stat) == null)
+            // excluded: damage taken during a temporary buff is not refunded when it ends. A
+            // status's own counters are included, so `until: gain 2 Strength` gives back exactly
+            // those two stacks and nothing added by anything else.
+            bool statusCounter = entity.Kind == EntityKind.Status || entity.Kind == EntityKind.Keyword;
+            if (context.UndoScope != null && (Content.Resource(stat) == null || statusCounter))
                 context.UndoScope.Undo.Add(new TemporaryChange(entity, stat: stat, delta: applied));
 
             AfterStatChanged(entity, stat, context);
@@ -104,7 +130,7 @@ namespace GameplayEffects.Runtime
             ResourceRule? rule = Content.Resource(stat);
             if (rule == null) return value;
 
-            EvalContext context = SystemContext(entity);
+            EvalContext context = new EvalContext(entity) { Source = entity };
             if (rule.Min != null && BoundApplies(rule.Min, entity)) value = Num.Max(value, EvaluateNumber(rule.Min, context));
             if (rule.Max != null && BoundApplies(rule.Max, entity)) value = Num.Min(value, EvaluateNumber(rule.Max, context));
             return value;
@@ -113,10 +139,11 @@ namespace GameplayEffects.Runtime
         private static bool BoundApplies(ExprNode bound, Entity entity) =>
             !(bound is NameExpr name) || entity.HasStat(name.Name);
 
-        /// <summary>Restores resources that reset on a lifecycle event, such as energy and block at turn start.</summary>
+        /// <summary>Restores the resources an actor holds that reset on <paramref name="trigger"/>.</summary>
         public void ResetResources(Entity actor, string trigger)
         {
-            foreach (ResourceRule rule in Content.Resources.Values)
+            // Sorted, so the order of the resulting `<stat>_changed` events never depends on load order.
+            foreach (ResourceRule rule in Content.Resources.Values.OrderBy(r => r.Stat, StringComparer.Ordinal))
             {
                 if (rule.ResetTo == null || !string.Equals(rule.ResetOn, trigger, StringComparison.OrdinalIgnoreCase)) continue;
                 if (!actor.HasStat(rule.Stat)) continue;
@@ -126,6 +153,23 @@ namespace GameplayEffects.Runtime
                 Num value = EvaluateNumber(rule.ResetTo, context);
                 ChangeStat(actor, rule.Stat, AssignOperator.Set, value, context);
             }
+        }
+
+        /// <summary>Runs <c>reset_on</c> rules for this event, for the entities it concerns.</summary>
+        private void ApplyEventResets(GameEvent gameEvent)
+        {
+            bool any = false;
+            foreach (ResourceRule rule in Content.Resources.Values)
+            {
+                if (rule.ResetTo != null && string.Equals(rule.ResetOn, gameEvent.Name, StringComparison.OrdinalIgnoreCase))
+                {
+                    any = true;
+                    break;
+                }
+            }
+            if (!any) return;
+
+            foreach (Entity who in Participants(gameEvent).ToArray()) ResetResources(who, gameEvent.Name);
         }
 
         // Statuses --------------------------------------------------------------------------
@@ -151,6 +195,10 @@ namespace GameplayEffects.Runtime
             foreach (string tag in definition.Tags) gameEvent.Tags.Add(tag);
             gameEvent.Data["status_name"] = Value.FromText(definition.Name);
 
+            // The status entity does not exist yet, so the definition stands in for it. That is
+            // what lets `on before_status_applied(Poison)` match and cancel.
+            gameEvent.Data["status"] = Value.FromDefinition(definition);
+
             Entity? result = null;
             Raise(gameEvent, context, () =>
             {
@@ -169,7 +217,7 @@ namespace GameplayEffects.Runtime
             {
                 foreach (Entity attached in host.Attached)
                 {
-                    if (attached.IsRemoved || attached.Definition != definition) continue;
+                    if (attached.IsRemoved || !SameDefinition(attached.Definition, definition)) continue;
                     if ((definition.Flags & StatusFlags.UniquePerSource) != 0 && attached.Source != context.Source) continue;
                     existing = attached;
                     break;
@@ -190,7 +238,7 @@ namespace GameplayEffects.Runtime
                         status.SetBase("duration", amount);
                         break;
                     case StackingMode.Both:
-                        status.SetBase("stacks", amount);
+                        status.SetBase("stacks", Clamp(status, "stacks", amount));
                         status.SetBase("duration", Num.FromInt(durationUnits.HasValue ? (int)durationUnits.Value : amount.ToInt()));
                         break;
                     default:
@@ -199,7 +247,15 @@ namespace GameplayEffects.Runtime
                 }
 
                 if (durationUnits.HasValue) status.SetBase("expires_at", Num.FromInt(State.Clock.Now + durationUnits.Value));
-                context.UndoScope?.Undo.Add(new TemporaryChange(host, attached: status));
+
+                // Inside `until`, remember the counter this application added rather than the
+                // whole instance, so stacks added permanently later on survive the revert.
+                if (context.UndoScope != null)
+                {
+                    string counter = Entity.CounterStat(status);
+                    context.UndoScope.Undo.Add(new TemporaryChange(status, stat: counter, delta: status.GetBase(counter)));
+                }
+
                 return status;
             }
 
@@ -272,16 +328,16 @@ namespace GameplayEffects.Runtime
         }
 
         /// <summary>
-        /// Adjusts the stacks of a named status on a host, applying or removing it as needed. This is
-        /// what <c>target.Poison -1</c> and <c>gain 2 Strength</c> do.
+        /// Adjusts the counter of a named status on a host (see <see cref="Entity.CounterOf"/>),
+        /// applying the status when it is absent. This is what <c>target.Poison -1</c> and
+        /// <c>gain 2 Strength</c> do.
         /// </summary>
         public void AdjustStatusStacks(Entity host, string statusName, AssignOperator op, Num amount, EvalContext context, SourceSpan span = default)
         {
             Entity? existing = host.FindAttached(statusName);
             if (existing != null)
             {
-                string counter = existing.Definition?.Stacking is StackingMode.Duration or StackingMode.Refresh ? "duration" : "stacks";
-                ChangeStat(existing, counter, op, amount, context, span);
+                ChangeStat(existing, Entity.CounterStat(existing), op, amount, context, span);
                 return;
             }
 
@@ -338,7 +394,9 @@ namespace GameplayEffects.Runtime
 
                 case ValueKind.Entity:
                 case ValueKind.List:
-                    foreach (Entity entity in what.AsEntities())
+                    // A zone name evaluates to the live zone list, which removal shrinks, so
+                    // iterate over a copy.
+                    foreach (Entity entity in what.AsEntities().ToArray())
                     {
                         if (entity.Kind == EntityKind.Status || entity.Kind == EntityKind.Keyword) RemoveStatus(entity, context);
                         else Destroy(entity, context);
@@ -363,10 +421,10 @@ namespace GameplayEffects.Runtime
             }
         }
 
-        /// <summary>Applies <c>decay</c> to every status on an actor that decays on this trigger.</summary>
-        public void ProcessDecay(Entity actor, string trigger)
+        /// <summary>Applies <c>decay</c> to every status on a host that decays on this trigger.</summary>
+        public void ProcessDecay(Entity host, string trigger)
         {
-            foreach (Entity status in actor.Attached.ToArray())
+            foreach (Entity status in host.Attached.ToArray())
             {
                 EntityDefinition? definition = status.Definition;
                 if (status.IsRemoved || definition == null || definition.DecayAmount <= Num.Zero) continue;
@@ -375,6 +433,38 @@ namespace GameplayEffects.Runtime
                 string counter = definition.Stacking is StackingMode.Duration or StackingMode.Refresh or StackingMode.Both ? "duration" : "stacks";
                 ChangeStat(status, counter, AssignOperator.Subtract, definition.DecayAmount, SystemContext(status));
             }
+        }
+
+        /// <summary>
+        /// Decays the statuses on an event's participants whose <c>decay ... on</c> names it. Decay
+        /// waits for the event's own listeners, so "at end of turn, deal damage equal to stacks"
+        /// sees the stacks before they tick down.
+        /// </summary>
+        private void QueueDecay(GameEvent gameEvent)
+        {
+            List<Entity>? hosts = null;
+            foreach (Entity host in Participants(gameEvent))
+            {
+                foreach (Entity status in host.Attached)
+                {
+                    EntityDefinition? definition = status.Definition;
+                    if (status.IsRemoved || definition == null || definition.DecayAmount <= Num.Zero) continue;
+                    if (!string.Equals(definition.DecayOn, gameEvent.Name, StringComparison.OrdinalIgnoreCase)) continue;
+
+                    (hosts ??= new List<Entity>()).Add(host);
+                    break;
+                }
+            }
+
+            if (hosts == null) return;
+
+            RunAfterListeners(() =>
+            {
+                foreach (Entity host in hosts)
+                {
+                    if (!host.IsRemoved) ProcessDecay(host, gameEvent.Name);
+                }
+            });
         }
 
         // Combat ----------------------------------------------------------------------------
@@ -457,6 +547,10 @@ namespace GameplayEffects.Runtime
             if (!target.IsDead) return false;
 
             Raise(new GameEvent("killed") { Source = source, Target = target, Card = context.Card }, context);
+
+            // Only now does the actor leave the board. Its own `on died` and `on killed` listeners,
+            // and those of its statuses, were queued while it was still listening.
+            State.Bury(target);
             return true;
         }
 
@@ -505,14 +599,19 @@ namespace GameplayEffects.Runtime
 
         // Cards and zones -------------------------------------------------------------------
 
-        /// <summary>Draws from the top of the draw pile, reshuffling the discard pile when it runs out.</summary>
+        /// <summary>
+        /// Draws from the top of the draw pile, reshuffling the discard pile when it runs out. The
+        /// count goes through the <c>draw</c> modifier channel. With a full hand a drawn card goes
+        /// to the discard pile instead.
+        /// </summary>
         public IReadOnlyList<Entity> Draw(Entity actor, int count, EvalContext context)
         {
+            var query = new ModifierQuery("draw") { Source = actor, Subject = actor, Card = context.Card };
+            count = Math.Max(0, State.Modifiers.Compute(query, Num.FromInt(count)).Floor().ToInt());
+
             var drawn = new List<Entity>();
             for (int i = 0; i < count; i++)
             {
-                if (State.ZoneOf(actor, Zones.Hand).Count >= Rules.MaxHandSize) break;
-
                 if (State.ZoneOf(actor, Zones.Draw).Count == 0)
                 {
                     if (State.ZoneOf(actor, Zones.Discard).Count == 0) break;
@@ -521,6 +620,14 @@ namespace GameplayEffects.Runtime
                 }
 
                 Entity card = State.ZoneOf(actor, Zones.Draw)[0];
+
+                if (State.ZoneOf(actor, Zones.Hand).Count >= Rules.MaxHandSize)
+                {
+                    bool discarded = MoveCard(card, Zones.Discard, "discarded", context);
+                    if (!discarded && card.Zone == Zones.Draw) break; // cancelled: stop rather than loop on the same card
+                    continue;
+                }
+
                 var gameEvent = new GameEvent("drawn") { Source = actor, Target = card, Card = card };
                 foreach (string tag in card.Tags) gameEvent.Tags.Add(tag);
 
@@ -580,9 +687,13 @@ namespace GameplayEffects.Runtime
                 {
                     case EntityKind.Actor:
                     {
-                        Team team = context.Controller?.Team == Team.Enemy ? Team.Enemy : Team.Enemy;
-                        if (context.Controller?.Team == Team.Player && definition.KindName == "actor") team = Team.Player;
+                        // An enemy always joins the enemy side; a generic actor joins whoever made it.
+                        Team team = Team.Enemy;
+                        if (definition.KindName != "enemy" && context.Controller != null && context.Controller.Team != Team.Neutral)
+                            team = context.Controller.Team;
+
                         created = State.Instantiate(definition, null, team, Zones.Board);
+                        if (!created.HasStat("block")) created.SetBase("block", Num.Zero);
                         break;
                     }
                     case EntityKind.Relic:
@@ -599,6 +710,9 @@ namespace GameplayEffects.Runtime
 
             if (created == null)
                 throw new RuntimeError($"Creating {definition} was replaced, so there is nothing to return.", context.Self?.Definition?.Syntax.Span ?? SourceSpan.None);
+
+            // A summon or split mid-battle acts on the next enemy turn, like any other enemy.
+            if (created.Kind == EntityKind.Actor && State.InBattle) RollIntent(created);
             return created;
         }
 
@@ -617,9 +731,55 @@ namespace GameplayEffects.Runtime
             Raise(gameEvent, context, () => State.Remove(entity));
         }
 
+        // Enemies ---------------------------------------------------------------------------
+
+        /// <summary>Picks an enemy's next move from its pattern, so the UI can show intents in advance.</summary>
+        public void RollIntent(Entity enemy)
+        {
+            EntityDefinition? definition = enemy.Definition;
+            if (definition == null || definition.Moves.Count == 0)
+            {
+                enemy.Intent = null;
+                return;
+            }
+
+            List<string> names = definition.PatternMoves.Count > 0
+                ? definition.PatternMoves.ToList()
+                : definition.Moves.Select(m => m.Name).ToList();
+
+            switch (definition.Pattern)
+            {
+                case EnemyPatternKind.Cycle:
+                    enemy.Intent = names[enemy.PatternIndex % names.Count];
+                    enemy.PatternIndex++;
+                    break;
+
+                case EnemyPatternKind.Random:
+                case EnemyPatternKind.RandomNoRepeat:
+                {
+                    var candidates = names.ToList();
+                    if (definition.Pattern == EnemyPatternKind.RandomNoRepeat && candidates.Count > 1 && enemy.LastMove != null)
+                        candidates.RemoveAll(n => string.Equals(n, enemy.LastMove, StringComparison.OrdinalIgnoreCase));
+
+                    var weights = candidates
+                        .Select(n => definition.Moves.FirstOrDefault(m => string.Equals(m.Name, n, StringComparison.OrdinalIgnoreCase))?.Weight ?? Num.One)
+                        .ToList();
+                    int index = State.Rng.PickWeighted(weights);
+                    enemy.Intent = index < 0 ? null : candidates[index];
+                    break;
+                }
+            }
+
+            State.Touch();
+        }
+
         // Temporary effects -----------------------------------------------------------------
 
-        /// <summary>Reverts <c>until</c> blocks whose deadline event has just resolved.</summary>
+        /// <summary>
+        /// Ends <c>until</c> blocks whose deadline event has just been raised for their owner. The
+        /// revert waits for the deadline's own listeners, so "at end of turn" effects still see
+        /// the temporary change.
+        /// </summary>
         private void ProcessDeadlines(GameEvent gameEvent)
         {
             if (State.Scheduled.Count == 0) return;
@@ -631,7 +791,7 @@ namespace GameplayEffects.Runtime
                 if (gameEvent.Target != null && gameEvent.Target.Kind == EntityKind.Actor && gameEvent.Target != action.Owner) continue;
 
                 State.Unschedule(action);
-                Revert(action);
+                RunAfterListeners(() => Revert(action));
             }
         }
 
@@ -651,7 +811,8 @@ namespace GameplayEffects.Runtime
                 }
                 else if (change.Stat != null && !change.Entity.IsRemoved)
                 {
-                    change.Entity.SetBase(change.Stat, change.Entity.GetBase(change.Stat) - change.Delta);
+                    // Through ChangeStat, so a status whose temporary stacks were all it had is removed.
+                    ChangeStat(change.Entity, change.Stat, AssignOperator.Subtract, change.Delta, context);
                 }
             }
         }

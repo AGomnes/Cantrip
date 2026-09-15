@@ -276,7 +276,7 @@ namespace GameplayEffects.Syntax
 
             if (!Num.TryParse(digits, out Num value))
             {
-                _diagnostics.Error("GE0004", $"`{digits}` is not a valid number.", SpanAt(start, _position - start));
+                _diagnostics.Error("GE0004", $"`{digits}` is not a valid number, or is too large to represent.", SpanAt(start, _position - start));
                 value = Num.Zero;
             }
 

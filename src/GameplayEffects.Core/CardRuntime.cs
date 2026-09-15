@@ -139,8 +139,13 @@ namespace GameplayEffects
             return enemy;
         }
 
+        /// <summary>
+        /// Applies a status from game code. <paramref name="source"/> defaults to the player, which
+        /// matters for <c>flags unique</c> statuses and for <c>source:</c> filters.
+        /// </summary>
         public Entity? ApplyStatus(string status, Entity target, int stacks = 1, Entity? source = null)
         {
+            source ??= State.Player;
             EntityDefinition definition = Content.FindAny(status, "status", "keyword") ?? Require(status, "status");
             Entity? result = null;
             Run(source, context => result = Interpreter.ApplyStatus(definition, target, stacks, null, context));
@@ -184,6 +189,11 @@ namespace GameplayEffects
             Won = null;
             _skipNextDraw = !drawOpeningHand;
 
+            // Enemies that died in an earlier battle are done with. Leaving them in would make every
+            // later battle count as already having had enemies, and so end before its own arrive.
+            foreach (Entity fallen in State.Entities.Where(e => e.Kind == EntityKind.Actor && e.Team == Team.Enemy && e.IsDead && !e.IsRemoved).ToArray())
+                State.Remove(fallen);
+
             if (!player.HasStat("block")) player.SetBase("block", 0);
             if (shuffle) Interpreter.ShuffleZone(player, Zones.Draw);
             foreach (Entity enemy in State.Actors(Team.Enemy)) RollIntent(enemy);
@@ -226,7 +236,6 @@ namespace GameplayEffects
             {
                 State.Turn++;
                 State.ResetTurnHistory();
-                if (State.Turn > 1 && State.Clock is TurnClock turns) turns.AdvanceTurn();
             }
 
             foreach (Entity actor in State.Actors(team).ToArray())
@@ -237,12 +246,9 @@ namespace GameplayEffects
                 // this turn start belongs to the following turn.
                 var due = State.Scheduled.Where(s => s.Timing == ScheduleTiming.NextTurn && s.Owner == actor).ToList();
 
-                Run(actor, context =>
-                {
-                    Interpreter.ResetResources(actor, "turn_start");
-                    Interpreter.ProcessDecay(actor, "turn_start");
-                    Interpreter.Raise(new GameEvent("turn_start") { Source = actor, Target = actor }, context);
-                });
+                // Resources that reset and statuses that decay on turn_start are handled by the
+                // event itself (reset_on / decay ... on), so they work for any event, not just turns.
+                Run(actor, context => Interpreter.Raise(new GameEvent("turn_start") { Source = actor, Target = actor }, context));
 
                 foreach (ScheduledAction action in due)
                 {
@@ -251,6 +257,14 @@ namespace GameplayEffects
                 }
 
                 if (CheckBattleOver()) return;
+            }
+
+            // Time moves once every actor has started its turn, so work scheduled for this turn
+            // (`in 1 turn: gain 1 energy`) runs after the turn-start resets instead of being wiped.
+            if (team == Team.Player && State.Turn > 1 && State.Clock is TurnClock turns)
+            {
+                turns.AdvanceTurn();
+                if (!State.InBattle) return;
             }
 
             if (team == Team.Player && State.Player != null && State.Player.IsAlive)
@@ -269,11 +283,6 @@ namespace GameplayEffects
                 if (!actor.IsAlive) continue;
 
                 Run(actor, context => Interpreter.Raise(new GameEvent("turn_end") { Source = actor, Target = actor }, context));
-                Run(actor, _ =>
-                {
-                    Interpreter.ProcessDecay(actor, "turn_end");
-                    Interpreter.ResetResources(actor, "turn_end");
-                });
 
                 if (CheckBattleOver()) return true;
             }
@@ -307,7 +316,7 @@ namespace GameplayEffects
                 return true;
             }
 
-            bool hadEnemies = State.Entities.Any(e => e.Kind == EntityKind.Actor && e.Team == Team.Enemy);
+            bool hadEnemies = State.Entities.Any(e => e.Kind == EntityKind.Actor && e.Team == Team.Enemy && !e.IsRemoved);
             if (hadEnemies && State.Actors(Team.Enemy).Count == 0)
             {
                 EndBattle(won: true);
@@ -330,12 +339,16 @@ namespace GameplayEffects
                 Interpreter.Raise(gameEvent, context);
             });
 
-            // Temporary effects end with the battle; statuses flagged persistent carry over.
-            foreach (ScheduledAction action in State.Scheduled.ToArray())
+            // Temporary effects end with the battle; statuses flagged persistent carry over. The
+            // reverts raise events of their own, so they run inside an action and drain with it.
+            Run(player, _ =>
             {
-                State.Unschedule(action);
-                if (action.Timing == ScheduleTiming.Until) Interpreter.Revert(action);
-            }
+                foreach (ScheduledAction action in State.Scheduled.ToArray())
+                {
+                    State.Unschedule(action);
+                    if (action.Timing == ScheduleTiming.Until) Interpreter.Revert(action);
+                }
+            });
 
             if (player == null) return;
 
@@ -361,8 +374,9 @@ namespace GameplayEffects
         {
             if (IsXCost(card)) return card.Controller.GetInt("energy");
 
+            // From the base cost: card.Get("cost") would already have run the cost channel once.
             var query = new ModifierQuery("cost") { Subject = card, Source = card.Controller, Card = card, Tags = card.Tags.ToArray() };
-            Num cost = State.Modifiers.Compute(query, card.Get("cost"));
+            Num cost = State.Modifiers.Compute(query, card.GetBase("cost"));
             return Math.Max(0, cost.Floor().ToInt());
         }
 
@@ -380,43 +394,61 @@ namespace GameplayEffects
 
             if (!TryResolveTarget(card, ref target)) return PlayResult.InvalidTarget;
 
-            Interpreter.ResetSteps();
+            if (_runDepth == 0) Interpreter.ResetSteps();
             var context = new EvalContext(card) { Source = player, Target = target, Card = card, Chain = Interpreter.NewChain() };
             if (IsXCost(card)) context.SetLocal("x", Value.FromNumber(Num.FromInt(cost)));
 
             var gameEvent = new GameEvent("card_played") { Source = player, Target = target, Card = card, Amount = cost };
             foreach (string tag in card.Tags) gameEvent.Tags.Add(tag);
 
-            Interpreter.Raise(
-                gameEvent,
-                context,
-                action: () =>
-                {
-                    BlockNode? effect = card.Definition?.Effect;
-                    if (effect != null) Interpreter.Execute(effect, context);
-                },
-                committed: () =>
-                {
-                    if (cost > 0) Interpreter.ChangeStat(player, "energy", AssignOperator.Subtract, cost, context);
-                    State.MoveTo(card, Zones.Play);
-                    State.RecordHistory("cards_played", player, Num.One);
-                    if (card.HasTag("attack")) State.RecordHistory("attacks", player, Num.One);
-                });
-
-            if (gameEvent.Cancelled && card.Zone == Zones.Hand) return PlayResult.Cancelled;
-
-            // The effect may already have moved the card (exhausted it, shuffled it away).
-            if (card.Zone == Zones.Play && !card.IsRemoved)
+            _runDepth++;
+            try
             {
-                if (card.HasTag("exhaust") || card.FindAttached("Exhaust") != null)
-                    Interpreter.MoveCard(card, Zones.Exhaust, "exhausted", context);
-                else if (card.HasTag("power"))
-                    State.MoveTo(card, Zones.Powers);
-                else
-                    State.MoveTo(card, Zones.Discard);
+                Interpreter.Raise(
+                    gameEvent,
+                    context,
+                    action: () =>
+                    {
+                        BlockNode? effect = card.Definition?.Effect;
+                        if (effect != null) Interpreter.Execute(effect, context);
+                    },
+                    committed: () =>
+                    {
+                        if (cost > 0) Interpreter.ChangeStat(player, "energy", AssignOperator.Subtract, cost, context);
+                        State.MoveTo(card, Zones.Play);
+                        State.RecordHistory("cards_played", player, Num.One);
+                        if (card.HasTag("attack")) State.RecordHistory("attacks", player, Num.One);
+                    });
+
+                if (gameEvent.Cancelled && card.Zone == Zones.Hand)
+                {
+                    Interpreter.Drain();
+                    return PlayResult.Cancelled;
+                }
+
+                // The effect may already have moved the card (exhausted it, shuffled it away).
+                if (card.Zone == Zones.Play && !card.IsRemoved)
+                {
+                    if (card.HasTag("exhaust") || card.FindAttached("Exhaust") != null)
+                        Interpreter.MoveCard(card, Zones.Exhaust, "exhausted", context);
+                    else if (card.HasTag("power"))
+                        State.MoveTo(card, Zones.Powers);
+                    else
+                        State.MoveTo(card, Zones.Discard);
+                }
+
+                Interpreter.Drain();
+            }
+            catch
+            {
+                Interpreter.AbandonPending();
+                throw;
+            }
+            finally
+            {
+                _runDepth--;
             }
 
-            Interpreter.Drain();
             CheckBattleOver();
             return PlayResult.Played;
         }
@@ -443,7 +475,7 @@ namespace GameplayEffects
                         if (enemies.Count == 0) return false;
                         target = enemies.Count == 1
                             ? enemies[0]
-                            : Chooser.Choose(new ChoiceRequest("choose a target", enemies, 1, 1, player, card.Definition!.Syntax.Span), State).FirstOrDefault(enemies.Contains) ?? enemies[0];
+                            : Chooser.Choose(new ChoiceRequest("choose a target", enemies, 1, 1, player, card.Definition!.Syntax.Span), State)?.FirstOrDefault(enemies.Contains) ?? enemies[0];
                     }
                     return target.Kind == EntityKind.Actor && target.IsAlive && target.Team == opposing;
                 }
@@ -466,45 +498,8 @@ namespace GameplayEffects
 
         // Enemies ------------------------------------------------------------------------------
 
-        /// <summary>Picks each enemy's next move from its pattern, so the UI can show intents in advance.</summary>
-        public void RollIntent(Entity enemy)
-        {
-            EntityDefinition? definition = enemy.Definition;
-            if (definition == null || definition.Moves.Count == 0)
-            {
-                enemy.Intent = null;
-                return;
-            }
-
-            List<string> names = definition.PatternMoves.Count > 0
-                ? definition.PatternMoves.ToList()
-                : definition.Moves.Select(m => m.Name).ToList();
-
-            switch (definition.Pattern)
-            {
-                case EnemyPatternKind.Cycle:
-                    enemy.Intent = names[enemy.PatternIndex % names.Count];
-                    enemy.PatternIndex++;
-                    break;
-
-                case EnemyPatternKind.Random:
-                case EnemyPatternKind.RandomNoRepeat:
-                {
-                    var candidates = names.ToList();
-                    if (definition.Pattern == EnemyPatternKind.RandomNoRepeat && candidates.Count > 1 && enemy.LastMove != null)
-                        candidates.RemoveAll(n => string.Equals(n, enemy.LastMove, StringComparison.OrdinalIgnoreCase));
-
-                    var weights = candidates
-                        .Select(n => definition.Moves.FirstOrDefault(m => string.Equals(m.Name, n, StringComparison.OrdinalIgnoreCase))?.Weight ?? Num.One)
-                        .ToList();
-                    int index = State.Rng.PickWeighted(weights);
-                    enemy.Intent = index < 0 ? null : candidates[index];
-                    break;
-                }
-            }
-
-            State.Touch();
-        }
+        /// <summary>Picks an enemy's next move from its pattern, so the UI can show intents in advance.</summary>
+        public void RollIntent(Entity enemy) => Interpreter.RollIntent(enemy);
 
         private void RunEnemyMove(Entity enemy)
         {
@@ -664,12 +659,34 @@ namespace GameplayEffects
             return file_.Declarations.OfType<TestDeclNode>().First().Body;
         }
 
-        /// <summary>Every top-level operation runs through here: fresh chain, step budget, and a full drain.</summary>
+        private int _runDepth;
+
+        /// <summary>
+        /// Every top-level operation runs through here: a fresh chain, a fresh step budget and a
+        /// full drain. A nested operation (an enemy's <c>use</c> inside a move) shares the outer
+        /// budget, so a loop cannot escape the sandbox by calling back into the runtime. If the
+        /// operation fails, whatever it queued is dropped with it.
+        /// </summary>
         private void Run(Entity? actor, Action<EvalContext> body)
         {
-            var context = new EvalContext(actor) { Source = actor, Chain = Interpreter.NewChain() };
-            body(context);
-            Interpreter.Drain();
+            if (_runDepth == 0) Interpreter.ResetSteps();
+
+            _runDepth++;
+            try
+            {
+                var context = new EvalContext(actor) { Source = actor, Chain = Interpreter.NewChain() };
+                body(context);
+                Interpreter.Drain();
+            }
+            catch
+            {
+                Interpreter.AbandonPending();
+                throw;
+            }
+            finally
+            {
+                _runDepth--;
+            }
         }
 
         // Runtime-level verbs -----------------------------------------------------------------

@@ -44,31 +44,64 @@ namespace GameplayEffects.Runtime
 
         // Core ------------------------------------------------------------------------------
 
-        /// <summary><c>change hp by -5 to target</c>, or the compact <c>change hp -5 on target</c>.</summary>
+        /// <summary>
+        /// <c>change hp by -5 to target</c>, or the compact <c>change hp -5 on target</c>. Without a
+        /// target the stat's nearest holder changes, exactly as an assignment would.
+        /// </summary>
         private void VerbChange(VerbCall call)
         {
-            if (!(call.ArgumentNode(0) is NameExpr statName)) throw call.Error("expected a stat name, as in `change hp by -5`.");
+            ExprNode node = call.ArgumentNode(0) ?? throw call.Error("expected a stat name, as in `change hp by -5`.");
+            ExprNode? targetNode = call.Node.Clause("to") ?? call.Node.Clause("of");
+            ExprNode? amountNode = call.Node.Clause("by");
+            bool negate = false;
 
-            ExprNode? amountNode = call.Node.Clause("by") ?? call.ArgumentNode(1);
-            if (amountNode == null) throw call.Error("expected an amount.");
+            // The compact form parses as `(hp - 5) on target`; take the pieces back apart.
+            if (node is BinaryExpr { Operator: BinaryOperator.On } on)
+            {
+                targetNode ??= on.Right;
+                node = on.Left;
+            }
 
-            IReadOnlyList<Entity> targets;
-            if (amountNode is BinaryExpr { Operator: BinaryOperator.On } on)
+            string stat;
+            switch (node)
             {
-                amountNode = on.Left;
-                targets = Evaluate(on.Right, call.Context).AsEntities();
+                case NameExpr name:
+                    stat = name.Name;
+                    break;
+                case BinaryExpr { Operator: BinaryOperator.Add or BinaryOperator.Subtract, Left: NameExpr name } sum when amountNode == null:
+                    stat = name.Name;
+                    amountNode = sum.Right;
+                    negate = sum.Operator == BinaryOperator.Subtract;
+                    break;
+                default:
+                    throw call.Error("expected a stat name, as in `change hp by -5`.");
             }
-            else if (call.Node.Clause("to") != null || call.Node.Clause("of") != null)
+
+            if (amountNode == null)
             {
-                targets = (call.Node.Clause("to") != null ? call.Clause("to") : call.Clause("of")).AsEntities();
-            }
-            else
-            {
-                targets = new[] { StatHolder(statName.Name, call.Context) }.Where(e => e != null).ToList()!;
+                amountNode = call.ArgumentNode(1) ?? throw call.Error("expected an amount.");
+                if (amountNode is BinaryExpr { Operator: BinaryOperator.On } amountOn)
+                {
+                    targetNode ??= amountOn.Right;
+                    amountNode = amountOn.Left;
+                }
             }
 
             Num amount = EvaluateNumber(amountNode, call.Context);
-            foreach (Entity target in targets) ChangeStat(target, statName.Name, AssignOperator.Add, amount, call.Context, call.Span);
+            if (negate) amount = -amount;
+
+            IReadOnlyList<Entity> targets;
+            if (targetNode != null)
+            {
+                targets = Evaluate(targetNode, call.Context).AsEntities();
+            }
+            else
+            {
+                Entity? holder = StatHolder(stat, call.Context);
+                targets = holder == null ? Array.Empty<Entity>() : new[] { holder };
+            }
+
+            foreach (Entity target in targets.ToArray()) ChangeStat(target, stat, AssignOperator.Add, amount, call.Context, call.Span);
         }
 
         /// <summary><c>move target to discard</c>, <c>move card to draw, top</c>.</summary>
@@ -99,7 +132,7 @@ namespace GameplayEffects.Runtime
         /// <summary><c>create Shiv 2 into hand</c>, <c>create Slime</c>.</summary>
         private void VerbCreate(VerbCall call)
         {
-            EntityDefinition definition = RequireDefinition(call.Argument(0), call);
+            EntityDefinition definition = RequireDefinition(call, 0, "card", "enemy", "actor", "relic", "item");
             int count = call.Number(1, Num.One).ToInt();
             ExprNode? zoneNode = call.Node.Clause("into") ?? call.Node.Clause("to") ?? call.Node.Clause("onto");
             string? zone = zoneNode == null ? null : ZoneName(zoneNode, call);
@@ -119,7 +152,7 @@ namespace GameplayEffects.Runtime
         /// <summary><c>apply Poison 3 to target</c>, <c>apply Slow 40% for 3s to enemies</c>.</summary>
         private void VerbApply(VerbCall call)
         {
-            EntityDefinition definition = RequireDefinition(call.Argument(0), call);
+            EntityDefinition definition = RequireDefinition(call, 0, "status", "keyword");
             if (definition.Kind != EntityKind.Status && definition.Kind != EntityKind.Keyword)
                 throw call.Error($"`{definition.Name}` is a {definition.KindName}, not a status.");
 
@@ -268,10 +301,11 @@ namespace GameplayEffects.Runtime
 
             // `shuffle Wound 2 into draw` creates copies; `shuffle hand into draw` moves cards.
             Value first = call.Argument(0);
-            if (first.Kind == ValueKind.Definition)
+            if (first.Kind == ValueKind.Definition || first.Kind == ValueKind.Text)
             {
+                EntityDefinition card = RequireDefinition(call, 0, "card");
                 int count = call.Number(1, Num.One).ToInt();
-                for (int i = 0; i < count; i++) Create(first.Definition!, actor, Zones.Draw, call.Context);
+                for (int i = 0; i < count; i++) Create(card, actor, Zones.Draw, call.Context);
             }
             else
             {
@@ -363,15 +397,39 @@ namespace GameplayEffects.Runtime
             gameEvent.Cancelled = true;
         }
 
+        /// <summary><c>kill lowest hp enemies</c>, <c>kill to target</c>, or bare <c>kill</c> for the effect's target.</summary>
         private void VerbKill(VerbCall call)
         {
-            foreach (Entity target in call.Targets("to").ToArray())
+            IReadOnlyList<Entity> targets = call.ArgumentCount > 0 ? call.Argument(0).AsEntities() : call.Targets("to");
+            foreach (Entity target in targets.ToArray())
             {
                 if (target.Kind == EntityKind.Actor) Kill(target, call.Context.Source, call.Context);
             }
         }
 
         // Helpers ---------------------------------------------------------------------------
+
+        /// <summary>
+        /// The definition an argument names. A bare name prefers the kinds the verb works with, so
+        /// <c>apply Burn</c> finds the status and <c>create Burn</c> the card when both exist.
+        /// </summary>
+        private EntityDefinition RequireDefinition(VerbCall call, int index, params string[] preferredKinds)
+        {
+            string? written = call.ArgumentNode(index) switch
+            {
+                NameExpr name when !call.Context.TryGetLocal(name.Name, out _) => name.Name,
+                StringExpr text => text.Value,
+                _ => null,
+            };
+
+            if (written != null)
+            {
+                EntityDefinition? preferred = Content.FindAny(written, preferredKinds);
+                if (preferred != null) return preferred;
+            }
+
+            return RequireDefinition(call.Argument(index), call);
+        }
 
         private EntityDefinition RequireDefinition(Value value, VerbCall call)
         {

@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using GameplayEffects.Content;
 using GameplayEffects.Syntax;
 
 namespace GameplayEffects.Runtime
 {
-    // Event dispatch, loop protection, limits and the trigger queue.
+    // Event dispatch, loop protection, limits and the work queue.
     public sealed partial class Interpreter
     {
         /// <summary>Lifecycle events that a listener on an attached entity only hears for its own controller.</summary>
@@ -14,28 +15,24 @@ namespace GameplayEffects.Runtime
             "turn_start", "turn_end",
         };
 
-        private readonly Queue<PendingTrigger> _queue = new Queue<PendingTrigger>();
+        /// <summary>
+        /// Work waiting to resolve: after-phase listeners, and the decay and temporary-effect expiry
+        /// that follow an event. A plain FIFO, so resolution is breadth-first and deterministic.
+        /// </summary>
+        private readonly Queue<Action> _queue = new Queue<Action>();
         private bool _draining;
         private long _nextChainRoot = 1;
 
-        private sealed class PendingTrigger
-        {
-            public PendingTrigger(Listener listener, GameEvent gameEvent, Chain chain)
-            {
-                Listener = listener;
-                Event = gameEvent;
-                Chain = chain;
-            }
-
-            public Listener Listener { get; }
-            public GameEvent Event { get; }
-            public Chain Chain { get; }
-        }
-
-        /// <summary>After-phase triggers waiting to resolve.</summary>
+        /// <summary>Work queued and not yet resolved.</summary>
         public int PendingTriggers => _queue.Count;
 
         internal Chain NewChain() => Chain.NewRoot(_nextChainRoot++);
+
+        /// <summary>
+        /// Drops queued work after an action fails, so triggers from a half-resolved action cannot
+        /// leak into whatever the game does next.
+        /// </summary>
+        internal void AbandonPending() => _queue.Clear();
 
         /// <summary>
         /// Raises an event through its three phases around <paramref name="action"/>. Before
@@ -77,7 +74,13 @@ namespace GameplayEffects.Runtime
 
                 if (gameEvent.Cancelled) return false;
 
+                // Resources that reset on this event do so as part of it: before listeners saw
+                // the old value, after listeners see the new one.
+                if (!replaced) ApplyEventResets(gameEvent);
+
                 if (Rules.AfterEvents) Dispatch(gameEvent, EventPhase.After, context);
+
+                QueueDecay(gameEvent);
                 ProcessDeadlines(gameEvent);
                 Host.OnEvent(gameEvent);
                 return !replaced;
@@ -93,6 +96,23 @@ namespace GameplayEffects.Runtime
             if (!gameEvent.Amount.IsZero) values["amount"] = gameEvent.Amount.ToString();
             if (gameEvent.Tags.Count > 0) values["tags"] = string.Join(",", gameEvent.Tags.OrderBy(t => t, StringComparer.Ordinal));
             return values;
+        }
+
+        /// <summary>Who an event concerns: its target and its source.</summary>
+        private static IEnumerable<Entity> Participants(GameEvent gameEvent)
+        {
+            if (gameEvent.Target != null && !gameEvent.Target.IsRemoved) yield return gameEvent.Target;
+            if (gameEvent.Source != null && gameEvent.Source != gameEvent.Target && !gameEvent.Source.IsRemoved) yield return gameEvent.Source;
+        }
+
+        /// <summary>
+        /// Runs engine work after the listeners already queued for the current event, or straight
+        /// away when triggers resolve immediately.
+        /// </summary>
+        private void RunAfterListeners(Action work)
+        {
+            if (Rules.Triggers == TriggerResolution.Queued) _queue.Enqueue(work);
+            else work();
         }
 
         /// <summary>Runs or queues every matching listener for one phase. Returns how many fired.</summary>
@@ -127,7 +147,7 @@ namespace GameplayEffects.Runtime
                 Chain chain = context.Chain.Extend(listener.Id);
 
                 if (phase == EventPhase.After && Rules.Triggers == TriggerResolution.Queued)
-                    _queue.Enqueue(new PendingTrigger(listener, gameEvent, chain));
+                    _queue.Enqueue(() => RunListener(listener, gameEvent, chain));
                 else
                     RunListener(listener, gameEvent, chain);
             }
@@ -156,8 +176,27 @@ namespace GameplayEffects.Runtime
 
             EvalContext context = ListenerContext(listener, gameEvent, chain);
             context.It = gameEvent.Target;
-            Value value = Evaluate(filter, context);
+            return FilterMatches(filter, gameEvent, context);
+        }
 
+        /// <summary>
+        /// Evaluates a listener filter clause by clause. Each clause that names entities or a
+        /// definition requires them to be involved in the event, including when it is combined
+        /// with other clauses through <c>,</c>, <c>and</c>, <c>or</c> or <c>not</c>.
+        /// </summary>
+        private bool FilterMatches(ExprNode filter, GameEvent gameEvent, EvalContext context)
+        {
+            switch (filter)
+            {
+                case BinaryExpr { Operator: BinaryOperator.And } and:
+                    return FilterMatches(and.Left, gameEvent, context) && FilterMatches(and.Right, gameEvent, context);
+                case BinaryExpr { Operator: BinaryOperator.Or } or:
+                    return FilterMatches(or.Left, gameEvent, context) || FilterMatches(or.Right, gameEvent, context);
+                case UnaryExpr { Operator: UnaryOperator.Not } not:
+                    return !FilterMatches(not.Operand, gameEvent, context);
+            }
+
+            Value value = Evaluate(filter, context);
             switch (value.Kind)
             {
                 // `on card_played(self)` or `on died(enemies)`: the filter names who must be involved.
@@ -170,7 +209,7 @@ namespace GameplayEffects.Runtime
 
                 // `on status_applied(Poison)`: something from that definition must be involved.
                 case ValueKind.Definition:
-                    return Involved(gameEvent).Any(e => e.Definition == value.Definition);
+                    return InvolvesDefinition(gameEvent, value.Definition!);
 
                 default:
                     return IsTrue(value, context);
@@ -186,6 +225,18 @@ namespace GameplayEffects.Runtime
             {
                 if (data.Kind == ValueKind.Entity) yield return data.Entity!;
             }
+        }
+
+        private static bool InvolvesDefinition(GameEvent gameEvent, EntityDefinition definition)
+        {
+            if (Involved(gameEvent).Any(e => SameDefinition(e.Definition, definition))) return true;
+
+            // Before a status exists its event carries only the definition being applied.
+            foreach (Value data in gameEvent.Data.Values)
+            {
+                if (data.Kind == ValueKind.Definition && SameDefinition(data.Definition, definition)) return true;
+            }
+            return false;
         }
 
         /// <summary>Resolves the <c>owner</c> in <c>on owner.damaged</c>, relative to the listening entity.</summary>
@@ -212,7 +263,8 @@ namespace GameplayEffects.Runtime
             switch (listener.Syntax.Limit)
             {
                 case LimitScope.None: return true;
-                case LimitScope.Turn: window = State.Turn; break;
+                // Turn numbers restart every battle, so the battle is part of the window.
+                case LimitScope.Turn: window = ((long)State.BattleNumber << 32) | (uint)State.Turn; break;
                 case LimitScope.Battle: window = State.BattleNumber; break;
                 case LimitScope.Run: window = 0; break;
                 case LimitScope.Chain: window = chain.RootId; break;
@@ -258,8 +310,8 @@ namespace GameplayEffects.Runtime
         }
 
         /// <summary>
-        /// Resolves queued triggers until none remain. Triggers raised while draining join the back
-        /// of the queue, so resolution is breadth-first and fully deterministic.
+        /// Resolves queued work until none remains. Work raised while draining joins the back of
+        /// the queue, so resolution is breadth-first and fully deterministic.
         /// </summary>
         public void Drain()
         {
@@ -267,11 +319,7 @@ namespace GameplayEffects.Runtime
             _draining = true;
             try
             {
-                while (_queue.Count > 0)
-                {
-                    PendingTrigger trigger = _queue.Dequeue();
-                    RunListener(trigger.Listener, trigger.Event, trigger.Chain);
-                }
+                while (_queue.Count > 0) _queue.Dequeue()();
             }
             catch
             {

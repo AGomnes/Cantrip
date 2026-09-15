@@ -158,6 +158,10 @@ namespace GameplayEffects
             else if (text[0] == '+') { index = 1; }
             if (index >= text.Length) return false;
 
+            // Anything larger cannot be scaled into a long; reject it rather than wrap to a
+            // negative number that a designer would never think to look for.
+            const long MaxWhole = long.MaxValue / Scale;
+
             long whole = 0;
             bool sawDigit = false;
             for (; index < text.Length && text[index] != '.'; index++)
@@ -165,7 +169,9 @@ namespace GameplayEffects
                 char c = text[index];
                 if (c == '_') continue;
                 if (c < '0' || c > '9') return false;
-                whole = whole * 10 + (c - '0');
+                int digit = c - '0';
+                if (whole > (MaxWhole - digit) / 10) return false;
+                whole = whole * 10 + digit;
                 sawDigit = true;
             }
 
@@ -191,7 +197,10 @@ namespace GameplayEffects
 
             if (!sawDigit) return false;
 
-            long raw = whole * Scale + fraction * (Scale / divisor);
+            long scaledFraction = fraction * (Scale / divisor);
+            if (whole == MaxWhole && scaledFraction > long.MaxValue - whole * Scale) return false;
+
+            long raw = whole * Scale + scaledFraction;
             value = new Num(negative ? -raw : raw);
             return true;
         }

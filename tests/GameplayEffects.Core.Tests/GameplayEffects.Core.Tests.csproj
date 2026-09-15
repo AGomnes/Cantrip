@@ -5,6 +5,8 @@
     <RootNamespace>GameplayEffects.Tests</RootNamespace>
     <AssemblyName>GameplayEffects.Core.Tests</AssemblyName>
     <IsPackable>false</IsPackable>
+    <!-- Core is held to C# 9 for Unity; tests run on net9.0 and may use newer syntax. -->
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>

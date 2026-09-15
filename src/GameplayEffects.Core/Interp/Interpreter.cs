@@ -83,6 +83,7 @@ namespace GameplayEffects.Runtime
         private readonly Dictionary<string, VerbHandler> _verbs = new Dictionary<string, VerbHandler>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _builtinVerbs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private int _steps;
+        private int _callDepth;
 
         public Interpreter(GameState state, IEffectHost? host = null)
         {
@@ -236,8 +237,19 @@ namespace GameplayEffects.Runtime
             for (int i = 0; i < verb.Parameters.Count; i++)
                 call.SetLocal(verb.Parameters[i], i < values.Count ? values[i] : Value.None);
 
+            if (_callDepth >= Rules.MaxCallDepth)
+                throw new RuntimeError($"`{verb.Name}` is nested more than {Rules.MaxCallDepth} calls deep; is it calling itself forever?", command.Span);
+
             long traceId = State.Trace.Record(State.Clock.Now, "verb", verb.Name, context.Self?.ToString(), span: command.Span);
-            using (State.Trace.Scope(traceId)) Execute(verb.Body, call);
+            _callDepth++;
+            try
+            {
+                using (State.Trace.Scope(traceId)) Execute(verb.Body, call);
+            }
+            finally
+            {
+                _callDepth--;
+            }
         }
 
         private void ExecuteAssign(AssignNode assign, EvalContext context)
@@ -385,11 +397,7 @@ namespace GameplayEffects.Runtime
 
             if (modifier.Syntax.Scope != null)
             {
-                EvalContext scopeContext = context.Derive();
-                scopeContext.It = null;
-                scopeContext.Focus = null;
-                IReadOnlyList<Entity> subjects = Evaluate(modifier.Syntax.Scope, scopeContext).AsEntities();
-                if (query.Subject == null || !subjects.Contains(query.Subject)) return false;
+                if (query.Subject == null || !InScope(modifier, modifier.Syntax.Scope, query, context)) return false;
             }
             else if (!InDefaultScope(modifier, query))
             {
@@ -397,6 +405,30 @@ namespace GameplayEffects.Runtime
             }
 
             return modifier.Syntax.Filter == null || EvaluateCondition(modifier.Syntax.Filter, context);
+        }
+
+        /// <summary>
+        /// Whether a query's subject belongs to an <c>of ...</c> scope. The group is read from the
+        /// modifier owner's side, so <c>of enemies</c> on the player's relic means the player's
+        /// enemies whoever is attacking. A <c>where</c> on the scope reads stats from the candidate
+        /// but tests qualifiers such as <c>source:self</c> against the value being computed, the same
+        /// way a <c>where</c> on the modifier itself does.
+        /// </summary>
+        private bool InScope(Modifier modifier, ExprNode scope, ModifierQuery query, EvalContext context)
+        {
+            if (scope is WhereExpr where)
+            {
+                if (!InScope(modifier, where.Source, query, context)) return false;
+
+                EvalContext probe = context.Derive();
+                probe.It = query.Subject;
+                probe.ItIsFocus = false;
+                probe.Focus = query;
+                return EvaluateCondition(where.Predicate, probe);
+            }
+
+            var groupContext = new EvalContext(modifier.Owner) { Source = modifier.Owner };
+            return Evaluate(scope, groupContext).AsEntities().Contains(query.Subject!);
         }
 
         public Value Amount(Modifier modifier, ModifierQuery query)

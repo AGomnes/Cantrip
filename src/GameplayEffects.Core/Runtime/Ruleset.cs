@@ -72,6 +72,12 @@ namespace GameplayEffects.Runtime
         /// </summary>
         public int MaxStepsPerAction { get; set; } = 100_000;
 
+        /// <summary>
+        /// How deeply content verbs may call each other. Recursion exhausts the process stack long
+        /// before the step limit is reached, so it needs its own, much smaller limit.
+        /// </summary>
+        public int MaxCallDepth { get; set; } = 64;
+
         /// <summary>Applies the settings from a <c>ruleset</c> block over the defaults.</summary>
         public static Ruleset FromSyntax(RulesetDeclNode syntax, DiagnosticBag diagnostics)
         {
@@ -131,6 +137,10 @@ namespace GameplayEffects.Runtime
                         rules.MaxStepsPerAction = FirstNumber(setting) ?? rules.MaxStepsPerAction;
                         break;
 
+                    case "max_call_depth":
+                        rules.MaxCallDepth = Math.Max(1, FirstNumber(setting) ?? rules.MaxCallDepth);
+                        break;
+
                     default:
                         diagnostics.Warn(
                             "GE0201",
@@ -138,7 +148,7 @@ namespace GameplayEffects.Runtime
                             setting.Span,
                             Suggest.Closest(setting.Name, new[]
                             {
-                                "events", "loops", "ordering", "modifier_layers", "triggers", "hand_size", "max_hand_size", "max_steps",
+                                "events", "loops", "ordering", "modifier_layers", "triggers", "hand_size", "max_hand_size", "max_steps", "max_call_depth",
                             }));
                         break;
                 }

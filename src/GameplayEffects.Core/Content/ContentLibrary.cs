@@ -47,7 +47,8 @@ namespace GameplayEffects.Content
         private readonly List<TestDefinition> _tests = new List<TestDefinition>();
         private readonly Dictionary<string, SourceFileNode> _files = new Dictionary<string, SourceFileNode>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, DiagnosticBag> _fileDiagnostics = new Dictionary<string, DiagnosticBag>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, RulesetDeclNode> _rulesets = new Dictionary<string, RulesetDeclNode>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>Ruleset blocks in load order. A list, not a dictionary, so "last loaded" survives unloads.</summary>
+        private readonly List<(string File, RulesetDeclNode Syntax)> _rulesets = new List<(string, RulesetDeclNode)>();
 
         public ContentLibrary()
         {
@@ -75,7 +76,7 @@ namespace GameplayEffects.Content
         public IEnumerable<SourceFileNode> Files => _files.Values;
 
         /// <summary>The ruleset declared in content, merged with defaults. Null when content declares none.</summary>
-        public RulesetDeclNode? RulesetSyntax => _rulesets.Values.LastOrDefault();
+        public RulesetDeclNode? RulesetSyntax => _rulesets.Count == 0 ? null : _rulesets[_rulesets.Count - 1].Syntax;
 
         public static ContentLibrary FromText(string text, string file = "<inline>")
         {
@@ -130,9 +131,9 @@ namespace GameplayEffects.Content
         {
             if (!_files.Remove(file)) return;
             _fileDiagnostics.Remove(file);
-            _rulesets.Remove(file);
+            _rulesets.RemoveAll(r => SameFile(r.File, file));
 
-            foreach (var key in _definitions.Where(kv => kv.Value.Syntax.Span.File == file).Select(kv => kv.Key).ToList())
+            foreach (var key in _definitions.Where(kv => SameFile(kv.Value.Syntax.Span.File, file)).Select(kv => kv.Key).ToList())
             {
                 EntityDefinition definition = _definitions[key];
                 _definitions.Remove(key);
@@ -140,13 +141,19 @@ namespace GameplayEffects.Content
                 if (definition.KindName == "resource") _resources.Remove(definition.Name);
             }
 
-            foreach (string verb in _verbs.Where(kv => kv.Value.Syntax.Span.File == file).Select(kv => kv.Key).ToList())
+            foreach (string verb in _verbs.Where(kv => SameFile(kv.Value.Syntax.Span.File, file)).Select(kv => kv.Key).ToList())
                 _verbs.Remove(verb);
 
-            _tests.RemoveAll(t => t.File == file);
+            _tests.RemoveAll(t => SameFile(t.File, file));
             AddBuiltInResources();
             Generation++;
         }
+
+        /// <summary>
+        /// File names compare case-insensitively, matching the file table. File watchers on Windows
+        /// report the same file with whatever casing they like, and a reload must still replace it.
+        /// </summary>
+        private static bool SameFile(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 
         private void Register(DeclarationNode declaration, string file, DiagnosticBag diagnostics)
         {
@@ -163,14 +170,21 @@ namespace GameplayEffects.Content
 
                     var definition = new EntityDefinition(entity, diagnostics);
                     _definitions[key] = definition;
+
+                    // A resource names a stat, not a thing: `mana` in an expression must read the
+                    // stat, so resources are kept out of name lookup.
+                    if (entity.Kind == "resource")
+                    {
+                        _resources[definition.Name] = ResourceRule.FromDefinition(definition);
+                        break;
+                    }
+
                     if (!_byName.TryGetValue(definition.Name, out List<EntityDefinition>? list))
                     {
                         list = new List<EntityDefinition>();
                         _byName[definition.Name] = list;
                     }
                     list.Add(definition);
-
-                    if (entity.Kind == "resource") _resources[definition.Name] = ResourceRule.FromDefinition(definition);
                     break;
                 }
 
@@ -184,9 +198,9 @@ namespace GameplayEffects.Content
                     break;
 
                 case RulesetDeclNode ruleset:
-                    if (_rulesets.Count > 0 && !_rulesets.ContainsKey(file))
+                    if (_rulesets.Count > 0)
                         diagnostics.Warn("GE0112", "More than one ruleset is loaded; the last one loaded wins.", ruleset.Span);
-                    _rulesets[file] = ruleset;
+                    _rulesets.Add((file, ruleset));
                     Ruleset.FromSyntax(ruleset, diagnostics); // validate eagerly so errors show at load time
                     break;
 

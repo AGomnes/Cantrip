@@ -174,7 +174,10 @@ namespace GameplayEffects.Runtime
             if (context.It != null && context.It.HasStat(name)) return Value.FromNumber(context.It.Get(name));
             if (context.Self != null && context.Self.HasStat(name)) return Value.FromNumber(context.Self.Get(name));
 
-            EntityDefinition? definition = Content.Find(name);
+            // When a status and a card share a name (Burn, Wound), a bare name in an expression means
+            // the status: `apply`, `has`, `on` and member access all want it. Verbs that want the
+            // card (`create`, `shuffle`) resolve the name themselves.
+            EntityDefinition? definition = Content.FindAny(name, "status", "keyword") ?? Content.Find(name);
             if (definition != null) return Value.FromDefinition(definition);
 
             if (context.Event != null && context.Event.Data.TryGetValue(name, out Value data)) return data;
@@ -310,9 +313,9 @@ namespace GameplayEffects.Runtime
 
             if (TryHistory(key, entity, out Value history)) return history;
 
-            // `target.Poison` reads the stacks of an attached status.
-            if (entity.FindAttached(member) != null || (Content.Find(member)?.Kind is EntityKind.Status or EntityKind.Keyword))
-                return Value.FromNumber(Num.FromInt(entity.StacksOf(member)));
+            // `target.Poison` reads an attached status's counter: stacks, or duration for duration statuses.
+            if (entity.FindAttached(member) != null || Content.FindAny(member, "status", "keyword") != null)
+                return Value.FromNumber(Num.FromInt(entity.CounterOf(member)));
 
             return Value.FromNumber(entity.Get(member));
         }
@@ -619,7 +622,7 @@ namespace GameplayEffects.Runtime
         private int StacksOnDefault(string status, EvalContext context)
         {
             Entity? subject = context.Target ?? context.Controller;
-            return subject?.StacksOf(status) ?? 0;
+            return subject?.CounterOf(status) ?? 0;
         }
 
         /// <summary><c>Poison on target</c> is total stacks; <c>tag:x on targets</c> counts matches.</summary>
@@ -628,9 +631,9 @@ namespace GameplayEffects.Runtime
             switch (left.Kind)
             {
                 case ValueKind.Definition:
-                    return Num.FromInt(entities.Sum(e => e.StacksOf(left.Definition!.Name)));
+                    return Num.FromInt(entities.Sum(e => e.CounterOf(left.Definition!.Name)));
                 case ValueKind.Text:
-                    return Num.FromInt(entities.Sum(e => e.StacksOf(left.Text!)));
+                    return Num.FromInt(entities.Sum(e => e.CounterOf(left.Text!)));
                 case ValueKind.Qualified:
                     return Num.FromInt(entities.Count(e => Has(e, left, context)));
                 default:

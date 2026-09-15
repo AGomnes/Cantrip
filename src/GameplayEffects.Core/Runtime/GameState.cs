@@ -107,6 +107,9 @@ namespace GameplayEffects.Runtime
             Modifiers = new ModifierPipeline(this);
             Events = new EventBus();
             Trace = new TraceLog();
+
+            // Modifiers can read `now`, so time passing is a state change like any other.
+            clock.Advanced += _ => Touch();
         }
 
         public ContentLibrary Content { get; }
@@ -122,11 +125,43 @@ namespace GameplayEffects.Runtime
 
         internal void Touch() => Version++;
 
-        public int Turn { get; internal set; }
-        public int BattleNumber { get; internal set; }
-        public Team ActiveTeam { get; internal set; } = Team.Player;
-        public bool InBattle { get; internal set; }
-        public Entity? Player { get; internal set; }
+        private int _turn;
+        private int _battleNumber;
+        private Team _activeTeam = Team.Player;
+        private bool _inBattle;
+        private Entity? _player;
+
+        // Modifiers can read `turn` and friends, so each of these bumps the version when it changes.
+
+        public int Turn
+        {
+            get => _turn;
+            internal set { if (_turn != value) { _turn = value; Touch(); } }
+        }
+
+        public int BattleNumber
+        {
+            get => _battleNumber;
+            internal set { if (_battleNumber != value) { _battleNumber = value; Touch(); } }
+        }
+
+        public Team ActiveTeam
+        {
+            get => _activeTeam;
+            internal set { if (_activeTeam != value) { _activeTeam = value; Touch(); } }
+        }
+
+        public bool InBattle
+        {
+            get => _inBattle;
+            internal set { if (_inBattle != value) { _inBattle = value; Touch(); } }
+        }
+
+        public Entity? Player
+        {
+            get => _player;
+            internal set { if (_player != value) { _player = value; Touch(); } }
+        }
 
         public IReadOnlyList<Entity> Entities => _entities;
         public IReadOnlyList<ScheduledAction> Scheduled => _scheduled;
@@ -209,12 +244,16 @@ namespace GameplayEffects.Runtime
             Place(child, Zones.Attached, toTop: false);
         }
 
-        /// <summary>Marks an actor dead and takes it off the board. Its attachments stop listening.</summary>
-        internal void MarkDead(Entity actor)
+        /// <summary>
+        /// Marks an actor dead. It stays on the board, still listening, until <see cref="Bury"/>, so
+        /// its own <c>on died</c> listeners can hear the death. Selectors already skip it.
+        /// </summary>
+        internal void MarkDead(Entity actor) => actor.IsDead = true;
+
+        /// <summary>Takes a dead actor off the board; it and its attachments stop listening.</summary>
+        internal void Bury(Entity actor)
         {
-            if (actor.IsDead) return;
-            actor.IsDead = true;
-            MoveTo(actor, Zones.Dead);
+            if (actor.IsDead && actor.Zone == Zones.Board) MoveTo(actor, Zones.Dead);
         }
 
         // Zones --------------------------------------------------------------------------------
@@ -258,7 +297,15 @@ namespace GameplayEffects.Runtime
             }
 
             if (entity.Kind == EntityKind.Actor && entity.Zone == Zones.Board)
-                entity.Position = Actors(entity.Team).Count(a => a != entity);
+            {
+                // One past the highest live slot, so positions stay unique after a death.
+                int next = 0;
+                foreach (Entity mate in Actors(entity.Team))
+                {
+                    if (mate != entity) next = Math.Max(next, mate.Position + 1);
+                }
+                entity.Position = next;
+            }
 
             Touch();
             RefreshActivation(entity);
@@ -306,7 +353,10 @@ namespace GameplayEffects.Runtime
                 case EntityKind.Actor:
                     return entity.Zone == Zones.Board && !entity.IsDead;
                 case EntityKind.Card:
-                    return entity.Zone == Zones.Hand || entity.Zone == Zones.Play || entity.Zone == Zones.Powers;
+                    // A power does nothing until it has been played. Other cards listen from hand,
+                    // which is what curses that hurt while held rely on.
+                    if (entity.HasTag("power")) return entity.Zone == Zones.Powers;
+                    return entity.Zone == Zones.Hand || entity.Zone == Zones.Play;
                 case EntityKind.Relic:
                 case EntityKind.Item:
                     return entity.Zone == Zones.Relics || entity.Zone == Zones.Board;
@@ -454,6 +504,8 @@ namespace GameplayEffects.Runtime
             Mix(Turn);
             Mix(BattleNumber);
             Mix((long)ActiveTeam);
+            Mix(InBattle ? 1 : 0);
+            Mix(Player?.Id ?? 0);
             Mix(Clock.Now);
             var (s0, s1, s2, s3) = Rng.GetState();
             Mix((long)s0); Mix((long)s1); Mix((long)s2); Mix((long)s3);
@@ -468,12 +520,20 @@ namespace GameplayEffects.Runtime
                 Mix(entity.IsDead ? 1 : 0);
                 MixText(entity.Zone);
                 Mix(entity.Owner?.Id ?? 0);
+                Mix(entity.Source?.Id ?? 0);
+                Mix((long)entity.RawTeam);
+                Mix(entity.Position);
+                Mix(entity.PatternIndex);
+                MixText(entity.Intent ?? string.Empty);
+                MixText(entity.LastMove ?? string.Empty);
                 foreach (string stat in entity.StatNames.OrderBy(s => s, StringComparer.OrdinalIgnoreCase))
                 {
                     MixText(stat);
                     Mix(entity.GetBase(stat).Raw);
                 }
                 foreach (string tag in entity.Tags.OrderBy(t => t, StringComparer.OrdinalIgnoreCase)) MixText(tag);
+                foreach (Entity attached in entity.Attached) Mix(attached.Id);
+                foreach (Listener listener in Events.OwnedBy(entity)) Mix(listener.LimitWindow);
             }
 
             foreach (var zone in _zones.OrderBy(z => z.Key.Owner).ThenBy(z => z.Key.Zone, StringComparer.Ordinal))
@@ -483,6 +543,32 @@ namespace GameplayEffects.Runtime
                 Mix(zone.Key.Owner);
                 MixText(zone.Key.Zone);
                 foreach (Entity entity in zone.Value) Mix(entity.Id);
+            }
+
+            // Two states with different futures must never hash the same, so pending work and the
+            // counters behind history queries count too.
+            foreach (var entry in _turnHistory.OrderBy(e => e.Key, StringComparer.Ordinal))
+            {
+                MixText(entry.Key);
+                Mix(entry.Value.Raw);
+            }
+            Mix(-2);
+            foreach (var entry in _battleHistory.OrderBy(e => e.Key, StringComparer.Ordinal))
+            {
+                MixText(entry.Key);
+                Mix(entry.Value.Raw);
+            }
+            Mix(-3);
+            foreach (ScheduledAction action in _scheduled)
+            {
+                Mix(action.Id);
+                Mix((long)action.Timing);
+                Mix(action.Owner.Id);
+                Mix(action.DueAt);
+                MixText(action.Deadline ?? string.Empty);
+                Mix(action.Body?.Span.Line ?? 0);
+                Mix(action.Body?.Span.Column ?? 0);
+                Mix(action.Undo.Count);
             }
 
             return hash;
