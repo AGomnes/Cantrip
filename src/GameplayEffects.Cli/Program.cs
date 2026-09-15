@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using GameplayEffects;
 using GameplayEffects.Content;
+using GameplayEffects.Descriptions;
 using GameplayEffects.Diagnostics;
 using GameplayEffects.Linting;
 using GameplayEffects.Runtime;
@@ -19,6 +20,8 @@ usage:
   gedsl validate <path>...          parse and load content, report problems
   gedsl lint <path>... [options]    load content and run static checks
   gedsl test <path>... [options]    run the `test` blocks in content
+  gedsl describe <path>... [--name <name>]
+                                    print generated descriptions (all definitions, or one)
   gedsl repl <path>...              load content and run DSL statements interactively
 
 paths may be files or folders (folders load every *.ge file, recursively).
@@ -51,6 +54,7 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
                 switch (args[i])
                 {
                     case "--filter" when i + 1 < args.Length: filter = args[++i]; break;
+                    case "--name" when i + 1 < args.Length: filter = args[++i]; break;
                     case "--trace": trace = true; break;
                     case "--suppress" when i + 1 < args.Length:
                         suppressed.AddRange(args[++i].Split(',').Select(c => c.Trim()).Where(c => c.Length > 0));
@@ -80,6 +84,7 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
                 case "validate": return Validate(content);
                 case "lint": return Lint(content, suppressed);
                 case "test": return Test(content, filter, trace);
+                case "describe": return Describe(content, filter);
                 case "repl": return Repl(content);
                 default:
                     Console.Error.WriteLine($"unknown command `{command}`\n\n" + Usage);
@@ -187,6 +192,38 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
             Console.WriteLine();
             Console.WriteLine($"{results.Count - failed} passed, {failed} failed");
             return failed == 0 ? 0 : 1;
+        }
+
+        private static int Describe(ContentLibrary content, string? name)
+        {
+            if (!Report(content)) return 1;
+
+            var builder = new DescriptionBuilder(content);
+            var definitions = content.Definitions
+                .Where(d => d.KindName != "resource")
+                .Where(d => name == null || string.Equals(d.Name, name, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(d => d.KindName, StringComparer.Ordinal)
+                .ThenBy(d => d.Name, StringComparer.Ordinal)
+                .ToList();
+
+            if (definitions.Count == 0)
+            {
+                Console.Error.WriteLine(name == null ? "no definitions loaded" : $"nothing called \"{name}\" is loaded");
+                return 1;
+            }
+
+            foreach (EntityDefinition definition in definitions)
+            {
+                Description description = builder.Describe(definition);
+                string cost = description.Cost == null ? string.Empty : $" ({description.Cost.Text})";
+                Console.WriteLine($"{description.Name} [{definition.KindName}]{cost}");
+                if (!description.IsEmpty) Console.WriteLine("  " + description.ToPlainText());
+                if (description.Flavour != null) Console.WriteLine($"  \"{description.Flavour}\"");
+                foreach (KeywordTooltip tooltip in description.Tooltips) Console.WriteLine("    " + tooltip);
+                Console.WriteLine();
+            }
+
+            return 0;
         }
 
         /// <summary>The REPL from section 5: run DSL lines against a live game.</summary>

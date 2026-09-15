@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using GameplayEffects.Content;
+using GameplayEffects.Descriptions;
 using GameplayEffects.Diagnostics;
 using GameplayEffects.Runtime;
 using GameplayEffects.Syntax;
@@ -201,6 +202,7 @@ namespace GameplayEffects.Linting
             CheckEventCycles();
             CheckCardTargets();
             CheckUnusedVerbs();
+            CheckDescriptions();
 
             return _diagnostics
                 .Where(d => !_options.Suppressed.Contains(d.Code))
@@ -691,6 +693,18 @@ namespace GameplayEffects.Linting
 
                 Warn(UnusedTarget, $"{body.Owner} asks the player to choose a target (`target {target}`), but its effect never uses it.", body.Owner.Syntax.Span);
             }
+        }
+
+        /// <summary>Description drift: GE401 to GE403, from <see cref="DescriptionBuilder.Validate"/>.</summary>
+        private void CheckDescriptions()
+        {
+            var descriptions = new DescriptionBuilder(_content);
+            IEnumerable<EntityDefinition> definitions = _content.Definitions
+                .Where(d => d.KindName != "resource")
+                .OrderBy(d => d.Syntax.Span.File, StringComparer.Ordinal)
+                .ThenBy(d => d.Syntax.Span.Line);
+
+            foreach (EntityDefinition definition in definitions) _diagnostics.AddRange(descriptions.Validate(definition));
         }
 
         private void CheckUnusedVerbs()
