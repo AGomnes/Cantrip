@@ -55,6 +55,9 @@ namespace GameplayEffects.Testing
 
         public DslTestRunner(ContentLibrary content) => _content = content ?? throw new ArgumentNullException(nameof(content));
 
+        /// <summary>Verbs that only exist inside <c>test</c> blocks.</summary>
+        public static IReadOnlyCollection<string> TestVerbs { get; } = Session.VerbTable.Select(v => v.Name).ToArray();
+
         /// <summary>Record the causality trace for every test (slower; attached to failures).</summary>
         public bool Trace { get; set; }
 
@@ -189,24 +192,33 @@ namespace GameplayEffects.Testing
                 if (State.InBattle) _runtime.CheckBattleOver();
             }
 
+            /// <summary>
+            /// Every test-only verb. The single source of truth: it drives registration and
+            /// <see cref="DslTestRunner.TestVerbs"/>, which the linter reads.
+            /// </summary>
+            internal static readonly (string Name, Func<Session, VerbHandler> Bind)[] VerbTable =
+            {
+                ("enemy", s => s.Enemy),
+                ("player", s => call => s.SetStats(s.State.Player!, call, 0)),
+                ("hand", s => call => s.AddCards(call, Zones.Hand)),
+                ("deck", s => call => s.AddCards(call, Zones.Draw)),
+                ("discard_pile", s => call => s.AddCards(call, Zones.Discard)),
+                ("relic", s => call => { foreach (string name in Names(call)) s._runtime.AddRelic(name); }),
+                ("seed", s => call => s.State.Rng.Reseed((ulong)call.Number(0, Num.One).ToInt())),
+                ("answer", s => call => { foreach (string name in Names(call)) s._chooser.Enqueue(name); }),
+                ("realtime", s => _ => { }),
+                ("play", s => s.Play),
+                ("end", s => s.EndTurn),
+                ("end_turn", s => s.EndTurn),
+                ("expect", s => s.Expect),
+                ("tick", s => call => s._runtime.Tick(call.Number(0, Num.One).ToInt())),
+                ("grant", s => call => { foreach (string name in Names(call)) s._runtime.GrantAbility(name, s.State.Player!); }),
+                ("cast", s => s.Cast),
+            };
+
             private void RegisterVerbs()
             {
-                Interpreter.RegisterVerb("enemy", Enemy);
-                Interpreter.RegisterVerb("player", call => SetStats(State.Player!, call, 0));
-                Interpreter.RegisterVerb("hand", call => AddCards(call, Zones.Hand));
-                Interpreter.RegisterVerb("deck", call => AddCards(call, Zones.Draw));
-                Interpreter.RegisterVerb("discard_pile", call => AddCards(call, Zones.Discard));
-                Interpreter.RegisterVerb("relic", call => { foreach (string name in Names(call)) _runtime.AddRelic(name); });
-                Interpreter.RegisterVerb("seed", call => State.Rng.Reseed((ulong)call.Number(0, Num.One).ToInt()));
-                Interpreter.RegisterVerb("answer", call => { foreach (string name in Names(call)) _chooser.Enqueue(name); });
-                Interpreter.RegisterVerb("realtime", _ => { });
-                Interpreter.RegisterVerb("play", Play);
-                Interpreter.RegisterVerb("end", EndTurn);
-                Interpreter.RegisterVerb("end_turn", EndTurn);
-                Interpreter.RegisterVerb("expect", Expect);
-                Interpreter.RegisterVerb("tick", call => _runtime.Tick(call.Number(0, Num.One).ToInt()));
-                Interpreter.RegisterVerb("grant", call => { foreach (string name in Names(call)) _runtime.GrantAbility(name, State.Player!); });
-                Interpreter.RegisterVerb("cast", Cast);
+                foreach (var (name, bind) in VerbTable) Interpreter.RegisterVerb(name, bind(this));
             }
 
             /// <summary><c>enemy hp 6</c>, <c>enemy "Jaw Worm"</c>, <c>enemy Slime hp 12 Poison 3</c>.</summary>

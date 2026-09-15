@@ -11,9 +11,20 @@ namespace GameplayEffects.Runtime
     public sealed partial class Interpreter
     {
         /// <summary>Stat names that read as zero when an entity has never had them set.</summary>
-        private static readonly string[] CommonStats =
+        internal static readonly string[] CommonStats =
         {
             "hp", "max_hp", "block", "energy", "max_energy", "strength", "dexterity", "cost", "stacks", "duration", "gold",
+        };
+
+        /// <summary>
+        /// Names <see cref="ResolveName"/> gives a built-in meaning. The linter and "did you mean"
+        /// suggestions read this list, so keep it in step with the switch below.
+        /// </summary>
+        internal static readonly string[] ReservedNames =
+        {
+            "self", "owner", "source", "target", "it", "card", "player", "controller", "true", "false", "none", "nothing",
+            "turn", "now", "enemies", "allies", "everyone", "actors", "enemy", "hand", "draw", "draw_pile", "discard",
+            "discard_pile", "exhaust", "exhaust_pile", "powers", "relics", "deck", "cards", "statuses", "stacks", "event",
         };
 
         public Value Evaluate(ExprNode node, EvalContext context)
@@ -218,11 +229,7 @@ namespace GameplayEffects.Runtime
         }
 
         private IEnumerable<string> NameCandidates(EvalContext context) =>
-            new[]
-            {
-                "self", "owner", "source", "target", "card", "player", "enemy", "enemies", "allies", "everyone",
-                "hand", "draw", "discard", "exhaust", "deck", "cards", "relics", "stacks", "turn",
-            }
+            ReservedNames
             .Concat(context.LocalNames())
             .Concat(Content.AllNames)
             .Concat(CommonStats);

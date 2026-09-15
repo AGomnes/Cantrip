@@ -1,0 +1,200 @@
+# Tests for slay_the_spire.ge. Player: 80 hp, 3 energy, seed 1. Plain enemies have 10 hp.
+
+test "sts Crushing Blow deals 8 and makes the next hit 50% stronger"
+  enemy hp 30
+  play "Crushing Blow" on enemy
+  expect enemy.hp == 22
+  expect enemy.Vulnerable == 2
+  play Swipe on enemy
+  expect enemy.hp == 13
+
+test "sts Cyclone spends all energy and hits every enemy that many times"
+  enemy hp 30
+  enemy hp 30
+  play Cyclone
+  expect enemy.hp == 15 and enemy2.hp == 15
+  expect player.energy == 0
+
+test "sts Shield Slam deals damage equal to block"
+  enemy hp 30
+  play Guard
+  play Guard
+  play "Shield Slam" on enemy
+  expect enemy.hp == 20
+
+test "sts Titan Blade counts Strength three times"
+  player Strength 3
+  enemy hp 50
+  play "Titan Blade" on enemy
+  expect enemy.hp == 27
+
+test "sts Fiend Form grows Strength at the start of every turn"
+  enemy hp 50
+  play "Fiend Form"
+  end turn
+  expect player.Strength == 2
+  end turn
+  expect player.Strength == 4
+
+test "sts Knife Flurry adds three Shivs that exhaust"
+  enemy hp 30
+  play "Knife Flurry"
+  expect hand.count == 3
+  play Shiv on enemy
+  expect enemy.hp == 26
+  expect exhaust.count == 1
+
+test "sts Honed Edge adds 4 damage to Shivs only"
+  enemy hp 30
+  play "Honed Edge"
+  play "Knife Flurry"
+  play Shiv on enemy
+  expect enemy.hp == 22
+  play Jab on enemy
+  expect enemy.hp == 21
+
+test "sts Rot Pact makes skills free and exhausts them"
+  enemy hp 30
+  play "Rot Pact"
+  expect player.energy == 0
+  play Guard
+  expect player.block == 5
+  expect exhaust.count == 1
+
+test "sts Bastion keeps block across turns"
+  enemy hp 30
+  play Bastion
+  block 12
+  end turn
+  expect player.block == 12
+
+test "sts Reverb plays the next skill twice, once"
+  enemy hp 30
+  play Reverb
+  play Guard
+  expect player.block == 10
+  expect not player.has(Echo)
+  play Guard
+  expect player.block == 15
+
+test "sts Echo from Reverb wears off at end of turn"
+  enemy hp 30
+  play Reverb
+  end turn
+  expect not player.has(Echo)
+
+test "sts Soul Reap heals for unblocked damage"
+  player hp 50
+  enemy hp 30 block 2
+  enemy hp 3
+  play "Soul Reap"
+  expect enemy.hp == 28 and enemy2.dead
+  expect player.hp == 55
+
+test "sts Venom Coat poisons on unblocked attack damage only"
+  player energy 4
+  enemy hp 30 block 3
+  enemy hp 30 block 10
+  play "Venom Coat"
+  play Swipe on enemy
+  play Swipe on enemy2
+  expect enemy.Poison == 1
+  expect not enemy2.has(Poison)
+
+test "sts Ache costs 1 hp per card played while held"
+  hand Ache
+  play Guard
+  play Guard
+  expect player.hp == 78
+
+test "sts Quill Nib doubles every tenth attack"
+  relic "Quill Nib"
+  enemy hp 100
+  repeat 9:
+    play Jab on enemy
+  expect enemy.hp == 91
+  play Jab on enemy
+  expect enemy.hp == 89
+  play Jab on enemy
+  expect enemy.hp == 88
+
+test "sts Heavy Anchor gives 10 block on the first turn only"
+  relic "Heavy Anchor"
+  enemy hp 30
+  expect player.block == 10
+  end turn
+  expect player.block == 0
+
+test "sts block gained on battle_start is wiped by the first turn start"
+  relic "Naive Anchor"
+  enemy hp 30
+  expect player.block == 0
+
+test "sts Serpent Eye rerolls the cost of every drawn card into 0..3"
+  relic "Serpent Eye"
+  enemy hp 30
+  deck Swipe Swipe Swipe Swipe Swipe
+  draw 5
+  expect hand.count == 5
+  expect (hand where cost >= 0 and cost <= 3).count == 5
+  expect (hand where cost != 1).count > 0
+
+test "sts Nullify cancels exactly one debuff"
+  player energy 4
+  enemy hp 30 Nullify 1
+  play "Crushing Blow" on enemy
+  expect enemy.hp == 22
+  expect not enemy.has(Vulnerable)
+  expect not enemy.has(Nullify)
+  play "Crushing Blow" on enemy
+  expect enemy.has(Vulnerable)
+
+test "sts Phased caps every hit at 1"
+  player Phased 1
+  enemy hp 30
+  deal 20 to player
+  deal 7 to player
+  expect player.hp == 78
+  end turn
+  expect not player.has(Phased)
+
+test "sts Chanter chants first, then strikes harder every turn"
+  enemy Chanter
+  end turn
+  expect player.hp == 80
+  expect enemy.has(Ritual) and enemy.Strength == 0
+  end turn
+  expect player.hp == 74
+  expect enemy.Strength == 3
+  end turn
+  expect player.hp == 65
+
+test "sts Rolling Louse curls up the first time it is attacked"
+  enemy "Rolling Louse"
+  play Swipe on enemy
+  expect enemy.hp == 6 and enemy.block == 5
+  play Swipe on enemy
+  expect enemy.hp == 5 and enemy.block == 0
+
+test "sts Fury grows Strength whenever the player uses a skill"
+  enemy hp 50 Fury 2
+  play Guard
+  expect enemy.Strength == 2
+  play Swipe on enemy
+  expect enemy.Strength == 2
+
+test "sts Slime King splits into two slimes carrying its hp"
+  enemy "Slime King"
+  deal 25 to enemy
+  expect enemy.dead
+  expect enemies.count == 2
+  expect enemies.hp == 30
+
+test "sts Sporeling makes the player vulnerable when it dies"
+  # A second enemy keeps the battle going: winning it would clear the player's statuses.
+  enemy Sporeling
+  enemy hp 30
+  play Swipe on enemy
+  play Swipe on enemy
+  expect enemy.dead
+  expect player.has(Vulnerable)

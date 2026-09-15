@@ -28,6 +28,13 @@ jobs:
       - name: Unit tests
         run: dotnet test tests/GameplayEffects.Core.Tests -c Release --no-build
 
+      # Each sample folder is its own game with its own definitions, so they are linted separately.
+      - name: Lint samples/basic
+        run: dotnet run --project src/GameplayEffects.Cli -c Release --no-build -- lint samples/basic
+
+      - name: Lint samples/corpus
+        run: dotnet run --project src/GameplayEffects.Cli -c Release --no-build -- lint samples/corpus
+
       - name: DSL tests (samples/basic)
         run: dotnet run --project src/GameplayEffects.Cli -c Release --no-build -- test samples/basic
 

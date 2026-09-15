@@ -5,6 +5,7 @@ using System.Linq;
 using GameplayEffects;
 using GameplayEffects.Content;
 using GameplayEffects.Diagnostics;
+using GameplayEffects.Linting;
 using GameplayEffects.Runtime;
 using GameplayEffects.Testing;
 
@@ -16,10 +17,14 @@ namespace GameplayEffects.Cli
 
 usage:
   gedsl validate <path>...          parse and load content, report problems
+  gedsl lint <path>... [options]    load content and run static checks
   gedsl test <path>... [options]    run the `test` blocks in content
   gedsl repl <path>...              load content and run DSL statements interactively
 
 paths may be files or folders (folders load every *.ge file, recursively).
+
+lint options:
+  --suppress <codes>  comma-separated diagnostic codes to leave out, e.g. GE306,GE310
 
 test options:
   --filter <text>    only run tests whose name contains <text>
@@ -39,6 +44,7 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
             var paths = new List<string>();
             string? filter = null;
             bool trace = false;
+            var suppressed = new List<string>();
 
             for (int i = 1; i < args.Length; i++)
             {
@@ -46,6 +52,9 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
                 {
                     case "--filter" when i + 1 < args.Length: filter = args[++i]; break;
                     case "--trace": trace = true; break;
+                    case "--suppress" when i + 1 < args.Length:
+                        suppressed.AddRange(args[++i].Split(',').Select(c => c.Trim()).Where(c => c.Length > 0));
+                        break;
                     default:
                         if (args[i].StartsWith("--", StringComparison.Ordinal))
                         {
@@ -69,6 +78,7 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
             switch (command)
             {
                 case "validate": return Validate(content);
+                case "lint": return Lint(content, suppressed);
                 case "test": return Test(content, filter, trace);
                 case "repl": return Repl(content);
                 default:
@@ -96,6 +106,12 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
         private static bool Report(ContentLibrary content)
         {
             DiagnosticBag diagnostics = content.Diagnostics;
+            Print(diagnostics);
+            return !diagnostics.HasErrors;
+        }
+
+        private static void Print(IEnumerable<Diagnostic> diagnostics)
+        {
             foreach (Diagnostic diagnostic in diagnostics)
             {
                 Console.ForegroundColor = diagnostic.Severity switch
@@ -107,7 +123,24 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
                 Console.WriteLine(diagnostic);
                 Console.ResetColor();
             }
-            return !diagnostics.HasErrors;
+        }
+
+        private static int Lint(ContentLibrary content, IEnumerable<string> suppressed)
+        {
+            bool loaded = Report(content);
+
+            var options = new LintOptions();
+            foreach (string code in suppressed) options.Suppressed.Add(code);
+
+            IReadOnlyList<Diagnostic> findings = Linter.Lint(content, options);
+            Print(findings);
+
+            int errors = findings.Count(d => d.Severity == DiagnosticSeverity.Error) + content.Diagnostics.Errors.Count();
+            int warnings = findings.Count(d => d.Severity == DiagnosticSeverity.Warning) + content.Diagnostics.Warnings.Count();
+            int infos = findings.Count(d => d.Severity == DiagnosticSeverity.Info);
+            Console.WriteLine($"{errors} error(s), {warnings} warning(s), {infos} note(s)");
+
+            return loaded && errors == 0 ? 0 : 1;
         }
 
         private static int Validate(ContentLibrary content)
