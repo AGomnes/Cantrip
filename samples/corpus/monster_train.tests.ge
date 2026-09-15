@@ -1,0 +1,69 @@
+# Tests for monster_train.ge. Player: 80 hp, 3 energy, seed 1. Plain enemies have 10 hp.
+# `create` binds the new unit to `created`, a group; `created.first` is the unit itself.
+
+test "mt Rage adds 2 attack per stack and wears off"
+  enemy hp 30
+  create "Train Steward"
+  apply Rage 2 to created
+  end turn
+  expect enemy.hp == 21
+  expect created.first.Rage == 1
+
+test "mt Armor absorbs damage and is used up"
+  enemy hp 30
+  create "Train Steward"
+  apply Armor 3 to created
+  deal 5 to created
+  expect created.first.hp == 3
+  expect not created.first.has(Armor)
+
+test "mt Spikes hurt attackers"
+  enemy Raider
+  create "Train Steward"
+  apply Spikes 2 to created
+  end turn
+  expect created.first.hp == 1
+  expect enemy.hp == 23
+
+test "mt Multistrike attacks again"
+  enemy hp 30
+  create Brawler
+  apply Multistrike 1 to created
+  end turn
+  expect enemy.hp == 24
+
+test "mt Slay rewards the killing blow"
+  enemy hp 10
+  enemy hp 30
+  create Headsman
+  end turn
+  expect enemy.dead
+  expect player.gold == 5
+
+test "mt Revenge grows when damaged"
+  enemy hp 30
+  create Grudgeholder
+  deal 3 to created
+  expect created.first.attack == 4
+
+test "mt Summon triggers when a unit arrives"
+  enemy hp 30
+  relic "Recruiter's Bell"
+  create "Train Steward"
+  expect player.gold == 1
+
+test "mt Incant triggers on spells"
+  enemy hp 30
+  create Acolyte
+  play "Ember Spell"
+  expect created.first.attack == 2
+  expect enemy.hp == 28
+
+test "mt Burnout kills the unit after its last turn"
+  enemy hp 50
+  create "Train Steward"
+  apply Burnout 2 to created
+  end turn
+  expect created.first.alive
+  end turn
+  expect created.first.dead

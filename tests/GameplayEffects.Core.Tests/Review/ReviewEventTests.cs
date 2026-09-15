@@ -4,7 +4,10 @@ using static GameplayEffects.Tests.Review.ReviewSupport;
 
 namespace GameplayEffects.Tests.Review
 {
-    /// <summary>Event dispatch: listener limits, before-phase amounts and the trigger queue's lifetime.</summary>
+    /// <summary>
+    /// Event dispatch: listener limits, before-phase amounts and the trigger queue's lifetime.
+    /// Regression tests: each test's summary records a defect a review found, now fixed.
+    /// </summary>
     public sealed class ReviewEventTests
     {
         /// <summary>

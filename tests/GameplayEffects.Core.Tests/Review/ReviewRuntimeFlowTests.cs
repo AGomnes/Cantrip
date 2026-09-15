@@ -6,7 +6,10 @@ using static GameplayEffects.Tests.Review.ReviewSupport;
 
 namespace GameplayEffects.Tests.Review
 {
-    /// <summary>CardRuntime turn flow, battle lifecycle, board layout, selectors and verbs.</summary>
+    /// <summary>
+    /// CardRuntime turn flow, battle lifecycle, board layout, selectors and verbs. Regression tests:
+    /// each test's summary records a defect an adversarial review of the core found, now fixed.
+    /// </summary>
     public sealed class ReviewRuntimeFlowTests
     {
         private const string Minimal = "status \"Marker\"\n";

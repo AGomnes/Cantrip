@@ -1,0 +1,65 @@
+# Coverage corpus: Balatro style scoring.
+# The player holds three stats: chips, mult and score. Playing a card scores its chips; playing
+# "Play Hand" raises hand_scored and adds chips x mult to the score. Jokers are relics.
+# Names are our own. Classification and notes: docs/coverage.md.   Tests: balatro.tests.ge.
+
+verb score(c):
+  gain c.chips chips to player
+
+card "Ace of Hearts"
+  cost 0
+  chips 11
+  tags heart
+  effect:
+    score card
+
+card "Seven of Diamonds"
+  cost 0
+  chips 7
+  tags diamond
+  effect:
+    score card
+
+card "Seven of Spades"
+  cost 0
+  chips 7
+  tags spade
+  effect:
+    score card
+
+card "Play Hand"
+  cost 0
+  effect:
+    emit hand_scored
+    gain chips * mult score to player
+
+# --- 1. ref Greedy Joker: +3 mult for each diamond scored ------------------------------------------------
+
+relic "Greedy Joker"
+  on card_played(tag:diamond):
+    gain 3 mult to player
+
+# --- 2. ref Abstract Joker: +3 mult per joker, at scoring time ----------------------------------------------
+# Workaround: after listeners resolve once the card has finished, too late for the score on
+# the next line, so the joker listens in the before phase, which runs straight away.
+
+relic "Abstract Joker"
+  on before_hand_scored:
+    gain 3 * relics.count mult to player
+
+# --- 3. ref Cavendish: x3 mult ---------------------------------------------------------------------------------
+
+relic "Cavendish"
+  modify mult: x3
+
+# --- 4. ref Glass Card: x2 mult, and it may break ----------------------------------------------------------------
+
+card "Glass Queen"
+  cost 0
+  chips 10
+  tags glass
+  effect:
+    score card
+    player.mult *= 2
+    chance 25%:
+      destroy self

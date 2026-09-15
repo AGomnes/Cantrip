@@ -7,7 +7,10 @@ using static GameplayEffects.Tests.Review.ReviewSupport;
 
 namespace GameplayEffects.Tests.Review
 {
-    /// <summary>The DSL test runner: failure reporting and the test-only verbs.</summary>
+    /// <summary>
+    /// The DSL test runner: failure reporting and the test-only verbs. Regression tests: each
+    /// test's summary records a defect a review found, now fixed.
+    /// </summary>
     public sealed class ReviewDslRunnerTests
     {
         private const string StrikeContent = @"

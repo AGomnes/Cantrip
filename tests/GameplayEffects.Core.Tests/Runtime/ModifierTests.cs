@@ -391,7 +391,7 @@ namespace GameplayEffects.Tests.Runtime
             Entity big = runtime.AddCard("Big", Zones.Hand);
             runtime.AddRelic("Discount");
 
-            // Entity.Get("cost") already runs the cost channel; CostOf then runs it again.
+            // Regression: CostOf once ran the cost channel again on top of Entity.Get("cost").
             Assert.Equal(2, runtime.CostOf(big));
         }
 
@@ -624,8 +624,8 @@ namespace GameplayEffects.Tests.Runtime
             Entity enemy = Enemy(runtime);
             runtime.AddRelic("Curse");
 
-            // "Enemies take 2 more damage" on the player's relic must not hurt the player: the
-            // scope selector is evaluated with the attacker as source, so `enemies` flips sides.
+            // "Enemies take 2 more damage" on the player's relic must not hurt the player. Regression:
+            // the scope was once read from the attacker's side, which flipped what `enemies` meant.
             runtime.Execute("deal 5 to player", self: enemy);
 
             Assert.Equal(75, Hp(runtime.Player!));

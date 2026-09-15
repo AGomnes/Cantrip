@@ -1,0 +1,52 @@
+# Tests for hearthstone.ge. Player: 80 hp, 3 energy, seed 1. Plain enemies have 10 hp.
+
+test "hs Aegis blocks the next damage only"
+  enemy hp 20
+  create Footman
+  apply Aegis 1 to created
+  deal 5 to created
+  expect created.first.hp == 2
+  expect not created.first.has(Aegis)
+  deal 1 to created
+  expect created.first.hp == 1
+
+test "hs Plague Gnome hits every enemy when it dies"
+  enemy hp 20
+  enemy hp 20
+  create "Plague Gnome"
+  deal 5 to created
+  expect enemy.hp == 18 and enemy2.hp == 18
+
+test "hs Elven Archer summons and pings"
+  enemy hp 10
+  play "Elven Archer" on enemy
+  expect enemy.hp == 9
+  expect allies.count == 2
+
+test "hs Kobold Geomancer adds spell damage only"
+  enemy hp 20
+  create "Kobold Geomancer"
+  play "Arcane Shot" on enemy
+  expect enemy.hp == 17
+  deal 2 to enemy
+  expect enemy.hp == 15
+
+test "hs Dire Wolf buffs its neighbours"
+  enemy hp 20
+  create Footman
+  create "Dire Wolf"
+  create Footman
+  expect (allies where attack == 2).count == 2
+
+test "hs Knife Juggler throws a knife per summon, not for itself"
+  enemy hp 20
+  create "Knife Juggler"
+  expect enemy.hp == 20
+  create Footman
+  expect enemy.hp == 19
+
+test "hs trading minions"
+  enemy hp 3 attack 2
+  create Footman
+  trade created.first enemy
+  expect enemy.hp == 2 and created.first.dead

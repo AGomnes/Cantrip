@@ -337,7 +337,7 @@ relic "Siege Engine"
 
 **`of` scope** replaces the default: the modifier applies when the value being computed belongs to someone in the group. The group is read from the modifier owner's side, so `of enemies` on the player's relic always means the player's enemies. A `where` on the group reads stats from the candidate (`hp > 20`) but tests qualifiers such as `tag:` and `source:` against the value being computed, like a `where` on the modifier.
 
-**Filters** (`where`) see the value being computed: `tag:fire` checks the damage's tags and the card's tags, `source:self` compares the source's controller with the modifier owner's.
+**Filters** (`where`) see the value being computed: `tag:fire` checks the damage's tags and the card's tags, `source:self` compares the source's controller with the modifier owner's. Roles and group names such as `source:enemies` and `allies.count` are read from the modifier owner's side, whoever is acting.
 
 Stat reads are cached and the cache is invalidated by any change to the game state.
 
@@ -430,7 +430,7 @@ Percent values multiply as fractions: `10 * 50%` is 5. Division by zero gives 0.
 
 `tag:x`, `keyword:x`, `status:x`, `source:role`, `target:role`, `name:x`, `card:x`, `zone:x`, `team:x`, `kind:x`, `type:x`, `rarity:x`, `id:x`. They are written with no spaces around the colon.
 
-A qualifier tests whatever is in focus: the candidate inside `where`, the value being computed inside a modifier, or the event inside a listener filter. Roles for `source:` and `target:` are `self`, `owner`, `player`, `enemy`/`enemies`, `ally`/`allies`, `target`, `any`, or an entity name. Roles compare controllers, so `source:self` on a relic matches damage from its holder's cards.
+A qualifier tests whatever is in focus: the candidate inside `where`, the value being computed inside a modifier, or the event inside a listener filter. Roles for `source:` and `target:` are `self`, `owner`, `player`, `enemy`/`enemies`, `ally`/`allies`, `target`, `any`, or an entity name. Roles compare controllers, so `source:self` on a relic matches damage from its holder's cards. `enemy` and `ally` roles are relative to the side the effect runs for; inside a modifier, that is the modifier owner's side.
 
 ## Names
 

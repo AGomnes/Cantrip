@@ -6,7 +6,10 @@ using static GameplayEffects.Tests.Review.ReviewSupport;
 
 namespace GameplayEffects.Tests.Review
 {
-    /// <summary>Status stacking, decay, temporary (<c>until</c>) changes and hot reload of statuses.</summary>
+    /// <summary>
+    /// Status stacking, decay, temporary (<c>until</c>) changes and hot reload of statuses.
+    /// Regression tests: each test's summary records a defect a review found, now fixed.
+    /// </summary>
     public sealed class ReviewStatusTests
     {
         private const string FlexContent = @"

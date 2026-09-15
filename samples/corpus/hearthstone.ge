@@ -1,0 +1,80 @@
+# Coverage corpus: Hearthstone style effects.
+# Minions are actors on the player's side, summoned by cards or `create`.
+# Names are our own. Classification and notes: docs/coverage.md.   Tests: hearthstone.tests.ge.
+
+actor "Footman"
+  hp 2
+  attack 1
+
+# --- 1. ref Divine Shield: ignore the next damage ----------------------------------------------------
+
+status "Aegis"
+  tags buff
+  stacking none
+  on owner.before_damaged:
+    if event.amount > 0:
+      cancel
+      remove Aegis from owner
+
+# --- 2. ref Leper Gnome: Deathrattle ------------------------------------------------------------------
+
+actor "Plague Gnome"
+  hp 1
+  attack 1
+  on self.died:
+    deal 2 to all enemies
+
+# --- 3. ref Elven Archer: Battlecry --------------------------------------------------------------------
+
+actor "Archer"
+  hp 1
+  attack 1
+
+card "Elven Archer"
+  cost 1
+  target enemy
+  tags minion
+  effect:
+    create Archer
+    deal 1 to target
+
+# --- 4. ref Kobold Geomancer: Spell Damage +1 ------------------------------------------------------------
+# Workaround: a modifier written on a minion is anchored to that minion, so "your spells" needs
+# an explicit scope and filter.
+
+card "Arcane Shot"
+  cost 1
+  target enemy
+  tags spell
+  effect:
+    deal 2 to target
+
+actor "Kobold Geomancer"
+  hp 2
+  attack 2
+  modify damage of enemies where tag:spell, source:player: +1
+
+# --- 5. ref Dire Wolf Alpha: adjacent minions have +1 attack ------------------------------------------------
+
+actor "Dire Wolf"
+  hp 2
+  attack 3
+  modify attack of adjacent(self): +1
+
+# --- 6. ref Knife Juggler: after you summon a minion, deal 1 to a random enemy -------------------------------
+# Workaround: a listener that becomes active during an event also hears that event, so the
+# Juggler would react to its own summon without the `event.target != self` check.
+
+actor "Knife Juggler"
+  hp 2
+  attack 2
+  on created(kind:actor):
+    if event.target != self:
+      deal 1 to random enemies
+
+# --- 7. ref minion combat: trade attack for attack ----------------------------------------------------------
+# Workaround: there is no built-in combat, and `deal` inside a verb comes from whoever called it.
+
+verb trade(minion, victim):
+  deal minion.attack to victim
+  deal victim.attack to minion

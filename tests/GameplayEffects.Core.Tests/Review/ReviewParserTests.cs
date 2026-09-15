@@ -6,7 +6,10 @@ using Xunit;
 
 namespace GameplayEffects.Tests.Review
 {
-    /// <summary>Robustness of the front end and the sandbox against hostile or broken content.</summary>
+    /// <summary>
+    /// Robustness of the front end and the sandbox against hostile or broken content. Regression
+    /// tests: each test's summary records a defect a review found, now fixed.
+    /// </summary>
     public sealed class ReviewParserTests
     {
         private static readonly string[] Vocabulary =

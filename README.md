@@ -48,7 +48,7 @@ An early MVP of the core, per step 1 of the plan in the design notes. It is not 
 - A causality trace, a static linter, generated and custom descriptions with live values, and a DSL test runner
 - The `gedsl` command-line tool
 
-**Not yet**: the Godot adapter and editor plugin, hot reload of live entities, the compiled backend, spatial selectors (`within` needs a host), resolving a player choice across a save, the VS Code extension, and the full coverage corpus. See [Roadmap](#roadmap).
+**Not yet**: the Godot adapter and editor plugin, hot reload of live entities, the compiled backend, spatial selectors (`within` needs a host), `every Xs` triggers, resolving a player choice across a save, the VS Code extension, and the full coverage corpus. See [Roadmap](#roadmap) and the gaps in [docs/coverage.md](docs/coverage.md).
 
 ## Building
 
@@ -186,7 +186,7 @@ Following section 7 of the design notes:
 2. **Save/load and deterministic math**: done.
 3. **Validate turn-based**: build inside a real roguelite.
 4. **Validate real-time**: the tick clock exists; it needs a real-time project, spatial selectors and allocation-free event paths.
-5. **Coverage corpus**: 23 Slay the Spire effects so far ([docs/coverage.md](docs/coverage.md)); Balatro, Monster Train, Hearthstone and Dota 2 are still to do.
+5. **Coverage corpus**: 58 effects from Slay the Spire, Monster Train, Hearthstone, Balatro and Dota 2 so far: 31 work directly, 16 need a workaround and 11 are not expressible yet ([docs/coverage.md](docs/coverage.md)). The design notes aim for about 150.
 6. **Release**: Godot plugin, hot reload, docs site, cookbook, sample game.
 7. **Project setup**: the name is still to be chosen.
 

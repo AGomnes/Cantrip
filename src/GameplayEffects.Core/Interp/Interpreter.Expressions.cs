@@ -881,10 +881,19 @@ namespace GameplayEffects.Runtime
 
         // Teams -----------------------------------------------------------------------------
 
-        /// <summary>The side an effect is running for. Neutral content is treated as the player's.</summary>
+        /// <summary>
+        /// The side an effect is running for, which is what <c>enemies</c>, <c>allies</c> and the
+        /// matching roles are relative to. Inside a modifier that is the modifier owner's side, not
+        /// the side of whoever is dealing the damage being modified: a relic that reduces damage
+        /// taken <c>where source:enemies</c> must still mean the player's enemies when an enemy is
+        /// the source. Neutral content is treated as the player's.
+        /// </summary>
         internal static Team Perspective(EvalContext context)
         {
-            Team team = (context.Source?.Controller ?? context.Self?.Controller)?.Team ?? Team.Player;
+            Entity? anchor = context.Focus != null
+                ? context.Self ?? context.Source
+                : context.Source ?? context.Self;
+            Team team = anchor?.Controller.Team ?? Team.Player;
             return team == Team.Neutral ? Team.Player : team;
         }
 

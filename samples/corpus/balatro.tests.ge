@@ -1,0 +1,26 @@
+# Tests for balatro.ge. Player: 80 hp, 3 energy, seed 1.
+
+test "balatro Greedy Joker adds mult for each diamond"
+  player chips 0 mult 1
+  relic "Greedy Joker"
+  play "Seven of Diamonds"
+  play "Seven of Spades"
+  expect player.mult == 4 and player.chips == 14
+
+test "balatro Cavendish multiplies mult"
+  player chips 0 mult 2
+  relic Cavendish
+  expect player.mult == 6
+
+test "balatro jokers count at scoring time"
+  player chips 0 mult 1 score 0
+  relic "Abstract Joker"
+  relic Cavendish
+  play "Ace of Hearts"
+  play "Play Hand"
+  expect player.score == 231
+
+test "balatro Glass cards double mult"
+  player chips 0 mult 3
+  play "Glass Queen"
+  expect player.mult == 6 and player.chips == 10

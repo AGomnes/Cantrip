@@ -4,7 +4,10 @@ using Xunit;
 
 namespace GameplayEffects.Tests.Review
 {
-    /// <summary>ContentLibrary loading, unloading and reloading, and number literal parsing.</summary>
+    /// <summary>
+    /// ContentLibrary loading, unloading and reloading, and number literal parsing. Regression
+    /// tests: each test's summary records a defect a review found, now fixed.
+    /// </summary>
     public sealed class ReviewContentTests
     {
         /// <summary>

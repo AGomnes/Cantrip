@@ -1,0 +1,37 @@
+# Tests for dota2.ge. Player: 80 hp, 3 energy, seed 1. `realtime 10` means ten ticks a second.
+
+test "dota Lifesteal heals for a share of the damage dealt"
+  player hp 50
+  enemy hp 50
+  apply Lifesteal 50 to player
+  deal 10 to enemy
+  expect player.hp == 55
+
+test "dota Poison Sting ticks once a second"
+  realtime 10
+  enemy hp 30
+  grant "Poison Sting"
+  cast "Poison Sting"
+  expect enemy.hp == 26
+  tick 10
+  expect enemy.hp == 22
+  tick 10
+  expect enemy.hp == 18
+  tick 10
+  expect enemy.hp == 18
+
+test "dota Skull Basher sometimes stuns"
+  realtime 10
+  enemy hp 100
+  relic "Skull Basher"
+  repeat 12:
+    deal 1 to enemy
+  expect enemy.has(Stun)
+
+test "dota War Banner boosts allied damage only"
+  enemy Raider
+  relic "War Banner"
+  deal 20 to enemy
+  expect enemy.hp == 5
+  end turn
+  expect player.hp == 76

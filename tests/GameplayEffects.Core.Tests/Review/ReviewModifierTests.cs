@@ -4,7 +4,10 @@ using static GameplayEffects.Tests.Review.ReviewSupport;
 
 namespace GameplayEffects.Tests.Review
 {
-    /// <summary>Modifier pipeline: layering, channel coverage and stat cache invalidation.</summary>
+    /// <summary>
+    /// Modifier pipeline: layering, channel coverage and stat cache invalidation. Regression tests:
+    /// each test's summary records a defect a review found, now fixed.
+    /// </summary>
     public sealed class ReviewModifierTests
     {
         private const string CodexContent = @"

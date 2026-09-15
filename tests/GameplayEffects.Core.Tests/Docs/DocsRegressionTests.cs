@@ -6,11 +6,10 @@ using Xunit;
 namespace GameplayEffects.Tests.Docs
 {
     /// <summary>
-    /// Defects found while writing docs/language.md. Each test states, as a DSL test block, what a
-    /// content author reading the reference would expect, so it fails until the defect is fixed.
-    /// The "Known issues" section of the reference describes today's behaviour and workarounds.
+    /// Defects found while documenting the language, now fixed. Each test states, as a DSL test
+    /// block, what a content author reading docs/language.md would expect.
     /// </summary>
-    public sealed class DocsBugTests
+    public sealed class DocsRegressionTests
     {
         [Fact]
         public void HarnessPassesAWorkingTest() => DocsDsl.AssertPasses(@"
@@ -249,7 +248,7 @@ test ""effect: with its body on the same line""
     {
         public static void AssertPasses(string dsl)
         {
-            ContentLibrary content = ContentLibrary.FromText(dsl, "docs-bug.ge");
+            ContentLibrary content = ContentLibrary.FromText(dsl, "docs-regression.ge");
             Assert.False(content.Diagnostics.HasErrors, content.Diagnostics.ToString());
             AssertAllPass(content);
         }
@@ -257,7 +256,7 @@ test ""effect: with its body on the same line""
         /// <summary>For defects where rejecting the content at load time would be an equally good fix.</summary>
         public static void AssertPassesOrReportsError(string dsl)
         {
-            ContentLibrary content = ContentLibrary.FromText(dsl, "docs-bug.ge");
+            ContentLibrary content = ContentLibrary.FromText(dsl, "docs-regression.ge");
             if (content.Diagnostics.HasErrors) return;
             AssertAllPass(content);
         }
