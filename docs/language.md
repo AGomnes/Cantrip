@@ -645,6 +645,6 @@ Numbers range to about ±9.2 trillion when written, and stay exact in multiplica
 - **Integration.** Section 4.7 sketches an `IEffectHost` with `Damage` and `Draw` methods. The library owns those rules itself (as section 6 asks), so the host only supplies names, functions and presentation: `TryResolveName`, `TryCall` and `OnEvent`.
 - **Spatial selectors** (`within`) parse, but their meaning comes from the host.
 - **`deal 2 to adjacent(target)`** uses board positions: actors on the same side one slot apart.
-- **Pending choices** are answered synchronously by an `IChoiceProvider`; suspending mid-choice across a save is not implemented yet.
+- **Pending choices** are answered by an `IChoiceProvider`. A UI that cannot answer on the spot uses `DeferredChooser`: the action rolls back to a snapshot, reports the choice, and replays deterministically once answered, so a saved game is never mid-choice.
 - **Backends.** Only the tree-walking interpreter exists; `ExecutionMode` is recorded but does not change pacing yet.
 - **Descriptions** follow section 3.12. Automatic text is serviceable English, meant as a starting point that designers override with `text:`.

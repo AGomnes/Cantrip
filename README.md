@@ -45,10 +45,12 @@ An early MVP of the core, per step 1 of the plan in the design notes. It is not 
 - A layered modifier pipeline (add, multiply, clamp, override) with sensible default scopes and explicit `of` scopes
 - A tree-walking interpreter, a battle runtime (turns, card play, draw, enemy intents) and a fixed-timestep tick clock for real time
 - Deterministic fixed-point math and RNG, state hashing, and save/load snapshots that replay exactly
+- Hot reload: edit content and a running game picks it up, keeping the state the game has changed
+- Player choices a UI answers mid-effect: the action rolls back, reports what it needs, and replays exactly once answered
 - A causality trace, a static linter, generated and custom descriptions with live values, and a DSL test runner
 - The `gedsl` command-line tool
 
-**Not yet**: the Godot adapter and editor plugin, hot reload of live entities, the compiled backend, spatial selectors (`within` needs a host), `every Xs` triggers, resolving a player choice across a save, the VS Code extension, and the full coverage corpus. See [Roadmap](#roadmap) and the gaps in [docs/coverage.md](docs/coverage.md).
+**Not yet**: the Godot adapter and editor plugin, the compiled backend, spatial selectors (`within` needs a host), `every Xs` triggers, the VS Code extension, and the full coverage corpus. See [Roadmap](#roadmap) and the gaps in [docs/coverage.md](docs/coverage.md).
 
 ## Building
 
@@ -134,6 +136,30 @@ Choices (targets, `choose`, `discard 2`) go through a pluggable `IChoiceProvider
 runtime.Chooser = new RandomChooser(seed: 7);
 ```
 
+A UI cannot answer on the spot, so it uses `DeferredChooser`. An action that needs a decision rolls back to where it started and says so; answering replays it, deterministically:
+
+```csharp
+runtime.Chooser = new DeferredChooser();
+
+if (runtime.Play(card) == PlayResult.ChoicePending)
+{
+    PendingChoice choice = runtime.Pending!;       // prompt, options, min, max
+    // ... ask the player, then ...
+    runtime.Answer(chosen.Id);                     // ChoicePending again if it needs another
+}
+```
+
+Nothing happens until the action completes: host events are held back, so the game never animates a hit that was rolled back.
+
+Hot reload. Load the changed files, then rebind the running game:
+
+```csharp
+content.LoadFile("content/cards.ge");
+CardRuntime.ReloadReport report = runtime.ApplyContentChanges();
+```
+
+Stats the game has changed keep their values; a card still at its printed cost takes the new one. Definitions that vanished are listed in the report, and their entities keep playing.
+
 Save and load. A snapshot is plain data, taken between actions; restoring it into a runtime with the same content continues the game exactly:
 
 ```csharp
@@ -187,7 +213,7 @@ Following section 7 of the design notes:
 3. **Validate turn-based**: build inside a real roguelite.
 4. **Validate real-time**: the tick clock exists; it needs a real-time project, spatial selectors and allocation-free event paths.
 5. **Coverage corpus**: 58 effects from Slay the Spire, Monster Train, Hearthstone, Balatro and Dota 2 so far: 31 work directly, 16 need a workaround and 11 are not expressible yet ([docs/coverage.md](docs/coverage.md)). The design notes aim for about 150.
-6. **Release**: Godot plugin, hot reload, docs site, cookbook, sample game.
+6. **Release**: Godot plugin (in progress), docs site, cookbook, sample game. Hot reload is done in the core.
 7. **Project setup**: the name is still to be chosen.
 
 ## License

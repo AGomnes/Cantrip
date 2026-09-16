@@ -51,7 +51,11 @@ Errors are collected, not thrown, with recovery to the end of the line or block,
 
 **`TraceLog`** records steps with parent ids when enabled, and costs one branch per recording site when not.
 
-**Snapshots.** `GameState.Capture` produces plain data. Scheduled blocks are stored by content address (`card:Prepare/effect/0.body`), not object reference, so a save stays valid across processes. `Restore` rebuilds entities, zones and scheduled work, then re-registers listeners and modifiers in creation order and restores listener limit windows.
+**Snapshots.** `GameState.Capture` produces plain data. Scheduled blocks are stored by content address (`card:Prepare/effect/0.body`), not object reference, so a save stays valid across processes. `Restore` rebuilds entities, zones and scheduled work, then re-registers listeners and modifiers in creation order and restores listener limit windows. Restoring into the same game reuses the entity instances whose ids match, so an `Entity` the game is holding stays the same object; anything the snapshot does not mention is marked removed.
+
+**Hot reload.** `ContentLibrary` replaces exactly what a file contributed, and `CardRuntime.ApplyContentChanges` then points every live entity at the definition now loaded under its kind and name, re-registering its listeners and modifiers. A stat the game has changed keeps its value, because editing a card's cost must not heal an enemy mid-fight; a stat still at the definition's old number takes the new one.
+
+**Player choices.** A UI cannot answer a `choose` while the interpreter is inside it, so `DeferredChooser` throws instead of guessing. `CardRuntime` wraps each top-level action: it snapshots first, and on a pending choice it abandons queued work, restores, truncates the trace and reports the choice. Answering replays the same action with the answers in order. The rollback is exact, so the replay follows the identical path, and host notifications are buffered for the attempt so presentation only ever sees events that really happened.
 
 ## Interpreter
 
