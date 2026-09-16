@@ -58,6 +58,43 @@ namespace GameplayEffects.Content
         /// <summary>Incremented whenever content changes, so a runtime knows to rebind live entities.</summary>
         public int Generation { get; private set; }
 
+        /// <summary>
+        /// A stable hash of what is loaded: every definition's kind and name, plus verb and resource
+        /// names. A save file records it and refuses to restore against content that has changed
+        /// underneath it, which turns "a definition this snapshot needs is missing" into a message
+        /// the game can show before anything goes wrong.
+        /// </summary>
+        public string Fingerprint
+        {
+            get
+            {
+                var names = new List<string>();
+                foreach (EntityDefinition definition in _definitions.Values) names.Add(definition.KindName + ":" + definition.Name);
+                foreach (string verb in _verbs.Keys) names.Add("verb:" + verb);
+                foreach (string resource in _resources.Keys) names.Add("resource:" + resource);
+                names.Sort(StringComparer.OrdinalIgnoreCase);
+
+                ulong hash = 14695981039346656037UL;
+                foreach (string name in names)
+                {
+                    foreach (char c in name)
+                    {
+                        unchecked
+                        {
+                            hash ^= char.ToLowerInvariant(c);
+                            hash *= 1099511628211UL;
+                        }
+                    }
+                    unchecked
+                    {
+                        hash ^= '\n';
+                        hash *= 1099511628211UL;
+                    }
+                }
+                return hash.ToString("x16", System.Globalization.CultureInfo.InvariantCulture);
+            }
+        }
+
         /// <summary>Every diagnostic from every loaded file, in load order.</summary>
         public DiagnosticBag Diagnostics
         {
@@ -114,9 +151,19 @@ namespace GameplayEffects.Content
             return diagnostics;
         }
 
+        /// <summary>
+        /// Reads a file from the file system. Tools and desktop games use this; a game engine that
+        /// packs content into an archive (Godot's <c>res://</c>, for one) cannot, because this goes
+        /// through <see cref="File"/>. Such a host reads the text its own way and calls
+        /// <see cref="LoadText"/>, which is the only seam that needs no file system at all.
+        /// </summary>
         public DiagnosticBag LoadFile(string path) => LoadText(File.ReadAllText(path), path);
 
-        /// <summary>Loads every matching file under a folder, in ordinal path order for determinism.</summary>
+        /// <summary>
+        /// Loads every matching file under a folder, in ordinal path order for determinism. Like
+        /// <see cref="LoadFile"/>, this reads the real file system, so a packed game must do its own
+        /// discovery and call <see cref="LoadText"/> per file, keeping the same ordinal order.
+        /// </summary>
         public DiagnosticBag LoadFolder(string folder, string extension = DefaultExtension, bool recursive = true)
         {
             var all = new DiagnosticBag();

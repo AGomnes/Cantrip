@@ -93,6 +93,12 @@ namespace GameplayEffects.Runtime
 
         public IReadOnlyList<TraceEntry> Entries => _entries;
 
+        /// <summary>
+        /// How many entries the ring buffer has discarded since the log was last cleared. A viewer
+        /// can say "412 entries dropped" rather than showing a gap and implying nothing happened.
+        /// </summary>
+        public long Dropped { get; private set; }
+
         /// <summary>The entry new records attach to as children.</summary>
         public long? CurrentParent => _scope.Count > 0 ? _scope.Peek() : (long?)null;
 
@@ -112,7 +118,11 @@ namespace GameplayEffects.Runtime
             _entries.Add(new TraceEntry(id, parentOverride ?? CurrentParent, time, kind, description, source, listener, span, values));
 
             if (Capacity.HasValue && _entries.Count > Capacity.Value)
-                _entries.RemoveRange(0, _entries.Count - Capacity.Value);
+            {
+                int excess = _entries.Count - Capacity.Value;
+                _entries.RemoveRange(0, excess);
+                Dropped += excess;
+            }
 
             return id;
         }
@@ -129,6 +139,7 @@ namespace GameplayEffects.Runtime
         {
             _entries.Clear();
             _scope.Clear();
+            Dropped = 0;
         }
 
         /// <summary>

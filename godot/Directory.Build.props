@@ -1,10 +1,18 @@
 <Project>
 
   <!--
-    Deliberately empty, and deliberately not importing the repository root's Directory.Build.props.
-    MSBuild stops at the nearest one, so this keeps the root's C# 9 / netstandard2.1 conventions
-    (which exist to keep the engine Unity-compatible) away from the Godot project, which builds as
-    net8.0 against the Godot SDK.
+    Chain to the repository root so the Godot projects keep its conventions (nullable warnings as
+    errors, no implicit usings, package metadata), then relax the one setting that cannot apply.
   -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <!--
+      C# 9 is pinned at the root only to keep the engine compilable for Unity. Godot's own source
+      generators emit modern C# into this compilation, so the Godot projects build at the latest
+      language version instead.
+    -->
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
 
 </Project>

@@ -8,18 +8,18 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <EnableDynamicLoading>true</EnableDynamicLoading>
+    <AssemblyName>GameplayEffects.Demo</AssemblyName>
     <RootNamespace>GameplayEffects.GodotAdapter</RootNamespace>
-    <Nullable>enable</Nullable>
-    <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
     <!--
-      In this repository the rules engine is a project next door. A game that installs the addon
-      replaces this with a PackageReference or a DLL in the project. The configuration is pinned:
-      MSBuild would otherwise ask the library for an ExportRelease build it does not define.
+      In this repository the rules engine is the project next door. A game that installs the addon
+      replaces this with a PackageReference or a DLL. The configuration is pinned: MSBuild would
+      otherwise ask the library for the Godot SDK's ExportRelease configuration, which it does not
+      define.
     -->
-    <ProjectReference Include="..\src\GameplayEffects.Core\GameplayEffects.Core.csproj" SetConfiguration="Configuration=Release" />
+    <ProjectReference Include="..\..\src\GameplayEffects.Core\GameplayEffects.Core.csproj" SetConfiguration="Configuration=Release" />
   </ItemGroup>
 
 </Project>

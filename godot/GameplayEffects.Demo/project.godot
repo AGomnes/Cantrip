@@ -3,8 +3,8 @@
 ; The C# assembly must be built before Godot runs, or the plugin silently does not load and the
 ; [GlobalClass] types are invisible to GDScript:
 ;
-;   dotnet build godot/GameplayEffectsGodot.csproj
-;   Godot_v4.6.1-stable_mono_win64_console.exe --headless --path godot --import
+;   dotnet build godot/GameplayEffects.Demo/GameplayEffects.Demo.csproj
+;   Godot_v4.6.1-stable_mono_win64_console.exe --headless --path godot/GameplayEffects.Demo --import
 
 config_version=5
 
@@ -16,7 +16,7 @@ config/features=PackedStringArray("4.6", "C#")
 
 [dotnet]
 
-project/assembly_name="GameplayEffectsGodot"
+project/assembly_name="GameplayEffects.Demo"
 
 [editor_plugins]
 

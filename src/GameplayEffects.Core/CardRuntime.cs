@@ -821,6 +821,12 @@ namespace GameplayEffects
         /// Captures the full rules state. Only valid between actions; the returned object is plain
         /// data that any serializer can store.
         /// </summary>
+        /// <summary>
+        /// Whether <see cref="Capture"/> would succeed right now. Snapshots are only valid between
+        /// actions, so a UI can grey out its save button instead of catching an exception.
+        /// </summary>
+        public bool CanCapture => !Interpreter.HasPendingWork;
+
         public GameSnapshot Capture()
         {
             if (Interpreter.HasPendingWork) throw new InvalidOperationException("Cannot snapshot while effects are still resolving.");
