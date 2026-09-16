@@ -1,0 +1,10 @@
+<Project>
+
+  <!--
+    Deliberately empty, and deliberately not importing the repository root's Directory.Build.props.
+    MSBuild stops at the nearest one, so this keeps the root's C# 9 / netstandard2.1 conventions
+    (which exist to keep the engine Unity-compatible) away from the Godot project, which builds as
+    net8.0 against the Godot SDK.
+  -->
+
+</Project>
