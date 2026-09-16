@@ -131,6 +131,18 @@ namespace GameplayEffects.Runtime
             _scope.Clear();
         }
 
+        /// <summary>
+        /// Drops everything recorded after a mark taken from <see cref="Entries"/>.Count. An action
+        /// that is rolled back (a pending player choice) uses this so the log shows only what
+        /// actually happened.
+        /// </summary>
+        public void TruncateTo(int count)
+        {
+            if (count < 0 || count >= _entries.Count) return;
+            _entries.RemoveRange(count, _entries.Count - count);
+            _scope.Clear();
+        }
+
         public TraceEntry? Find(long id)
         {
             for (int i = _entries.Count - 1; i >= 0; i--)

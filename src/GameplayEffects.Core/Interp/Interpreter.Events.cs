@@ -35,6 +35,31 @@ namespace GameplayEffects.Runtime
         internal void AbandonPending() => _queue.Clear();
 
         /// <summary>
+        /// Host notifications held back while an action that may be rolled back is running, so a
+        /// game never animates an event that turns out not to have happened.
+        /// </summary>
+        private List<GameEvent>? _hostBuffer;
+
+        internal void BeginHostBuffer() => _hostBuffer = new List<GameEvent>();
+
+        /// <summary>Delivers everything buffered, in the order it resolved.</summary>
+        internal void FlushHostBuffer()
+        {
+            List<GameEvent>? buffered = _hostBuffer;
+            _hostBuffer = null;
+            if (buffered == null) return;
+            foreach (GameEvent gameEvent in buffered) Host.OnEvent(gameEvent);
+        }
+
+        internal void DiscardHostBuffer() => _hostBuffer = null;
+
+        private void NotifyHost(GameEvent gameEvent)
+        {
+            if (_hostBuffer != null) _hostBuffer.Add(gameEvent);
+            else Host.OnEvent(gameEvent);
+        }
+
+        /// <summary>
         /// Raises an event through its three phases around <paramref name="action"/>. Before
         /// listeners run inline and may cancel or change <see cref="GameEvent.Amount"/>; if any
         /// instead listener fires, the action is skipped; after listeners are queued. Returns
@@ -82,7 +107,7 @@ namespace GameplayEffects.Runtime
 
                 QueueDecay(gameEvent);
                 ProcessDeadlines(gameEvent);
-                Host.OnEvent(gameEvent);
+                NotifyHost(gameEvent);
                 return !replaced;
             }
         }

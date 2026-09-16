@@ -78,6 +78,26 @@ namespace GameplayEffects.Runtime
         /// </summary>
         public int MaxCallDepth { get; set; } = 64;
 
+        /// <summary>
+        /// True when two rulesets say exactly the same thing. Hot reload uses it to tell a designer
+        /// that a ruleset edit needs a new game, since a running one is already resolving against
+        /// the old rules.
+        /// </summary>
+        public bool SameAs(Ruleset other) =>
+            other != null
+            && BeforeEvents == other.BeforeEvents
+            && InsteadEvents == other.InsteadEvents
+            && AfterEvents == other.AfterEvents
+            && Loops == other.Loops
+            && MaxDepth == other.MaxDepth
+            && Triggers == other.Triggers
+            && HandSize == other.HandSize
+            && MaxHandSize == other.MaxHandSize
+            && MaxStepsPerAction == other.MaxStepsPerAction
+            && MaxCallDepth == other.MaxCallDepth
+            && Ordering.SequenceEqual(other.Ordering)
+            && ModifierLayers.SequenceEqual(other.ModifierLayers);
+
         /// <summary>Applies the settings from a <c>ruleset</c> block over the defaults.</summary>
         public static Ruleset FromSyntax(RulesetDeclNode syntax, DiagnosticBag diagnostics)
         {

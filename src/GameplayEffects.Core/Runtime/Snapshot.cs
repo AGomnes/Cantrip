@@ -241,7 +241,10 @@ namespace GameplayEffects.Runtime
             if (snapshot.FormatVersion != GameSnapshot.CurrentFormat)
                 throw new InvalidOperationException($"Snapshot format {snapshot.FormatVersion} is not supported (expected {GameSnapshot.CurrentFormat}).");
 
-            // Tear down: every listener and modifier goes, then every entity.
+            // Tear down: every listener and modifier goes, then every entity. The instances are
+            // kept aside first: restoring into the same game reuses the ones whose ids match, so an
+            // Entity the game is holding stays the same object across a load or a rolled-back action.
+            var previous = new Dictionary<int, Entity>(_byId);
             foreach (Entity entity in _entities.ToArray()) SetActive(entity, false);
             _entities.Clear();
             _byId.Clear();
@@ -258,23 +261,45 @@ namespace GameplayEffects.Runtime
                         ?? throw new InvalidOperationException($"The snapshot needs {record.DefinitionKind} \"{record.DefinitionName}\", which is not loaded.");
                 }
 
-                var entity = new Entity(this, record.Id, record.Name, (EntityKind)record.Kind, definition)
+                Entity entity;
+                if (previous.TryGetValue(record.Id, out Entity? existing)
+                    && existing.Kind == (EntityKind)record.Kind
+                    && string.Equals(existing.Name, record.Name, StringComparison.Ordinal))
                 {
-                    Team = (Team)record.Team,
-                    Zone = record.Zone ?? string.Empty,
-                    Position = record.Position,
-                    IsDead = record.IsDead,
-                    IsRemoved = record.IsRemoved,
-                    Sequence = record.Sequence,
-                    PatternIndex = record.PatternIndex,
-                    LastMove = record.LastMove,
-                    Intent = record.Intent,
-                };
+                    entity = existing;
+                    entity.ResetForRestore();
+                    entity.Definition = definition;
+                    previous.Remove(record.Id);
+                }
+                else
+                {
+                    entity = new Entity(this, record.Id, record.Name, (EntityKind)record.Kind, definition);
+                }
+
+                entity.Team = (Team)record.Team;
+                entity.Zone = record.Zone ?? string.Empty;
+                entity.Position = record.Position;
+                entity.IsDead = record.IsDead;
+                entity.IsRemoved = record.IsRemoved;
+                entity.Sequence = record.Sequence;
+                entity.PatternIndex = record.PatternIndex;
+                entity.LastMove = record.LastMove;
+                entity.Intent = record.Intent;
+
                 foreach (var stat in record.Stats) entity.SetBase(stat.Key, Num.FromRaw(stat.Value));
                 foreach (string tag in record.Tags) entity.AddTag(tag);
 
                 _entities.Add(entity);
                 _byId[entity.Id] = entity;
+            }
+
+            // Whatever the snapshot does not mention never existed in the timeline being restored.
+            // Anything still holding one of those entities sees it as removed, which is the truth.
+            foreach (Entity gone in previous.Values)
+            {
+                gone.Owner = null;
+                gone.Zone = Zones.None;
+                gone.IsRemoved = true;
             }
 
             foreach (EntitySnapshot record in snapshot.Entities)

@@ -17,6 +17,12 @@ namespace GameplayEffects
         NotEnoughEnergy,
         InvalidTarget,
         Cancelled,
+
+        /// <summary>
+        /// The action needs a decision from the player. The game has been rolled back to where it
+        /// was; see <see cref="CardRuntime.Pending"/> and answer with <see cref="CardRuntime.Answer(int[])"/>.
+        /// </summary>
+        ChoicePending,
     }
 
     public sealed class RuntimeOptions
@@ -178,7 +184,12 @@ namespace GameplayEffects
 
         /// <param name="shuffle">Shuffle the draw pile first. Tests turn this off to control draw order.</param>
         /// <param name="drawOpeningHand">Draw the first hand. Tests turn this off to set the hand explicitly.</param>
-        public void StartBattle(bool shuffle = true, bool drawOpeningHand = true)
+        public void StartBattle(bool shuffle = true, bool drawOpeningHand = true) =>
+            Attempt(
+                () => { StartBattleCore(shuffle, drawOpeningHand); return PlayResult.Played; },
+                () => { StartBattle(shuffle, drawOpeningHand); return Outcome(); });
+
+        private void StartBattleCore(bool shuffle, bool drawOpeningHand)
         {
             Entity player = State.Player ?? throw new InvalidOperationException("Create a player before starting a battle.");
 
@@ -205,7 +216,12 @@ namespace GameplayEffects
         }
 
         /// <summary>Ends the player's turn, runs the enemies' turn, and starts the next player turn.</summary>
-        public void EndTurn()
+        public void EndTurn() =>
+            Attempt(
+                () => { EndTurnCore(); return PlayResult.Played; },
+                () => { EndTurn(); return Outcome(); });
+
+        private void EndTurnCore()
         {
             if (!State.InBattle) return;
             if (State.ActiveTeam != Team.Player) throw new InvalidOperationException("It is not the player's turn.");
@@ -384,6 +400,16 @@ namespace GameplayEffects
         public PlayResult Play(Entity card, Entity? target = null)
         {
             if (card == null) throw new ArgumentNullException(nameof(card));
+
+            int cardId = card.Id;
+            int targetId = target?.Id ?? 0;
+            return Attempt(
+                () => PlayCore(card, target),
+                () => Live(cardId) is Entity again ? Play(again, Live(targetId)) : PlayResult.NotACard);
+        }
+
+        private PlayResult PlayCore(Entity card, Entity? target)
+        {
             if (card.Kind != EntityKind.Card || card.IsRemoved) return PlayResult.NotACard;
             if (card.Zone != Zones.Hand) return PlayResult.NotInHand;
             if (card.HasTag("unplayable")) return PlayResult.Unplayable;
@@ -541,6 +567,23 @@ namespace GameplayEffects
         /// <summary>Uses an ability if it is off cooldown. Returns false if it was not ready.</summary>
         public bool UseAbility(Entity ability, Entity? target = null)
         {
+            if (ability == null) throw new ArgumentNullException(nameof(ability));
+
+            int abilityId = ability.Id;
+            int targetId = target?.Id ?? 0;
+            bool used = false;
+            Attempt(
+                () => { used = UseAbilityCore(ability, target); return PlayResult.Played; },
+                () =>
+                {
+                    if (Live(abilityId) is Entity again) used = UseAbility(again, Live(targetId));
+                    return Outcome();
+                });
+            return used;
+        }
+
+        private bool UseAbilityCore(Entity ability, Entity? target)
+        {
             if (ability.IsRemoved || ability.Owner == null || !ability.Owner.IsAlive || !IsReady(ability)) return false;
 
             Entity owner = ability.Owner;
@@ -579,6 +622,181 @@ namespace GameplayEffects
 
             Run(null, _ => Interpreter.ExpireTimedStatuses());
             if (State.InBattle) CheckBattleOver();
+        }
+
+        // Player choices ------------------------------------------------------------------------
+
+        private Func<PlayResult>? _replay;
+        private bool _deferring;
+
+        /// <summary>
+        /// The decision a UI still has to make, set when an action returned
+        /// <see cref="PlayResult.ChoicePending"/>. Null when nothing is waiting.
+        /// </summary>
+        public PendingChoice? Pending { get; private set; }
+
+        /// <summary>
+        /// Answers <see cref="Pending"/> and replays the action that asked. Returns what the replayed
+        /// action returned, which is <see cref="PlayResult.ChoicePending"/> again if it needs a
+        /// further decision.
+        /// </summary>
+        public PlayResult Answer(params int[] entityIds) => Answer((IEnumerable<int>)entityIds);
+
+        public PlayResult Answer(IEnumerable<Entity> entities) => Answer((entities ?? Enumerable.Empty<Entity>()).Select(e => e.Id));
+
+        public PlayResult Answer(IEnumerable<int> entityIds)
+        {
+            if (Pending == null) throw new InvalidOperationException("No choice is pending.");
+            if (!(Chooser is DeferredChooser deferred)) throw new InvalidOperationException("Answering a choice needs a DeferredChooser.");
+
+            Func<PlayResult> replay = _replay ?? throw new InvalidOperationException("There is no action to replay.");
+            deferred.Add(entityIds);
+            Pending = null;
+            _replay = null;
+            return replay();
+        }
+
+        /// <summary>
+        /// Abandons the pending choice. The game is already back where it was before the action that
+        /// asked, so nothing else has to be undone.
+        /// </summary>
+        public void CancelPending()
+        {
+            Pending = null;
+            _replay = null;
+            (Chooser as DeferredChooser)?.Clear();
+        }
+
+        private PlayResult Outcome() => Pending == null ? PlayResult.Played : PlayResult.ChoicePending;
+
+        private Entity? Live(int id) => id == 0 ? null : State.Find(id);
+
+        /// <summary>
+        /// Runs a top-level action so that a decision nobody has answered stops it cleanly: the game
+        /// is restored to the snapshot the action started from, the choice is reported, and
+        /// <see cref="Answer(int[])"/> replays it. Without a <see cref="DeferredChooser"/> this is
+        /// nothing but a direct call.
+        /// </summary>
+        private PlayResult Attempt(Func<PlayResult> action, Func<PlayResult> replay)
+        {
+            if (_deferring || !(Chooser is DeferredChooser deferred)) return action();
+
+            GameSnapshot before;
+            try
+            {
+                before = Capture();
+            }
+            catch (InvalidOperationException error)
+            {
+                throw new InvalidOperationException(
+                    "Deferred choices need a game that can be snapshotted. " + error.Message, error);
+            }
+
+            int traceMark = State.Trace.Entries.Count;
+            _deferring = true;
+            deferred.Rewind();
+            deferred.Armed = true;
+            Interpreter.BeginHostBuffer();
+
+            try
+            {
+                PlayResult result = action();
+
+                // Only a completed action is real: now the game may hear about its events.
+                Interpreter.FlushHostBuffer();
+                deferred.Clear();
+                Pending = null;
+                _replay = null;
+                return result;
+            }
+            catch (ChoicePendingException pending)
+            {
+                Interpreter.AbandonPending();
+                Interpreter.DiscardHostBuffer();
+
+                // Options belong to the state being thrown away; ids survive the round trip.
+                int[] optionIds = pending.Request.Options.Select(o => o.Id).ToArray();
+                int chooserId = pending.Request.Chooser?.Id ?? 0;
+
+                Restore(before);
+                State.Trace.TruncateTo(traceMark);
+
+                Pending = new PendingChoice(
+                    pending.Request.Prompt,
+                    optionIds.Select(Live).Where(e => e != null).ToList()!,
+                    pending.Request.Min,
+                    pending.Request.Max,
+                    Live(chooserId),
+                    pending.Request.Span);
+                _replay = replay;
+                return PlayResult.ChoicePending;
+            }
+            catch
+            {
+                Interpreter.DiscardHostBuffer();
+                throw;
+            }
+            finally
+            {
+                deferred.Armed = false;
+                _deferring = false;
+            }
+        }
+
+        // Hot reload ----------------------------------------------------------------------------
+
+        /// <summary>What <see cref="ApplyContentChanges"/> did, for tools and logs.</summary>
+        public sealed class ReloadReport
+        {
+            /// <summary>Live entities pointed at a newly loaded definition.</summary>
+            public int Rebound { get; internal set; }
+
+            /// <summary>Definitions entities still use that the reloaded content no longer has.</summary>
+            public List<string> Missing { get; } = new List<string>();
+
+            /// <summary>The ruleset changed; a running game keeps the rules it started with.</summary>
+            public bool RulesetChanged { get; internal set; }
+
+            public override string ToString() =>
+                $"{Rebound} rebound, {Missing.Count} missing" + (RulesetChanged ? ", ruleset changed (needs a new game)" : string.Empty);
+        }
+
+        /// <summary>
+        /// Rebinds every live entity to the definition now loaded under its kind and name, so edits
+        /// to content take effect in a running game (section 4.1). Call it after reloading files
+        /// into <see cref="Content"/>.
+        /// </summary>
+        /// <remarks>
+        /// Stats the game has changed keep their values; stats still at the old definition's number
+        /// take the new one. An entity whose definition has disappeared keeps the one it has and is
+        /// listed in the report.
+        /// </remarks>
+        public ReloadReport ApplyContentChanges()
+        {
+            if (Interpreter.HasPendingWork) throw new InvalidOperationException("Cannot reload content while effects are still resolving.");
+
+            var report = new ReloadReport();
+
+            foreach (Entity entity in State.Entities.ToArray())
+            {
+                EntityDefinition? old = entity.Definition;
+                if (old == null || entity.IsRemoved) continue;
+
+                EntityDefinition? current = Content.Find(old.Name, old.KindName);
+                if (current == null)
+                {
+                    if (!report.Missing.Contains(old.ToString())) report.Missing.Add(old.ToString());
+                    continue;
+                }
+
+                if (ReferenceEquals(current, old)) continue;
+
+                State.Rebind(entity, current);
+                report.Rebound++;
+            }
+
+            report.RulesetChanged = !State.Rules.SameAs(Content.BuildRuleset());
+            return report;
         }
 
         // Save and load -------------------------------------------------------------------------
@@ -634,6 +852,15 @@ namespace GameplayEffects
         /// Runs DSL statements directly, as the REPL and tests do: <c>runtime.Execute("deal 5 to enemy")</c>.
         /// </summary>
         public void Execute(string statements, Entity? self = null, Entity? target = null)
+        {
+            int selfId = self?.Id ?? 0;
+            int targetId = target?.Id ?? 0;
+            Attempt(
+                () => { ExecuteCore(statements, self, target); return PlayResult.Played; },
+                () => { Execute(statements, Live(selfId), Live(targetId)); return Outcome(); });
+        }
+
+        private void ExecuteCore(string statements, Entity? self, Entity? target)
         {
             BlockNode block = ParseStatements(statements);
             Entity? actor = self == null ? State.Player : self.Kind == EntityKind.Actor ? self : self.Controller;

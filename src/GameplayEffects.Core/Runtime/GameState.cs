@@ -409,6 +409,50 @@ namespace GameplayEffects.Runtime
             RefreshActivation(entity);
         }
 
+        /// <summary>
+        /// Points a live entity at a reloaded definition: listeners and modifiers are re-registered
+        /// from the new content, and stats and tags are brought forward.
+        /// </summary>
+        /// <remarks>
+        /// A stat the game has changed keeps its value, because a designer editing a card's cost
+        /// must not heal the enemy that is halfway through a fight. A stat still sitting at the old
+        /// definition's number takes the new one, which is what makes tweaking numbers live work.
+        /// </remarks>
+        internal void Rebind(Entity entity, EntityDefinition definition)
+        {
+            if (definition == null) throw new ArgumentNullException(nameof(definition));
+
+            EntityDefinition? old = entity.Definition;
+            SetActive(entity, false);
+            entity.Definition = definition;
+
+            if (old != null)
+            {
+                foreach (KeyValuePair<string, Num> stat in old.Stats)
+                {
+                    if (!entity.HasStat(stat.Key) || entity.GetBase(stat.Key) != stat.Value) continue;
+
+                    if (definition.Stats.TryGetValue(stat.Key, out Num updated)) entity.SetBase(stat.Key, updated);
+                    else entity.RemoveStat(stat.Key);
+                }
+
+                // Tags the game added at runtime are not the definition's to take away.
+                foreach (string tag in old.Tags)
+                {
+                    if (!definition.HasTag(tag)) entity.RemoveTag(tag);
+                }
+            }
+
+            foreach (KeyValuePair<string, Num> stat in definition.Stats)
+            {
+                if (!entity.HasStat(stat.Key)) entity.SetBase(stat.Key, stat.Value);
+            }
+            foreach (string tag in definition.Tags) entity.AddTag(tag);
+
+            RefreshActivation(entity);
+            Touch();
+        }
+
         // History ------------------------------------------------------------------------------
 
         /// <summary>

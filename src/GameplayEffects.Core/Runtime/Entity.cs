@@ -33,7 +33,12 @@ namespace GameplayEffects.Runtime
 
         public string Name { get; }
         public EntityKind Kind { get; }
-        public EntityDefinition? Definition { get; }
+
+        /// <summary>
+        /// The content this entity came from. Hot reload swaps it for the newly loaded definition
+        /// of the same kind and name, which is why it is not read-only.
+        /// </summary>
+        public EntityDefinition? Definition { get; internal set; }
 
         // Every property a modifier filter could read bumps GameState.Version when it changes, so
         // the stat cache can never serve a value computed against stale state.
@@ -182,6 +187,28 @@ namespace GameplayEffects.Runtime
         internal void RemoveStat(string stat)
         {
             if (_base.Remove(stat)) State.Touch();
+        }
+
+        /// <summary>
+        /// Wipes everything a snapshot fully describes, so this instance can be reused when a game
+        /// is restored. Reusing instances is what lets an <see cref="Entity"/> a game is holding
+        /// stay valid across a load, or across an action that was rolled back for a player choice.
+        /// </summary>
+        internal void ResetForRestore()
+        {
+            _base.Clear();
+            _tags.Clear();
+            _attached.Clear();
+            Owner = null;
+            Source = null;
+            Zone = string.Empty;
+            Position = 0;
+            IsDead = false;
+            IsRemoved = false;
+            PatternIndex = 0;
+            LastMove = null;
+            Intent = null;
+            State.Touch();
         }
 
         // Attachments ----------------------------------------------------------------------
