@@ -66,6 +66,13 @@ func _on_choice_requested(request: Dictionary) -> void:
     rules.AnswerChoice(request["id"], [picked])
 ```
 
+A complete version of this, with a hand, enemy panels, intents and a log, is in
+`godot/GameplayEffects.Demo/demo/battle.tscn`. It also plays itself:
+
+```
+godot --headless --path godot/GameplayEffects.Demo res://demo/battle.tscn -- --demo-auto
+```
+
 ## The node
 
 `GameplayEffectsRuntime` is the only surface script touches. Entities cross as `int` ids (0 means
@@ -96,9 +103,10 @@ use `Core`, the `CardRuntime` underneath.
 
 The rules resolve an action completely and immediately; presentation watches afterwards.
 
-- **Events are delivered after the action finishes, never during it.** A handler that called back
-  into the runtime mid-resolution would re-enter an interpreter that is not re-entrant, so every
-  entry point refuses a nested call with a clear error.
+- **Events are delivered after the action finishes, never during it.** Acting again from a handler
+  is fine — answer a choice, play the next card — because by then nothing is resolving. What is
+  refused, with a clear error, is calling in from a **host callback** (`RegisterName`,
+  `RegisterFunction`): those run in the middle of an effect and must answer and return.
 - **They arrive in completion order, innermost first.** An event that wraps others completes after
   them: playing a card reports `damaged`, then `status_applied`, then `card_played`.
 - **Each event carries the stats it changed, as they were then** (`after`), because by animation
@@ -190,6 +198,7 @@ dotnet test tests/GameplayEffects.Godot.Tests
 godot --headless --path godot/GameplayEffects.Demo --import
 godot --headless --path godot/GameplayEffects.Demo res://tests/headless.tscn
 godot --headless --path godot/GameplayEffects.Demo res://tests/gdscript_smoke.tscn
+godot --headless --path godot/GameplayEffects.Demo res://demo/battle.tscn -- --demo-auto
 ```
 
 The `ExportRelease` build is the cheap proof that no editor-only code escaped `#if TOOLS`; both

@@ -100,5 +100,9 @@ jobs:
       - name: GDScript smoke test
         run: timeout 300 "$GODOT" --headless --path godot/GameplayEffects.Demo res://tests/gdscript_smoke.tscn
 
+      # The demo is the worked example in docs/godot.md, so it has to keep working.
+      - name: Demo plays itself
+        run: timeout 300 "$GODOT" --headless --path godot/GameplayEffects.Demo res://demo/battle.tscn -- --demo-auto
+
       - name: Editor dock self-test
         run: timeout 300 "$GODOT" --headless --path godot/GameplayEffects.Demo --import -- --ge-selftest

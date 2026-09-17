@@ -38,6 +38,7 @@ namespace GameplayEffects.GodotAdapter
         private DescriptionBuilder? _describer;
         private int _describerGeneration = -1;
         private bool _busy;
+        private bool _drainingEvents;
         private int _announcedChoice;
         private bool _wasInBattle;
 
@@ -556,12 +557,12 @@ namespace GameplayEffects.GodotAdapter
         private T Act<T>(Func<T> action)
         {
             Guard();
+
+            T result;
             _busy = true;
             try
             {
-                T result = action();
-                AfterAction();
-                return result;
+                result = action();
             }
             catch
             {
@@ -572,19 +573,42 @@ namespace GameplayEffects.GodotAdapter
             {
                 _busy = false;
             }
+
+            // Deliberately outside the guard. Telling the game what happened is not resolving, and
+            // the obvious thing to do when asked for a decision is to answer it there and then.
+            AfterAction();
+            return result;
         }
 
+        /// <summary>
+        /// Refuses a call made while the rules are mid-effect. That can only happen from a host
+        /// callback, which the interpreter invokes in the middle of resolving; such a callback must
+        /// answer and return. Acting again from a signal handler is fine: by then the action is over.
+        /// </summary>
         private void Guard()
         {
             if (_busy)
                 throw new InvalidOperationException(
-                    "The rules are already resolving. Presentation must not call back into the runtime; react to the event and act on the next frame.");
+                    "The rules are resolving. A host callback must answer and return; it cannot play a card, end a turn or save from inside an effect.");
         }
 
         private void AfterAction()
         {
-            if (Presenter != null && IsInstanceValid(Presenter)) Presenter.Drain(Buffer);
-            else Buffer.Drain(record => EmitSignal(SignalName.EffectEvent, VariantMap.Event(record)));
+            // A handler that acts again arrives here a second time while the first drain is still
+            // walking the buffer. Let the outer one finish rather than deliver the same events twice.
+            if (!_drainingEvents)
+            {
+                _drainingEvents = true;
+                try
+                {
+                    if (Presenter != null && IsInstanceValid(Presenter)) Presenter.Drain(Buffer);
+                    else Buffer.Drain(record => EmitSignal(SignalName.EffectEvent, VariantMap.Event(record)));
+                }
+                finally
+                {
+                    _drainingEvents = false;
+                }
+            }
 
             SyncChoice();
 

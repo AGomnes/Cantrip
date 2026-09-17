@@ -43,7 +43,8 @@ namespace GameplayEffects.GodotAdapter.Demo
                 ADeferredChoiceRollsBackAndReplays();
                 SavingAndLoadingReturnsTheSameGame();
                 HotReloadChangesARunningGame();
-                PresentationCannotCallBackIn();
+                AChoiceIsAnsweredFromTheSignalThatAsks();
+                AHostCallbackCannotCallBackIn();
 
                 code = _failures.Count == 0 ? 0 : 1;
             }
@@ -226,16 +227,52 @@ namespace GameplayEffects.GodotAdapter.Demo
             rules.QueueFree();
         }
 
-        private void PresentationCannotCallBackIn()
+        /// <summary>
+        /// The flow the documentation shows: a game is asked for a decision and answers it from the
+        /// signal. This has to work, or deferred choices are unusable from a normal Godot game.
+        /// </summary>
+        private void AChoiceIsAnsweredFromTheSignalThatAsks()
+        {
+            GameplayEffectsRuntime rules = Loaded();
+            rules.CreatePlayer();
+            rules.SpawnEnemy("Slime");
+            rules.StartBattle(false, false);
+
+            int spare = rules.AddCard("Ember", "hand");
+            int sort = rules.AddCard("Sort", "hand");
+
+            string answered = "never asked";
+            Action<Godot.Collections.Dictionary> answer = request =>
+                answered = rules.AnswerChoice(request["id"].AsInt32(), new Godot.Collections.Array { spare })["result"].AsString();
+
+            rules.ChoiceRequested += answer.Invoke;
+            string played = rules.Play(sort);
+            rules.ChoiceRequested -= answer.Invoke;
+
+            Check("the card reported that it needed a decision", played == "pending", played);
+            Check("answering from the signal finished the action", answered == "played", answered);
+            Check("and the chosen card was exhausted", rules.GetZone(0, "exhaust").Contains(spare));
+            Check("with nothing left pending", !rules.HasPendingChoice());
+
+            rules.QueueFree();
+        }
+
+        /// <summary>
+        /// The one place calling back in really is wrong: a host callback runs while the interpreter
+        /// is mid-effect, so it must answer and return rather than start another action.
+        /// </summary>
+        private void AHostCallbackCannotCallBackIn()
         {
             GameplayEffectsRuntime rules = Loaded();
             rules.CreatePlayer();
             int slime = rules.SpawnEnemy("Slime");
             rules.StartBattle(false, false);
-            int ember = rules.AddCard("Ember", "hand");
 
             bool refused = false;
-            Action<Godot.Collections.Dictionary> reenter = _ =>
+
+            // The callback has to answer with a value. A host that returns nothing is saying "I do
+            // not know this name", and the rules carry on looking for it elsewhere.
+            rules.RegisterName("meddle", Callable.From((Godot.Collections.Dictionary _) =>
             {
                 try
                 {
@@ -245,14 +282,13 @@ namespace GameplayEffects.GodotAdapter.Demo
                 {
                     refused = true;
                 }
-            };
+                return 0;
+            }));
 
-            rules.EffectEvent += reenter.Invoke;
-            rules.Play(ember, slime);
-            rules.EffectEvent -= reenter.Invoke;
+            rules.Execute("log meddle", 0, 0);
 
-            Check("a handler calling back in is refused rather than corrupting the game", refused);
-            Check("and the game is still sound", rules.IsInBattle() && rules.GetStat(slime, "hp") == 25);
+            Check("a host callback that calls back in is refused", refused);
+            Check("and the game is still sound", rules.IsInBattle() && rules.GetStat(slime, "hp") == 30);
 
             rules.QueueFree();
         }
