@@ -60,6 +60,47 @@ namespace GameplayEffects.Descriptions
         }
 
         /// <summary>
+        /// Describes a single enemy move, which is what an intent panel shows: "Deal 11 damage to
+        /// you", not the enemy's whole repertoire. Pass the runtime and the enemy as well to get the
+        /// numbers it would actually deal now, modifiers and all.
+        /// </summary>
+        public Description DescribeMove(EntityDefinition definition, string moveName, CardRuntime? runtime = null, Entity? enemy = null)
+        {
+            if (definition == null) throw new ArgumentNullException(nameof(definition));
+            if (moveName == null) throw new ArgumentNullException(nameof(moveName));
+
+            MoveDefinition? move = definition.Moves.FirstOrDefault(m => string.Equals(m.Name, moveName, StringComparison.OrdinalIgnoreCase));
+            if (move == null)
+            {
+                string? suggestion = Suggest.Closest(moveName, definition.Moves.Select(m => m.Name));
+                throw new ArgumentException(
+                    $"{definition} has no move \"{moveName}\"." + (suggestion == null ? string.Empty : $" Did you mean \"{suggestion}\"?"),
+                    nameof(moveName));
+            }
+
+            Live? live = runtime != null && enemy != null ? new Live(runtime, enemy, runtime.Player) : null;
+            var session = new Session(this, definition, live);
+            List<DescriptionSegment> segments = session.RenderMove(move);
+
+            return new Description(move.Name, definition, DescriptionLevel.Auto, Merge(segments), null, Tooltips(definition, session.References), null);
+        }
+
+        /// <summary>
+        /// Describes what an enemy intends to do on its next turn. Empty while intents have not been
+        /// rolled, which is also what a UI should show then.
+        /// </summary>
+        public Description DescribeIntent(Entity enemy, CardRuntime runtime)
+        {
+            if (enemy == null) throw new ArgumentNullException(nameof(enemy));
+            if (runtime == null) throw new ArgumentNullException(nameof(runtime));
+
+            if (enemy.Definition == null || enemy.Intent == null)
+                return new Description(enemy.Name, enemy.Definition, DescriptionLevel.Auto, new List<DescriptionSegment>(), null, new KeywordTooltip[0], null);
+
+            return DescribeMove(enemy.Definition, enemy.Intent, runtime, enemy);
+        }
+
+        /// <summary>
         /// Drift protection: GE401 for placeholders that point at nothing, GE402 when the effect has
         /// changed since the writer recorded <c>text_checked</c>, GE403 when <c>text</c> is shadowed.
         /// </summary>
@@ -312,6 +353,22 @@ namespace GameplayEffects.Descriptions
 
             public List<DescriptionSegment> RenderCustom(string template) =>
                 Fill(template, name => Resolve(name) is DescriptionSegment segment ? new List<DescriptionSegment> { segment } : null, keepUnknown: true);
+
+            /// <summary>
+            /// One move's body on its own, for an intent panel. Values are named exactly as they
+            /// would be in the enemy's full description, so the same placeholders resolve.
+            /// </summary>
+            public List<DescriptionSegment> RenderMove(MoveDefinition move)
+            {
+                Values.Clear();
+                _counts.Clear();
+                _references.Clear();
+
+                foreach (KeyValuePair<string, Num> stat in _definition.Stats)
+                    Values[stat.Key] = DescriptionSegment.Number(stat.Value, stat.Value, stat.Key);
+
+                return Block(move.Body);
+            }
 
             public List<DescriptionSegment> RenderAuto()
             {

@@ -313,6 +313,46 @@ namespace GameplayEffects.Tests.Descriptions
         }
 
         [Fact]
+        public void One_enemy_move_can_be_described_for_an_intent_panel()
+        {
+            ContentLibrary content = Samples();
+            var builder = new DescriptionBuilder(content);
+            EntityDefinition worm = content.Find("Jaw Worm", "enemy")!;
+
+            Assert.Equal("Deal 11 damage to the player.", builder.DescribeMove(worm, "Chomp").ToPlainText());
+
+            // Live: the same move against a player who will take more from it.
+            var runtime = new CardRuntime(content);
+            Entity player = runtime.CreatePlayer();
+            Entity enemy = runtime.SpawnEnemy("Jaw Worm");
+            runtime.ApplyStatus("Vulnerable", player, 2);
+
+            Description live = builder.DescribeMove(worm, "Chomp", runtime, enemy);
+            DescriptionSegment damage = live.Find("damage")!;
+            Assert.Equal(11, damage.Base.ToInt());
+            Assert.Equal(16, damage.Current.ToInt());
+        }
+
+        [Fact]
+        public void An_enemy_intent_describes_the_move_it_rolled()
+        {
+            ContentLibrary content = Samples();
+            var runtime = new CardRuntime(content, new RuntimeOptions { Seed = 1 });
+            runtime.CreatePlayer();
+            Entity worm = runtime.SpawnEnemy("Jaw Worm");
+            var builder = new DescriptionBuilder(content);
+
+            // Intents are rolled when the battle starts; before that there is nothing to show.
+            Assert.True(builder.DescribeIntent(worm, runtime).IsEmpty);
+
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+
+            Description intent = builder.DescribeIntent(worm, runtime);
+            Assert.Equal(worm.Intent, intent.Name);
+            Assert.False(intent.IsEmpty);
+        }
+
+        [Fact]
         public void Every_sample_definition_can_be_described()
         {
             ContentLibrary content = Samples();
