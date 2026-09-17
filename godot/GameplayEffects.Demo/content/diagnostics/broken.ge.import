@@ -1,0 +1,16 @@
+[remap]
+
+importer="gameplay_effects.ge"
+importer_version=1
+type="Resource"
+uid="uid://q2mtlfcyo8yy"
+path="res://.godot/imported/broken.ge-8b0b5dc3ce0c510b4af88c68acaf78d1.res"
+
+[deps]
+
+source_file="res://content/diagnostics/broken.ge"
+dest_files=["res://.godot/imported/broken.ge-8b0b5dc3ce0c510b4af88c68acaf78d1.res"]
+
+[params]
+
+diagnostics/report_problems=true
