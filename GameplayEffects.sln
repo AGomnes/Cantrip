@@ -13,6 +13,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GameplayEffects.Core.Tests", "tests\GameplayEffects.Core.Tests\GameplayEffects.Core.Tests.csproj", "{98B64F3E-94D3-49B2-ADBA-294CA7289E6C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GameplayEffects.Godot.Tests", "tests\GameplayEffects.Godot.Tests\GameplayEffects.Godot.Tests.csproj", "{BD7F8916-E16F-4D19-AA73-E18986C0CA73}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -59,6 +61,18 @@ Global
 		{98B64F3E-94D3-49B2-ADBA-294CA7289E6C}.Release|x64.Build.0 = Release|Any CPU
 		{98B64F3E-94D3-49B2-ADBA-294CA7289E6C}.Release|x86.ActiveCfg = Release|Any CPU
 		{98B64F3E-94D3-49B2-ADBA-294CA7289E6C}.Release|x86.Build.0 = Release|Any CPU
+		{BD7F8916-E16F-4D19-AA73-E18986C0CA73}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BD7F8916-E16F-4D19-AA73-E18986C0CA73}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BD7F8916-E16F-4D19-AA73-E18986C0CA73}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{BD7F8916-E16F-4D19-AA73-E18986C0CA73}.Debug|x64.Build.0 = Debug|Any CPU
+		{BD7F8916-E16F-4D19-AA73-E18986C0CA73}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{BD7F8916-E16F-4D19-AA73-E18986C0CA73}.Debug|x86.Build.0 = Debug|Any CPU
+		{BD7F8916-E16F-4D19-AA73-E18986C0CA73}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BD7F8916-E16F-4D19-AA73-E18986C0CA73}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BD7F8916-E16F-4D19-AA73-E18986C0CA73}.Release|x64.ActiveCfg = Release|Any CPU
+		{BD7F8916-E16F-4D19-AA73-E18986C0CA73}.Release|x64.Build.0 = Release|Any CPU
+		{BD7F8916-E16F-4D19-AA73-E18986C0CA73}.Release|x86.ActiveCfg = Release|Any CPU
+		{BD7F8916-E16F-4D19-AA73-E18986C0CA73}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -67,5 +81,6 @@ Global
 		{11427C68-A000-44C8-B980-14E6C06B32A6} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{DD913FDD-513B-4138-9FE9-FF94492E1ED3} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{98B64F3E-94D3-49B2-ADBA-294CA7289E6C} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{BD7F8916-E16F-4D19-AA73-E18986C0CA73} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
