@@ -19,6 +19,11 @@ inside the project's own assembly — only the engine library itself can be a DL
 4. Enable *Gameplay Effects* in Project Settings → Plugins.
 5. Put `.ge` files under `res://content` (or set the node's `ContentFolder`).
 
+To hand the addon to someone else, `tools/package-addon.sh` (or `package-addon.ps1` on Windows)
+writes a zip whose root is `addons/gameplay_effects`, which is what "unzip this into your project"
+and the Asset Library both expect. It takes the version from `plugin.cfg`, so the two can never
+disagree.
+
 ## Two rules for GDScript
 
 Both are enforced by a smoke test in `godot/GameplayEffects.Demo/tests/`, because both fail in
