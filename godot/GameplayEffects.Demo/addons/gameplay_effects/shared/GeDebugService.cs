@@ -1,0 +1,212 @@
+using System;
+using System.Collections.Generic;
+using GameplayEffects.Content;
+using GameplayEffects.Diagnostics;
+using GameplayEffects.Runtime;
+
+namespace GameplayEffects.GodotAdapter
+{
+    /// <summary>What a game says about itself when the editor first reaches it.</summary>
+    public sealed class GeHello
+    {
+        internal GeHello(int protocol, int generation, string fingerprint, int definitions, bool inBattle, int turn, bool tracing)
+        {
+            Protocol = protocol;
+            Generation = generation;
+            Fingerprint = fingerprint;
+            Definitions = definitions;
+            InBattle = inBattle;
+            Turn = turn;
+            Tracing = tracing;
+        }
+
+        /// <summary>The protocol the game speaks, so an editor of another age can say so plainly.</summary>
+        public int Protocol { get; }
+
+        public int Generation { get; }
+
+        /// <summary>The content the game is running, as the core hashes it.</summary>
+        public string Fingerprint { get; }
+
+        public int Definitions { get; }
+
+        public bool InBattle { get; }
+
+        public int Turn { get; }
+
+        public bool Tracing { get; }
+
+        public override string ToString() => $"protocol {Protocol}, {Definitions} definition(s), {Fingerprint}";
+    }
+
+    /// <summary>What came of reloading content into a running game.</summary>
+    public sealed class GeReloadResult
+    {
+        internal GeReloadResult(bool applied, IReadOnlyList<Diagnostic> diagnostics, int rebound, IReadOnlyList<string> missing, bool rulesetChanged)
+        {
+            Applied = applied;
+            Diagnostics = diagnostics;
+            Rebound = rebound;
+            Missing = missing;
+            RulesetChanged = rulesetChanged;
+        }
+
+        /// <summary>
+        /// False when the new content has errors. The files are loaded either way, so the editor can
+        /// show what is wrong, but nothing live is rebound: a designer saving a half-written file
+        /// mid-battle should not have it applied.
+        /// </summary>
+        public bool Applied { get; }
+
+        public IReadOnlyList<Diagnostic> Diagnostics { get; }
+
+        public int Rebound { get; }
+
+        /// <summary>Definitions live entities still use that the reloaded content no longer has.</summary>
+        public IReadOnlyList<string> Missing { get; }
+
+        /// <summary>The ruleset changed; a running game keeps the rules it started with.</summary>
+        public bool RulesetChanged { get; }
+
+        public override string ToString() =>
+            Applied ? $"{Rebound} rebound" : $"not applied, {Diagnostics.Count} problem(s)";
+    }
+
+    /// <summary>What came of running statements from the editor's console.</summary>
+    public sealed class GeExecuteResult
+    {
+        internal GeExecuteResult(bool ok, string message, SourceSpan span)
+        {
+            Ok = ok;
+            Message = message;
+            Span = span;
+        }
+
+        public bool Ok { get; }
+
+        /// <summary>Empty when it worked; otherwise why it did not, ready to show.</summary>
+        public string Message { get; }
+
+        /// <summary>Where it went wrong, when the failure knows.</summary>
+        public SourceSpan Span { get; }
+
+        public override string ToString() => Ok ? "ok" : Message;
+    }
+
+    /// <summary>
+    /// The game's half of the editor channel, with no engine in it: what the editor can ask a
+    /// running game, and what it gets back.
+    /// </summary>
+    /// <remarks>
+    /// Keeping this engine-free is what makes it testable. The Godot side is then a thin adapter
+    /// that turns Variants into these calls and their results back into Variants, which is a shape
+    /// worth keeping: the awkward part of a debug channel is deciding what to send and when, not
+    /// the sending.
+    /// </remarks>
+    public sealed class GeDebugService
+    {
+        private static readonly IReadOnlyList<Diagnostic> NoDiagnostics = new Diagnostic[0];
+        private static readonly IReadOnlyList<string> NoMissing = new string[0];
+
+        public GeDebugService(CardRuntime runtime)
+        {
+            Runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
+        }
+
+        public CardRuntime Runtime { get; }
+
+        public ContentLibrary Content => Runtime.Content;
+
+        private TraceLog Log => Runtime.State.Trace;
+
+        /// <summary>Who the game is, answered as soon as the editor says hello.</summary>
+        public GeHello Hello()
+        {
+            int definitions = 0;
+            foreach (EntityDefinition _ in Content.Definitions) definitions++;
+
+            return new GeHello(
+                GeProtocol.Version,
+                Content.Generation,
+                Content.Fingerprint,
+                definitions,
+                Runtime.State.InBattle,
+                Runtime.State.Turn,
+                Log.Enabled);
+        }
+
+        /// <summary>
+        /// Turns the causality trace on or off from the editor, and bounds it. Tracing is not free,
+        /// so it is off until someone asks, and the bound is what keeps a long session from growing
+        /// without limit.
+        /// </summary>
+        public void EnableTrace(bool enabled, int capacity = 2000)
+        {
+            Log.Enabled = enabled;
+            Log.Capacity = capacity > 0 ? capacity : (int?)null;
+            if (!enabled) Log.Clear();
+        }
+
+        /// <summary>The steps recorded after a cursor. See <see cref="TraceBatch"/> for why it is pulled.</summary>
+        public TraceBatch Fetch(long sinceId = 0, int max = TraceBatch.DefaultMax) => TraceBatch.From(Log, sinceId, max);
+
+        /// <summary>
+        /// Reloads content the editor has just saved and rebinds the running game to it. Files are
+        /// loaded even when they are broken, so the editor can show why; the rebinding is what is
+        /// held back until they are clean.
+        /// </summary>
+        public GeReloadResult Reload(IEnumerable<KeyValuePair<string, string>> files)
+        {
+            if (files == null) throw new ArgumentNullException(nameof(files));
+
+            var problems = new List<Diagnostic>();
+            bool any = false;
+            foreach (KeyValuePair<string, string> file in files)
+            {
+                if (string.IsNullOrEmpty(file.Key)) continue;
+                any = true;
+                problems.AddRange(Content.LoadText(file.Value ?? string.Empty, file.Key));
+            }
+
+            if (!any) return new GeReloadResult(false, NoDiagnostics, 0, NoMissing, false);
+
+            bool broken = false;
+            foreach (Diagnostic problem in problems)
+            {
+                if (problem.Severity == DiagnosticSeverity.Error) broken = true;
+            }
+
+            if (broken) return new GeReloadResult(false, problems, 0, NoMissing, false);
+
+            CardRuntime.ReloadReport report = Runtime.ApplyContentChanges();
+            return new GeReloadResult(true, problems, report.Rebound, report.Missing, report.RulesetChanged);
+        }
+
+        /// <summary>
+        /// Runs DSL statements against the running game, which is the editor's console. A failure is
+        /// reported rather than thrown: the point of a console is to try things that might not work.
+        /// </summary>
+        public GeExecuteResult Execute(string statements)
+        {
+            if (string.IsNullOrWhiteSpace(statements)) return new GeExecuteResult(false, "Nothing to run.", SourceSpan.None);
+
+            try
+            {
+                Runtime.Execute(statements);
+                return new GeExecuteResult(true, string.Empty, SourceSpan.None);
+            }
+            catch (RuntimeError error)
+            {
+                return new GeExecuteResult(false, error.Message, error.Span);
+            }
+            catch (DslException error)
+            {
+                return new GeExecuteResult(false, error.Message, SourceSpan.None);
+            }
+            catch (Exception error) when (!(error is OutOfMemoryException))
+            {
+                return new GeExecuteResult(false, error.Message, SourceSpan.None);
+            }
+        }
+    }
+}
