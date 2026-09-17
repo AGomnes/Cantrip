@@ -1,0 +1,8 @@
+# The status Ember applies. Kept in its own file so that loading the folder exercises the
+# ordinal ordering the loader promises: cards.ge is read before statuses.ge, every time.
+
+status "Burn"
+  tags dot, fire, debuff
+  stacking intensity
+  on turn_end:
+    deal stacks to owner, ignore block

@@ -1,0 +1,12 @@
+# A tiny card, here so the importer has something real to import. The demo's own content comes
+# later. Note that Burn lives in statuses.ge: names resolve across files, which is why the
+# importer reports a file's parse problems but never claims a single file is valid on its own.
+
+card "Ember"
+  cost 1
+  target enemy
+  tags attack, fire
+  effect:
+    deal 5 to target
+    apply Burn 2 to target
+  text: "Deal {damage} damage and apply {Burn}."

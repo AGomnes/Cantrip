@@ -1,0 +1,7 @@
+# Deliberately broken, and kept out of the folders a game loads: `once` must say what it is once
+# per. It exists so the importer's diagnostics path has something to report, and so a reviewer can
+# see a parse error arrive in the Godot output with a file and a line on it.
+
+relic "Broken Sample"
+  on damaged once:
+    heal 1
