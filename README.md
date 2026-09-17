@@ -207,6 +207,7 @@ IReadOnlyList<DslTestResult> results = new DslTestRunner(content).RunAll();
 | `samples/corpus` | Reference effects from existing games, with DSL tests |
 | `godot/GameplayEffects.Demo` | The Godot 4.6 addon, with demo content and headless tests |
 | `tests/GameplayEffects.Godot.Tests` | The adapter's engine-free layer, tested without Godot |
+| `tools` | Packaging the addon as a zip someone can drop into their own project |
 
 ## Roadmap
 
@@ -217,7 +218,7 @@ Following section 7 of the design notes:
 3. **Validate turn-based**: build inside a real roguelite.
 4. **Validate real-time**: the tick clock exists; it needs a real-time project, spatial selectors and allocation-free event paths.
 5. **Coverage corpus**: 58 effects from Slay the Spire, Monster Train, Hearthstone, Balatro and Dota 2 so far: 31 work directly, 16 need a workaround and 11 are not expressible yet ([docs/coverage.md](docs/coverage.md)). The design notes aim for about 150.
-6. **Release**: the Godot addon runs headlessly today (node, importer, export check, editor dock). Still to do: live debugging from the editor, an export smoke test, Asset Library packaging, a docs site, a cookbook and a sample game.
+6. **Release**: the Godot addon is done and packaged — node, importer, export check, editor dock, a debugger tab showing a running game's causality tree, and a demo. A packaged build has been run to prove content reaches it. Still to do: an entity inspector beside the trace, breakpoints and stepping (which need a core change), a docs site and a cookbook.
 7. **Project setup**: the name is still to be chosen.
 
 ## License
