@@ -175,6 +175,24 @@ works in the editor would simply be missing from a shipped game. The addon there
 build. Loading always goes through the engine's file access, never `System.IO`: the engine's own
 `ContentLibrary.LoadFolder` cannot see inside an exported package.
 
+Two things to know before exporting a .NET game, both of which cost an afternoon to discover:
+
+- **Godot needs a solution file beside the project.** Without `YourProject.sln` next to the
+  `.csproj`, the export prints "This project contains C# files but no solution file was found",
+  ships no managed assembly, and the packaged game crashes on startup.
+- **The export exits 0 even when it fails.** Check its output, or check the result: the surest
+  test is to run the packaged game.
+
+```
+godot --headless --path godot/GameplayEffects.Demo --export-release "Linux" out/demo.x86_64
+out/demo.x86_64 --headless -- --demo-auto
+```
+
+The demo exits non-zero when no content loaded, so that second line is the test: a build whose
+content never travelled starts with an empty library and an empty hand. A workflow that does all
+of this on demand is in `.github/workflows/export.yml`; it is not part of every push, because the
+export templates are about a gigabyte.
+
 ## The editor dock
 
 Enable the plugin and the dock appears at the bottom:
@@ -208,6 +226,6 @@ quits.
 ## Not done yet
 
 Live debugging from the editor (a causality tree and entity inspector over Godot's debugger
-channel), hot reload pushed from the editor into a running game, an export smoke test that runs a
-packaged build, and Asset Library packaging. The dock's interactive use is checked by hand; only
-its work is covered headlessly.
+channel) and hot reload pushed from the editor into a running game: the message protocol for both
+is written and tested, but neither half is wired up yet. Asset Library packaging is also still to
+do. The dock's interactive use is checked by hand; only its work is covered headlessly.

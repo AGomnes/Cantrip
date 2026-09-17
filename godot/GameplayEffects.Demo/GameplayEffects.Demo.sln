@@ -1,0 +1,25 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Godot needs a solution beside the project to export a .NET game: without it the export prints
+# "This project contains C# files but no solution file was found", ships no managed assembly, and
+# the packaged game crashes on start. The export still exits 0 while doing it, so the export step
+# has to check the result rather than the status code.
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GameplayEffects.Demo", "GameplayEffects.Demo.csproj", "{6E3BE1F1-7C7A-4E5D-9A63-1B6F2D0A5E11}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		ExportDebug|Any CPU = ExportDebug|Any CPU
+		ExportRelease|Any CPU = ExportRelease|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6E3BE1F1-7C7A-4E5D-9A63-1B6F2D0A5E11}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6E3BE1F1-7C7A-4E5D-9A63-1B6F2D0A5E11}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6E3BE1F1-7C7A-4E5D-9A63-1B6F2D0A5E11}.ExportDebug|Any CPU.ActiveCfg = ExportDebug|Any CPU
+		{6E3BE1F1-7C7A-4E5D-9A63-1B6F2D0A5E11}.ExportDebug|Any CPU.Build.0 = ExportDebug|Any CPU
+		{6E3BE1F1-7C7A-4E5D-9A63-1B6F2D0A5E11}.ExportRelease|Any CPU.ActiveCfg = ExportRelease|Any CPU
+		{6E3BE1F1-7C7A-4E5D-9A63-1B6F2D0A5E11}.ExportRelease|Any CPU.Build.0 = ExportRelease|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

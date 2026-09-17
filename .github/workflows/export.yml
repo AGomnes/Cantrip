@@ -1,0 +1,77 @@
+name: Export
+
+# Exporting needs Godot's export templates, which are about a gigabyte, so this is not part of
+# every push. It answers the one question no other test can: does the content actually reach a
+# packaged game? A .ge file is not a resource, and a build that quietly shipped without any
+# content would start, run, and do nothing at all.
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Cache Godot and its export templates
+        id: godot
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot
+            ~/.local/share/godot/export_templates
+          key: godot-4.6.1-mono-linux-templates
+
+      - name: Download Godot and its export templates
+        if: steps.godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot /tmp/tpz
+          curl -fsSL -o /tmp/godot.zip \
+            https://github.com/godotengine/godot-builds/releases/download/4.6.1-stable/Godot_v4.6.1-stable_mono_linux_x86_64.zip
+          unzip -q /tmp/godot.zip -d ~/godot
+          curl -fsSL -o /tmp/templates.tpz \
+            https://github.com/godotengine/godot-builds/releases/download/4.6.1-stable/Godot_v4.6.1-stable_mono_export_templates.tpz
+          unzip -q /tmp/templates.tpz -d /tmp/tpz
+          mkdir -p ~/.local/share/godot/export_templates/4.6.1.stable.mono
+          mv /tmp/tpz/templates/* ~/.local/share/godot/export_templates/4.6.1.stable.mono/
+
+      - name: Find the binary
+        run: |
+          GODOT=$(find ~/godot -type f -name 'Godot_v*_mono_linux*' ! -name '*.zip' | head -1)
+          chmod +x "$GODOT"
+          echo "GODOT=$GODOT" >> "$GITHUB_ENV"
+
+      - name: Build and import
+        run: |
+          dotnet build godot/GameplayEffects.Demo/GameplayEffects.Demo.csproj
+          timeout 300 "$GODOT" --headless --path godot/GameplayEffects.Demo --import
+
+      # The export prints its failures and exits 0 anyway, so the log decides, not the status code.
+      - name: Export
+        run: |
+          mkdir -p artifacts/export
+          timeout 900 "$GODOT" --headless --path godot/GameplayEffects.Demo \
+            --export-release "Linux" "$PWD/artifacts/export/demo.x86_64" 2>&1 | tee export.log
+          if grep -iqE '^ERROR|no solution file' export.log; then
+            echo "The export reported errors; the build cannot be trusted."
+            exit 1
+          fi
+          ls -la artifacts/export
+
+      # The real check: a packaged game with no content starts with an empty hand, and the demo
+      # exits non-zero when that happens.
+      - name: The packaged game plays itself
+        run: |
+          chmod +x artifacts/export/demo.x86_64
+          timeout 300 artifacts/export/demo.x86_64 --headless -- --demo-auto
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: demo-linux
+          path: artifacts/export
+          retention-days: 7

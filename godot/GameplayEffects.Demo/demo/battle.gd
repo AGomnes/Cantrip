@@ -16,6 +16,7 @@ var presenter: BattlePresenter
 var _player := 0
 var _selected_card := 0
 var _auto := false
+var _load_errors := 0
 var _log: RichTextLabel
 var _enemies_box: HBoxContainer
 var _hand_box: HBoxContainer
@@ -41,6 +42,7 @@ func _build_game() -> void:
 	var problems: Array = rules.LoadContent(CONTENT)
 	for problem in problems:
 		if problem["severity"] == "error":
+			_load_errors += 1
 			push_error("%s:%d %s %s" % [problem["file"], problem["line"], problem["code"], problem["message"]])
 
 	# Without a presenter the node emits every event at once; with one, events arrive one at a
@@ -235,6 +237,14 @@ func _build_ui() -> void:
 # --- playing itself, for CI ----------------------------------------------------------------------
 
 func _play_itself() -> void:
+	# The check that makes this worth running against an exported build: a packaged game whose
+	# content did not travel starts with an empty library and an empty hand, and would otherwise
+	# "play" a battle of nothing and report success.
+	if _load_errors > 0 or rules.GetHand().is_empty():
+		print("DEMO: content did not load (%d error(s), %d card(s) in hand)" % [_load_errors, rules.GetHand().size()])
+		get_tree().quit(1)
+		return
+
 	for turn in 3:
 		for attempt in 8:
 			var playable := _playable()

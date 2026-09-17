@@ -13,6 +13,7 @@ config_version=5
 config/name="Gameplay Effects"
 config/description="Cards, statuses, relics and abilities written as text files."
 config/features=PackedStringArray("4.6", "C#")
+run/main_scene="res://demo/battle.tscn"
 
 [dotnet]
 
