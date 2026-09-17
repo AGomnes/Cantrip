@@ -38,6 +38,7 @@ namespace GameplayEffects.GodotAdapter
         private GeWorkspace? _workspace;
         private GePanel? _panel;
         private EditorDock? _dock;
+        private GeDebuggerPlugin? _debugger;
 
         public override string _GetPluginName() => "Gameplay Effects";
 
@@ -67,6 +68,12 @@ namespace GameplayEffects.GodotAdapter
             _highlighter = new GeSyntaxHighlighter();
             EditorInterface.Singleton?.GetScriptEditor()?.RegisterSyntaxHighlighter(_highlighter);
 
+            // A step in the trace of a running game opens the content line that caused it, in the
+            // same viewer a diagnostic or a failing test opens.
+            _debugger = new GeDebuggerPlugin();
+            _debugger.NavigateRequested += OnNavigateRequested;
+            AddDebuggerPlugin(_debugger);
+
             _workspace.Reload();
             GD.Print(
                 $"Gameplay Effects: dock ready, {_workspace.Files.Count} content file(s), " +
@@ -77,6 +84,14 @@ namespace GameplayEffects.GodotAdapter
 
         public override void _ExitTree()
         {
+            if (_debugger != null)
+            {
+                _debugger.NavigateRequested -= OnNavigateRequested;
+                _debugger.Close();
+                RemoveDebuggerPlugin(_debugger);
+                _debugger = null;
+            }
+
             if (_highlighter != null)
             {
                 EditorInterface.Singleton?.GetScriptEditor()?.UnregisterSyntaxHighlighter(_highlighter);
@@ -105,6 +120,8 @@ namespace GameplayEffects.GodotAdapter
                 _importPlugin = null;
             }
         }
+
+        private void OnNavigateRequested(string file, int line, int column) => _panel?.ShowSource(file, line, column);
 
         private static bool SelfTestRequested()
         {

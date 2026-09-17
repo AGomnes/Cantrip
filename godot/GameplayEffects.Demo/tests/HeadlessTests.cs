@@ -45,6 +45,7 @@ namespace GameplayEffects.GodotAdapter.Demo
                 HotReloadChangesARunningGame();
                 AChoiceIsAnsweredFromTheSignalThatAsks();
                 AHostCallbackCannotCallBackIn();
+                TheDebugChannelAnswersTheEditor();
 
                 code = _failures.Count == 0 ? 0 : 1;
             }
@@ -289,6 +290,57 @@ namespace GameplayEffects.GodotAdapter.Demo
 
             Check("a host callback that calls back in is refused", refused);
             Check("and the game is still sound", rules.IsInBattle() && rules.GetStat(slime, "hp") == 30);
+
+            rules.QueueFree();
+        }
+
+        /// <summary>
+        /// The conversation an attached editor has with a running game. A live session cannot be
+        /// staged headlessly, so this drives the same handler the debugger capture calls, which is
+        /// where the Variant shapes on both sides are decided.
+        /// </summary>
+        private void TheDebugChannelAnswersTheEditor()
+        {
+            GameplayEffectsRuntime rules = Loaded();
+            rules.CreatePlayer();
+            int slime = rules.SpawnEnemy("Slime");
+            rules.StartBattle(false, false);
+
+            var agent = new GeDebugAgent(new GeDebugService(rules.Core));
+
+            Check("a message for another capture is not ours",
+                !agent.Respond("something_else:hello", new Godot.Collections.Array(), out _, out _));
+
+            bool answered = agent.Respond(GeProtocol.Message(GeProtocol.Hello), new Godot.Collections.Array(), out string hello, out Godot.Collections.Dictionary who);
+            Check("the game says hello", answered && hello == GeProtocol.Welcome, hello);
+            Check("and says what it is running", who["definitions"].AsInt32() >= 2 && who["fingerprint"].AsString().Length == 16);
+            Check("with tracing off until asked", !who["tracing"].AsBool());
+
+            agent.Respond(GeProtocol.Message(GeProtocol.TraceEnable), new Godot.Collections.Array { true, 500 }, out _, out Godot.Collections.Dictionary traced);
+            Check("the editor can turn recording on", traced["tracing"].AsBool());
+
+            rules.Play(rules.AddCard("Ember", "hand"), slime);
+
+            agent.Respond(GeProtocol.Message(GeProtocol.TraceFetch), new Godot.Collections.Array { 0, 50 }, out string traceReply, out Godot.Collections.Dictionary batch);
+            Check("and pull what was recorded", traceReply == GeProtocol.Trace && batch["entries"].AsGodotArray().Count > 0,
+                batch["entries"].AsGodotArray().Count.ToString());
+            Check("each step carrying the line behind it",
+                batch["entries"].AsGodotArray()[0].AsGodotDictionary().ContainsKey("file"));
+
+            agent.Respond(GeProtocol.Message(GeProtocol.Execute), new Godot.Collections.Array { "deal 1 to enemy" }, out string ranReply, out Godot.Collections.Dictionary ran);
+            Check("the console runs a statement", ranReply == GeProtocol.Ran && ran["ok"].AsBool(), ran["message"].AsString());
+
+            agent.Respond(GeProtocol.Message(GeProtocol.Execute), new Godot.Collections.Array { "deal 1 to nonsense" }, out _, out Godot.Collections.Dictionary failed);
+            Check("and reports one that cannot run", !failed["ok"].AsBool());
+
+            var saved = new Godot.Collections.Array
+            {
+                "res://content/cards.ge",
+                "card \"Ember\"\n  cost 1\n  target enemy\n  effect:\n    deal 9 to target\n",
+            };
+            agent.Respond(GeProtocol.Message(GeProtocol.Reload), saved, out string reloadReply, out Godot.Collections.Dictionary reloaded);
+            Check("saving a file reaches the running game", reloadReply == GeProtocol.Reloaded && reloaded["applied"].AsBool());
+            Check("and rebinds what is live", reloaded["rebound"].AsInt32() > 0, reloaded["rebound"].AsInt32().ToString());
 
             rules.QueueFree();
         }

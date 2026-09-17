@@ -35,6 +35,7 @@ namespace GameplayEffects.GodotAdapter
         private readonly VariantMap.Marshal _marshal = new VariantMap.Marshal();
 
         private CardRuntime? _core;
+        private GeDebugAgent? _debug;
         private DescriptionBuilder? _describer;
         private int _describerGeneration = -1;
         private bool _busy;
@@ -107,6 +108,12 @@ namespace GameplayEffects.GodotAdapter
         {
             if (Driver != null) Driver.Drive = count => Tick(count);
             if (AutoLoad) LoadContent(ContentFolder);
+        }
+
+        public override void _ExitTree()
+        {
+            _debug?.Uninstall();
+            _debug = null;
         }
 
         // Content --------------------------------------------------------------------------------
@@ -537,6 +544,11 @@ namespace GameplayEffects.GodotAdapter
             _wasInBattle = _core.State.InBattle;
 
             if (Presenter != null && IsInstanceValid(Presenter)) Presenter.Formatter = VariantMap.Event;
+
+            // Only ever talks while a debugger is attached, so an exported game pays nothing for it.
+            _debug = new GeDebugAgent(new GeDebugService(_core));
+            _debug.Install();
+
             return _core;
         }
 

@@ -1,0 +1,227 @@
+using System;
+using System.Collections.Generic;
+using GameplayEffects.Diagnostics;
+using Godot;
+
+namespace GameplayEffects.GodotAdapter
+{
+    /// <summary>
+    /// The game end of the editor channel: it registers a message capture while a debugger is
+    /// attached, answers what the editor asks, and says nothing otherwise.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// All the thinking is in <see cref="GeDebugService"/>, which has no engine in it and is tested
+    /// on its own. This turns Variants into those calls and their answers back into Variants.
+    /// </para>
+    /// <para>
+    /// Nothing is pushed except one greeting. Godot's debugger channel is capped — a live 4.6.1 run
+    /// reports 2048 queued messages and 32768 characters a second — so the editor pulls batches at
+    /// its own pace, and a game that is busy cannot flood it or be slowed by it.
+    /// </para>
+    /// </remarks>
+    internal sealed class GeDebugAgent
+    {
+        private readonly GeDebugService _service;
+        private bool _installed;
+
+        internal GeDebugAgent(GeDebugService service)
+        {
+            _service = service ?? throw new ArgumentNullException(nameof(service));
+        }
+
+        /// <summary>
+        /// Starts listening, but only with a debugger attached: an exported game pays nothing for
+        /// this, and a game run without the editor has nobody to talk to.
+        /// </summary>
+        internal void Install()
+        {
+            if (_installed || !EngineDebugger.IsActive()) return;
+
+            EngineDebugger.RegisterMessageCapture(GeProtocol.Capture, Callable.From<string, Godot.Collections.Array, bool>(OnMessage));
+            _installed = true;
+
+            Send(GeProtocol.Welcome, Welcome());
+        }
+
+        internal void Uninstall()
+        {
+            if (!_installed) return;
+
+            EngineDebugger.UnregisterMessageCapture(GeProtocol.Capture);
+            _installed = false;
+        }
+
+        /// <summary>
+        /// Answers one message. Returning false tells Godot the message was not ours, so anything
+        /// addressed elsewhere carries on to whoever wanted it.
+        /// </summary>
+        private bool OnMessage(string message, Godot.Collections.Array data)
+        {
+            if (!Respond(message, data, out string reply, out Godot.Collections.Dictionary payload)) return false;
+
+            Send(reply, payload);
+            return true;
+        }
+
+        /// <summary>
+        /// Works out the answer to one message without sending it. Splitting this out is what lets
+        /// the headless tests exercise the whole conversation with no editor on the other end, which
+        /// is the only way this plumbing gets covered at all.
+        /// </summary>
+        internal bool Respond(string message, Godot.Collections.Array data, out string reply, out Godot.Collections.Dictionary payload)
+        {
+            reply = GeProtocol.Failed;
+            payload = new Godot.Collections.Dictionary();
+
+            if (!GeProtocol.TryName(message, out string name)) return false;
+
+            try
+            {
+                switch (name)
+                {
+                    case GeProtocol.Hello:
+                        reply = GeProtocol.Welcome;
+                        payload = Welcome();
+                        return true;
+
+                    case GeProtocol.TraceEnable:
+                        _service.EnableTrace(Flag(data, 0, true), Number(data, 1, 2000));
+                        reply = GeProtocol.Welcome;
+                        payload = Welcome();
+                        return true;
+
+                    case GeProtocol.TraceFetch:
+                        reply = GeProtocol.Trace;
+                        payload = Batch(_service.Fetch(Number(data, 0, 0), Number(data, 1, TraceBatch.DefaultMax)));
+                        return true;
+
+                    case GeProtocol.Reload:
+                        reply = GeProtocol.Reloaded;
+                        payload = Reloaded(_service.Reload(Files(data)));
+                        return true;
+
+                    case GeProtocol.Execute:
+                    {
+                        GeExecuteResult result = _service.Execute(Text(data, 0));
+                        reply = GeProtocol.Ran;
+                        payload = new Godot.Collections.Dictionary
+                        {
+                            ["ok"] = result.Ok,
+                            ["message"] = result.Message,
+                            ["file"] = result.Span.File ?? string.Empty,
+                            ["line"] = result.Span.Line,
+                        };
+                        return true;
+                    }
+
+                    default:
+                        return false;
+                }
+            }
+            catch (Exception error) when (!(error is OutOfMemoryException))
+            {
+                // A debugger that takes the game down with it is worse than one that says nothing.
+                reply = GeProtocol.Failed;
+                payload = new Godot.Collections.Dictionary
+                {
+                    ["ok"] = false,
+                    ["message"] = error.Message,
+                    ["file"] = string.Empty,
+                    ["line"] = 0,
+                };
+                return true;
+            }
+        }
+
+        private static void Send(string name, Godot.Collections.Dictionary payload) =>
+            EngineDebugger.SendMessage(GeProtocol.Message(name), new Godot.Collections.Array { payload });
+
+        private Godot.Collections.Dictionary Welcome()
+        {
+            GeHello hello = _service.Hello();
+            return new Godot.Collections.Dictionary
+            {
+                ["protocol"] = hello.Protocol,
+                ["generation"] = hello.Generation,
+                ["fingerprint"] = hello.Fingerprint,
+                ["definitions"] = hello.Definitions,
+                ["in_battle"] = hello.InBattle,
+                ["turn"] = hello.Turn,
+                ["tracing"] = hello.Tracing,
+            };
+        }
+
+        private static Godot.Collections.Dictionary Batch(TraceBatch batch)
+        {
+            var entries = new Godot.Collections.Array();
+            for (int i = 0; i < batch.Entries.Count; i++)
+            {
+                TraceDto entry = batch.Entries[i];
+
+                var values = new Godot.Collections.Dictionary();
+                foreach (KeyValuePair<string, string> value in entry.Values) values[value.Key] = value.Value;
+
+                entries.Add(new Godot.Collections.Dictionary
+                {
+                    ["id"] = entry.Id,
+                    ["parent"] = entry.Parent,
+                    ["time"] = entry.Time,
+                    ["kind"] = entry.Kind,
+                    ["text"] = entry.Text,
+                    ["source"] = entry.Source,
+                    ["listener"] = entry.Listener,
+                    ["file"] = entry.File,
+                    ["line"] = entry.Line,
+                    ["column"] = entry.Column,
+                    ["values"] = values,
+                });
+            }
+
+            return new Godot.Collections.Dictionary
+            {
+                ["entries"] = entries,
+                ["next"] = batch.NextId,
+                ["dropped"] = batch.Dropped,
+                ["more"] = batch.More,
+            };
+        }
+
+        private static Godot.Collections.Dictionary Reloaded(GeReloadResult result)
+        {
+            var diagnostics = new Godot.Collections.Array();
+            foreach (Diagnostic diagnostic in result.Diagnostics) diagnostics.Add(VariantMap.Diagnostic(diagnostic));
+
+            return new Godot.Collections.Dictionary
+            {
+                ["applied"] = result.Applied,
+                ["rebound"] = result.Rebound,
+                ["missing"] = VariantMap.Strings(result.Missing),
+                ["ruleset_changed"] = result.RulesetChanged,
+                ["diagnostics"] = diagnostics,
+            };
+        }
+
+        // Reading what the editor sent -------------------------------------------------------------
+
+        /// <summary>Files arrive as a flat array of path, text, path, text: one message, no nesting.</summary>
+        private static IEnumerable<KeyValuePair<string, string>> Files(Godot.Collections.Array data)
+        {
+            for (int i = 0; i + 1 < data.Count; i += 2)
+            {
+                yield return new KeyValuePair<string, string>(data[i].AsString(), data[i + 1].AsString());
+            }
+        }
+
+        private static string Text(Godot.Collections.Array data, int index) =>
+            index < data.Count ? data[index].AsString() : string.Empty;
+
+        private static int Number(Godot.Collections.Array data, int index, int fallback) =>
+            index < data.Count && (data[index].VariantType == Variant.Type.Int || data[index].VariantType == Variant.Type.Float)
+                ? data[index].AsInt32()
+                : fallback;
+
+        private static bool Flag(Godot.Collections.Array data, int index, bool fallback) =>
+            index < data.Count && data[index].VariantType == Variant.Type.Bool ? data[index].AsBool() : fallback;
+    }
+}

@@ -225,7 +225,13 @@ quits.
 
 ## Not done yet
 
-Live debugging from the editor (a causality tree and entity inspector over Godot's debugger
-channel) and hot reload pushed from the editor into a running game: the message protocol for both
-is written and tested, but neither half is wired up yet. Asset Library packaging is also still to
-do. The dock's interactive use is checked by hand; only its work is covered headlessly.
+**Live debugging** is built but only half proven. Run a game from the editor and the debugger gets
+a *Gameplay Effects* tab: turn recording on, pull the causality tree, and click a step to open the
+content line that caused it. Saving a file reloads it into the running game, and statements can be
+run against it as a console. Both ends compile, the addon loads with them, and the whole
+conversation is exercised headlessly by driving the game's handler directly — but a live
+editor-to-game session cannot be staged without a person, so that round trip is checked by hand.
+
+Still to do: an entity inspector beside the trace, breakpoints and stepping (which need a core
+change to resolve one queued trigger at a time), and Asset Library packaging. The dock's
+interactive use is likewise checked by hand; only its work is covered headlessly.

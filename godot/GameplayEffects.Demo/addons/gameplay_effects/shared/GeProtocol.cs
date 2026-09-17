@@ -35,6 +35,7 @@ namespace GameplayEffects.GodotAdapter
         public const string Welcome = "welcome";
         public const string Trace = "trace";
         public const string Reloaded = "reloaded";
+        public const string Ran = "ran";
         public const string Failed = "failed";
 
         /// <summary>The full message name, as both sides send it: <c>gameplay_effects:trace</c>.</summary>
