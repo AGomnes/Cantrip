@@ -28,6 +28,11 @@ jobs:
       - name: Unit tests
         run: dotnet test tests/GameplayEffects.Core.Tests -c Release --no-build
 
+      # The adapter's engine-free half: event buffering, view mapping, tick maths, choice ids.
+      # It compiles the addon's shared/ files directly, so it needs no Godot at all.
+      - name: Adapter tests
+        run: dotnet test tests/GameplayEffects.Godot.Tests -c Release --no-build
+
       # Each sample folder is its own game with its own definitions, so they are linted separately.
       - name: Lint samples/basic
         run: dotnet run --project src/GameplayEffects.Cli -c Release --no-build -- lint samples/basic
@@ -41,3 +46,59 @@ jobs:
       - name: DSL tests (samples/corpus)
         if: hashFiles('samples/corpus/**') != ''
         run: dotnet run --project src/GameplayEffects.Cli -c Release --no-build -- test samples/corpus
+
+  godot:
+    # Everything that can only break inside a real engine: importing content, the Variant
+    # boundary, signals, and the GDScript call path. Linux only, because this is about the
+    # adapter rather than cross-platform determinism, which the matrix above already covers.
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Cache Godot
+        id: godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-4.6.1-mono-linux
+
+      - name: Download Godot
+        if: steps.godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot
+          curl -fsSL -o /tmp/godot.zip \
+            https://github.com/godotengine/godot-builds/releases/download/4.6.1-stable/Godot_v4.6.1-stable_mono_linux_x86_64.zip
+          unzip -q /tmp/godot.zip -d ~/godot
+
+      - name: Find the binary
+        run: |
+          GODOT=$(find ~/godot -type f -name 'Godot_v*_mono_linux*' ! -name '*.zip' | head -1)
+          chmod +x "$GODOT"
+          echo "GODOT=$GODOT" >> "$GITHUB_ENV"
+          "$GODOT" --headless --version
+
+      # Build first, always. Without the assembly the plugin does not load and the importer never
+      # runs, yet --import still exits 0, so a missing build would look like a pass.
+      - name: Build the addon
+        run: |
+          dotnet build godot/GameplayEffects.Demo/GameplayEffects.Demo.csproj
+          dotnet build godot/GameplayEffects.Demo/GameplayEffects.Demo.csproj -c ExportRelease
+
+      - name: Import content
+        run: timeout 300 "$GODOT" --headless --path godot/GameplayEffects.Demo --import
+
+      # Each scene exits non-zero on a failed check. The timeouts matter: a script that cannot
+      # parse never reaches its quit() and would otherwise hang the job.
+      - name: Headless tests
+        run: timeout 300 "$GODOT" --headless --path godot/GameplayEffects.Demo res://tests/headless.tscn
+
+      - name: GDScript smoke test
+        run: timeout 300 "$GODOT" --headless --path godot/GameplayEffects.Demo res://tests/gdscript_smoke.tscn
+
+      - name: Editor dock self-test
+        run: timeout 300 "$GODOT" --headless --path godot/GameplayEffects.Demo --import -- --ge-selftest

@@ -1,0 +1,7 @@
+# One enemy, so the demo and the headless tests have something to fight.
+
+enemy "Slime"
+  hp 30
+  move "Swipe":
+    deal 4 to player
+  pattern cycle Swipe

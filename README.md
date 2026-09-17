@@ -49,8 +49,9 @@ An early MVP of the core, per step 1 of the plan in the design notes. It is not 
 - Player choices a UI answers mid-effect: the action rolls back, reports what it needs, and replays exactly once answered
 - A causality trace, a static linter, generated and custom descriptions with live values, and a DSL test runner
 - The `gedsl` command-line tool
+- A Godot 4.6 addon: one node drives a battle from GDScript, `.ge` files import so they reach an exported build, and an editor dock shows problems, DSL tests and card text ([docs/godot.md](docs/godot.md))
 
-**Not yet**: the Godot adapter and editor plugin, the compiled backend, spatial selectors (`within` needs a host), `every Xs` triggers, the VS Code extension, and the full coverage corpus. See [Roadmap](#roadmap) and the gaps in [docs/coverage.md](docs/coverage.md).
+**Not yet**: live debugging from the Godot editor, an export smoke test, Asset Library packaging, the compiled backend, spatial selectors (`within` needs a host), `every Xs` triggers, the VS Code extension, and the full coverage corpus. See [Roadmap](#roadmap) and the gaps in [docs/coverage.md](docs/coverage.md).
 
 ## Building
 
@@ -192,6 +193,7 @@ IReadOnlyList<DslTestResult> results = new DslTestRunner(content).RunAll();
 - [docs/language.md](docs/language.md): the DSL reference
 - [docs/architecture.md](docs/architecture.md): how the library is put together, and where to extend it
 - [docs/coverage.md](docs/coverage.md): which reference effects the language can express today
+- [docs/godot.md](docs/godot.md): the Godot addon, and the two rules GDScript imposes on it
 - [gameplay-effects-dsl.md](gameplay-effects-dsl.md): the design notes this project follows
 
 ## Project layout
@@ -203,6 +205,8 @@ IReadOnlyList<DslTestResult> results = new DslTestRunner(content).RunAll();
 | `tests/GameplayEffects.Core.Tests` | Unit tests |
 | `samples/basic` | Every example from the design notes, with DSL tests |
 | `samples/corpus` | Reference effects from existing games, with DSL tests |
+| `godot/GameplayEffects.Demo` | The Godot 4.6 addon, with demo content and headless tests |
+| `tests/GameplayEffects.Godot.Tests` | The adapter's engine-free layer, tested without Godot |
 
 ## Roadmap
 
@@ -213,7 +217,7 @@ Following section 7 of the design notes:
 3. **Validate turn-based**: build inside a real roguelite.
 4. **Validate real-time**: the tick clock exists; it needs a real-time project, spatial selectors and allocation-free event paths.
 5. **Coverage corpus**: 58 effects from Slay the Spire, Monster Train, Hearthstone, Balatro and Dota 2 so far: 31 work directly, 16 need a workaround and 11 are not expressible yet ([docs/coverage.md](docs/coverage.md)). The design notes aim for about 150.
-6. **Release**: Godot plugin (in progress), docs site, cookbook, sample game. Hot reload is done in the core.
+6. **Release**: the Godot addon runs headlessly today (node, importer, export check, editor dock). Still to do: live debugging from the editor, an export smoke test, Asset Library packaging, a docs site, a cookbook and a sample game.
 7. **Project setup**: the name is still to be chosen.
 
 ## License

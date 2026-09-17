@@ -1,0 +1,16 @@
+[remap]
+
+importer="gameplay_effects.ge"
+importer_version=1
+type="Resource"
+uid="uid://cbd8p6mjsn1jt"
+path="res://.godot/imported/tests.ge-1ce1ac9037af117da75f74529f7784c2.res"
+
+[deps]
+
+source_file="res://content/tests.ge"
+dest_files=["res://.godot/imported/tests.ge-1ce1ac9037af117da75f74529f7784c2.res"]
+
+[params]
+
+diagnostics/report_problems=true
