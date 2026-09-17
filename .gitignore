@@ -48,3 +48,6 @@ scratch/
 
 ## Claude Code personal settings
 .claude/settings.local.json
+
+## Agent worktrees (scratch checkouts, never part of the project)
+.claude/worktrees/
