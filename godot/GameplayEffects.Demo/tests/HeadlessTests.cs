@@ -342,6 +342,29 @@ namespace GameplayEffects.GodotAdapter.Demo
             Check("saving a file reaches the running game", reloadReply == GeProtocol.Reloaded && reloaded["applied"].AsBool());
             Check("and rebinds what is live", reloaded["rebound"].AsInt32() > 0, reloaded["rebound"].AsInt32().ToString());
 
+            agent.Respond(GeProtocol.Message(GeProtocol.Entities), new Godot.Collections.Array { string.Empty, string.Empty },
+                out string listReply, out Godot.Collections.Dictionary list);
+            Check("the editor can ask what is in play",
+                listReply == GeProtocol.EntityList && list["entities"].AsGodotArray().Count > 0);
+
+            agent.Respond(GeProtocol.Message(GeProtocol.Entities), new Godot.Collections.Array { "hand", string.Empty },
+                out _, out Godot.Collections.Dictionary inHand);
+            foreach (Variant held in inHand["entities"].AsGodotArray())
+            {
+                Check("narrowed to one zone when asked", held.AsGodotDictionary()["zone"].AsString() == "hand");
+            }
+
+            agent.Respond(GeProtocol.Message(GeProtocol.Entity), new Godot.Collections.Array { slime },
+                out string detailReply, out Godot.Collections.Dictionary detail);
+            Check("and look inside one of them", detailReply == GeProtocol.EntityDetail && detail["found"].AsBool());
+            Check("seeing what its stats started as", detail["base_stats"].AsGodotDictionary().ContainsKey("hp"));
+            Check("the rules it carries", detail.ContainsKey("listeners") && detail.ContainsKey("modifiers"));
+            Check("and whether they are live at all", detail["active"].AsBool());
+
+            agent.Respond(GeProtocol.Message(GeProtocol.Entity), new Godot.Collections.Array { 999999 },
+                out _, out Godot.Collections.Dictionary gone);
+            Check("an entity that is not there is said to be missing, not faked", !gone["found"].AsBool());
+
             rules.QueueFree();
         }
 

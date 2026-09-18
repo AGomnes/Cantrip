@@ -30,12 +30,16 @@ namespace GameplayEffects.GodotAdapter
         public const string TraceFetch = "trace_fetch";
         public const string Reload = "reload";
         public const string Execute = "execute";
+        public const string Entities = "entities";
+        public const string Entity = "entity";
 
         // Game to editor.
         public const string Welcome = "welcome";
         public const string Trace = "trace";
         public const string Reloaded = "reloaded";
         public const string Ran = "ran";
+        public const string EntityList = "entity_list";
+        public const string EntityDetail = "entity_detail";
         public const string Failed = "failed";
 
         /// <summary>The full message name, as both sides send it: <c>gameplay_effects:trace</c>.</summary>

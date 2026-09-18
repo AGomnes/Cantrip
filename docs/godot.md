@@ -231,12 +231,15 @@ quits.
 ## Not done yet
 
 **Live debugging** is built but only half proven. Run a game from the editor and the debugger gets
-a *Gameplay Effects* tab: turn recording on, pull the causality tree, and click a step to open the
-content line that caused it. Saving a file reloads it into the running game, and statements can be
+two *Gameplay Effects* tabs. The first is the trace: turn recording on, pull the causality tree, and
+click a step to open the content line that caused it. The second is *Entities*: everything in play,
+and for whichever one you pick, its zone and side, each stat's base value beside what the modifiers
+make of it, its statuses, and every listener and modifier it has registered — each of those rows
+opening the line of content behind it. Saving a file reloads it into the running game, and statements can be
 run against it as a console. Both ends compile, the addon loads with them, and the whole
 conversation is exercised headlessly by driving the game's handler directly — but a live
 editor-to-game session cannot be staged without a person, so that round trip is checked by hand.
 
-Still to do: an entity inspector beside the trace, breakpoints and stepping (which need a core
-change to resolve one queued trigger at a time), and Asset Library packaging. The dock's
+Still to do: breakpoints and stepping (which need a core change to resolve one queued trigger at a
+time), and Asset Library packaging. The dock's
 interactive use is likewise checked by hand; only its work is covered headlessly.

@@ -151,6 +151,38 @@ namespace GameplayEffects.GodotAdapter
         public TraceBatch Fetch(long sinceId = 0, int max = TraceBatch.DefaultMax) => TraceBatch.From(Log, sinceId, max);
 
         /// <summary>
+        /// The live entities, in the order the game made them, optionally narrowed to one zone or
+        /// side. Removed entities are left out: an inspector is for what is in play.
+        /// </summary>
+        public IReadOnlyList<EntityView> Entities(string? zone = null, string? team = null)
+        {
+            var result = new List<EntityView>();
+            IReadOnlyList<Entity> all = Runtime.State.Entities;
+
+            for (int i = 0; i < all.Count; i++)
+            {
+                Entity entity = all[i];
+                if (entity.IsRemoved) continue;
+                if (!string.IsNullOrEmpty(zone) && !string.Equals(entity.Zone, zone, StringComparison.OrdinalIgnoreCase)) continue;
+                if (!string.IsNullOrEmpty(team) && !string.Equals(entity.Team.ToString(), team, StringComparison.OrdinalIgnoreCase)) continue;
+
+                result.Add(EntityView.Of(entity));
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Everything about one entity, including the listeners and modifiers it has registered and
+        /// the line of content each came from. Null when the id is not in the game.
+        /// </summary>
+        public EntityDetail? Detail(int entityId)
+        {
+            Entity? entity = Runtime.State.Find(entityId);
+            return entity == null ? null : EntityDetail.Of(entity);
+        }
+
+        /// <summary>
         /// Reloads content the editor has just saved and rebinds the running game to it. Files are
         /// loaded even when they are broken, so the editor can show why; the rebinding is what is
         /// held back until they are clean.

@@ -18,6 +18,7 @@ namespace GameplayEffects.GodotAdapter
     public partial class GeDebuggerPlugin : EditorDebuggerPlugin
     {
         private readonly Dictionary<int, GeTraceView> _views = new Dictionary<int, GeTraceView>();
+        private readonly Dictionary<int, GeInspectorView> _inspectors = new Dictionary<int, GeInspectorView>();
 
         /// <summary>Raised when someone picks a step in any session, so the dock can open its line.</summary>
         public event Action<string, int, int>? NavigateRequested;
@@ -33,7 +34,10 @@ namespace GameplayEffects.GodotAdapter
                 ? data[0].AsGodotDictionary()
                 : new Godot.Collections.Dictionary();
 
+            // Both tabs watch the same conversation: each takes the messages it understands, which
+            // is also how the inspector knows to refresh after the game reloads its content.
             view.Receive(name, payload);
+            if (_inspectors.TryGetValue(sessionId, out GeInspectorView? inspector)) inspector.Receive(name, payload);
             return true;
         }
 
@@ -49,11 +53,24 @@ namespace GameplayEffects.GodotAdapter
             _views[sessionId] = view;
             session.AddSessionTab(view);
 
+            var inspector = new GeInspectorView();
+            inspector.Initialize((name, arguments) => GetSession(sessionId)?.SendMessage(GeProtocol.Message(name), arguments));
+            inspector.NavigateRequested += OnNavigateRequested;
+
+            _inspectors[sessionId] = inspector;
+            session.AddSessionTab(inspector);
+
             session.Started += view.OnStarted;
             session.Stopped += view.OnStopped;
+            session.Started += inspector.OnStarted;
+            session.Stopped += inspector.OnStopped;
 
             // A session that is already running when the plugin loads still needs its greeting.
-            if (session.IsActive()) view.OnStarted();
+            if (session.IsActive())
+            {
+                view.OnStarted();
+                inspector.OnStarted();
+            }
         }
 
         /// <summary>Lets go of every session's tab. Called when the addon is disabled or rebuilt.</summary>
@@ -66,6 +83,14 @@ namespace GameplayEffects.GodotAdapter
                 entry.Value.QueueFree();
             }
             _views.Clear();
+
+            foreach (KeyValuePair<int, GeInspectorView> entry in _inspectors)
+            {
+                entry.Value.NavigateRequested -= OnNavigateRequested;
+                GetSession(entry.Key)?.RemoveSessionTab(entry.Value);
+                entry.Value.QueueFree();
+            }
+            _inspectors.Clear();
         }
 
         private void OnNavigateRequested(string file, int line, int column) => NavigateRequested?.Invoke(file, line, column);

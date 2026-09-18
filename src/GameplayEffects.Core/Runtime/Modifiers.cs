@@ -173,6 +173,13 @@ namespace GameplayEffects.Runtime
             _state.Touch();
         }
 
+        /// <summary>
+        /// Every modifier one entity declared. The event bus answers the same question for
+        /// listeners, and an inspector needs both to say what a single thing is doing to a game.
+        /// </summary>
+        public IReadOnlyList<Modifier> OwnedBy(Entity owner) =>
+            _byOwner.TryGetValue(owner.Id, out List<Modifier>? owned) ? owned : (IReadOnlyList<Modifier>)Array.Empty<Modifier>();
+
         public IReadOnlyList<Modifier> OnChannel(string channel) =>
             _byChannel.TryGetValue(channel, out List<Modifier>? list) ? list : (IReadOnlyList<Modifier>)Array.Empty<Modifier>();
 

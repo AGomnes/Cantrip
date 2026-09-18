@@ -101,6 +101,16 @@ namespace GameplayEffects.GodotAdapter
                         payload = Reloaded(_service.Reload(Files(data)));
                         return true;
 
+                    case GeProtocol.Entities:
+                        reply = GeProtocol.EntityList;
+                        payload = EntityList(_service.Entities(Text(data, 0), Text(data, 1)));
+                        return true;
+
+                    case GeProtocol.Entity:
+                        reply = GeProtocol.EntityDetail;
+                        payload = Detail(_service.Detail(Number(data, 0, 0)));
+                        return true;
+
                     case GeProtocol.Execute:
                     {
                         GeExecuteResult result = _service.Execute(Text(data, 0));
@@ -184,6 +194,70 @@ namespace GameplayEffects.GodotAdapter
                 ["next"] = batch.NextId,
                 ["dropped"] = batch.Dropped,
                 ["more"] = batch.More,
+            };
+        }
+
+        private static Godot.Collections.Dictionary EntityList(IReadOnlyList<EntityView> entities)
+        {
+            var array = new Godot.Collections.Array();
+            for (int i = 0; i < entities.Count; i++) array.Add(VariantMap.Entity(entities[i]));
+
+            return new Godot.Collections.Dictionary { ["entities"] = array };
+        }
+
+        private static Godot.Collections.Dictionary Detail(EntityDetail? detail)
+        {
+            if (detail == null) return new Godot.Collections.Dictionary { ["found"] = false };
+
+            var baseStats = new Godot.Collections.Dictionary();
+            foreach (KeyValuePair<string, int> stat in detail.BaseStats) baseStats[stat.Key] = stat.Value;
+
+            var listeners = new Godot.Collections.Array();
+            for (int i = 0; i < detail.Listeners.Count; i++)
+            {
+                ListenerView listener = detail.Listeners[i];
+                listeners.Add(new Godot.Collections.Dictionary
+                {
+                    ["id"] = listener.Id,
+                    ["event"] = listener.Event,
+                    ["scope"] = listener.Scope,
+                    ["phase"] = listener.Phase,
+                    ["limit"] = listener.Limit,
+                    ["priority"] = listener.Priority,
+                    ["text"] = listener.Text,
+                    ["file"] = listener.File,
+                    ["line"] = listener.Line,
+                    ["column"] = listener.Column,
+                });
+            }
+
+            var modifiers = new Godot.Collections.Array();
+            for (int i = 0; i < detail.Modifiers.Count; i++)
+            {
+                ModifierView modifier = detail.Modifiers[i];
+                modifiers.Add(new Godot.Collections.Dictionary
+                {
+                    ["id"] = modifier.Id,
+                    ["channel"] = modifier.Channel,
+                    ["layer"] = modifier.Layer,
+                    ["scope"] = modifier.Scope,
+                    ["amount"] = modifier.Amount,
+                    ["text"] = modifier.Text,
+                    ["file"] = modifier.File,
+                    ["line"] = modifier.Line,
+                    ["column"] = modifier.Column,
+                });
+            }
+
+            return new Godot.Collections.Dictionary
+            {
+                ["found"] = true,
+                ["entity"] = VariantMap.Entity(detail.Entity),
+                ["active"] = detail.Active,
+                ["definition"] = detail.Definition,
+                ["base_stats"] = baseStats,
+                ["listeners"] = listeners,
+                ["modifiers"] = modifiers,
             };
         }
 
