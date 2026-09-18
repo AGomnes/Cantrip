@@ -492,7 +492,7 @@ A bare name resolves in this order: local variables (`let` bindings, `for each` 
 | `attack` | `attack [who] [with attacker] [as tag] [, ignore block]`. Deals the attacker's `attack` stat to the target, with the attacker as the damage source, so the attacker's own listeners and modifiers see it as its damage. The attacker defaults to the running entity when that is an actor, otherwise to its controller, so a card or relic swings with the player; the target defaults to the effect's target. |
 | `block` (`gain_block`) | `block N [to who]`. Defaults to yourself. |
 | `heal` | `heal N [to who]`. Defaults to yourself. |
-| `draw` | `draw [N]` for the controller. Reshuffles the discard pile when the draw pile runs out. |
+| `draw` | `draw [N] [to who]` for the controller, or for whoever `to` names. Reshuffles the discard pile when the draw pile runs out. A creature controls itself, so `draw 1 to player` is how a creature draws for you. |
 | `discard`, `exhaust` | `discard N` asks the chooser to pick from hand; `discard who` and `exhaust self` name the cards. |
 | `apply` | `apply Status [N] [for duration] [to who]`. Defaults to the target, or a status's host, or the controller. |
 | `add` | `add tag:x [to who]` adds a tag; `add Status N` is `apply`. |

@@ -37,6 +37,13 @@ test "insc ants are as strong as the colony is large"
   expect (allies where tag:ant).count == 2
   expect (allies where attack == 2).count == 2
 
+test "insc a Sporebearer draws for you when it dies"
+  enemy hp 10
+  deck "Bone Bargain"
+  create Sporebearer
+  kill created.first
+  expect hand.count == 1
+
 test "insc Blood Offering eats an ant to make a skeleton"
   enemy hp 10
   create "Ant Worker"

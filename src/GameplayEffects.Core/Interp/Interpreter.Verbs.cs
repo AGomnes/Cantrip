@@ -321,10 +321,26 @@ namespace GameplayEffects.Runtime
             foreach (Entity target in SelfTargets(call).ToArray()) GainBlock(call.Context.Source, target, amount, call.Context, call.Span);
         }
 
+        /// <summary>
+        /// <c>draw 2</c>, or <c>draw 1 to player</c>.
+        /// </summary>
+        /// <remarks>
+        /// Naming who draws is what lets a creature draw for you. A creature controls itself, so a
+        /// bare `draw` inside one would draw for the creature, whose zones hold no cards, and nobody
+        /// would get anything.
+        /// </remarks>
         private void VerbDraw(VerbCall call)
         {
+            int count = call.Number(0, Num.One).ToInt();
+
+            if (call.Node.Clause("to") != null)
+            {
+                foreach (Entity who in call.Clause("to").AsEntities().ToArray()) Draw(who, count, call.Context);
+                return;
+            }
+
             Entity actor = call.Context.Controller ?? throw call.Error("nobody to draw for.");
-            Draw(actor, call.Number(0, Num.One).ToInt(), call.Context);
+            Draw(actor, count, call.Context);
         }
 
         /// <summary><c>discard 2</c> asks the chooser; <c>discard hand</c> or <c>exhaust self</c> names the cards.</summary>

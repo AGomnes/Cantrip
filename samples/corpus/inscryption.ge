@@ -63,8 +63,14 @@ card "Blood Offering"
     create Skeleton
 
 # --- 7. ref Leshy's Fecundity: a creature that draws when it dies ---------------------------
-# Not expressible: `draw` draws for the running entity's controller, and a creature controls
-# itself, so a creature cannot draw for you. The same gap as the Hearthstone Deathrattle note.
+# A creature controls itself, so a bare `draw` inside one would draw for the creature and
+# nobody would get a card. Naming who draws is the whole of it.
+
+actor "Sporebearer"
+  hp 1
+  attack 1
+  on self.died:
+    draw 1 to player
 
 # --- 8. ref candles: losing a run takes three lives -----------------------------------------
 # Not expressible: this is run structure above a battle. Nothing here models a run of battles

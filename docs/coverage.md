@@ -27,8 +27,8 @@ gedsl lint samples/corpus
 | Balatro | 7 | 3 | 1 | 3 |
 | Dota 2 (real time) | 8 | 4 | 1 | 3 |
 | Magic | 10 | 6 | 2 | 2 |
-| Inscryption | 8 | 5 | 1 | 2 |
-| **Total** | **76** | **47** | **15** | **14** |
+| Inscryption | 8 | 6 | 1 | 1 |
+| **Total** | **76** | **48** | **15** | **13** |
 
 Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics. Inscryption models creatures the same way, with sigils as `keyword` definitions applied to them and bones as a declared `resource`.
 
@@ -90,7 +90,7 @@ Units and minions in Monster Train and Hearthstone are modelled as `actor` defin
 | 9 | Silence | | Not expressible | Nothing can switch off an entity's own listeners and modifiers |
 | 10 | Discover | | Not expressible | No way to pick random definitions from a pool, such as "three random spells" |
 
-A Deathrattle that draws a card is also not directly expressible: `draw` always draws for the running entity's controller, and a minion controls itself.
+A Deathrattle that draws a card needs to name who draws — `draw 1 to player` — because `draw` otherwise draws for the running entity's controller, and a minion controls itself.
 
 ## Balatro
 
@@ -142,7 +142,7 @@ A Deathrattle that draws a card is also not directly expressible: `draw` always 
 | 4 | Fledgling | Fledgling | Works | `on any.turn_end once per battle: attack += 1` |
 | 5 | Ant Swarm | Ant Worker | Works | A modifier amount may be a group count: `modify attack: +(allies where tag:ant).count` |
 | 6 | Blood cost | Blood Offering | Workaround | The sacrifice happens in the effect, so the card summons whether or not anything was actually sacrificed. A real blood cost would refuse |
-| 7 | Leshy's Fecundity | | Not expressible | `draw` draws for the running entity's controller and a creature controls itself, so a creature cannot draw for you |
+| 7 | Leshy's Fecundity | Sporebearer | Works | `draw 1 to player` on `self.died`. Naming who draws is what lets a creature draw for you, since it controls itself |
 | 8 | Candles and lives | | Not expressible | Run structure above a battle: nothing models a run of battles with lives carried between them |
 
 ## Gaps, most useful first
@@ -160,7 +160,7 @@ A Deathrattle that draws a card is also not directly expressible: `draw` always 
 11. **Cooldown as a modifier channel** (Dota 2 #5).
 12. **Space and richer boards** (Dota 2 #6, #7; Monster Train #10). Built-in geometry, or a documented host contract for it.
 13. **Outgoing modifier scopes for other cards and "your" effects** (Slay the Spire #7, Hearthstone #4).
-14. **`draw` for someone else** (Hearthstone note above; Inscryption #7). `draw` draws for the running entity's controller, and a creature controls itself, so no creature can draw for you.
+14. **Delivered: `draw` for someone else.** `draw N to who` names who draws, so a creature can draw for you (Inscryption #7) despite controlling itself. The Hearthstone Deathrattle note above is answered by the same clause.
 15. **Multi-currency and sacrifice costs** (Magic #7; Inscryption #6). A cost may now name the resource it is paid in — `cost 2 bones`, and `cost x bones` spends all of it — and such a card is refused exactly as an unaffordable energy card is. What is left is a cost in *several* currencies at once ("two red and one of any colour"), and a cost paid by destroying something you own, which is a payment step rather than a number.
 
 ## Found while building the corpus
