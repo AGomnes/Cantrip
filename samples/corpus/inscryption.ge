@@ -1,0 +1,75 @@
+# Coverage corpus: Inscryption style effects. Creatures are actors on the player's side, sigils
+# are `keyword` definitions attached to them, and bones are a declared `resource`.
+# Names are our own. Classification and notes: docs/coverage.md.   Tests: inscryption.tests.ge.
+
+resource "bones"
+  min 0
+
+# --- 1. ref bones: every death leaves something behind --------------------------------------
+
+relic "Bone Collector"
+  on killed(kind:actor):
+    gain 1 bones to player
+
+# --- 2. ref Bone Lord's Horn: spend bones to summon -----------------------------------------
+# Workaround: `cost` is energy and nothing else, so the bones are spent inside the effect
+# instead of being paid as a cost. The card cannot refuse to be played for want of bones; it
+# can only check and then do nothing, which is a different thing from being unplayable.
+
+actor "Skeleton"
+  hp 1
+  attack 1
+  tags token
+
+card "Bone Bargain"
+  cost 0
+  tags spell
+  effect:
+    if player.bones >= 2:
+      lose 2 bones to player
+      create Skeleton
+
+# --- 3. ref Sharp Quills: a sigil that answers every hit ------------------------------------
+
+keyword "Quills"
+  on owner.damaged(source:enemies):
+    deal 1 to event.source
+
+actor "Quilled Beast"
+  hp 3
+  attack 1
+
+# --- 4. ref Fledgling: it grows once the turn is over ---------------------------------------
+
+actor "Fledgling"
+  hp 2
+  attack 1
+  on any.turn_end once per battle:
+    attack += 1
+
+# --- 5. ref Ant Swarm: as strong as the colony is large -------------------------------------
+
+actor "Ant Worker"
+  hp 1
+  attack 0
+  tags ant
+  modify attack: +(allies where tag:ant).count
+
+# --- 6. ref blood cost: creatures are paid for with creatures --------------------------------
+# Workaround: the sacrifice happens in the effect, so the card cannot require it first. It
+# summons whether or not anything was actually sacrificed, which a real blood cost would not.
+
+card "Blood Offering"
+  cost 0
+  tags spell
+  effect:
+    kill random allies where tag:ant
+    create Skeleton
+
+# --- 7. ref Leshy's Fecundity: a creature that draws when it dies ---------------------------
+# Not expressible: `draw` draws for the running entity's controller, and a creature controls
+# itself, so a creature cannot draw for you. The same gap as the Hearthstone Deathrattle note.
+
+# --- 8. ref candles: losing a run takes three lives -----------------------------------------
+# Not expressible: this is run structure above a battle. Nothing here models a run of battles
+# with lives carried between them.

@@ -27,9 +27,10 @@ gedsl lint samples/corpus
 | Balatro | 7 | 3 | 1 | 3 |
 | Dota 2 (real time) | 8 | 4 | 1 | 3 |
 | Magic | 10 | 6 | 2 | 2 |
-| **Total** | **68** | **42** | **14** | **12** |
+| Inscryption | 8 | 4 | 2 | 2 |
+| **Total** | **76** | **46** | **16** | **14** |
 
-Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics.
+Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics. Inscryption models creatures the same way, with sigils as `keyword` definitions applied to them and bones as a declared `resource`.
 
 ## Slay the Spire
 
@@ -131,6 +132,19 @@ A Deathrattle that draws a card is also not directly expressible: `draw` always 
 | 9 | Deathtouch | Venomstrike | Works | `on damaged(source:owner): kill event.target`, which only works because the creature is the source of its own hit |
 | 10 | Lifelink | Soulbond | Works | `heal event.amount to player` on the same trigger. A minion controls itself here, so the life goes to `player` |
 
+## Inscryption
+
+| # | Mechanic | Ours | Status | Notes |
+|---|---|---|---|---|
+| 1 | Bones from every death | Bone Collector | Works | `resource "bones"` with a floor, and `on killed(kind:actor): gain 1 bones to player` |
+| 2 | Bone Lord's Horn | Bone Bargain | Workaround | `cost` is energy and nothing else, so the bones are spent inside the effect. The card cannot refuse to be played for want of bones; it checks and then does nothing, which is a different thing from being unplayable |
+| 3 | Sharp Quills | Quills | Works | A sigil as a `keyword` definition, applied like a status: `on owner.damaged(source:enemies): deal 1 to event.source` |
+| 4 | Fledgling | Fledgling | Works | `on any.turn_end once per battle: attack += 1` |
+| 5 | Ant Swarm | Ant Worker | Works | A modifier amount may be a group count: `modify attack: +(allies where tag:ant).count` |
+| 6 | Blood cost | Blood Offering | Workaround | The sacrifice happens in the effect, so the card summons whether or not anything was actually sacrificed. A real blood cost would refuse |
+| 7 | Leshy's Fecundity | | Not expressible | `draw` draws for the running entity's controller and a creature controls itself, so a creature cannot draw for you |
+| 8 | Candles and lives | | Not expressible | Run structure above a battle: nothing models a run of battles with lives carried between them |
+
 ## Gaps, most useful first
 
 1. **Delivered: time-based triggers.** `on every 1s:` fires on the clock, and both Poison Sting (#2) and Mana Font (#8) are written with it. Nothing is left in this area that the language cannot say.
@@ -146,11 +160,12 @@ A Deathrattle that draws a card is also not directly expressible: `draw` always 
 11. **Cooldown as a modifier channel** (Dota 2 #5).
 12. **Space and richer boards** (Dota 2 #6, #7; Monster Train #10). Built-in geometry, or a documented host contract for it.
 13. **Outgoing modifier scopes for other cards and "your" effects** (Slay the Spire #7, Hearthstone #4).
-14. **`draw` for someone else** (Hearthstone note above).
-15. **Typed or multi-currency costs** (Magic #7). `cost` is a single number through a single channel. Coloured mana, or any cost paid in more than one currency, needs resources the cost channel can read and a payment step content can describe.
+14. **`draw` for someone else** (Hearthstone note above; Inscryption #7). `draw` draws for the running entity's controller, and a creature controls itself, so no creature can draw for you.
+15. **Typed or multi-currency costs** (Magic #7; Inscryption #2, #6). Two games reach this wall independently, which argues for its priority. `cost` is a single number through a single channel, so a cost cannot be "two red and one of any colour", nor two bones, nor a creature sacrificed. It needs resources the cost channel can read, and a payment step content can describe and refuse.
 
 ## Found while building the corpus
 
 - **A defect, fixed:** inside modifiers, roles such as `source:enemies` and group names such as `allies` were read from the attacker's side instead of the modifier owner's. War Banner depends on the fix.
 - Names with hyphens or spaces (`Anti-Magic`) cannot be written as bare words in expressions or test setup; use single-word names or strings.
 - Winning a battle clears the player's non-persistent statuses, so a test that checks a status applied by the last enemy on death needs a second enemy.
+- Until Inscryption was added, nothing in the repository declared a `resource` or a `keyword` — not the samples, not the corpus. Both behave as the language reference says, but neither had been exercised anywhere outside it.
