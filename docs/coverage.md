@@ -26,9 +26,10 @@ gedsl lint samples/corpus
 | Hearthstone | 10 | 4 | 3 | 3 |
 | Balatro | 7 | 3 | 1 | 3 |
 | Dota 2 (real time) | 8 | 4 | 1 | 3 |
-| **Total** | **58** | **35** | **13** | **10** |
+| Magic | 8 | 4 | 2 | 2 |
+| **Total** | **66** | **39** | **15** | **12** |
 
-Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock.
+Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics.
 
 ## Slay the Spire
 
@@ -115,6 +116,19 @@ A Deathrattle that draws a card is also not directly expressible: `draw` always 
 | 7 | Blink | | Not expressible | Actors have board slots, not positions in space |
 | 8 | Mana regeneration | Mana Font | Works | `on every 1s: gain 1 mana to player` on a relic |
 
+## Magic
+
+| # | Mechanic | Ours | Status | Notes |
+|---|---|---|---|---|
+| 1 | Lightning Bolt | Spark Bolt | Works | Direct damage from a spell card |
+| 2 | Raise the Alarm | Muster | Works | `create Militia 2` makes two token creatures |
+| 3 | Goblin King | Goblin Chief | Workaround | A modifier cannot exclude its own owner from its scope, so "other goblins" is written by tagging the chief separately and buffing the tag it does not carry |
+| 4 | Regenerate | Regrowth | Works | `on instead_of_died(target:owner) once per turn` survives one death a turn |
+| 5 | Counterspell | Denial | Workaround | A counterspell is an instant played into a priority window, and there is no such window here. It becomes a permanent that commits in advance to countering the next spell, which is still cast and still paid for |
+| 6 | Blood Artist | Blood Tithe | Works | `on killed(kind:actor): deal 1 to enemies` |
+| 7 | Coloured mana costs | | Not expressible | `cost` is one number through one channel, so a cost cannot be "two red and one of any colour" |
+| 8 | Flying | | Not expressible | There is no blocking step, and target validity has no rules content can add to. The same gap as Taunt |
+
 ## Gaps, most useful first
 
 1. **Delivered: time-based triggers.** `on every 1s:` fires on the clock, and both Poison Sting (#2) and Mana Font (#8) are written with it. Nothing is left in this area that the language cannot say.
@@ -131,6 +145,7 @@ A Deathrattle that draws a card is also not directly expressible: `draw` always 
 12. **Space and richer boards** (Dota 2 #6, #7; Monster Train #10). Built-in geometry, or a documented host contract for it.
 13. **Outgoing modifier scopes for other cards and "your" effects** (Slay the Spire #7, Hearthstone #4).
 14. **`draw` for someone else** (Hearthstone note above).
+15. **Typed or multi-currency costs** (Magic #7). `cost` is a single number through a single channel. Coloured mana, or any cost paid in more than one currency, needs resources the cost channel can read and a payment step content can describe.
 
 ## Found while building the corpus
 
