@@ -141,6 +141,13 @@ namespace GameplayEffects.GodotAdapter
             if (_panel == null) return;
 
             foreach (string line in _panel.SelfTest()) GD.Print("Gameplay Effects self-test: " + line);
+
+            // The debugger's tabs are the one part of the addon a headless editor would otherwise
+            // never touch: they only ever exist inside a live session.
+            if (_debugger != null && _workspace != null)
+            {
+                foreach (string line in _debugger.SelfTest(_workspace.Content)) GD.Print("Gameplay Effects self-test: " + line);
+            }
         }
     }
 }

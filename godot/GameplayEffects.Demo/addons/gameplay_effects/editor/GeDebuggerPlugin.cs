@@ -1,6 +1,8 @@
 #if TOOLS
 using System;
 using System.Collections.Generic;
+using GameplayEffects.Content;
+using GameplayEffects.Runtime;
 using Godot;
 
 namespace GameplayEffects.GodotAdapter
@@ -71,6 +73,67 @@ namespace GameplayEffects.GodotAdapter
                 view.OnStarted();
                 inspector.OnStarted();
             }
+        }
+
+        /// <summary>
+        /// Drives both session tabs without a session: it stands up a game from the project's own
+        /// content, asks it the questions the editor asks over the channel, and gives the real
+        /// answers to the real views.
+        /// </summary>
+        /// <remarks>
+        /// A live editor-to-game round trip cannot be staged without a person, but this covers the
+        /// parts that actually break: a key renamed on one side of the channel and not the other, and
+        /// a Godot call that compiles and then throws when it is finally made.
+        /// </remarks>
+        public IReadOnlyList<string> SelfTest(ContentLibrary content)
+        {
+            var report = new List<string>();
+            if (content == null)
+            {
+                report.Add("debugger: no content to run");
+                return report;
+            }
+
+            var runtime = new CardRuntime(content, new RuntimeOptions { Seed = 1 });
+            runtime.CreatePlayer();
+
+            var agent = new GeDebugAgent(new GeDebugService(runtime));
+            var trace = new GeTraceView();
+            var inspector = new GeInspectorView();
+
+            try
+            {
+                var raised = new List<string>();
+                Action<string, Godot.Collections.Array> send = (name, arguments) => raised.Add(name);
+
+                trace.Initialize(send);
+                inspector.Initialize(send);
+
+                Relay(agent, trace, inspector, GeProtocol.Hello, new Godot.Collections.Array());
+                Relay(agent, trace, inspector, GeProtocol.TraceEnable, new Godot.Collections.Array { true, 200 });
+                Relay(agent, trace, inspector, GeProtocol.TraceFetch, new Godot.Collections.Array { 0, 50 });
+                Relay(agent, trace, inspector, GeProtocol.Entities, new Godot.Collections.Array { string.Empty, string.Empty });
+                Relay(agent, trace, inspector, GeProtocol.Entity, new Godot.Collections.Array { runtime.Player == null ? 0 : runtime.Player.Id });
+
+                report.Add($"debugger: 2 session tab(s) driven, {raised.Count} request(s) raised back");
+                report.Add(inspector.SelfTest());
+            }
+            finally
+            {
+                trace.QueueFree();
+                inspector.QueueFree();
+            }
+
+            return report;
+        }
+
+        /// <summary>Asks the game one thing and hands its answer to both tabs, as a session would.</summary>
+        private static void Relay(GeDebugAgent agent, GeTraceView trace, GeInspectorView inspector, string name, Godot.Collections.Array arguments)
+        {
+            if (!agent.Respond(GeProtocol.Message(name), arguments, out string reply, out Godot.Collections.Dictionary payload)) return;
+
+            trace.Receive(reply, payload);
+            inspector.Receive(reply, payload);
         }
 
         /// <summary>Lets go of every session's tab. Called when the addon is disabled or rebuilt.</summary>

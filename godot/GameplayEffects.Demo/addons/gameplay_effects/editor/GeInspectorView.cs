@@ -92,6 +92,27 @@ namespace GameplayEffects.GodotAdapter
             if (_status != null) _status.Text = "The game has stopped.";
         }
 
+        /// <summary>
+        /// What this tab has made of the answers it was given, for headless checks. A live session
+        /// needs a person to stage, so the self-test hands it a real game's replies and asks what it
+        /// showed: that is what catches a key renamed on one side of the channel and not the other.
+        /// </summary>
+        public string SelfTest()
+        {
+            int rows = 0;
+            TreeItem? root = _details?.GetRoot();
+            if (root != null)
+            {
+                foreach (TreeItem group in root.GetChildren())
+                {
+                    rows++;
+                    foreach (TreeItem _ in group.GetChildren()) rows++;
+                }
+            }
+
+            return $"inspector: {_ids.Count} entit{(_ids.Count == 1 ? "y" : "ies")} listed, {rows} detail row(s)";
+        }
+
         /// <summary>One answer from the game.</summary>
         public void Receive(string name, Godot.Collections.Dictionary payload)
         {
