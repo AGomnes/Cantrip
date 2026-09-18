@@ -84,7 +84,7 @@ Units and minions in Monster Train and Hearthstone are modelled as `actor` defin
 | 3 | Elven Archer (Battlecry) | Elven Archer | Works | The card's effect summons the minion and pings |
 | 4 | Kobold Geomancer (Spell Damage) | Kobold Geomancer | Workaround | A modifier on a minion is anchored to that minion, so "your spells" needs `of enemies where tag:spell, source:player` |
 | 5 | Dire Wolf Alpha (adjacency aura) | Dire Wolf | Works | `modify attack of adjacent(self): +1` |
-| 6 | Knife Juggler | Knife Juggler | Workaround | A listener that becomes active during an event hears it, so the Juggler must ignore its own summon with `event.target != self` |
+| 6 | Knife Juggler | Knife Juggler | Workaround | A listener that becomes active during an event hears it, so the Juggler must leave its own summon out. `not target:self` says it as a filter rather than a guard in the body, but it still has to be said |
 | 7 | Minion combat | `trade` verb | Works | The `attack` verb makes each creature the source of its own hit. A content verb still spells the trade out, which is where combat rules belong |
 | 8 | Taunt | | Not expressible | Target selection has no rules content can add to, such as "must target a Taunt minion" |
 | 9 | Silence | | Not expressible | Nothing can switch off an entity's own listeners and modifiers |
@@ -152,7 +152,7 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 3. **Targeting rules and action blocking** (Hearthstone #8; Magic #8; Dota 2 #3; Monster Train #4). The `attack` verb has landed, so a creature is the source of its own hit and deathtouch, lifelink and "whenever this deals damage" all work. What is left is target validity content can add to (Taunt, Flying), stopping a stunned unit from acting, and attack counts such as Multistrike.
 4. **Verbs that return values** (Slay the Spire #11). `let` has covered the local-variable half of this gap; what remains is getting a result back out of a verb, so that an attack's damage need not be recovered by differencing a counter around it.
 5. **Effects as values** (Balatro #6, Hearthstone #9). Copying and disabling another entity's effects; section 3.11 already lists this as a stress test.
-6. **Listeners registered during an event hear that event** (Slay the Spire #10, Hearthstone #6). Either skip it, or offer a clean "not myself" filter.
+6. **Listeners registered during an event hear that event** (Slay the Spire #10, Hearthstone #6). The clean "not myself" filter already exists — `not target:self`, `not card:Reverb` — so what is left to decide is whether the default should change, since every listener of this shape has to remember to exclude itself.
 7. **Definition pools** (Hearthstone #10). "A random spell", "three random cards with tag X".
 8. **Grouping over collections** (Balatro #7). Count by rank or suit, distinct values, runs.
 9. **Ordered modifier resolution** (Balatro #5). Resolve by source position instead of fixed layers, as an option.
@@ -169,5 +169,6 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 - Names with hyphens or spaces (`Anti-Magic`) cannot be written as bare words in expressions or test setup; use single-word names or strings.
 - Winning a battle clears the player's non-persistent statuses, so a test that checks a status applied by the last enemy on death needs a second enemy.
 - Until Inscryption was added, nothing in the repository declared a `resource` or a `keyword` — not the samples, not the corpus. Both behave as the language reference says, but neither had been exercised anywhere outside it.
+- Knife Juggler's `if event.target != self` guard is expressible as a filter clause, `on created(kind:actor, not target:self)`. Two of the workarounds in this table turned out to be partly self-inflicted once they were re-tested rather than trusted, which is an argument for re-testing the rest of them.
 - `other` excludes the entity a modifier is written on, not merely the target: a modifier's scope is evaluated with the owner as `self`, and `other` drops `self` as well as the target or controller. So "other goblins" is `of other allies where tag:goblin`, with no need to tag the lord separately. The language reference describes `other` in terms of the target and the running entity's controller, which does not make this obvious, and the Magic entry carried a needless workaround until it was checked.
 - Winning a battle returns the player's hand, discard, exhaust, play and powers piles to the draw pile (`EndBattle`), and `Execute` checks whether the battle is over when it finishes. So a test that draws a card by killing the last enemy finds that card back in the draw pile afterwards, which looks precisely like the draw never happening. It is worth ruling this out before suspecting the effect. Relatedly, `player` in content is always the game's player, never relative to whichever side is acting.

@@ -63,14 +63,14 @@ actor "Dire Wolf"
 
 # --- 6. ref Knife Juggler: after you summon a minion, deal 1 to a random enemy -------------------------------
 # Workaround: a listener that becomes active during an event also hears that event, so the
-# Juggler would react to its own summon without the `event.target != self` check.
+# Juggler has to leave its own summon out. `not target:self` says that as a filter rather than
+# as a guard in the body, but it still has to be said.
 
 actor "Knife Juggler"
   hp 2
   attack 2
-  on created(kind:actor):
-    if event.target != self:
-      deal 1 to random enemies
+  on created(kind:actor, not target:self):
+    deal 1 to random enemies
 
 # --- 7. ref minion combat: trade attack for attack ----------------------------------------------------------
 # Combat is still spelled out in content, which is this library's division of labour, but
