@@ -113,6 +113,7 @@ card "Knife Flurry"
 # --- 7. ref Accuracy: buff one named card ---------------------------------------------------
 # A modifier written on a power card is anchored to that card (it would only boost the
 # power's own damage), so the power applies a status and the status carries the modifier.
+# Confirmed by experiment: with the modifier on the card instead, a Shiv lands 4 rather than 8.
 
 card "Honed Edge"
   cost 1
