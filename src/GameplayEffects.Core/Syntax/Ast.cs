@@ -493,7 +493,9 @@ namespace GameplayEffects.Syntax
             BlockNode body,
             LimitScope limit,
             int priority,
-            SourceSpan span)
+            SourceSpan span,
+            Num interval = default,
+            string? intervalUnit = null)
             : base(span)
         {
             EventName = eventName;
@@ -502,6 +504,8 @@ namespace GameplayEffects.Syntax
             Body = body;
             Limit = limit;
             Priority = priority;
+            Interval = interval;
+            IntervalUnit = intervalUnit;
         }
 
         /// <summary>Normalised event name with any <c>before_</c>/<c>after_</c> prefix stripped.</summary>
@@ -512,6 +516,12 @@ namespace GameplayEffects.Syntax
         public BlockNode Body { get; }
         public LimitScope Limit { get; }
         public int Priority { get; }
+
+        /// <summary>How often <c>on every ...:</c> fires. Zero for an ordinary event listener.</summary>
+        public Num Interval { get; }
+
+        /// <summary>The unit written against the interval: <c>s</c>, <c>ms</c>, <c>turns</c>.</summary>
+        public string? IntervalUnit { get; }
     }
 
     /// <summary><c>modify damage where tag:fire, source:self: x1.5</c>.</summary>

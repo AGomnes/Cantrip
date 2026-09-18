@@ -13,16 +13,19 @@ status "Lifesteal"
     heal event.amount * stacks / 100 to owner
 
 # --- 2. ref Venomous Gale: damage every second for a few seconds --------------------------------------------
-# Workaround: there is no `every 1s` trigger, so each later tick is a nested `in 1s:` block.
+# The venom carries the ticking, so the ability is the hit plus a debuff that lasts two
+# seconds and deals its damage once a second.
+
+status "Venom"
+  tags debuff, dot
+  on every 1s:
+    deal 4 to owner
 
 ability "Poison Sting"
   cooldown 5s
   effect:
     deal 4 to enemies
-    in 1s:
-      deal 4 to enemies
-      in 1s:
-        deal 4 to enemies
+    apply Venom for 2s to enemies
 
 # --- 3. ref Skull Basher: a chance to stun on hit --------------------------------------------------------------
 # Workaround: Stun is only a marker; nothing in the runtime stops a stunned unit from acting.

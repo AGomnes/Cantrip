@@ -249,6 +249,9 @@ A bound that names another stat (`max max_hp`) only applies to entities that hav
 ```
 on [phase_][scope.][phase_]event[(filter)] [once per turn|battle|run|chain] [priority N]:
   statements
+
+on every <interval>[(filter)] [once per turn|battle|run|chain] [priority N]:
+  statements
 ```
 
 ```
@@ -284,6 +287,8 @@ relic "Bloodlust"
 **Inside a listener**, `self` is the listening entity, `source` is also the listening entity (so a status's damage comes from the status, and its controller is the host), `target` is `event.target`, and `event` is the event. `card` is not set: the card that caused the event is `event.card`. This keeps a status's retaliation from counting as part of the card that triggered it.
 
 **Resolution.** Before and instead listeners run immediately. After listeners are queued and resolve in order once the current action finishes; work they raise joins the back of the queue. With `triggers: immediate` in the ruleset they run immediately instead.
+
+**Every.** `on every 1s:` fires on an interval rather than on an event. It is pumped by the clock instead of raised by anything, so only the listener whose interval has elapsed runs. The interval is written like any other duration (`1s`, `250ms`, `2 turns`), and the clock has to understand the unit: seconds mean nothing to a turn-based game, so `every 1s` there registers nothing at all rather than half-working. Filters and `once per ...` apply as they do to any listener. When the next firing is due is part of the saved game, so a reload resumes mid-interval instead of restarting it.
 
 **Ordering.** Listeners for the same event run by priority (higher first), then play order (the order their entities became active), then the active side first, then registration order. The ruleset can reorder the first three.
 

@@ -95,6 +95,18 @@ namespace GameplayEffects.Runtime
         // Limit bookkeeping for `once per turn` and friends.
         internal long LimitWindow { get; set; } = long.MinValue;
 
+        /// <summary>
+        /// Interval of an <c>on every ...:</c> listener, in clock units. Zero for every other
+        /// listener, which is what makes a periodic one recognisable at all.
+        /// </summary>
+        public long IntervalUnits { get; internal set; }
+
+        /// <summary>
+        /// Clock time this listener is next due to fire. Saved with the game, because when the next
+        /// tick lands is part of the state a replay has to agree about.
+        /// </summary>
+        public long NextDueAt { get; internal set; }
+
         public override string ToString() => $"{Owner.Name}: on {Syntax.EventName}";
     }
 
@@ -108,14 +120,27 @@ namespace GameplayEffects.Runtime
             new Dictionary<string, List<Listener>>(StringComparer.OrdinalIgnoreCase);
 
         private readonly Dictionary<int, List<Listener>> _byOwner = new Dictionary<int, List<Listener>>();
+
+        /// <summary>
+        /// Periodic listeners, in registration order. Held separately because they are pumped by the
+        /// clock rather than found by an event name: only the one whose time has come may run.
+        /// </summary>
+        private readonly List<Listener> _periodic = new List<Listener>();
+
         private int _nextId = 1;
         private long _nextOrder = 1;
 
         public int Count { get; private set; }
 
-        internal Listener Register(Entity owner, ListenerNode syntax)
+        internal Listener Register(Entity owner, ListenerNode syntax, long intervalUnits = 0)
         {
             var listener = new Listener(_nextId++, owner, syntax, _nextOrder++);
+
+            if (intervalUnits > 0)
+            {
+                listener.IntervalUnits = intervalUnits;
+                _periodic.Add(listener);
+            }
 
             if (!_byEvent.TryGetValue(listener.EventName, out List<Listener>? list))
             {
@@ -146,10 +171,15 @@ namespace GameplayEffects.Runtime
                     list.Remove(listener);
                     Count--;
                 }
+
+                if (listener.IntervalUnits > 0) _periodic.Remove(listener);
             }
 
             _byOwner.Remove(owner.Id);
         }
+
+        /// <summary>Every periodic listener, for the clock to pump. Empty in a game with none.</summary>
+        public IReadOnlyList<Listener> Periodic => _periodic;
 
         public IReadOnlyList<Listener> OwnedBy(Entity owner) =>
             _byOwner.TryGetValue(owner.Id, out List<Listener>? owned) ? owned : (IReadOnlyList<Listener>)Array.Empty<Listener>();

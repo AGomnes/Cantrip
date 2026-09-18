@@ -18,7 +18,7 @@ namespace GameplayEffects.Tests.Review
             "on", "modify", "damage", "cost", "hp", "stacking", "decay", "max_stacks", "pattern", "tags", "flags", "immune",
             "events", "loops", "ordering", "where", "of", "to", "from", "for", "as", "by", "into", "tag:fire", "source:self",
             "target", "self", "owner", "event", "if", "else", "repeat", "each", "in", "chance", "next", "turn", "until", "once",
-            "let", "phase", "when",
+            "let", "phase", "when", "every",
             "per", "priority", "random", "lowest", "highest", "all", "other", "within", "deal", "apply", "remove", "stacks",
             "not", "and", "or", "has", "is", "6", "1.5", "40%", "3s", "x1.5", "clamp", "set", "0..10", ":", ",", ".", "..",
             "(", ")", "[", "]", "+", "-", "*", "/", "%", "=", "==", "!=", "<", "<=", ">", ">=", "+=", "-=", "*=", "->", "!",

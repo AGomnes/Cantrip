@@ -25,8 +25,8 @@ gedsl lint samples/corpus
 | Monster Train | 10 | 8 | 1 | 1 |
 | Hearthstone | 10 | 4 | 3 | 3 |
 | Balatro | 7 | 3 | 1 | 3 |
-| Dota 2 (real time) | 8 | 2 | 2 | 4 |
-| **Total** | **58** | **33** | **14** | **11** |
+| Dota 2 (real time) | 8 | 3 | 1 | 4 |
+| **Total** | **58** | **34** | **13** | **11** |
 
 Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock.
 
@@ -107,17 +107,17 @@ A Deathrattle that draws a card is also not directly expressible: `draw` always 
 | # | Mechanic | Ours | Status | Notes |
 |---|---|---|---|---|
 | 1 | Lifesteal | Lifesteal | Works | `heal event.amount * stacks / 100 to owner` |
-| 2 | Damage over time | Poison Sting | Workaround | There is no `every 1s` trigger, so each tick is a nested `in 1s:` block |
+| 2 | Damage over time | Poison Sting | Works | The venom carries the ticking: a debuff applied `for 2s` with `on every 1s:` deals its damage once a second |
 | 3 | Skull Basher | Skull Basher | Workaround | Stun is only a marker; nothing stops a stunned unit from acting |
 | 4 | Vladmir's Offering | War Banner | Works | `modify damage of everyone where source:allies: x1.25` |
 | 5 | Cooldown reduction | | Not expressible | Cooldowns come straight from the `cooldown` property, not through a modifier channel |
 | 6 | Crystal Nova (area) | | Not expressible | `within` is parsed but its meaning must come from a host; DSL tests have none |
 | 7 | Blink | | Not expressible | Actors have board slots, not positions in space |
-| 8 | Mana regeneration | | Not expressible | Nothing triggers per second or per tick |
+| 8 | Mana regeneration | | Not expressible | `on every 1s:` now exists, so the trigger is no longer the obstacle; this row simply has no content or test written for it yet |
 
 ## Gaps, most useful first
 
-1. **Time-based triggers** (Dota 2 #2, #8). `on every 1s` was in the design notes; real-time content needs it for regeneration, damage over time and auras.
+1. **Delivered: time-based triggers.** `on every 1s:` fires on the clock, and Poison Sting (#2) is written with it. What remains here is corpus coverage rather than language: mana regeneration (#8) and the other real-time rows are expressible now but not yet written and tested.
 2. **Re-telegraphing when a phase changes** (Slay the Spire #22). Phases now gate which moves an enemy may choose, which covers opening moves and hp thresholds; what is left is re-rolling an intent when a phase changes during the player's turn, so a boss can telegraph the move its new phase has just unlocked.
 3. **Combat and targeting rules** (Hearthstone #7, #8; Monster Train #4; Dota 2 #3). A built-in attack verb with the attacker as source, target validity rules (Taunt) and action blocking (Stun).
 4. **Verbs that return values** (Slay the Spire #11). `let` has covered the local-variable half of this gap; what remains is getting a result back out of a verb, so that an attack's damage need not be recovered by differencing a counter around it.

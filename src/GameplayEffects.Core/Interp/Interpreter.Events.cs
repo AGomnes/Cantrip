@@ -343,6 +343,51 @@ namespace GameplayEffects.Runtime
         }
 
         /// <summary>
+        /// Runs every <c>on every ...:</c> listener whose time has come, in registration order.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// A periodic listener is pumped rather than dispatched: raising an <c>every</c> event would
+        /// run all of them, and only the one whose interval has elapsed should fire.
+        /// </para>
+        /// <para>
+        /// One that has fallen behind — a big tick jump, or a game paused at a breakpoint — fires once
+        /// and resyncs from now, instead of owing the clock one firing per interval it missed.
+        /// </para>
+        /// </remarks>
+        internal void RunDuePeriodic(long now)
+        {
+            IReadOnlyList<Listener> periodic = State.Events.Periodic;
+            if (periodic.Count == 0) return;
+
+            // Taken as a copy: a body may create or remove entities, and so the list itself.
+            List<Listener>? due = null;
+            for (int i = 0; i < periodic.Count; i++)
+            {
+                Listener listener = periodic[i];
+                if (listener.IntervalUnits > 0 && listener.NextDueAt <= now) (due ??= new List<Listener>()).Add(listener);
+            }
+
+            if (due == null) return;
+
+            foreach (Listener listener in due)
+            {
+                if (listener.Owner.IsRemoved || !State.IsActive(listener.Owner)) continue;
+
+                // Advanced before the body runs, so a body that throws cannot fire again at once.
+                listener.NextDueAt = now + listener.IntervalUnits;
+
+                var gameEvent = new GameEvent(BuiltinEvents.Every) { Target = listener.Owner, Source = listener.Owner };
+                Chain chain = NewChain();
+
+                if (!Matches(listener, gameEvent, chain)) continue;
+                if (!ConsumeLimit(listener, chain)) continue;
+
+                RunListener(listener, gameEvent, chain);
+            }
+        }
+
+        /// <summary>
         /// Resolves queued work until none remains. Work raised while draining joins the back of
         /// the queue, so resolution is breadth-first and fully deterministic.
         /// </summary>

@@ -60,6 +60,7 @@ namespace GameplayEffects.Runtime
         public const string Move = "move";
         public const string AbilityUsed = "ability_used";
         public const string Obtained = "obtained";
+        public const string Every = "every";
 
         /// <summary>Suffix of the per-stat events such as <c>energy_changed</c>.</summary>
         public const string StatChangedSuffix = "_changed";
@@ -98,6 +99,7 @@ namespace GameplayEffects.Runtime
             new BuiltinEvent(Move, "enemy source performs a move against target; data move."),
             new BuiltinEvent(AbilityUsed, "source used an ability on target; data ability."),
             new BuiltinEvent(Obtained, "source obtained target (a relic)."),
+            new BuiltinEvent(Every, "the interval of an `on every ...:` listener elapsed; target and source are the listening entity. Raised only for the listener whose time has come, never broadcast."),
         };
 
         private static readonly Dictionary<string, BuiltinEvent> ByName =

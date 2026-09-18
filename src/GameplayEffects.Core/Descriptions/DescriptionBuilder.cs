@@ -1187,6 +1187,7 @@ namespace GameplayEffects.Descriptions
 
                     case ListenerNode listener:
                         text.Append("on ").Append(listener.Phase).Append(' ').Append(listener.EventName)
+                            .Append(' ').Append(listener.Interval.IsZero ? string.Empty : listener.Interval + (listener.IntervalUnit ?? string.Empty))
                             .Append(' ').Append(listener.Filter == null ? string.Empty : AstPrinter.Print(listener.Filter))
                             .Append(' ').Append(listener.Limit)
                             .Append(' ').Append(listener.Priority.ToString(CultureInfo.InvariantCulture))

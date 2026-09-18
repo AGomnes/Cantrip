@@ -620,6 +620,7 @@ namespace GameplayEffects
                 Run(action.Owner, _ => Interpreter.RunScheduled(action));
             }
 
+            Run(null, _ => Interpreter.RunDuePeriodic(now));
             Run(null, _ => Interpreter.ExpireTimedStatuses());
             if (State.InBattle) CheckBattleOver();
         }

@@ -42,6 +42,7 @@ namespace GameplayEffects.Runtime
         public List<ZoneSnapshot> Zones { get; set; } = new List<ZoneSnapshot>();
         public List<ScheduledSnapshot> Scheduled { get; set; } = new List<ScheduledSnapshot>();
         public List<ListenerLimitSnapshot> ListenerLimits { get; set; } = new List<ListenerLimitSnapshot>();
+        public List<ListenerDueSnapshot> ListenerDues { get; set; } = new List<ListenerDueSnapshot>();
 
         /// <summary>History counters, as raw <see cref="Num"/> values.</summary>
         public Dictionary<string, long> TurnHistory { get; set; } = new Dictionary<string, long>();
@@ -137,6 +138,17 @@ namespace GameplayEffects.Runtime
         public long Window { get; set; }
     }
 
+    /// <summary>When an <c>on every ...:</c> listener of one entity is next due to fire.</summary>
+    public sealed class ListenerDueSnapshot
+    {
+        public int OwnerId { get; set; }
+
+        /// <summary>Index of the listener among its owner's listeners, in definition order.</summary>
+        public int Index { get; set; }
+
+        public long DueAt { get; set; }
+    }
+
     public sealed partial class GameState
     {
         internal GameSnapshot Capture(BlockAddressBook addresses)
@@ -189,6 +201,9 @@ namespace GameplayEffects.Runtime
                 {
                     if (listeners[i].LimitWindow != long.MinValue)
                         snapshot.ListenerLimits.Add(new ListenerLimitSnapshot { OwnerId = entity.Id, Index = i, Window = listeners[i].LimitWindow });
+
+                    if (listeners[i].IntervalUnits > 0)
+                        snapshot.ListenerDues.Add(new ListenerDueSnapshot { OwnerId = entity.Id, Index = i, DueAt = listeners[i].NextDueAt });
                 }
             }
 
@@ -366,6 +381,14 @@ namespace GameplayEffects.Runtime
                 if (owner == null) continue;
                 IReadOnlyList<Listener> listeners = Events.OwnedBy(owner);
                 if (limit.Index < listeners.Count) listeners[limit.Index].LimitWindow = limit.Window;
+            }
+
+            foreach (ListenerDueSnapshot due in snapshot.ListenerDues)
+            {
+                Entity? owner = Lookup(due.OwnerId);
+                if (owner == null) continue;
+                IReadOnlyList<Listener> listeners = Events.OwnedBy(owner);
+                if (due.Index < listeners.Count) listeners[due.Index].NextDueAt = due.DueAt;
             }
 
             Touch();

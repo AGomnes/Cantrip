@@ -491,12 +491,42 @@ namespace GameplayEffects.Syntax
                 return new ListenerNode("<invalid>", EventPhase.After, null, BlockNode.Empty(keyword.Span), LimitScope.None, 0, keyword.Span);
             }
 
-            // Event names may be dotted, as in `owner.damaged`.
-            eventName.Append(Advance().Text);
-            while (Check(TokenKind.Dot) && Peek().Kind == TokenKind.Identifier)
+            // `on every 1s:` is a periodic trigger rather than an event name. It registers under the
+            // built-in `every` event, but only the listener whose interval has elapsed is run.
+            Num interval = default;
+            string? intervalUnit = null;
+
+            if (CheckKeyword("every"))
             {
                 _index++;
-                eventName.Append('.').Append(Advance().Text);
+                if (Check(TokenKind.Number))
+                {
+                    Token amount = Advance();
+                    interval = amount.Value;
+                    intervalUnit = amount.Unit;
+
+                    // `every 2 turns` writes its unit as a following word; `every 2s` attaches it.
+                    if (intervalUnit == null && Check(TokenKind.Identifier) && UnitWords.Contains(Current.Text.ToLowerInvariant()))
+                        intervalUnit = Advance().Text.ToLowerInvariant();
+                }
+                else
+                {
+                    Expect(TokenKind.Number, "an interval such as `1s` or `2 turns`");
+                }
+
+                // Spelled out rather than taken from BuiltinEvents: the syntax layer does not know
+                // about the runtime, and this is the name the runtime registers under.
+                eventName.Append("every");
+            }
+            else
+            {
+                // Event names may be dotted, as in `owner.damaged`.
+                eventName.Append(Advance().Text);
+                while (Check(TokenKind.Dot) && Peek().Kind == TokenKind.Identifier)
+                {
+                    _index++;
+                    eventName.Append('.').Append(Advance().Text);
+                }
             }
 
             ExprNode? filter = null;
@@ -535,7 +565,7 @@ namespace GameplayEffects.Syntax
             BlockNode body = ParseBlock();
 
             (string normalized, EventPhase phase) = NormalizeEventName(eventName.ToString());
-            return new ListenerNode(normalized, phase, filter, body, limit, priority, keyword.Span.To(nameSpan));
+            return new ListenerNode(normalized, phase, filter, body, limit, priority, keyword.Span.To(nameSpan), interval, intervalUnit);
         }
 
         private LimitScope ParseLimitScope()

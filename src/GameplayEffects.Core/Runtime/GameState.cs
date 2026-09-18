@@ -388,7 +388,17 @@ namespace GameplayEffects.Runtime
                 EntityDefinition? definition = entity.Definition;
                 if (definition != null)
                 {
-                    foreach (ListenerNode listener in definition.Listeners) Events.Register(entity, listener);
+                    foreach (ListenerNode listener in definition.Listeners)
+                    {
+                        // The interval is authored in seconds or turns; only the clock can say what
+                        // that is in units, and a unit it cannot convert (seconds on a turn clock)
+                        // leaves the listener unregistered as periodic rather than half-working.
+                        long units = 0;
+                        if (!listener.Interval.IsZero) Clock.TryConvert(listener.Interval, listener.IntervalUnit, out units);
+
+                        Listener registered = Events.Register(entity, listener, units);
+                        if (units > 0) registered.NextDueAt = Clock.Now + units;
+                    }
                     foreach (ModifyNode modifier in definition.Modifiers) Modifiers.Register(entity, modifier);
                 }
             }
@@ -578,7 +588,11 @@ namespace GameplayEffects.Runtime
                 }
                 foreach (string tag in entity.Tags.OrderBy(t => t, StringComparer.OrdinalIgnoreCase)) MixText(tag);
                 foreach (Entity attached in entity.Attached) Mix(attached.Id);
-                foreach (Listener listener in Events.OwnedBy(entity)) Mix(listener.LimitWindow);
+                foreach (Listener listener in Events.OwnedBy(entity))
+                {
+                    Mix(listener.LimitWindow);
+                    Mix(listener.NextDueAt);
+                }
             }
 
             foreach (var zone in _zones.OrderBy(z => z.Key.Owner).ThenBy(z => z.Key.Zone, StringComparer.Ordinal))
