@@ -28,6 +28,14 @@ test "dota Skull Basher sometimes stuns"
     deal 1 to enemy
   expect enemy.has(Stun)
 
+test "dota a stunned unit loses its move"
+  enemy Brute
+  end turn
+  expect player.hp == 75
+  apply Stun 1 to enemy
+  end turn
+  expect player.hp == 75
+
 test "dota War Banner boosts allied damage only"
   enemy Raider
   relic "War Banner"

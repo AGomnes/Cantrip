@@ -25,10 +25,10 @@ gedsl lint samples/corpus
 | Monster Train | 10 | 8 | 1 | 1 |
 | Hearthstone | 10 | 6 | 1 | 3 |
 | Balatro | 7 | 3 | 1 | 3 |
-| Dota 2 (real time) | 8 | 4 | 1 | 3 |
+| Dota 2 (real time) | 8 | 5 | 0 | 3 |
 | Magic | 10 | 7 | 1 | 2 |
 | Inscryption | 8 | 6 | 1 | 1 |
-| **Total** | **76** | **51** | **12** | **13** |
+| **Total** | **76** | **52** | **11** | **13** |
 
 Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics. Inscryption models creatures the same way, with sigils as `keyword` definitions applied to them and bones as a declared `resource`.
 
@@ -110,7 +110,7 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 |---|---|---|---|---|
 | 1 | Lifesteal | Lifesteal | Works | `heal event.amount * stacks / 100 to owner` |
 | 2 | Damage over time | Poison Sting | Works | The venom carries the ticking: a debuff applied `for 2s` with `on every 1s:` deals its damage once a second |
-| 3 | Skull Basher | Skull Basher | Workaround | Stun is only a marker; nothing stops a stunned unit from acting |
+| 3 | Skull Basher | Skull Basher | Works | Stun cancels its host's move in the before phase — `on before_move(source:owner): cancel` — so a stunned unit really does lose its turn |
 | 4 | Vladmir's Offering | War Banner | Works | `modify damage of everyone where source:allies: x1.25` |
 | 5 | Cooldown reduction | | Not expressible | Cooldowns come straight from the `cooldown` property, not through a modifier channel |
 | 6 | Crystal Nova (area) | | Not expressible | `within` is parsed but its meaning must come from a host; DSL tests have none |
@@ -149,7 +149,7 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 
 1. **Delivered: time-based triggers.** `on every 1s:` fires on the clock, and both Poison Sting (#2) and Mana Font (#8) are written with it. Nothing is left in this area that the language cannot say.
 2. **Re-telegraphing when a phase changes** (Slay the Spire #22). Phases now gate which moves an enemy may choose, which covers opening moves and hp thresholds; what is left is re-rolling an intent when a phase changes during the player's turn, so a boss can telegraph the move its new phase has just unlocked.
-3. **Targeting rules and action blocking** (Hearthstone #8; Magic #8; Dota 2 #3; Monster Train #4). The `attack` verb has landed, so a creature is the source of its own hit and deathtouch, lifelink and "whenever this deals damage" all work. What is left is target validity content can add to (Taunt, Flying), stopping a stunned unit from acting, and attack counts such as Multistrike.
+3. **Target validity** (Hearthstone #8; Magic #8). Nothing content writes can add a rule to target selection: `TryResolveTarget` consults the definition's `target` word and hard-coded validity and raises no event, so "must target a Taunt minion" and "only fliers may block it" have nowhere to attach. Two things once filed here have left it. Action blocking is expressible — a stunned unit loses its move by cancelling `move` in the before phase (Dota 2 #3) — and Multistrike (Monster Train #4) is a duplication problem rather than a targeting one.
 4. **Verbs that return values** (Slay the Spire #11). `let` has covered the local-variable half of this gap; what remains is getting a result back out of a verb, so that an attack's damage need not be recovered by differencing a counter around it.
 5. **Effects as values** (Balatro #6, Hearthstone #9). Copying and disabling another entity's effects; section 3.11 already lists this as a stress test.
 6. **Listeners registered during an event hear that event** (Slay the Spire #10, Hearthstone #6). The clean "not myself" filter already exists — `not target:self`, `not card:Reverb` — so what is left to decide is whether the default should change, since every listener of this shape has to remember to exclude itself.
@@ -170,6 +170,6 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 - Winning a battle clears the player's non-persistent statuses, so a test that checks a status applied by the last enemy on death needs a second enemy.
 - Until Inscryption was added, nothing in the repository declared a `resource` or a `keyword` — not the samples, not the corpus. Both behave as the language reference says, but neither had been exercised anywhere outside it.
 - Knife Juggler's `if event.target != self` guard is expressible as a filter clause, `on created(kind:actor, not target:self)`.
-- Five of these workarounds have been re-tested rather than trusted, and not one proved inexpressible. Three were self-inflicted: the Goblin Chief's separate tag, the Juggler's body guard, and Honed Edge's extra status. What is real is narrower, and it is the anchoring rule: drop the `of` scope and Kobold Geomancer's Arcane Shot lands 2 instead of 3, and a Shiv lands 4 instead of 8. Naming a scope is the ordinary way to write an outward modifier, though, not a trick — so the lesson is not "the notes were wrong" but that the anchor catches people out even though the language reference states it plainly under Modifiers. Every note in this table is worth testing before believing.
+- Six of these workarounds have been re-tested rather than trusted, and not one proved inexpressible. Four were self-inflicted: the Goblin Chief's separate tag, the Juggler's body guard, Honed Edge's extra status, and Stun — which really can stop a unit from acting, by cancelling `move` in the before phase. What is real is narrower, and it is the anchoring rule: drop the `of` scope and Kobold Geomancer's Arcane Shot lands 2 instead of 3, and a Shiv lands 4 instead of 8. Naming a scope is the ordinary way to write an outward modifier, though, not a trick — so the lesson is not "the notes were wrong" but that the anchor catches people out even though the language reference states it plainly under Modifiers. Every note in this table is worth testing before believing.
 - `other` excludes the entity a modifier is written on, not merely the target: a modifier's scope is evaluated with the owner as `self`, and `other` drops `self` as well as the target or controller. So "other goblins" is `of other allies where tag:goblin`, with no need to tag the lord separately. The language reference describes `other` in terms of the target and the running entity's controller, which does not make this obvious, and the Magic entry carried a needless workaround until it was checked.
 - Winning a battle returns the player's hand, discard, exhaust, play and powers piles to the draw pile (`EndBattle`), and `Execute` checks whether the battle is over when it finishes. So a test that draws a card by killing the last enemy finds that card back in the draw pile afterwards, which looks precisely like the draw never happening. It is worth ruling this out before suspecting the effect. Relatedly, `player` in content is always the game's player, never relative to whichever side is acting.

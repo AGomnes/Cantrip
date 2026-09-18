@@ -3,6 +3,8 @@
 
 status "Stun"
   tags debuff, control
+  on before_move(source:owner):
+    cancel
 
 # --- 1. ref Lifesteal: heal for a share of the damage dealt -------------------------------------------------
 
@@ -28,12 +30,18 @@ ability "Poison Sting"
     apply Venom for 2s to enemies
 
 # --- 3. ref Skull Basher: a chance to stun on hit --------------------------------------------------------------
-# Workaround: Stun is only a marker; nothing in the runtime stops a stunned unit from acting.
+# Stun cancels its host's move in the before phase, so a stunned unit really does lose its turn.
 
 relic "Skull Basher"
   on damaged(source:owner):
     chance 25%:
       apply Stun 1 for 1s to event.target
+
+enemy "Brute"
+  hp 20
+  attack 5
+  move "Smash":
+    deal 5 to player
 
 # --- 4. ref Vladmir's Offering: allies deal more damage ---------------------------------------------------------
 
