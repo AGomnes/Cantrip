@@ -194,6 +194,21 @@ enemy "Gremlin"
 | `pattern random` | A weighted random move each turn (`weight N` on the move, default 1). |
 | `pattern random_no_repeat` | Weighted random, never the same move twice in a row (unless it is the only move). |
 
+**Phases** gate which moves an enemy may choose from:
+
+```
+enemy "Slime King"
+  hp 60
+  phase Broken when hp <= max_hp / 2
+  move "Chomp":
+    deal 11 to player
+  move "Split" phase Broken:
+    deal 5 to player
+  pattern cycle Chomp, Split
+```
+
+A move with no `phase` is available in every phase; a move with one only while that phase is active. Conditions are evaluated against the enemy each time its intent is rolled, and the **last** declared phase whose condition holds is the one that applies — so thresholds can be written in the order they are thought of (three quarters, then half, then a quarter) and the deepest one that is true wins. Entering a phase restarts the pattern, because the old position counted through a list of moves that is no longer the same one. The phase is readable as `enemy.phase`, and is part of the saved game.
+
 The next move (the intent, readable as `enemy.intent`) is rolled when the battle starts, when an enemy spawns or is created mid-battle, and after each enemy turn. Inside a move, `self` is the enemy and `target` is the player. `use Chant` makes an enemy perform one of its moves.
 
 ## Abilities and real time

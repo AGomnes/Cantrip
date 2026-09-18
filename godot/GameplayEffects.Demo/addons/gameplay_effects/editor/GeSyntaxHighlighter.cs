@@ -38,7 +38,7 @@ namespace GameplayEffects.GodotAdapter
         {
             "card", "status", "relic", "ability", "enemy", "keyword", "item", "event", "encounter", "actor",
             "resource", "verb", "ruleset", "test", "effect", "move", "on", "modify", "setup", "once", "per",
-            "priority", "and", "or", "not", "is", "has", "where", "within", "of",
+            "priority", "and", "or", "not", "is", "has", "where", "within", "of", "phase", "when",
         };
 
         /// <summary>Words that decide what runs next.</summary>

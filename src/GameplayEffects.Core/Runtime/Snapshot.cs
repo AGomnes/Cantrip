@@ -71,6 +71,7 @@ namespace GameplayEffects.Runtime
         public int PatternIndex { get; set; }
         public string? LastMove { get; set; }
         public string? Intent { get; set; }
+        public string? Phase { get; set; }
 
         /// <summary>Base stats, as raw <see cref="Num"/> values.</summary>
         public Dictionary<string, long> Stats { get; set; } = new Dictionary<string, long>();
@@ -176,6 +177,7 @@ namespace GameplayEffects.Runtime
                     PatternIndex = entity.PatternIndex,
                     LastMove = entity.LastMove,
                     Intent = entity.Intent,
+                    Phase = entity.Phase,
                 };
                 foreach (string stat in entity.StatNames.OrderBy(s => s, StringComparer.Ordinal)) record.Stats[stat] = entity.GetBase(stat).Raw;
                 record.Tags.AddRange(entity.Tags.OrderBy(t => t, StringComparer.Ordinal));
@@ -285,6 +287,7 @@ namespace GameplayEffects.Runtime
                 entity.PatternIndex = record.PatternIndex;
                 entity.LastMove = record.LastMove;
                 entity.Intent = record.Intent;
+                entity.Phase = record.Phase;
 
                 foreach (var stat in record.Stats) entity.SetBase(stat.Key, Num.FromRaw(stat.Value));
                 foreach (string tag in record.Tags) entity.AddTag(tag);

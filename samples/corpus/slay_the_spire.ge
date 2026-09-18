@@ -242,18 +242,18 @@ status "Phased"
   modify damage_taken: clamp 1
 
 # --- 19. ref Cultist: opening move, then the same move forever; Ritual ------------------
-# Workaround: patterns are cycle/random only, so the opening move is folded into a single
-# move with a branch (the intent shown to the player is always "Act"). Ritual skips the
-# turn it was applied on with a scratch stat.
+# Phases give the opening its own move, so the intent the player is shown is the real one
+# rather than a single "Act" hiding a branch. Ritual still skips the turn it was applied on
+# with a counter stat, which is cross-turn state rather than a temporary.
 
 enemy "Chanter"
   hp 50
-  move "Act":
-    if not self.has(Ritual):
-      apply Ritual 3 to self
-    else:
-      deal 6 to player
-  pattern cycle Act
+  phase Opening when not self.has(Ritual)
+  phase Onward when self.has(Ritual)
+  move "Chant" phase Opening:
+    apply Ritual 3 to self
+  move "Slash" phase Onward:
+    deal 6 to player
 
 status "Ritual"
   tags buff

@@ -745,9 +745,22 @@ namespace GameplayEffects.Runtime
                 return;
             }
 
+            UpdatePhase(enemy, definition);
+
             List<string> names = definition.PatternMoves.Count > 0
                 ? definition.PatternMoves.ToList()
                 : definition.Moves.Select(m => m.Name).ToList();
+
+            if (definition.Phases.Count > 0)
+            {
+                names.RemoveAll(n => !AvailableInPhase(definition, n, enemy.Phase));
+                if (names.Count == 0)
+                {
+                    enemy.Intent = null;
+                    State.Touch();
+                    return;
+                }
+            }
 
             switch (definition.Pattern)
             {
@@ -773,6 +786,40 @@ namespace GameplayEffects.Runtime
             }
 
             State.Touch();
+        }
+
+        /// <summary>
+        /// Settles which phase an enemy is in before its next move is chosen.
+        /// </summary>
+        /// <remarks>
+        /// The last declared phase whose condition holds wins, so thresholds can be written in the
+        /// order a designer thinks of them — three quarters, then half, then a quarter — and the
+        /// deepest one that is true is the one that applies.
+        /// </remarks>
+        private void UpdatePhase(Entity enemy, EntityDefinition definition)
+        {
+            if (definition.Phases.Count == 0) return;
+
+            EvalContext context = SystemContext(enemy);
+            string? active = null;
+            foreach (PhaseDefinition phase in definition.Phases)
+            {
+                if (EvaluateCondition(phase.Condition, context)) active = phase.Name;
+            }
+
+            if (string.Equals(active, enemy.Phase, StringComparison.OrdinalIgnoreCase)) return;
+
+            // A new phase starts its own sequence: the old index counted through a list of moves
+            // that is no longer the same one.
+            enemy.Phase = active;
+            enemy.PatternIndex = 0;
+        }
+
+        /// <summary>A move with no phase is always available; one with a phase only during it.</summary>
+        private static bool AvailableInPhase(EntityDefinition definition, string move, string? phase)
+        {
+            MoveDefinition? found = definition.Moves.FirstOrDefault(m => string.Equals(m.Name, move, StringComparison.OrdinalIgnoreCase));
+            return found?.Phase == null || string.Equals(found.Phase, phase, StringComparison.OrdinalIgnoreCase);
         }
 
         // Temporary effects -----------------------------------------------------------------

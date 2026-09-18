@@ -21,12 +21,12 @@ gedsl lint samples/corpus
 
 | Game | Effects | Works | Workaround | Not expressible |
 |---|---|---|---|---|
-| Slay the Spire | 23 | 15 | 8 | 0 |
+| Slay the Spire | 23 | 16 | 7 | 0 |
 | Monster Train | 10 | 8 | 1 | 1 |
 | Hearthstone | 10 | 4 | 3 | 3 |
 | Balatro | 7 | 3 | 1 | 3 |
 | Dota 2 (real time) | 8 | 2 | 2 | 4 |
-| **Total** | **58** | **32** | **15** | **11** |
+| **Total** | **58** | **33** | **14** | **11** |
 
 Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock.
 
@@ -52,10 +52,10 @@ Units and minions in Monster Train and Hearthstone are modelled as `actor` defin
 | 16 | Snecko Eye | Serpent Eye | Works | Drawn cards get a random cost |
 | 17 | Artifact | Nullify | Works | Cancels the next debuff |
 | 18 | Intangible | Phased | Works | Damage taken is clamped to 1 |
-| 19 | Cultist and Ritual | Chanter | Workaround | Patterns cannot say "this move first, then cycle", so the opening is a branch inside one move; Ritual skips its first turn with a scratch stat |
+| 19 | Cultist and Ritual | Chanter | Works | A phase for the opening and one for afterwards, so the chant is its own move and the telegraphed intent is the real one. Ritual still skips its first turn with a counter stat, which is cross-turn state rather than a temporary |
 | 20 | Louse Curl Up | Rolling Louse | Works | Blocks the first time it is attacked |
 | 21 | Gremlin Nob Enrage | Fury | Works | Gains Strength when the player uses a skill |
-| 22 | Slime Boss split | Slime King | Workaround | Splits immediately at half hp instead of telegraphing a Split intent |
+| 22 | Slime Boss split | Slime King | Workaround | Splits immediately at half hp instead of telegraphing a Split intent. A phase can gate the move, but intents are rolled at battle start and after each enemy turn, so crossing the threshold during the player's turn does not re-telegraph |
 | 23 | Spore Cloud | Sporeling | Works | Debuffs the player when it dies |
 
 ## Monster Train
@@ -118,7 +118,7 @@ A Deathrattle that draws a card is also not directly expressible: `draw` always 
 ## Gaps, most useful first
 
 1. **Time-based triggers** (Dota 2 #2, #8). `on every 1s` was in the design notes; real-time content needs it for regeneration, damage over time and auras.
-2. **Enemy AI phases and sequences** (Slay the Spire #19, #22). An opening move, HP-threshold phases and telegraphed intents would cover most bosses.
+2. **Re-telegraphing when a phase changes** (Slay the Spire #22). Phases now gate which moves an enemy may choose, which covers opening moves and hp thresholds; what is left is re-rolling an intent when a phase changes during the player's turn, so a boss can telegraph the move its new phase has just unlocked.
 3. **Combat and targeting rules** (Hearthstone #7, #8; Monster Train #4; Dota 2 #3). A built-in attack verb with the attacker as source, target validity rules (Taunt) and action blocking (Stun).
 4. **Verbs that return values** (Slay the Spire #11). `let` has covered the local-variable half of this gap; what remains is getting a result back out of a verb, so that an attack's damage need not be recovered by differencing a counter around it.
 5. **Effects as values** (Balatro #6, Hearthstone #9). Copying and disabling another entity's effects; section 3.11 already lists this as a stress test.

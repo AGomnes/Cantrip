@@ -112,6 +112,12 @@ namespace GameplayEffects.Runtime
         internal int PatternIndex { get; set; }
         internal string? LastMove { get; set; }
 
+        /// <summary>
+        /// The behaviour phase this enemy is in, when its definition declares any. Null until
+        /// intents have been rolled, and for enemies with no phases at all.
+        /// </summary>
+        public string? Phase { get; internal set; }
+
         /// <summary>The move this enemy will use on its next turn, once intents have been rolled.</summary>
         public string? Intent
         {
@@ -208,6 +214,7 @@ namespace GameplayEffects.Runtime
             PatternIndex = 0;
             LastMove = null;
             Intent = null;
+            Phase = null;
             State.Touch();
         }
 

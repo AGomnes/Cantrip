@@ -570,6 +570,7 @@ namespace GameplayEffects.Runtime
                 Mix(entity.PatternIndex);
                 MixText(entity.Intent ?? string.Empty);
                 MixText(entity.LastMove ?? string.Empty);
+                MixText(entity.Phase ?? string.Empty);
                 foreach (string stat in entity.StatNames.OrderBy(s => s, StringComparer.OrdinalIgnoreCase))
                 {
                     MixText(stat);

@@ -31,19 +31,46 @@ namespace GameplayEffects.Content
         RandomNoRepeat,
     }
 
+    /// <summary>
+    /// A behaviour phase: <c>phase Broken when hp &lt;= max_hp / 2</c>. Moves tagged with the phase
+    /// are available only while its condition holds.
+    /// </summary>
+    public sealed class PhaseDefinition
+    {
+        public PhaseDefinition(string name, ExprNode condition, SourceSpan span)
+        {
+            Name = name;
+            Condition = condition;
+            Span = span;
+        }
+
+        public string Name { get; }
+
+        /// <summary>Evaluated against the enemy each time its intent is rolled.</summary>
+        public ExprNode Condition { get; }
+
+        public SourceSpan Span { get; }
+
+        public override string ToString() => Name;
+    }
+
     /// <summary>A named enemy move: <c>move "Chomp": deal 11 to player</c>.</summary>
     public sealed class MoveDefinition
     {
-        public MoveDefinition(string name, BlockNode body, Num weight)
+        public MoveDefinition(string name, BlockNode body, Num weight, string? phase = null)
         {
             Name = name;
             Body = body;
             Weight = weight;
+            Phase = phase;
         }
 
         public string Name { get; }
         public BlockNode Body { get; }
         public Num Weight { get; }
+
+        /// <summary>The phase this move belongs to, or null when it is available in every phase.</summary>
+        public string? Phase { get; }
     }
 
     /// <summary>
@@ -69,6 +96,7 @@ namespace GameplayEffects.Content
             var modifiers = new List<ModifyNode>();
             var blocks = new Dictionary<string, BlockMemberNode>(StringComparer.OrdinalIgnoreCase);
             var moves = new List<MoveDefinition>();
+            var phases = new List<PhaseDefinition>();
 
             foreach (MemberNode member in syntax.Members)
             {
@@ -92,6 +120,15 @@ namespace GameplayEffects.Content
                         blocks[block.Name] = block;
                         break;
 
+                    // Collected here rather than left to `_properties`, which is keyed by name: an
+                    // enemy may declare several phases and a dictionary would keep only the last.
+                    case PropertyNode property when property.Name == "phase":
+                    {
+                        PhaseDefinition? phase = ReadPhase(property, diagnostics);
+                        if (phase != null) phases.Add(phase);
+                        break;
+                    }
+
                     case PropertyNode property when property.Name == "tags" || property.Name == "tag":
                         foreach (ExprNode value in property.Values) tags.AddRange(ReadWords(value));
                         break;
@@ -111,12 +148,14 @@ namespace GameplayEffects.Content
             Modifiers = modifiers;
             Blocks = blocks;
             Moves = moves;
+            Phases = phases;
 
             // An enemy's hp doubles as its max_hp unless both are given.
             if (_stats.ContainsKey("hp") && !_stats.ContainsKey("max_hp")) _stats["max_hp"] = _stats["hp"];
 
             ReadStatusConfig(diagnostics);
             ReadPattern(diagnostics);
+            ValidateMovePhases(diagnostics);
         }
 
         public EntityDeclNode Syntax { get; }
@@ -156,6 +195,12 @@ namespace GameplayEffects.Content
 
         /// <summary>Move names in pattern order. Empty means "all moves, in declaration order".</summary>
         public IReadOnlyList<string> PatternMoves { get; private set; } = new string[0];
+
+        /// <summary>
+        /// Behaviour phases, in declaration order. Empty means the enemy has one behaviour and every
+        /// move is always available.
+        /// </summary>
+        public IReadOnlyList<PhaseDefinition> Phases { get; private set; } = new PhaseDefinition[0];
 
         // Presentation --------------------------------------------------------------------
 
@@ -232,6 +277,7 @@ namespace GameplayEffects.Content
         {
             string name = "<unnamed move>";
             Num weight = Num.One;
+            string? phase = null;
 
             if (block.Arguments.Count > 0)
             {
@@ -243,13 +289,15 @@ namespace GameplayEffects.Content
                 diagnostics.Error("GE0102", $"`move` in `{Name}` needs a name, as in `move \"Chomp\":`.", block.Span);
             }
 
-            // `move "Chomp" weight 2:` - an optional weight for random patterns.
+            // Optional header pairs: `move "Chomp" weight 2:` for random patterns, and
+            // `move "Split" phase Broken:` to limit a move to one phase.
             for (int i = 1; i + 1 < block.Arguments.Count; i++)
             {
                 if (block.Arguments[i] is NameExpr { Name: "weight" } && block.Arguments[i + 1] is NumberExpr w) weight = w.Value;
+                else if (block.Arguments[i] is NameExpr { Name: "phase" }) phase = ReadWords(block.Arguments[i + 1]).FirstOrDefault();
             }
 
-            return new MoveDefinition(name, block.Body, weight);
+            return new MoveDefinition(name, block.Body, weight, phase);
         }
 
         private void ReadStatusConfig(DiagnosticBag diagnostics)
@@ -333,6 +381,42 @@ namespace GameplayEffects.Content
             if (HasTag("buff")) flags |= StatusFlags.Buff;
             if (HasTag("debuff")) flags |= StatusFlags.Debuff;
             Flags = flags;
+        }
+
+        /// <summary>
+        /// <c>phase Broken when hp &lt;= max_hp / 2</c>. The name, the word `when`, and a condition
+        /// arrive as three values, because a property's values are whitespace-separated expressions.
+        /// </summary>
+        private PhaseDefinition? ReadPhase(PropertyNode property, DiagnosticBag diagnostics)
+        {
+            string? name = property.Values.Count > 0 ? ReadWords(property.Values[0]).FirstOrDefault() : null;
+            bool when = property.Values.Count > 1 && property.Values[1] is NameExpr { Name: "when" };
+
+            if (name == null || !when || property.Values.Count < 3)
+            {
+                diagnostics.Error("GE0107",
+                    $"`phase` in `{Name}` needs a name and a condition, as in `phase Broken when hp <= max_hp / 2`.",
+                    property.Span);
+                return null;
+            }
+
+            return new PhaseDefinition(name, property.Values[2], property.Span);
+        }
+
+        /// <summary>
+        /// A move naming a phase the enemy never declares would simply never be chosen, which is the
+        /// kind of silence worth a diagnostic.
+        /// </summary>
+        private void ValidateMovePhases(DiagnosticBag diagnostics)
+        {
+            foreach (MoveDefinition move in Moves)
+            {
+                if (move.Phase == null) continue;
+                if (Phases.Any(p => string.Equals(p.Name, move.Phase, StringComparison.OrdinalIgnoreCase))) continue;
+
+                diagnostics.Error("GE0108", $"Move `{move.Name}` of `{Name}` names unknown phase `{move.Phase}`.",
+                    Syntax.Span, Suggest.Closest(move.Phase, Phases.Select(p => p.Name)));
+            }
         }
 
         private void ReadPattern(DiagnosticBag diagnostics)

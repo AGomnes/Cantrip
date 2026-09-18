@@ -314,6 +314,7 @@ namespace GameplayEffects.Runtime
                 case "zone": return Value.FromText(entity.Zone);
                 case "position": return Value.FromNumber(Num.FromInt(entity.Position));
                 case "intent": return entity.Intent == null ? Value.None : Value.FromText(entity.Intent);
+                case "phase": return entity.Phase == null ? Value.None : Value.FromText(entity.Phase);
                 case "statuses": return Value.FromEntities(entity.Attached.Where(a => !a.IsRemoved).ToList());
                 case "kind": return Value.FromText(entity.Definition?.KindName ?? entity.Kind.ToString().ToLowerInvariant());
             }
