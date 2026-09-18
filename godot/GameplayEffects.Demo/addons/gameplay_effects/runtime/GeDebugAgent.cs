@@ -111,6 +111,36 @@ namespace GameplayEffects.GodotAdapter
                         payload = Detail(_service.Detail(Number(data, 0, 0)));
                         return true;
 
+                    case GeProtocol.Pause:
+                        reply = GeProtocol.StepState;
+                        payload = Stepped(_service.Pause());
+                        return true;
+
+                    case GeProtocol.Resume:
+                        reply = GeProtocol.StepState;
+                        payload = Stepped(_service.Resume());
+                        return true;
+
+                    case GeProtocol.Step:
+                        reply = GeProtocol.StepState;
+                        payload = Stepped(_service.Step());
+                        return true;
+
+                    case GeProtocol.BreakLine:
+                        reply = GeProtocol.StepState;
+                        payload = Stepped(_service.Break(Text(data, 0), Number(data, 1, 0), Flag(data, 2, true)));
+                        return true;
+
+                    case GeProtocol.BreakEvent:
+                        reply = GeProtocol.StepState;
+                        payload = Stepped(_service.BreakOnEvent(Text(data, 0), Flag(data, 1, true)));
+                        return true;
+
+                    case GeProtocol.BreakClear:
+                        reply = GeProtocol.StepState;
+                        payload = Stepped(_service.ClearBreakpoints());
+                        return true;
+
                     case GeProtocol.Execute:
                     {
                         GeExecuteResult result = _service.Execute(Text(data, 0));
@@ -196,6 +226,21 @@ namespace GameplayEffects.GodotAdapter
                 ["more"] = batch.More,
             };
         }
+
+        private static Godot.Collections.Dictionary Stepped(GeStepState state) =>
+            new Godot.Collections.Dictionary
+            {
+                ["paused"] = state.Paused,
+                ["steppable"] = state.Steppable,
+                ["pending"] = state.Pending,
+                ["next"] = state.Next,
+                ["event"] = state.Event,
+                ["file"] = state.Span.File ?? string.Empty,
+                ["line"] = state.Span.Line,
+                ["column"] = state.Span.Column,
+                ["breakpoints"] = state.Breakpoints,
+                ["message"] = state.Message,
+            };
 
         private static Godot.Collections.Dictionary EntityList(IReadOnlyList<EntityView> entities)
         {

@@ -44,6 +44,10 @@ namespace GameplayEffects.GodotAdapter
         private CheckBox? _follow;
         private Button? _fetch;
         private Button? _clear;
+        private Button? _pause;
+        private Button? _step;
+        private Button? _resume;
+        private Label? _held;
         private Timer? _poll;
 
         private long _cursor;
@@ -90,6 +94,25 @@ namespace GameplayEffects.GodotAdapter
             _clear = new Button { Text = "Clear", TooltipText = "Empty this view. The game keeps what it has." };
             _clear.Pressed += ClearRows;
             bar.AddChild(_clear);
+
+            bar.AddChild(new VSeparator());
+
+            // Stepping is the other half of reading a trace: the tree says what already happened,
+            // these say what happens next and let it happen one trigger at a time.
+            _pause = new Button { Text = "Pause", TooltipText = "Hold queued triggers. Whatever is running finishes first." };
+            _pause.Pressed += () => Request(GeProtocol.Pause, new Godot.Collections.Array());
+            bar.AddChild(_pause);
+
+            _step = new Button { Text = "Step", TooltipText = "Resolve exactly one queued trigger." };
+            _step.Pressed += () => Request(GeProtocol.Step, new Godot.Collections.Array());
+            bar.AddChild(_step);
+
+            _resume = new Button { Text = "Resume", TooltipText = "Let the rest of the queue resolve." };
+            _resume.Pressed += () => Request(GeProtocol.Resume, new Godot.Collections.Array());
+            bar.AddChild(_resume);
+
+            _held = new Label { ClipText = true, CustomMinimumSize = new Vector2(240, 0) };
+            bar.AddChild(_held);
 
             _status = new Label { SizeFlagsHorizontal = SizeFlags.ExpandFill, ClipText = true, Text = "No game running." };
             bar.AddChild(_status);
@@ -148,6 +171,9 @@ namespace GameplayEffects.GodotAdapter
                 case GeProtocol.Trace:
                     OnTrace(payload);
                     break;
+                case GeProtocol.StepState:
+                    OnStepState(payload);
+                    break;
                 case GeProtocol.Reloaded:
                 case GeProtocol.Failed:
                     OnMessage(payload);
@@ -156,6 +182,38 @@ namespace GameplayEffects.GodotAdapter
         }
 
         // What the game said -------------------------------------------------------------------
+
+        /// <summary>
+        /// Where the game stands after a pause, step or breakpoint. A paused game is asked for its
+        /// trace straight away: what led to the stop is the reason anyone stopped there.
+        /// </summary>
+        private void OnStepState(Godot.Collections.Dictionary payload)
+        {
+            bool paused = payload["paused"].AsBool();
+            string message = payload["message"].AsString();
+            string next = payload["next"].AsString();
+            int pending = payload["pending"].AsInt32();
+
+            if (_held != null)
+            {
+                string where = payload["file"].AsString();
+                string at = where.Length == 0
+                    ? string.Empty
+                    : $" ({System.IO.Path.GetFileName(where)}:{payload["line"].AsInt32()})";
+
+                _held.Text = message.Length > 0
+                    ? message
+                    : !paused ? (pending > 0 ? $"running, {pending} queued" : "running")
+                    : next.Length > 0 ? $"held before {next}{at}"
+                    : "held, nothing queued";
+            }
+
+            if (_step != null) _step.Disabled = pending == 0 || !payload["steppable"].AsBool();
+            if (_resume != null) _resume.Disabled = !paused;
+            if (_pause != null) _pause.Disabled = paused;
+
+            if (paused) RequestBatch();
+        }
 
         private void OnWelcome(Godot.Collections.Dictionary payload)
         {

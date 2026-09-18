@@ -93,6 +93,49 @@ namespace GameplayEffects.GodotAdapter
         public override string ToString() => Ok ? "ok" : Message;
     }
 
+    /// <summary>Where a game stands for a debugger: what is being held, and what would run next.</summary>
+    public sealed class GeStepState
+    {
+        internal GeStepState(bool paused, bool steppable, int pending, PendingTrigger? next, int breakpoints, string message)
+        {
+            Paused = paused;
+            Steppable = steppable;
+            Pending = pending;
+            Next = next?.Description ?? string.Empty;
+            Event = next?.EventName ?? string.Empty;
+            Span = next?.Span ?? SourceSpan.None;
+            Breakpoints = breakpoints;
+            Message = message ?? string.Empty;
+        }
+
+        /// <summary>Whether the queue is held: nothing resolves except one step at a time.</summary>
+        public bool Paused { get; }
+
+        /// <summary>
+        /// False when the ruleset resolves triggers as they are raised, so nothing ever queues and
+        /// there is nothing a debugger could step through.
+        /// </summary>
+        public bool Steppable { get; }
+
+        public int Pending { get; }
+
+        /// <summary>How the next trigger reads, or empty when nothing is waiting.</summary>
+        public string Next { get; }
+
+        /// <summary>The event that queued it, empty for the engine's own follow-up work.</summary>
+        public string Event { get; }
+
+        /// <summary>The line of content behind the next trigger, for the editor to open.</summary>
+        public SourceSpan Span { get; }
+
+        public int Breakpoints { get; }
+
+        /// <summary>Why the last request did nothing, ready to show. Empty when it did something.</summary>
+        public string Message { get; }
+
+        public override string ToString() => Paused ? $"paused, {Pending} queued" : "running";
+    }
+
     /// <summary>
     /// The game's half of the editor channel, with no engine in it: what the editor can ask a
     /// running game, and what it gets back.
@@ -180,6 +223,84 @@ namespace GameplayEffects.GodotAdapter
         {
             Entity? entity = Runtime.State.Find(entityId);
             return entity == null ? null : EntityDetail.Of(entity);
+        }
+
+        /// <summary>Where the game stands, with an optional note about what was just refused.</summary>
+        public GeStepState Stepping(string message = "") => new GeStepState(
+            Runtime.Interpreter.Paused,
+            Runtime.State.Rules.Triggers == TriggerResolution.Queued,
+            Runtime.Interpreter.PendingTriggers,
+            Runtime.Interpreter.Next,
+            Runtime.Interpreter.Breakpoints.Count,
+            message);
+
+        /// <summary>Holds the queue. Whatever is running finishes; what it queued waits.</summary>
+        public GeStepState Pause()
+        {
+            Runtime.Interpreter.Pause();
+            return Stepping();
+        }
+
+        public GeStepState Resume()
+        {
+            Runtime.Interpreter.Resume();
+            return Stepping();
+        }
+
+        /// <summary>
+        /// Resolves one queued trigger.
+        /// </summary>
+        /// <remarks>
+        /// A choice waiting to be answered refuses the step instead of taking it: answering one rolls
+        /// its action back and replays it, which would undo the very triggers just stepped through.
+        /// Everything else that cannot be stepped is reported the same way, because a debugger button
+        /// that silently does nothing is worse than one that says why.
+        /// </remarks>
+        public GeStepState Step()
+        {
+            if (Runtime.Pending != null)
+                return Stepping("A choice is waiting to be answered; answer it before stepping.");
+
+            if (Runtime.State.Rules.Triggers != TriggerResolution.Queued)
+                return Stepping("This ruleset resolves triggers as they are raised, so there is nothing to step.");
+
+            if (Runtime.Interpreter.PendingTriggers == 0) return Stepping("Nothing is queued.");
+
+            try
+            {
+                Runtime.Interpreter.TryDrainStep();
+                return Stepping();
+            }
+            catch (RuntimeError error)
+            {
+                return Stepping(error.Message);
+            }
+            catch (DslException error)
+            {
+                return Stepping(error.Message);
+            }
+        }
+
+        /// <summary>Stops the game before any trigger written on one line.</summary>
+        public GeStepState Break(string file, int line, bool on)
+        {
+            if (on) Runtime.Interpreter.Breakpoints.Add(file, line);
+            else Runtime.Interpreter.Breakpoints.Remove(file, line);
+            return Stepping();
+        }
+
+        /// <summary>Stops the game before anything queued by one event, wherever it was written.</summary>
+        public GeStepState BreakOnEvent(string eventName, bool on)
+        {
+            if (on) Runtime.Interpreter.Breakpoints.AddEvent(eventName);
+            else Runtime.Interpreter.Breakpoints.RemoveEvent(eventName);
+            return Stepping();
+        }
+
+        public GeStepState ClearBreakpoints()
+        {
+            Runtime.Interpreter.Breakpoints.Clear();
+            return Stepping();
         }
 
         /// <summary>

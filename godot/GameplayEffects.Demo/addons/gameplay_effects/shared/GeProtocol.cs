@@ -32,6 +32,12 @@ namespace GameplayEffects.GodotAdapter
         public const string Execute = "execute";
         public const string Entities = "entities";
         public const string Entity = "entity";
+        public const string Pause = "pause";
+        public const string Resume = "resume";
+        public const string Step = "step";
+        public const string BreakLine = "break_line";
+        public const string BreakEvent = "break_event";
+        public const string BreakClear = "break_clear";
 
         // Game to editor.
         public const string Welcome = "welcome";
@@ -40,6 +46,7 @@ namespace GameplayEffects.GodotAdapter
         public const string Ran = "ran";
         public const string EntityList = "entity_list";
         public const string EntityDetail = "entity_detail";
+        public const string StepState = "step_state";
         public const string Failed = "failed";
 
         /// <summary>The full message name, as both sides send it: <c>gameplay_effects:trace</c>.</summary>

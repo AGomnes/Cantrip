@@ -349,9 +349,9 @@ namespace GameplayEffects.GodotAdapter.Demo
 
             agent.Respond(GeProtocol.Message(GeProtocol.Entities), new Godot.Collections.Array { "hand", string.Empty },
                 out _, out Godot.Collections.Dictionary inHand);
-            foreach (Variant held in inHand["entities"].AsGodotArray())
+            foreach (Variant inZone in inHand["entities"].AsGodotArray())
             {
-                Check("narrowed to one zone when asked", held.AsGodotDictionary()["zone"].AsString() == "hand");
+                Check("narrowed to one zone when asked", inZone.AsGodotDictionary()["zone"].AsString() == "hand");
             }
 
             agent.Respond(GeProtocol.Message(GeProtocol.Entity), new Godot.Collections.Array { slime },
@@ -364,6 +364,32 @@ namespace GameplayEffects.GodotAdapter.Demo
             agent.Respond(GeProtocol.Message(GeProtocol.Entity), new Godot.Collections.Array { 999999 },
                 out _, out Godot.Collections.Dictionary gone);
             Check("an entity that is not there is said to be missing, not faked", !gone["found"].AsBool());
+
+            agent.Respond(GeProtocol.Message(GeProtocol.Pause), new Godot.Collections.Array(),
+                out string heldReply, out Godot.Collections.Dictionary held);
+            Check("the editor can hold the queue", heldReply == GeProtocol.StepState && held["paused"].AsBool());
+            Check("and is told the game can be stepped at all", held["steppable"].AsBool());
+
+            agent.Respond(GeProtocol.Message(GeProtocol.Step), new Godot.Collections.Array(),
+                out _, out Godot.Collections.Dictionary stepped);
+            Check("a step with nothing queued says so rather than doing nothing",
+                stepped["message"].AsString().Length > 0, stepped["message"].AsString());
+
+            agent.Respond(GeProtocol.Message(GeProtocol.BreakEvent), new Godot.Collections.Array { "damaged", true },
+                out _, out Godot.Collections.Dictionary armed);
+            Check("a breakpoint can be armed on an event", armed["breakpoints"].AsInt32() == 1);
+
+            agent.Respond(GeProtocol.Message(GeProtocol.BreakLine), new Godot.Collections.Array { "res://content/cards.ge", 4, true },
+                out _, out Godot.Collections.Dictionary online);
+            Check("and on a line of content", online["breakpoints"].AsInt32() == 2);
+
+            agent.Respond(GeProtocol.Message(GeProtocol.BreakClear), new Godot.Collections.Array(),
+                out _, out Godot.Collections.Dictionary cleared);
+            Check("and all of them taken away again", cleared["breakpoints"].AsInt32() == 0);
+
+            agent.Respond(GeProtocol.Message(GeProtocol.Resume), new Godot.Collections.Array(),
+                out _, out Godot.Collections.Dictionary running);
+            Check("the game runs on when let go", !running["paused"].AsBool());
 
             rules.QueueFree();
         }

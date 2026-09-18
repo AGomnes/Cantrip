@@ -128,6 +128,11 @@ namespace GameplayEffects.GodotAdapter
                     // A game that has just reloaded content may have different entities.
                     RequestEntities();
                     break;
+                case GeProtocol.StepState:
+                    // Stepping is where watching an entity pays off: a step changes its numbers, so
+                    // refresh rather than leaving stale ones on screen next to a live trace.
+                    RequestEntities();
+                    break;
             }
         }
 
