@@ -28,9 +28,10 @@ gedsl lint samples/corpus
 | Dota 2 (real time) | 8 | 5 | 0 | 3 |
 | Magic | 10 | 7 | 1 | 2 |
 | Inscryption | 8 | 6 | 1 | 1 |
-| **Total** | **76** | **52** | **11** | **13** |
+| Dominion | 8 | 5 | 1 | 2 |
+| **Total** | **84** | **57** | **12** | **15** |
 
-Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics. Inscryption models creatures the same way, with sigils as `keyword` definitions applied to them and bones as a declared `resource`.
+Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics. Inscryption models creatures the same way, with sigils as `keyword` definitions applied to them and bones as a declared `resource`. Dominion is treasure and victory cards as cards, with actions, buys and coins as declared resources and a Turn Order relic granting each turn's allowance.
 
 ## Slay the Spire
 
@@ -145,6 +146,19 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 | 7 | Leshy's Fecundity | Sporebearer | Works | `draw 1 to player` on `self.died`. Naming who draws is what lets a creature draw for you, since it controls itself |
 | 8 | Candles and lives | | Not expressible | Run structure above a battle: nothing models a run of battles with lives carried between them |
 
+## Dominion
+
+| # | Mechanic | Ours | Status | Notes |
+|---|---|---|---|---|
+| 1 | Village | Hamlet | Works | `draw 1` and `gain 2 actions`, on a card costing coins |
+| 2 | Market | Bazaar | Works | Four resources moved at once: a card, an action, a buy and a coin |
+| 3 | Cellar | Larder | Workaround | `discard N` takes a fixed count, so "discard any number, draw that many" becomes a particular number. Which cards go is still the player's choice; how many is not |
+| 4 | Chapel | Shrine | Works | `exhaust 1` trashes a card out of the deck, resolved through the chooser |
+| 5 | Moat | Bulwark | Works | A card in hand is active, so it reacts from there without being played: `on before_damaged(target:player) once per turn: cancel` |
+| 6 | Throne Room | Regent | Works | `choose 1 from hand where tag:action as picked`, then `repeat 2: replay picked` |
+| 7 | Buying from the supply | | Not expressible | A supply is piles of definitions, so gaining "a card from the Silver pile" needs definition pools. Costs themselves are fine — `cost 5 coins` is refused when unaffordable — but there is no buy phase and nothing to buy from |
+| 8 | Militia | | Not expressible | There is one player, and enemies are actors without hands or decks, so an effect reaching into another player's hand has nobody to reach |
+
 ## Gaps, most useful first
 
 1. **Delivered: time-based triggers.** `on every 1s:` fires on the clock, and both Poison Sting (#2) and Mana Font (#8) are written with it. Nothing is left in this area that the language cannot say.
@@ -162,6 +176,7 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 13. **Not a gap: the modifier anchor.** A modifier with no `of` scope is anchored to the entity it is written on — a card to its own damage, a status to its host, a relic to its controller — and naming a scope reaches past that. Both rows once filed here (Slay the Spire #7, Hearthstone #4) were expressible that way all along, as Dota 2 #4 already was, and excluding yourself is covered by `of other allies`. The rule is set out under Modifiers in the language reference, both the default anchor and what `of` replaces it with; these corpus entries had simply not followed it.
 14. **Delivered: `draw` for someone else.** `draw N to who` names who draws, so a creature can draw for you (Inscryption #7) despite controlling itself. The Hearthstone Deathrattle note above is answered by the same clause.
 15. **Multi-currency and sacrifice costs** (Magic #7; Inscryption #6). A cost may now name the resource it is paid in — `cost 2 bones`, and `cost x bones` spends all of it — and such a card is refused exactly as an unaffordable energy card is. What is left is a cost in *several* currencies at once ("two red and one of any colour"), and a cost paid by destroying something you own, which is a payment step rather than a number.
+16. **A declared resource establishes the stat on nobody** (Dominion #1, #2). `resource "actions"` with `reset_to 1` sets bounds and a reset rule but gives no entity the stat: `ResetResources` skips an entity that does not already have it, and only the host API establishes the player's stats. Until something in content brings the stat into being — Dominion uses a Turn Order relic to grant each turn's allowance — the reset is silently inert.
 
 ## Found while building the corpus
 
@@ -170,6 +185,7 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 - Winning a battle clears the player's non-persistent statuses, so a test that checks a status applied by the last enemy on death needs a second enemy.
 - Until Inscryption was added, nothing in the repository declared a `resource` or a `keyword` — not the samples, not the corpus. Both behave as the language reference says, but neither had been exercised anywhere outside it.
 - Knife Juggler's `if event.target != self` guard is expressible as a filter clause, `on created(kind:actor, not target:self)`.
+- Dominion settled four things nothing had tested. `discard N` and `exhaust N` resolve through the chooser inside a DSL test with no `answer` needed, as long as the candidates are identical or there is only one. A card in hand is active, so it can react from there without ever being played. `choose N from group as name` binds something `replay` accepts. And a trap: a stat set in setup is wiped by its own `reset_on turn_start`, because setup runs before the battle starts — grant it with a statement instead.
 - Six of these workarounds have been re-tested rather than trusted, and not one proved inexpressible. Four were self-inflicted: the Goblin Chief's separate tag, the Juggler's body guard, Honed Edge's extra status, and Stun — which really can stop a unit from acting, by cancelling `move` in the before phase. What is real is narrower, and it is the anchoring rule: drop the `of` scope and Kobold Geomancer's Arcane Shot lands 2 instead of 3, and a Shiv lands 4 instead of 8. Naming a scope is the ordinary way to write an outward modifier, though, not a trick — so the lesson is not "the notes were wrong" but that the anchor catches people out even though the language reference states it plainly under Modifiers. Every note in this table is worth testing before believing.
 - `other` excludes the entity a modifier is written on, not merely the target: a modifier's scope is evaluated with the owner as `self`, and `other` drops `self` as well as the target or controller. So "other goblins" is `of other allies where tag:goblin`, with no need to tag the lord separately. The language reference describes `other` in terms of the target and the running entity's controller, which does not make this obvious, and the Magic entry carried a needless workaround until it was checked.
 - Winning a battle returns the player's hand, discard, exhaust, play and powers piles to the draw pile (`EndBattle`), and `Execute` checks whether the battle is over when it finishes. So a test that draws a card by killing the last enemy finds that card back in the draw pile afterwards, which looks precisely like the draw never happening. It is worth ruling this out before suspecting the effect. Relatedly, `player` in content is always the game's player, never relative to whichever side is acting.

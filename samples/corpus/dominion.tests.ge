@@ -1,0 +1,61 @@
+# Tests for dominion.ge. Player: 80 hp, 3 energy, seed 1. Plain enemies have 10 hp.
+# Two things to know. These cards cost coins, and coins reset to nothing at the start of a turn,
+# so coins are granted with a statement rather than in setup: setup runs before the battle, and
+# the turn_start reset would wipe them. And the turn's actions and buys come from the Turn Order
+# relic, because a declared resource establishes the stat on nobody by itself.
+# Each test also avoids depending on which card the chooser picks, by offering identical
+# candidates or only one.
+
+test "dom Hamlet draws a card and adds two actions"
+  enemy hp 10
+  relic "Turn Order"
+  deck Copper
+  hand Hamlet
+  gain 3 coins to player
+  play Hamlet
+  expect player.actions == 3
+  expect hand.count == 1
+
+test "dom Bazaar adds one of everything"
+  enemy hp 10
+  relic "Turn Order"
+  deck Copper
+  hand Bazaar
+  gain 5 coins to player
+  play Bazaar
+  expect player.actions == 2
+  expect player.buys == 2
+  expect player.coins == 1
+
+test "dom Larder trades two cards for two others"
+  enemy hp 10
+  relic "Turn Order"
+  deck Copper, Copper
+  hand Copper, Copper, Copper, Larder
+  gain 2 coins to player
+  play Larder
+  expect hand.count == 3
+  expect player.actions == 2
+
+test "dom Shrine trashes a card out of the deck"
+  enemy hp 10
+  hand Copper, Shrine
+  gain 2 coins to player
+  play Shrine
+  expect exhaust.count == 1
+
+test "dom Bulwark reacts from hand without being played"
+  enemy hp 10
+  hand Bulwark
+  deal 5 to player
+  expect player.hp == 80
+  expect hand.count == 1
+
+test "dom Regent plays an action twice"
+  enemy hp 10
+  relic "Turn Order"
+  deck Copper, Copper
+  hand Regent, Hamlet
+  gain 4 coins to player
+  play Regent
+  expect player.actions == 5
