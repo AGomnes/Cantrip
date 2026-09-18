@@ -42,3 +42,19 @@ test "mtg Blood Tithe drains when a creature dies"
   create Militia
   kill created.first
   expect enemy.hp == 4 and enemy2.hp == 4
+
+test "mtg Venomstrike kills whatever it damages"
+  enemy hp 20
+  create "Goblin Skirmisher"
+  apply Venomstrike 1 to created
+  attack enemy with created.first
+  expect enemy.dead
+
+test "mtg Soulbond gains you what the creature deals"
+  player hp 70
+  enemy hp 20
+  create "Goblin Skirmisher"
+  apply Soulbond 1 to created
+  attack enemy with created.first
+  expect enemy.hp == 18
+  expect player.hp == 72

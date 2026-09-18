@@ -70,3 +70,20 @@ relic "Blood Tithe"
 # --- 8. ref Flying: only creatures with flying may block it ---------------------------------
 # Not expressible: the same gap as Taunt. There is no blocking step, and target validity has
 # no rules content can add to.
+
+# --- 9. ref Deathtouch: any damage it deals is lethal ---------------------------------------
+
+status "Venomstrike"
+  tags buff
+  stacking none
+  on damaged(source:owner):
+    kill event.target
+
+# --- 10. ref Lifelink: what it deals, you gain -----------------------------------------------
+# A minion controls itself here, so the life goes to `player` rather than to the creature.
+
+status "Soulbond"
+  tags buff
+  stacking none
+  on damaged(source:owner):
+    heal event.amount to player

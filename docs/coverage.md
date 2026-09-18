@@ -23,11 +23,11 @@ gedsl lint samples/corpus
 |---|---|---|---|---|
 | Slay the Spire | 23 | 16 | 7 | 0 |
 | Monster Train | 10 | 8 | 1 | 1 |
-| Hearthstone | 10 | 4 | 3 | 3 |
+| Hearthstone | 10 | 5 | 2 | 3 |
 | Balatro | 7 | 3 | 1 | 3 |
 | Dota 2 (real time) | 8 | 4 | 1 | 3 |
-| Magic | 8 | 4 | 2 | 2 |
-| **Total** | **66** | **39** | **15** | **12** |
+| Magic | 10 | 6 | 2 | 2 |
+| **Total** | **68** | **42** | **14** | **12** |
 
 Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics.
 
@@ -84,7 +84,7 @@ Units and minions in Monster Train and Hearthstone are modelled as `actor` defin
 | 4 | Kobold Geomancer (Spell Damage) | Kobold Geomancer | Workaround | A modifier on a minion is anchored to that minion, so "your spells" needs `of enemies where tag:spell, source:player` |
 | 5 | Dire Wolf Alpha (adjacency aura) | Dire Wolf | Works | `modify attack of adjacent(self): +1` |
 | 6 | Knife Juggler | Knife Juggler | Workaround | A listener that becomes active during an event hears it, so the Juggler must ignore its own summon with `event.target != self` |
-| 7 | Minion combat | `trade` verb | Workaround | No built-in attack; a content verb trades damage, and its damage comes from whoever called the verb rather than the minion |
+| 7 | Minion combat | `trade` verb | Works | The `attack` verb makes each creature the source of its own hit. A content verb still spells the trade out, which is where combat rules belong |
 | 8 | Taunt | | Not expressible | Target selection has no rules content can add to, such as "must target a Taunt minion" |
 | 9 | Silence | | Not expressible | Nothing can switch off an entity's own listeners and modifiers |
 | 10 | Discover | | Not expressible | No way to pick random definitions from a pool, such as "three random spells" |
@@ -128,12 +128,14 @@ A Deathrattle that draws a card is also not directly expressible: `draw` always 
 | 6 | Blood Artist | Blood Tithe | Works | `on killed(kind:actor): deal 1 to enemies` |
 | 7 | Coloured mana costs | | Not expressible | `cost` is one number through one channel, so a cost cannot be "two red and one of any colour" |
 | 8 | Flying | | Not expressible | There is no blocking step, and target validity has no rules content can add to. The same gap as Taunt |
+| 9 | Deathtouch | Venomstrike | Works | `on damaged(source:owner): kill event.target`, which only works because the creature is the source of its own hit |
+| 10 | Lifelink | Soulbond | Works | `heal event.amount to player` on the same trigger. A minion controls itself here, so the life goes to `player` |
 
 ## Gaps, most useful first
 
 1. **Delivered: time-based triggers.** `on every 1s:` fires on the clock, and both Poison Sting (#2) and Mana Font (#8) are written with it. Nothing is left in this area that the language cannot say.
 2. **Re-telegraphing when a phase changes** (Slay the Spire #22). Phases now gate which moves an enemy may choose, which covers opening moves and hp thresholds; what is left is re-rolling an intent when a phase changes during the player's turn, so a boss can telegraph the move its new phase has just unlocked.
-3. **Combat and targeting rules** (Hearthstone #7, #8; Monster Train #4; Dota 2 #3). A built-in attack verb with the attacker as source, target validity rules (Taunt) and action blocking (Stun).
+3. **Targeting rules and action blocking** (Hearthstone #8; Magic #8; Dota 2 #3; Monster Train #4). The `attack` verb has landed, so a creature is the source of its own hit and deathtouch, lifelink and "whenever this deals damage" all work. What is left is target validity content can add to (Taunt, Flying), stopping a stunned unit from acting, and attack counts such as Multistrike.
 4. **Verbs that return values** (Slay the Spire #11). `let` has covered the local-variable half of this gap; what remains is getting a result back out of a verb, so that an attack's damage need not be recovered by differencing a counter around it.
 5. **Effects as values** (Balatro #6, Hearthstone #9). Copying and disabling another entity's effects; section 3.11 already lists this as a stress test.
 6. **Listeners registered during an event hear that event** (Slay the Spire #10, Hearthstone #6). Either skip it, or offer a clean "not myself" filter.

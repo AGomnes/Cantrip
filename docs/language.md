@@ -488,6 +488,7 @@ A bare name resolves in this order: local variables (`let` bindings, `for each` 
 | Verb | Usage |
 |---|---|
 | `deal` (`damage`) | `deal N [to who] [as tag] [, ignore block]`. Without `to`, hits the effect's target. The damage carries the tags of the running card, status or relic. |
+| `attack` | `attack [who] [with attacker] [as tag] [, ignore block]`. Deals the attacker's `attack` stat to the target, with the attacker as the damage source, so the attacker's own listeners and modifiers see it as its damage. The attacker defaults to the running entity when that is an actor, otherwise to its controller, so a card or relic swings with the player; the target defaults to the effect's target. |
 | `block` (`gain_block`) | `block N [to who]`. Defaults to yourself. |
 | `heal` | `heal N [to who]`. Defaults to yourself. |
 | `draw` | `draw [N]` for the controller. Reshuffles the discard pile when the draw pile runs out. |

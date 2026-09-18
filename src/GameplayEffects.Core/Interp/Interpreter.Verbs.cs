@@ -24,6 +24,7 @@ namespace GameplayEffects.Runtime
             // Macros ----------------------------------------------------------------------------
             RegisterVerb("deal", VerbDeal);
             RegisterVerb("damage", VerbDeal);
+            RegisterVerb("attack", VerbAttack);
             RegisterVerb("heal", VerbHeal);
             RegisterVerb("block", VerbBlock);
             RegisterVerb("gain_block", VerbBlock);
@@ -248,6 +249,64 @@ namespace GameplayEffects.Runtime
 
             foreach (Entity target in targets.ToArray())
                 DealDamage(call.Context.Source, target, amount, tags, ignoreBlock, call.Context, call.Span);
+        }
+
+        /// <summary>
+        /// <c>attack enemy with created.first</c>: the attacker deals its own <c>attack</c> stat, and
+        /// is itself the source of that damage.
+        /// </summary>
+        /// <remarks>
+        /// That last part is the whole point, and it is why this is built in rather than written as a
+        /// content verb. Inside a content verb `deal` comes from whoever called the verb, so a
+        /// creature could never be the source of its own hit and `on damaged(source:owner)` on the
+        /// creature never fired. Lifelink, deathtouch and "whenever this deals damage" all need it.
+        /// </remarks>
+        private void VerbAttack(VerbCall call)
+        {
+            Entity attacker = AttackerOf(call);
+
+            IReadOnlyList<Entity> targets = call.ArgumentNode(0) != null
+                ? call.Argument(0).AsEntities()
+                : call.Targets("to");
+
+            if (targets.Count == 0)
+                throw call.Error("nobody to attack. Write `attack <who>`, or give the effect a `target`.");
+
+            Num amount = Num.FromInt(attacker.GetInt("attack"));
+
+            // An attack carries the attacker's own tags, the way a status's damage carries its.
+            var tags = new List<string>(attacker.Tags);
+            switch (call.Node.Clause("as"))
+            {
+                case NameExpr name: tags.Add(name.Name); break;
+                case QualifiedExpr qualified: tags.Add(qualified.Name); break;
+                case StringExpr text: tags.Add(text.Value); break;
+            }
+
+            bool ignoreBlock = call.Flag("ignore_block") || call.Flag("pierce") || call.Flag("unblockable") || call.Flag("true_damage");
+
+            foreach (Entity target in targets.ToArray())
+                DealDamage(attacker, target, amount, tags, ignoreBlock, call.Context, call.Span);
+        }
+
+        /// <summary>
+        /// Who is swinging: whatever <c>with</c> names, else the running entity when that is an actor
+        /// (a creature attacking inside its own move or listener), else its controller — so a card or
+        /// relic that says <c>attack</c> swings with the player rather than with itself.
+        /// </summary>
+        private static Entity AttackerOf(VerbCall call)
+        {
+            if (call.Node.Clause("with") != null)
+            {
+                IReadOnlyList<Entity> named = call.Clause("with").AsEntities();
+                if (named.Count == 0) throw call.Error("`with` did not name anything to attack with.");
+                return named[0];
+            }
+
+            if (call.Context.Self?.Kind == EntityKind.Actor) return call.Context.Self;
+
+            return call.Context.Controller
+                ?? throw call.Error("nothing to attack with. Name one with `with <who>`.");
         }
 
         private void VerbHeal(VerbCall call)

@@ -123,6 +123,7 @@ namespace GameplayEffects.Runtime
             ["emit"] = NoEvents,
             ["deal"] = new[] { Damaged, Blocked, Overkill, Died, Killed },
             ["damage"] = new[] { Damaged, Blocked, Overkill, Died, Killed },
+            ["attack"] = new[] { Damaged, Blocked, Overkill, Died, Killed },
             ["heal"] = new[] { Healed },
             ["block"] = new[] { GainedBlock },
             ["gain_block"] = new[] { GainedBlock },

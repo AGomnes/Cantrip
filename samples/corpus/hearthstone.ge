@@ -73,8 +73,10 @@ actor "Knife Juggler"
       deal 1 to random enemies
 
 # --- 7. ref minion combat: trade attack for attack ----------------------------------------------------------
-# Workaround: there is no built-in combat, and `deal` inside a verb comes from whoever called it.
+# Combat is still spelled out in content, which is this library's division of labour, but
+# `attack` makes each creature the source of its own hit, so what a minion deals is its own
+# damage and its own listeners hear it.
 
 verb trade(minion, victim):
-  deal minion.attack to victim
-  deal victim.attack to minion
+  attack victim with minion
+  attack minion with victim
