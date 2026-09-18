@@ -21,14 +21,14 @@ gedsl lint samples/corpus
 
 | Game | Effects | Works | Workaround | Not expressible |
 |---|---|---|---|---|
-| Slay the Spire | 23 | 16 | 7 | 0 |
+| Slay the Spire | 23 | 17 | 6 | 0 |
 | Monster Train | 10 | 8 | 1 | 1 |
-| Hearthstone | 10 | 5 | 2 | 3 |
+| Hearthstone | 10 | 6 | 1 | 3 |
 | Balatro | 7 | 3 | 1 | 3 |
 | Dota 2 (real time) | 8 | 4 | 1 | 3 |
 | Magic | 10 | 7 | 1 | 2 |
 | Inscryption | 8 | 6 | 1 | 1 |
-| **Total** | **76** | **49** | **14** | **13** |
+| **Total** | **76** | **51** | **12** | **13** |
 
 Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics. Inscryption models creatures the same way, with sigils as `keyword` definitions applied to them and bones as a declared `resource`.
 
@@ -42,7 +42,7 @@ Units and minions in Monster Train and Hearthstone are modelled as `actor` defin
 | 4 | Heavy Blade | Titan Blade | Workaround | Strength must count three times; the extra two are written as `2 * player.Strength` because the Strength modifier already adds one |
 | 5 | Demon Form | Fiend Form | Works | A power with a turn-start listener |
 | 6 | Blade Dance | Knife Flurry | Works | Creates exhausting Shivs in hand |
-| 7 | Accuracy | Honed Edge | Workaround | A modifier written on a power card is anchored to that card, so the power applies a status that carries `modify damage where card:Shiv` |
+| 7 | Accuracy | Honed Edge | Works | `modify damage of enemies where card:Shiv` on the power card itself. A modifier with no scope is anchored to what it is written on — for a card, its own damage — and naming a scope reaches past that |
 | 8 | Corruption | Rot Pact | Works | Skills cost 0 and exhaust |
 | 9 | Barricade | Bastion | Workaround | Cancels the turn-start block reset by listening for `before_block_changed` with `new == 0` |
 | 10 | Burst | Reverb | Workaround | The next skill is replayed. A listener that becomes active during an event also hears that event's after phase, so Echo needs `not card:Reverb` |
@@ -82,7 +82,7 @@ Units and minions in Monster Train and Hearthstone are modelled as `actor` defin
 | 1 | Divine Shield | Aegis | Works | A before listener cancels the next hit and removes the shield |
 | 2 | Leper Gnome (Deathrattle) | Plague Gnome | Works | `on self.died: deal 2 to all enemies` |
 | 3 | Elven Archer (Battlecry) | Elven Archer | Works | The card's effect summons the minion and pings |
-| 4 | Kobold Geomancer (Spell Damage) | Kobold Geomancer | Workaround | A modifier on a minion is anchored to that minion, so "your spells" needs `of enemies where tag:spell, source:player` |
+| 4 | Kobold Geomancer (Spell Damage) | Kobold Geomancer | Works | `modify damage of enemies where tag:spell, source:player`. Naming a scope is how an outward modifier is written here, as War Banner does; without one it would be anchored to the minion itself |
 | 5 | Dire Wolf Alpha (adjacency aura) | Dire Wolf | Works | `modify attack of adjacent(self): +1` |
 | 6 | Knife Juggler | Knife Juggler | Workaround | A listener that becomes active during an event hears it, so the Juggler must leave its own summon out. `not target:self` says it as a filter rather than a guard in the body, but it still has to be said |
 | 7 | Minion combat | `trade` verb | Works | The `attack` verb makes each creature the source of its own hit. A content verb still spells the trade out, which is where combat rules belong |
@@ -159,7 +159,7 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 10. **Cancellable resets** (Slay the Spire #9, #15).
 11. **Cooldown as a modifier channel** (Dota 2 #5).
 12. **Space and richer boards** (Dota 2 #6, #7; Monster Train #10). Built-in geometry, or a documented host contract for it.
-13. **Outgoing modifier scopes for other cards and "your" effects** (Slay the Spire #7, Hearthstone #4). Excluding yourself is already covered — `of other allies` leaves out the modifier's own owner — so what is left is reaching outward: "your spells", or a modifier written on one card that applies to another.
+13. **Not a gap: the modifier anchor.** A modifier with no `of` scope is anchored to the entity it is written on — a card to its own damage, a status to its host, a relic to its controller — and naming a scope reaches past that. Both rows once filed here (Slay the Spire #7, Hearthstone #4) were expressible that way all along, as Dota 2 #4 already was, and excluding yourself is covered by `of other allies`. The rule is set out under Modifiers in the language reference, both the default anchor and what `of` replaces it with; these corpus entries had simply not followed it.
 14. **Delivered: `draw` for someone else.** `draw N to who` names who draws, so a creature can draw for you (Inscryption #7) despite controlling itself. The Hearthstone Deathrattle note above is answered by the same clause.
 15. **Multi-currency and sacrifice costs** (Magic #7; Inscryption #6). A cost may now name the resource it is paid in — `cost 2 bones`, and `cost x bones` spends all of it — and such a card is refused exactly as an unaffordable energy card is. What is left is a cost in *several* currencies at once ("two red and one of any colour"), and a cost paid by destroying something you own, which is a payment step rather than a number.
 
@@ -170,6 +170,6 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 - Winning a battle clears the player's non-persistent statuses, so a test that checks a status applied by the last enemy on death needs a second enemy.
 - Until Inscryption was added, nothing in the repository declared a `resource` or a `keyword` — not the samples, not the corpus. Both behave as the language reference says, but neither had been exercised anywhere outside it.
 - Knife Juggler's `if event.target != self` guard is expressible as a filter clause, `on created(kind:actor, not target:self)`.
-- Four workarounds have now been re-tested rather than trusted, and the split is even. Two were partly self-inflicted: the Goblin Chief's separate tag, and the Juggler's guard. Two are real, and failed loudly when the trick was removed — a modifier on a power card genuinely does not reach the damage its owner deals (Honed Edge's Shiv lands 4 instead of 8 without the status), and Kobold Geomancer genuinely needs its explicit `of enemies` scope (Arcane Shot lands 2 instead of 3 without it). Gap 13 is therefore well founded, not merely asserted, and the notes in this table are worth testing before believing either way.
+- Five of these workarounds have been re-tested rather than trusted, and not one proved inexpressible. Three were self-inflicted: the Goblin Chief's separate tag, the Juggler's body guard, and Honed Edge's extra status. What is real is narrower, and it is the anchoring rule: drop the `of` scope and Kobold Geomancer's Arcane Shot lands 2 instead of 3, and a Shiv lands 4 instead of 8. Naming a scope is the ordinary way to write an outward modifier, though, not a trick — so the lesson is not "the notes were wrong" but that the anchor catches people out even though the language reference states it plainly under Modifiers. Every note in this table is worth testing before believing.
 - `other` excludes the entity a modifier is written on, not merely the target: a modifier's scope is evaluated with the owner as `self`, and `other` drops `self` as well as the target or controller. So "other goblins" is `of other allies where tag:goblin`, with no need to tag the lord separately. The language reference describes `other` in terms of the target and the running entity's controller, which does not make this obvious, and the Magic entry carried a needless workaround until it was checked.
 - Winning a battle returns the player's hand, discard, exhaust, play and powers piles to the draw pile (`EndBattle`), and `Execute` checks whether the battle is over when it finishes. So a test that draws a card by killing the last enemy finds that card back in the draw pile afterwards, which looks precisely like the draw never happening. It is worth ruling this out before suspecting the effect. Relatedly, `player` in content is always the game's player, never relative to whichever side is acting.
