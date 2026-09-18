@@ -217,7 +217,7 @@ Following section 7 of the design notes:
 2. **Save/load and deterministic math**: done.
 3. **Validate turn-based**: build inside a real roguelite.
 4. **Validate real-time**: the tick clock exists; it needs a real-time project, spatial selectors and allocation-free event paths.
-5. **Coverage corpus**: 76 effects from Slay the Spire, Monster Train, Hearthstone, Balatro, Dota 2, Magic and Inscryption so far: 48 work directly, 15 need a workaround and 13 are not expressible yet ([docs/coverage.md](docs/coverage.md)). The design notes aim for about 150.
+5. **Coverage corpus**: 76 effects from Slay the Spire, Monster Train, Hearthstone, Balatro, Dota 2, Magic and Inscryption so far: 49 work directly, 14 need a workaround and 13 are not expressible yet ([docs/coverage.md](docs/coverage.md)). The design notes aim for about 150.
 6. **Release**: the Godot addon is done and packaged — node, importer, export check, editor dock, debugger tabs showing a running game's causality tree and what each live entity is made of, pause, step and breakpoints over the debug channel, and a demo. A packaged build has been run to prove content reaches it. Still to do: a docs site and a cookbook.
 7. **Project setup**: the name is still to be chosen.
 

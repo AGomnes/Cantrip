@@ -25,8 +25,8 @@ card "Muster"
     create Militia 2
 
 # --- 3. ref Goblin King: other goblins are bigger -------------------------------------------
-# Workaround: a modifier cannot exclude its own owner from its scope, so "other goblins" is
-# written by tagging the chief separately and buffing the tag it does not carry.
+# `other` leaves out the entity a modifier is written on, so the chief carries the goblin tag
+# itself and still buffs only the rest of them.
 
 actor "Goblin Skirmisher"
   hp 1
@@ -36,8 +36,8 @@ actor "Goblin Skirmisher"
 actor "Goblin Chief"
   hp 2
   attack 2
-  tags goblin_leader
-  modify attack of allies where tag:goblin: +1
+  tags goblin
+  modify attack of other allies where tag:goblin: +1
 
 # --- 4. ref Regenerate: survive the first death each turn -----------------------------------
 

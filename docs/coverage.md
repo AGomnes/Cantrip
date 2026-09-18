@@ -26,9 +26,9 @@ gedsl lint samples/corpus
 | Hearthstone | 10 | 5 | 2 | 3 |
 | Balatro | 7 | 3 | 1 | 3 |
 | Dota 2 (real time) | 8 | 4 | 1 | 3 |
-| Magic | 10 | 6 | 2 | 2 |
+| Magic | 10 | 7 | 1 | 2 |
 | Inscryption | 8 | 6 | 1 | 1 |
-| **Total** | **76** | **48** | **15** | **13** |
+| **Total** | **76** | **49** | **14** | **13** |
 
 Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics. Inscryption models creatures the same way, with sigils as `keyword` definitions applied to them and bones as a declared `resource`.
 
@@ -123,7 +123,7 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 |---|---|---|---|---|
 | 1 | Lightning Bolt | Spark Bolt | Works | Direct damage from a spell card |
 | 2 | Raise the Alarm | Muster | Works | `create Militia 2` makes two token creatures |
-| 3 | Goblin King | Goblin Chief | Workaround | A modifier cannot exclude its own owner from its scope, so "other goblins" is written by tagging the chief separately and buffing the tag it does not carry |
+| 3 | Goblin King | Goblin Chief | Works | `modify attack of other allies where tag:goblin`. `other` leaves out the entity the modifier is written on, so the chief carries the goblin tag itself and still buffs only the rest |
 | 4 | Regenerate | Regrowth | Works | `on instead_of_died(target:owner) once per turn` survives one death a turn |
 | 5 | Counterspell | Denial | Workaround | A counterspell is an instant played into a priority window, and there is no such window here. It becomes a permanent that commits in advance to countering the next spell, which is still cast and still paid for |
 | 6 | Blood Artist | Blood Tithe | Works | `on killed(kind:actor): deal 1 to enemies` |
@@ -159,7 +159,7 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 10. **Cancellable resets** (Slay the Spire #9, #15).
 11. **Cooldown as a modifier channel** (Dota 2 #5).
 12. **Space and richer boards** (Dota 2 #6, #7; Monster Train #10). Built-in geometry, or a documented host contract for it.
-13. **Outgoing modifier scopes for other cards and "your" effects** (Slay the Spire #7, Hearthstone #4).
+13. **Outgoing modifier scopes for other cards and "your" effects** (Slay the Spire #7, Hearthstone #4). Excluding yourself is already covered — `of other allies` leaves out the modifier's own owner — so what is left is reaching outward: "your spells", or a modifier written on one card that applies to another.
 14. **Delivered: `draw` for someone else.** `draw N to who` names who draws, so a creature can draw for you (Inscryption #7) despite controlling itself. The Hearthstone Deathrattle note above is answered by the same clause.
 15. **Multi-currency and sacrifice costs** (Magic #7; Inscryption #6). A cost may now name the resource it is paid in — `cost 2 bones`, and `cost x bones` spends all of it — and such a card is refused exactly as an unaffordable energy card is. What is left is a cost in *several* currencies at once ("two red and one of any colour"), and a cost paid by destroying something you own, which is a payment step rather than a number.
 
@@ -169,4 +169,5 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 - Names with hyphens or spaces (`Anti-Magic`) cannot be written as bare words in expressions or test setup; use single-word names or strings.
 - Winning a battle clears the player's non-persistent statuses, so a test that checks a status applied by the last enemy on death needs a second enemy.
 - Until Inscryption was added, nothing in the repository declared a `resource` or a `keyword` — not the samples, not the corpus. Both behave as the language reference says, but neither had been exercised anywhere outside it.
+- `other` excludes the entity a modifier is written on, not merely the target: a modifier's scope is evaluated with the owner as `self`, and `other` drops `self` as well as the target or controller. So "other goblins" is `of other allies where tag:goblin`, with no need to tag the lord separately. The language reference describes `other` in terms of the target and the running entity's controller, which does not make this obvious, and the Magic entry carried a needless workaround until it was checked.
 - Winning a battle returns the player's hand, discard, exhaust, play and powers piles to the draw pile (`EndBattle`), and `Execute` checks whether the battle is over when it finishes. So a test that draws a card by killing the last enemy finds that card back in the draw pile afterwards, which looks precisely like the draw never happening. It is worth ruling this out before suspecting the effect. Relatedly, `player` in content is always the game's player, never relative to whichever side is acting.
