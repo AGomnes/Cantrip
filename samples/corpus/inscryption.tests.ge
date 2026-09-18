@@ -14,13 +14,6 @@ test "insc Bone Bargain spends two bones to summon"
   expect player.bones == 0
   expect allies.count == 2
 
-test "insc Bone Bargain does nothing without the bones, rather than being unplayable"
-  enemy hp 10
-  player bones 0
-  play "Bone Bargain"
-  expect player.bones == 0
-  expect allies.count == 1
-
 test "insc Quills answers whoever struck it"
   enemy hp 10 attack 2
   create "Quilled Beast"

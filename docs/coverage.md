@@ -27,8 +27,8 @@ gedsl lint samples/corpus
 | Balatro | 7 | 3 | 1 | 3 |
 | Dota 2 (real time) | 8 | 4 | 1 | 3 |
 | Magic | 10 | 6 | 2 | 2 |
-| Inscryption | 8 | 4 | 2 | 2 |
-| **Total** | **76** | **46** | **16** | **14** |
+| Inscryption | 8 | 5 | 1 | 2 |
+| **Total** | **76** | **47** | **15** | **14** |
 
 Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics. Inscryption models creatures the same way, with sigils as `keyword` definitions applied to them and bones as a declared `resource`.
 
@@ -137,7 +137,7 @@ A Deathrattle that draws a card is also not directly expressible: `draw` always 
 | # | Mechanic | Ours | Status | Notes |
 |---|---|---|---|---|
 | 1 | Bones from every death | Bone Collector | Works | `resource "bones"` with a floor, and `on killed(kind:actor): gain 1 bones to player` |
-| 2 | Bone Lord's Horn | Bone Bargain | Workaround | `cost` is energy and nothing else, so the bones are spent inside the effect. The card cannot refuse to be played for want of bones; it checks and then does nothing, which is a different thing from being unplayable |
+| 2 | Bone Lord's Horn | Bone Bargain | Works | `cost 2 bones`: the bones are the cost, so the card is unplayable without them rather than merely ineffective |
 | 3 | Sharp Quills | Quills | Works | A sigil as a `keyword` definition, applied like a status: `on owner.damaged(source:enemies): deal 1 to event.source` |
 | 4 | Fledgling | Fledgling | Works | `on any.turn_end once per battle: attack += 1` |
 | 5 | Ant Swarm | Ant Worker | Works | A modifier amount may be a group count: `modify attack: +(allies where tag:ant).count` |
@@ -161,7 +161,7 @@ A Deathrattle that draws a card is also not directly expressible: `draw` always 
 12. **Space and richer boards** (Dota 2 #6, #7; Monster Train #10). Built-in geometry, or a documented host contract for it.
 13. **Outgoing modifier scopes for other cards and "your" effects** (Slay the Spire #7, Hearthstone #4).
 14. **`draw` for someone else** (Hearthstone note above; Inscryption #7). `draw` draws for the running entity's controller, and a creature controls itself, so no creature can draw for you.
-15. **Typed or multi-currency costs** (Magic #7; Inscryption #2, #6). Two games reach this wall independently, which argues for its priority. `cost` is a single number through a single channel, so a cost cannot be "two red and one of any colour", nor two bones, nor a creature sacrificed. It needs resources the cost channel can read, and a payment step content can describe and refuse.
+15. **Multi-currency and sacrifice costs** (Magic #7; Inscryption #6). A cost may now name the resource it is paid in — `cost 2 bones`, and `cost x bones` spends all of it — and such a card is refused exactly as an unaffordable energy card is. What is left is a cost in *several* currencies at once ("two red and one of any colour"), and a cost paid by destroying something you own, which is a payment step rather than a number.
 
 ## Found while building the corpus
 

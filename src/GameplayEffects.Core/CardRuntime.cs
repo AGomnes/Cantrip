@@ -385,10 +385,18 @@ namespace GameplayEffects
         public bool IsXCost(Entity card) =>
             card.Definition?.Property("cost")?.First is NameExpr { Name: var name } && string.Equals(name, "x", StringComparison.OrdinalIgnoreCase);
 
-        /// <summary>The card's current cost after modifiers. X-cost cards cost all remaining energy.</summary>
+        /// <summary>
+        /// The resource a card's cost is paid in: <c>energy</c>, or whatever its <c>cost</c> names.
+        /// </summary>
+        public string CostResourceOf(Entity card) => card.Definition?.CostResource ?? "energy";
+
+        /// <summary>
+        /// The card's current cost after modifiers. An X cost spends everything the payer has of the
+        /// resource the card is priced in.
+        /// </summary>
         public int CostOf(Entity card)
         {
-            if (IsXCost(card)) return card.Controller.GetInt("energy");
+            if (IsXCost(card)) return card.Controller.GetInt(CostResourceOf(card));
 
             // From the base cost: card.Get("cost") would already have run the cost channel once.
             var query = new ModifierQuery("cost") { Subject = card, Source = card.Controller, Card = card, Tags = card.Tags.ToArray() };
@@ -416,7 +424,10 @@ namespace GameplayEffects
 
             Entity player = card.Controller;
             int cost = CostOf(card);
-            if (!IsXCost(card) && player.GetInt("energy") < cost) return PlayResult.NotEnoughEnergy;
+            // A card priced in something else is refused the same way, so NotEnoughEnergy now means
+            // "not enough of whatever this costs".
+            string resource = CostResourceOf(card);
+            if (!IsXCost(card) && player.GetInt(resource) < cost) return PlayResult.NotEnoughEnergy;
 
             if (!TryResolveTarget(card, ref target)) return PlayResult.InvalidTarget;
 
@@ -440,7 +451,7 @@ namespace GameplayEffects
                     },
                     committed: () =>
                     {
-                        if (cost > 0) Interpreter.ChangeStat(player, "energy", AssignOperator.Subtract, cost, context);
+                        if (cost > 0) Interpreter.ChangeStat(player, resource, AssignOperator.Subtract, cost, context);
                         State.MoveTo(card, Zones.Play);
                         State.RecordHistory("cards_played", player, Num.One);
                         if (card.HasTag("attack")) State.RecordHistory("attacks", player, Num.One);

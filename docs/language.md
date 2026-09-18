@@ -83,6 +83,7 @@ card "Whirlwind"
 |---|---|
 | `cost N` | Energy to play. Goes through the `cost` modifier channel. |
 | `cost x` | Spends all energy; the effect sees the amount as `x`. |
+| `cost N <resource>` | Paid in that resource instead of energy: `cost 2 bones`. The card is refused when the payer has too little, exactly as it would be for energy, and `cost x bones` spends all of it. Declare the resource with `resource` so its bounds are known. |
 | `target enemy` | Needs a living enemy. With one enemy it is chosen automatically; with several, the chooser picks. |
 | `target ally` | Needs a living ally; defaults to the player. |
 | `target self` | Targets the player. |

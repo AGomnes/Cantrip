@@ -12,9 +12,7 @@ relic "Bone Collector"
     gain 1 bones to player
 
 # --- 2. ref Bone Lord's Horn: spend bones to summon -----------------------------------------
-# Workaround: `cost` is energy and nothing else, so the bones are spent inside the effect
-# instead of being paid as a cost. The card cannot refuse to be played for want of bones; it
-# can only check and then do nothing, which is a different thing from being unplayable.
+# The bones are the cost, so the card is simply unplayable without them.
 
 actor "Skeleton"
   hp 1
@@ -22,12 +20,10 @@ actor "Skeleton"
   tags token
 
 card "Bone Bargain"
-  cost 0
+  cost 2 bones
   tags spell
   effect:
-    if player.bones >= 2:
-      lose 2 bones to player
-      create Skeleton
+    create Skeleton
 
 # --- 3. ref Sharp Quills: a sigil that answers every hit ------------------------------------
 

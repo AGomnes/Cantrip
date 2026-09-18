@@ -153,6 +153,7 @@ namespace GameplayEffects.Content
             // An enemy's hp doubles as its max_hp unless both are given.
             if (_stats.ContainsKey("hp") && !_stats.ContainsKey("max_hp")) _stats["max_hp"] = _stats["hp"];
 
+            ReadCost(diagnostics);
             ReadStatusConfig(diagnostics);
             ReadPattern(diagnostics);
             ValidateMovePhases(diagnostics);
@@ -188,6 +189,12 @@ namespace GameplayEffects.Content
 
         /// <summary>The event that triggers decay, typically <c>turn_end</c>.</summary>
         public string? DecayOn { get; private set; }
+
+        /// <summary>
+        /// The resource a card's cost is paid in. <c>energy</c> unless the cost names another, as in
+        /// <c>cost 2 bones</c>.
+        /// </summary>
+        public string CostResource { get; private set; } = "energy";
 
         // Enemy configuration -------------------------------------------------------------
 
@@ -417,6 +424,34 @@ namespace GameplayEffects.Content
                 diagnostics.Error("GE0108", $"Move `{move.Name}` of `{Name}` names unknown phase `{move.Phase}`.",
                     Syntax.Span, Suggest.Closest(move.Phase, Phases.Select(p => p.Name)));
             }
+        }
+
+        /// <summary>
+        /// <c>cost 2 bones</c>: an amount, and the resource it is paid in.
+        /// </summary>
+        /// <remarks>
+        /// A property with more than one value never becomes a stat on its own, so the amount has to
+        /// be registered here by hand. Without that, the cost would silently read as zero.
+        /// </remarks>
+        private void ReadCost(DiagnosticBag diagnostics)
+        {
+            PropertyNode? cost = Property("cost");
+            if (cost == null || cost.Values.Count < 2) return;
+
+            string? resource = cost.Values.Count == 2 ? ReadWords(cost.Values[1]).FirstOrDefault() : null;
+            if (resource == null)
+            {
+                diagnostics.Error("GE0109",
+                    $"`cost` in `{Name}` takes an amount and, at most, the resource to pay it in, as in `cost 2 bones`.",
+                    cost.Span);
+                return;
+            }
+
+            CostResource = resource.ToLowerInvariant();
+
+            // `cost x bones` leaves the amount unregistered on purpose: it is an X cost, and
+            // CostOf reads the whole of the resource instead.
+            if (cost.Values[0] is NumberExpr amount) _stats["cost"] = amount.Value;
         }
 
         private void ReadPattern(DiagnosticBag diagnostics)
