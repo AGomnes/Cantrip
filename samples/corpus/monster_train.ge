@@ -22,14 +22,12 @@ status "Rage"
   modify attack: +2 * stacks
 
 # --- 2. ref Armor: absorbs damage and is used up ------------------------------------------------------
-# Workaround: there are no local variables, so the absorbed amount goes through a scratch stat.
 
 status "Armor"
   tags buff
   stacking intensity
-  absorbed 0
   on owner.before_damaged:
-    absorbed = min(stacks, event.amount)
+    let absorbed = min(stacks, event.amount)
     event.amount -= absorbed
     stacks -= absorbed
 

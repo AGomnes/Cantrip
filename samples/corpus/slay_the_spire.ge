@@ -164,17 +164,16 @@ status "Echo"
     stacks -1
 
 # --- 11. ref Reaper: heal for the unblocked damage dealt -----------------------------------
-# Workaround: verbs return nothing and there are no local variables, so the card stores
-# the history counter in a scratch stat (`mark`) and heals the difference.
+# Workaround: verbs return nothing, so the card reads the history counter either side of the
+# attack and heals the difference. The counter itself is now held in a local.
 
 card "Soul Reap"
   cost 2
   tags attack, exhaust
-  mark 0
   effect:
-    mark = damage_dealt_this_turn
+    let before = damage_dealt_this_turn
     deal 4 to all enemies
-    heal damage_dealt_this_turn - mark
+    heal damage_dealt_this_turn - before
 
 # --- 12. ref Envenom: unblocked attack damage poisons -------------------------------------
 
