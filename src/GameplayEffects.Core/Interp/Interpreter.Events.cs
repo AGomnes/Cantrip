@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using GameplayEffects.Content;
+using GameplayEffects.Diagnostics;
 using GameplayEffects.Syntax;
 
 namespace GameplayEffects.Runtime
@@ -19,7 +20,7 @@ namespace GameplayEffects.Runtime
         /// Work waiting to resolve: after-phase listeners, and the decay and temporary-effect expiry
         /// that follow an event. A plain FIFO, so resolution is breadth-first and deterministic.
         /// </summary>
-        private readonly Queue<Action> _queue = new Queue<Action>();
+        private readonly Queue<QueuedWork> _queue = new Queue<QueuedWork>();
         private bool _draining;
         private long _nextChainRoot = 1;
 
@@ -134,9 +135,10 @@ namespace GameplayEffects.Runtime
         /// Runs engine work after the listeners already queued for the current event, or straight
         /// away when triggers resolve immediately.
         /// </summary>
-        private void RunAfterListeners(Action work)
+        private void RunAfterListeners(Action work, string description = "engine follow-up", SourceSpan span = default)
         {
-            if (Rules.Triggers == TriggerResolution.Queued) _queue.Enqueue(work);
+            if (Rules.Triggers == TriggerResolution.Queued)
+                _queue.Enqueue(new QueuedWork(work, new PendingTrigger(description, string.Empty, 0, span)));
             else work();
         }
 
@@ -172,9 +174,15 @@ namespace GameplayEffects.Runtime
                 Chain chain = context.Chain.Extend(listener.Id);
 
                 if (phase == EventPhase.After && Rules.Triggers == TriggerResolution.Queued)
-                    _queue.Enqueue(() => RunListener(listener, gameEvent, chain));
+                {
+                    _queue.Enqueue(new QueuedWork(
+                        () => RunListener(listener, gameEvent, chain),
+                        new PendingTrigger(listener.ToString(), gameEvent.Name, listener.Id, listener.Syntax.Span)));
+                }
                 else
+                {
                     RunListener(listener, gameEvent, chain);
+                }
             }
 
             return fired;
@@ -338,13 +346,33 @@ namespace GameplayEffects.Runtime
         /// Resolves queued work until none remains. Work raised while draining joins the back of
         /// the queue, so resolution is breadth-first and fully deterministic.
         /// </summary>
+        /// <remarks>
+        /// Does nothing at all while <see cref="Paused"/>, which is what lets a debugger hold a game
+        /// mid-resolution: every operation still calls this, and every call is a no-op until the
+        /// queue is either stepped or resumed.
+        /// </remarks>
         public void Drain()
         {
-            if (_draining) return;
+            if (_draining || _paused) return;
             _draining = true;
             try
             {
-                while (_queue.Count > 0) _queue.Dequeue()();
+                while (_queue.Count > 0)
+                {
+                    // Breakpoints cost a peek per entry, and only once something has set one.
+                    if (Breakpoints.Any)
+                    {
+                        PendingTrigger next = _queue.Peek().About;
+                        if (Breakpoints.Matches(next))
+                        {
+                            _paused = true;
+                            State.Trace.Record(State.Clock.Now, "paused", "stopped before " + next.Description, span: next.Span);
+                            return;
+                        }
+                    }
+
+                    _queue.Dequeue().Work();
+                }
             }
             catch
             {

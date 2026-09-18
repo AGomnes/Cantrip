@@ -458,13 +458,15 @@ namespace GameplayEffects.Runtime
 
             if (hosts == null) return;
 
-            RunAfterListeners(() =>
-            {
-                foreach (Entity host in hosts)
+            RunAfterListeners(
+                () =>
                 {
-                    if (!host.IsRemoved) ProcessDecay(host, gameEvent.Name);
-                }
-            });
+                    foreach (Entity host in hosts)
+                    {
+                        if (!host.IsRemoved) ProcessDecay(host, gameEvent.Name);
+                    }
+                },
+                "status decay after " + gameEvent.Name);
         }
 
         // Combat ----------------------------------------------------------------------------
@@ -791,7 +793,7 @@ namespace GameplayEffects.Runtime
                 if (gameEvent.Target != null && gameEvent.Target.Kind == EntityKind.Actor && gameEvent.Target != action.Owner) continue;
 
                 State.Unschedule(action);
-                RunAfterListeners(() => Revert(action));
+                RunAfterListeners(() => Revert(action), "end of `until " + action.Deadline + "` block", action.Body?.Span ?? default);
             }
         }
 
