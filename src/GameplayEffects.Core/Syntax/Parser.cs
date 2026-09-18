@@ -716,6 +716,7 @@ namespace GameplayEffects.Syntax
             {
                 switch (Current.Text.ToLowerInvariant())
                 {
+                    case "let": return ParseLet();
                     case "if": return ParseIf();
                     case "repeat": return ParseRepeat();
                     case "for": return ParseForEach();
@@ -764,6 +765,24 @@ namespace GameplayEffects.Syntax
             }
 
             return new IfNode(condition, thenBlock, elseBlock, keyword.Span);
+        }
+
+        /// <summary>
+        /// `let name = expression`. The `=` is required: it keeps a binding obviously a binding, and
+        /// leaves `let` out of the sign shorthand that bare assignments allow.
+        /// </summary>
+        private StatementNode ParseLet()
+        {
+            Token keyword = Advance(); // `let`
+
+            string name = string.Empty;
+            if (Check(TokenKind.Identifier)) name = Advance().Text;
+            else Expect(TokenKind.Identifier, "a name after `let`");
+
+            Expect(TokenKind.Equal, "`=`");
+            ExprNode value = ParseExpression();
+            Expect(TokenKind.Newline, "end of line");
+            return new LetNode(name, value, keyword.Span);
         }
 
         private StatementNode ParseRepeat()

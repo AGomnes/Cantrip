@@ -29,6 +29,10 @@ namespace GameplayEffects.Syntax
                     if (branch.Else != null) VisitBlock(branch.Else);
                     break;
 
+                case LetNode let:
+                    VisitExpression(let.Value);
+                    break;
+
                 case RepeatNode repeat:
                     VisitExpression(repeat.Count);
                     VisitBlock(repeat.Body);

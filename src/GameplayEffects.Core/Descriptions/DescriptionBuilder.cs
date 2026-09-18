@@ -1264,6 +1264,10 @@ namespace GameplayEffects.Descriptions
                         Block(schedule.Body, text, depth + 1);
                         break;
 
+                    case LetNode let:
+                        text.Append("let ").Append(let.Name).Append(" = ").Append(AstPrinter.Print(let.Value)).Append('\n');
+                        break;
+
                     case AssignNode assign:
                         text.Append(AstPrinter.Print(assign.Target)).Append(' ').Append(assign.Operator).Append(' ').Append(AstPrinter.Print(assign.Value)).Append('\n');
                         break;

@@ -302,6 +302,18 @@ namespace GameplayEffects.Syntax
         public BlockNode? Else { get; }
     }
 
+    public sealed class LetNode : StatementNode
+    {
+        public LetNode(string name, ExprNode value, SourceSpan span) : base(span)
+        {
+            Name = name;
+            Value = value;
+        }
+
+        public string Name { get; }
+        public ExprNode Value { get; }
+    }
+
     public sealed class RepeatNode : StatementNode
     {
         public RepeatNode(ExprNode count, BlockNode body, SourceSpan span) : base(span)

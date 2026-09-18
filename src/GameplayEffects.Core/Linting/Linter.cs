@@ -129,6 +129,9 @@ namespace GameplayEffects.Linting
                     case ForEachNode loop:
                         Locals.Add(loop.Variable);
                         break;
+                    case LetNode let:
+                        Locals.Add(let.Name);
+                        break;
                     case AssignNode assign:
                         Assigns.Add(assign);
                         break;

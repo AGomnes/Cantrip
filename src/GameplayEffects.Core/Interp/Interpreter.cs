@@ -136,6 +136,14 @@ namespace GameplayEffects.Runtime
 
             switch (statement)
             {
+                // A local lives in the context that bound it, which is a fresh one per listener run,
+                // per card play and per move, so nothing leaks between invocations. It deliberately
+                // outlives the `if` that bound it: blocks do not derive a scope of their own, and a
+                // name that disappeared halfway down a body would be the surprising rule.
+                case LetNode let:
+                    context.SetLocal(let.Name, Evaluate(let.Value, context));
+                    break;
+
                 case CommandNode command:
                     ExecuteCommand(command, context);
                     break;

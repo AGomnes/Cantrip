@@ -365,6 +365,16 @@ event.amount = event.amount * 2
 
 `name -N` and `name +N` are shorthand for `-=` and `+=` when nothing else follows on the line. A bare stat name refers to the nearest entity up the ownership chain that has the stat, else the controller: `stacks -1` in a status changes the status, `energy += 1` in a card changes the player, `block +6` in an enemy move changes the enemy. `host.Status` adjusts that status's counter. Only `event.amount` can be assigned on an event.
 
+**Locals** bind a value for the rest of the body with `let`:
+
+```
+let bonus = 2 + stacks
+gain bonus energy
+deal bonus to target
+```
+
+A local shadows any stat of the same name, and assigning to a name that is already a local changes the local rather than a stat. That is the difference worth having: without `let`, a scratch value had to be declared as a stat, and `scratch += 1` quietly wrote one. A local holds anything an expression yields, entities included (`let foe = enemy`), and lives as long as the body that bound it — still visible after the `if` that bound it, and gone once the effect, move or listener returns.
+
 **Control flow**:
 
 ```
@@ -434,7 +444,7 @@ A qualifier tests whatever is in focus: the candidate inside `where`, the value 
 
 ## Names
 
-A bare name resolves in this order: local variables (`for each` variables, verb parameters, `chosen`, `created`, `index`, `x`); the built-in names below; history counters; names the host supplies; inside `where`, the candidate's stat; the running entity's stat; a definition (statuses and keywords first, so `apply Burn` and `has(Burn)` find the status when a card has the same name); event data; the controller's stat; a stat declared anywhere in content, which reads 0. Anything else is a runtime error with a suggestion.
+A bare name resolves in this order: local variables (`let` bindings, `for each` variables, verb parameters, `chosen`, `created`, `index`, `x`); the built-in names below; history counters; names the host supplies; inside `where`, the candidate's stat; the running entity's stat; a definition (statuses and keywords first, so `apply Burn` and `has(Burn)` find the status when a card has the same name); event data; the controller's stat; a stat declared anywhere in content, which reads 0. Anything else is a runtime error with a suggestion.
 
 | Name | Meaning |
 |---|---|

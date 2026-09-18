@@ -44,7 +44,7 @@ namespace GameplayEffects.GodotAdapter
         /// <summary>Words that decide what runs next.</summary>
         private static readonly HashSet<string> ControlFlow = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "if", "else", "repeat", "for", "each", "in", "chance", "next", "until", "then", "times",
+            "if", "else", "repeat", "for", "each", "in", "chance", "next", "until", "then", "times", "let",
         };
 
         /// <summary>Names the runtime gives a meaning wherever they appear.</summary>
