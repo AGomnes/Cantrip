@@ -79,6 +79,8 @@ card "Shield Slam"
 
 # --- 4. ref Heavy Blade: Strength counts three times -------------------------------------
 # Workaround: the Strength modifier already adds 1x; the other 2x is written by hand.
+# Confirmed by experiment: writing 3x deals 26 rather than 23, because the modifier applies its
+# own multiple on top of whatever the effect says.
 
 card "Titan Blade"
   cost 2

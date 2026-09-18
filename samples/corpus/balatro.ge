@@ -42,6 +42,7 @@ relic "Greedy Joker"
 # --- 2. ref Abstract Joker: +3 mult per joker, at scoring time ----------------------------------------------
 # Workaround: after listeners resolve once the card has finished, too late for the score on
 # the next line, so the joker listens in the before phase, which runs straight away.
+# Confirmed by experiment: on the after phase the score comes out 33 instead of 231.
 
 relic "Abstract Joker"
   on before_hand_scored:
