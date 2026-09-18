@@ -35,3 +35,14 @@ test "dota War Banner boosts allied damage only"
   expect enemy.hp == 5
   end turn
   expect player.hp == 76
+
+test "dota Mana Font regenerates mana once a second"
+  # `realtime 10` comes first on purpose: the clock has to be the tick clock before the relic
+  # is granted, or the `1s` interval means nothing to it and no periodic listener registers.
+  realtime 10
+  player mana 0
+  relic "Mana Font"
+  tick 10
+  expect player.mana == 1
+  tick 20
+  expect player.mana == 3

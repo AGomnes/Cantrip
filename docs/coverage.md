@@ -25,8 +25,8 @@ gedsl lint samples/corpus
 | Monster Train | 10 | 8 | 1 | 1 |
 | Hearthstone | 10 | 4 | 3 | 3 |
 | Balatro | 7 | 3 | 1 | 3 |
-| Dota 2 (real time) | 8 | 3 | 1 | 4 |
-| **Total** | **58** | **34** | **13** | **11** |
+| Dota 2 (real time) | 8 | 4 | 1 | 3 |
+| **Total** | **58** | **35** | **13** | **10** |
 
 Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock.
 
@@ -113,11 +113,11 @@ A Deathrattle that draws a card is also not directly expressible: `draw` always 
 | 5 | Cooldown reduction | | Not expressible | Cooldowns come straight from the `cooldown` property, not through a modifier channel |
 | 6 | Crystal Nova (area) | | Not expressible | `within` is parsed but its meaning must come from a host; DSL tests have none |
 | 7 | Blink | | Not expressible | Actors have board slots, not positions in space |
-| 8 | Mana regeneration | | Not expressible | `on every 1s:` now exists, so the trigger is no longer the obstacle; this row simply has no content or test written for it yet |
+| 8 | Mana regeneration | Mana Font | Works | `on every 1s: gain 1 mana to player` on a relic |
 
 ## Gaps, most useful first
 
-1. **Delivered: time-based triggers.** `on every 1s:` fires on the clock, and Poison Sting (#2) is written with it. What remains here is corpus coverage rather than language: mana regeneration (#8) and the other real-time rows are expressible now but not yet written and tested.
+1. **Delivered: time-based triggers.** `on every 1s:` fires on the clock, and both Poison Sting (#2) and Mana Font (#8) are written with it. Nothing is left in this area that the language cannot say.
 2. **Re-telegraphing when a phase changes** (Slay the Spire #22). Phases now gate which moves an enemy may choose, which covers opening moves and hp thresholds; what is left is re-rolling an intent when a phase changes during the player's turn, so a boss can telegraph the move its new phase has just unlocked.
 3. **Combat and targeting rules** (Hearthstone #7, #8; Monster Train #4; Dota 2 #3). A built-in attack verb with the attacker as source, target validity rules (Taunt) and action blocking (Stun).
 4. **Verbs that return values** (Slay the Spire #11). `let` has covered the local-variable half of this gap; what remains is getting a result back out of a verb, so that an attack's damage need not be recovered by differencing a counter around it.

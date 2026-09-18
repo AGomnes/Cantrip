@@ -31,6 +31,23 @@ The parser is recursive descent. Its main design choice is that **it knows nothi
 
 Errors are collected, not thrown, with recovery to the end of the line or block, so a file with several mistakes reports all of them. Nesting deeper than 256 levels is a diagnostic rather than a stack overflow.
 
+### Adding a node
+
+No switch over node types in this codebase is exhaustive, so the compiler will not tell you where a new AST node has to be handled. Exactly two places fail loudly — `Interpreter.ExecuteStatement` and `Interpreter.Evaluate` both throw on a node they do not know — and every other place fails quietly:
+
+| Place | What goes wrong when it is missed |
+|---|---|
+| `AstWalker.VisitStatement` | the walk stops at the node, so the linter goes blind inside it |
+| `Linter.Facts.VisitStatement` | a name the node binds is not recorded, so every use of it warns GE302 |
+| `DescriptionBuilder.Statement` | the node contributes nothing to generated rules text |
+| `DescriptionBuilder.Canonical.Statement` | the effect hash stops noticing edits, so `text_checked` drift protection goes quiet |
+| `Content/BlockAddresses` | a scheduled block nested inside the node has no address, and `Capture` later throws somewhere unrelated |
+| `Definitions` member switch, `ContentLibrary.Register` | a new member or declaration is silently ignored |
+| `Descriptions/Localization` | a missing phrase key falls back to the bare template instead of erroring |
+| `AstPrinter` (expressions only) | error messages and failing tests print the node's type name instead of its source text |
+
+`let`, enemy `phase` and `on every ...:` were each added by working down this list.
+
 ## Content
 
 `ContentLibrary` parses files and registers definitions keyed by kind and name. Loading a file again replaces exactly what it contributed, which is the basis for hot reload. Diagnostics are kept per file.

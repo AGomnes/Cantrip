@@ -39,3 +39,9 @@ relic "Skull Basher"
 
 relic "War Banner"
   modify damage of everyone where source:allies: x1.25
+
+# --- 8. ref Mana regeneration: mana trickles back every second ----------------------------
+
+relic "Mana Font"
+  on every 1s:
+    gain 1 mana to player
