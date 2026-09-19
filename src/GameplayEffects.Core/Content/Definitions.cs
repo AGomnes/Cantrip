@@ -37,11 +37,12 @@ namespace GameplayEffects.Content
     /// </summary>
     public sealed class PhaseDefinition
     {
-        public PhaseDefinition(string name, ExprNode condition, SourceSpan span)
+        public PhaseDefinition(string name, ExprNode condition, SourceSpan span, bool retelegraph = false)
         {
             Name = name;
             Condition = condition;
             Span = span;
+            Retelegraph = retelegraph;
         }
 
         public string Name { get; }
@@ -50,6 +51,18 @@ namespace GameplayEffects.Content
         public ExprNode Condition { get; }
 
         public SourceSpan Span { get; }
+
+        /// <summary>
+        /// Whether entering this phase re-rolls the enemy's intent there and then, so a boss can
+        /// telegraph the move the phase has just unlocked.
+        /// </summary>
+        /// <remarks>
+        /// Opt-in, because it trades away a guarantee worth keeping: ordinarily the intent shown
+        /// during the player's turn is exactly the move that follows, and re-telegraphing means a
+        /// boss can change its mind after the player has committed. Only a phase that asks for it
+        /// does that.
+        /// </remarks>
+        public bool Retelegraph { get; }
 
         public override string ToString() => Name;
     }
@@ -407,7 +420,15 @@ namespace GameplayEffects.Content
                 return null;
             }
 
-            return new PhaseDefinition(name, property.Values[2], property.Span);
+            // `phase Broken when hp <= max_hp / 2, retelegraph` — a trailing word, so the condition
+            // is still whatever sits in the third value.
+            bool retelegraph = false;
+            for (int i = 3; i < property.Values.Count; i++)
+            {
+                if (property.Values[i] is NameExpr { Name: "retelegraph" }) retelegraph = true;
+            }
+
+            return new PhaseDefinition(name, property.Values[2], property.Span, retelegraph);
         }
 
         /// <summary>

@@ -534,6 +534,10 @@ namespace GameplayEffects.Runtime
                 if (Kill(target, source, context) && overkill > Num.Zero)
                     Raise(new GameEvent("overkill") { Source = source, Target = target, Card = context.Card, Amount = overkill }, context);
             }
+            else if (lost > Num.Zero)
+            {
+                RetelegraphIfPhaseChanged(target);
+            }
 
             return lost;
         }
@@ -803,9 +807,9 @@ namespace GameplayEffects.Runtime
         /// order a designer thinks of them — three quarters, then half, then a quarter — and the
         /// deepest one that is true is the one that applies.
         /// </remarks>
-        private void UpdatePhase(Entity enemy, EntityDefinition definition)
+        private bool UpdatePhase(Entity enemy, EntityDefinition definition)
         {
-            if (definition.Phases.Count == 0) return;
+            if (definition.Phases.Count == 0) return false;
 
             EvalContext context = SystemContext(enemy);
             string? active = null;
@@ -814,12 +818,41 @@ namespace GameplayEffects.Runtime
                 if (EvaluateCondition(phase.Condition, context)) active = phase.Name;
             }
 
-            if (string.Equals(active, enemy.Phase, StringComparison.OrdinalIgnoreCase)) return;
+            if (string.Equals(active, enemy.Phase, StringComparison.OrdinalIgnoreCase)) return false;
 
             // A new phase starts its own sequence: the old index counted through a list of moves
             // that is no longer the same one.
             enemy.Phase = active;
             enemy.PatternIndex = 0;
+            return true;
+        }
+
+        /// <summary>
+        /// Re-rolls an enemy's intent when a hit has just moved it into a phase that asks to
+        /// re-telegraph, so the move the phase unlocked is the one the player is shown.
+        /// </summary>
+        /// <remarks>
+        /// Checked where damage lands rather than inside <see cref="RollIntent"/>, because a phase
+        /// crossed during the player's turn has to be noticed before the next intent would be rolled
+        /// — which is the whole point of re-telegraphing.
+        /// </remarks>
+        private void RetelegraphIfPhaseChanged(Entity enemy)
+        {
+            EntityDefinition? definition = enemy.Definition;
+            if (definition == null || definition.Phases.Count == 0) return;
+            if (!enemy.IsAlive || enemy.Kind != EntityKind.Actor || enemy.Team != Team.Enemy) return;
+
+            string? before = enemy.Phase;
+            if (!UpdatePhase(enemy, definition)) return;
+
+            PhaseDefinition? entered = definition.Phases
+                .FirstOrDefault(p => string.Equals(p.Name, enemy.Phase, StringComparison.OrdinalIgnoreCase));
+
+            // Leaving a phase for no phase at all never re-telegraphs: there is nothing that asked.
+            if (entered == null || !entered.Retelegraph) return;
+            if (string.Equals(before, enemy.Phase, StringComparison.OrdinalIgnoreCase)) return;
+
+            RollIntent(enemy);
         }
 
         /// <summary>A move with no phase is always available; one with a phase only during it.</summary>

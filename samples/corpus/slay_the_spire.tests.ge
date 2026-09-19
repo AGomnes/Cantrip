@@ -183,10 +183,13 @@ test "sts Fury grows Strength whenever the player uses a skill"
   play Swipe on enemy
   expect enemy.Strength == 2
 
-test "sts Slime King splits into two slimes carrying its hp"
+test "sts Slime King telegraphs the split, then splits"
   enemy "Slime King"
+  expect enemy.intent == "Slam"
   deal 25 to enemy
-  expect enemy.dead
+  expect enemy.phase == "Broken"
+  expect enemy.intent == "Split"
+  end turn
   expect enemies.count == 2
   expect enemies.hp == 30
 

@@ -21,7 +21,7 @@ gedsl lint samples/corpus
 
 | Game | Effects | Works | Workaround | Not expressible |
 |---|---|---|---|---|
-| Slay the Spire | 23 | 17 | 6 | 0 |
+| Slay the Spire | 23 | 18 | 5 | 0 |
 | Monster Train | 10 | 8 | 1 | 1 |
 | Hearthstone | 10 | 6 | 1 | 3 |
 | Balatro | 7 | 3 | 1 | 3 |
@@ -29,7 +29,7 @@ gedsl lint samples/corpus
 | Magic | 10 | 7 | 1 | 2 |
 | Inscryption | 8 | 6 | 1 | 1 |
 | Dominion | 8 | 5 | 1 | 2 |
-| **Total** | **84** | **57** | **12** | **15** |
+| **Total** | **84** | **58** | **11** | **15** |
 
 Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics. Inscryption models creatures the same way, with sigils as `keyword` definitions applied to them and bones as a declared `resource`. Dominion is treasure and victory cards as cards, with actions, buys and coins as declared resources that establish and refresh themselves each turn.
 
@@ -58,7 +58,7 @@ Units and minions in Monster Train and Hearthstone are modelled as `actor` defin
 | 19 | Cultist and Ritual | Chanter | Works | A phase for the opening and one for afterwards, so the chant is its own move and the telegraphed intent is the real one. Ritual still skips its first turn with a counter stat, which is cross-turn state rather than a temporary |
 | 20 | Louse Curl Up | Rolling Louse | Works | Blocks the first time it is attacked |
 | 21 | Gremlin Nob Enrage | Fury | Works | Gains Strength when the player uses a skill |
-| 22 | Slime Boss split | Slime King | Workaround | Splits immediately at half hp instead of telegraphing a Split intent. A phase can gate the move, but intents are rolled at battle start and after each enemy turn, so crossing the threshold during the player's turn does not re-telegraph |
+| 22 | Slime Boss split | Slime King | Works | A phase gates the Split, and `retelegraph` on that phase re-rolls the intent the moment the threshold is crossed, so the player is shown the Split before it lands rather than after |
 | 23 | Spore Cloud | Sporeling | Works | Debuffs the player when it dies |
 
 ## Monster Train
@@ -162,7 +162,7 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 ## Gaps, most useful first
 
 1. **Delivered: time-based triggers.** `on every 1s:` fires on the clock, and both Poison Sting (#2) and Mana Font (#8) are written with it. Nothing is left in this area that the language cannot say.
-2. **Re-telegraphing when a phase changes** (Slay the Spire #22). Phases now gate which moves an enemy may choose, which covers opening moves and hp thresholds; what is left is re-rolling an intent when a phase changes during the player's turn, so a boss can telegraph the move its new phase has just unlocked.
+2. **Delivered: re-telegraphing when a phase changes.** `phase Broken when hp <= max_hp / 2, retelegraph` re-rolls the enemy's intent the moment a hit moves it into that phase, so a boss shows the move the phase has just unlocked (Slay the Spire #22). It is opt-in on purpose: ordinarily the intent shown during the player's turn is exactly the move that follows, and only a phase that asks gives that up. A killing blow re-telegraphs nothing, and a hit absorbed entirely by block cannot cross a threshold.
 3. **Target validity** (Hearthstone #8; Magic #8). Nothing content writes can add a rule to target selection: `TryResolveTarget` consults the definition's `target` word and hard-coded validity and raises no event, so "must target a Taunt minion" and "only fliers may block it" have nowhere to attach. Two things once filed here have left it. Action blocking is expressible — a stunned unit loses its move by cancelling `move` in the before phase (Dota 2 #3) — and Multistrike (Monster Train #4) is a duplication problem rather than a targeting one.
 4. **Verbs that return values** (Slay the Spire #11). `let` has covered the local-variable half of this gap; what remains is getting a result back out of a verb, so that an attack's damage need not be recovered by differencing a counter around it.
 5. **Effects as values** (Balatro #6, Hearthstone #9). Copying and disabling another entity's effects; section 3.11 already lists this as a stress test.
@@ -187,6 +187,7 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 - Knife Juggler's `if event.target != self` guard is expressible as a filter clause, `on created(kind:actor, not target:self)`.
 - The other four held up, and each fails by a measurable amount when the trick is taken out. Kobold Geomancer's Arcane Shot lands 2 instead of 3 without its `of` scope; a Shiv lands 4 instead of 8 without one; Titan Blade deals 26 instead of 23 if the doubled Strength is written as tripled, because the modifier applies its own multiple on top; and Abstract Joker scores 33 instead of 231 if it listens on the after phase rather than the before. Heavy Anchor needed no probe at all: the corpus already ships a `Naive Anchor` relic and a test asserting that block granted on `battle_start` is wiped to 0. A deliberate counter-example beside the entry is the best evidence in this table, and more of these notes could carry one.
 - Dominion settled four things nothing had tested. `discard N` and `exhaust N` resolve through the chooser inside a DSL test with no `answer` needed, as long as the candidates are identical or there is only one. A card in hand is active, so it can react from there without ever being played. `choose N from group as name` binds something `replay` accepts. And a trap: a stat set in setup is wiped by its own `reset_on turn_start`, because setup runs before the battle starts — grant it with a statement instead.
+- Re-telegraphing turned out to be a conflict between two guarantees rather than a missing hook. "The telegraph never lies" and "a boss re-telegraphs when it transforms" cannot both hold unconditionally, and an existing test pins the first across twelve turns — the intent shown is asserted to be the move used. That is what made the feature opt-in per phase instead of a change to how intents work. Replacing Slime King's `on self.damaged` listener with a phase-gated move also took four GE306 self-retrigger notes out of the corpus, which is a fair sign the listener was doing more than it looked like.
 - Declaring a resource used to establish the stat on nobody, so its reset was silently inert and Dominion carried a relic whose only job was to bring `actions` into being. A reset now creates the stat it resets, that relic is deleted, and the four action counts it had been inflating came back to what the tests always asserted.
 - Eight of these workarounds have been examined rather than trusted, and four were self-inflicted: the Goblin Chief's separate tag, the Juggler's body guard, Honed Edge's extra status, and Stun — which really can stop a unit from acting, by cancelling `move` in the before phase. What is real is narrower, and it is the anchoring rule: drop the `of` scope and Kobold Geomancer's Arcane Shot lands 2 instead of 3, and a Shiv lands 4 instead of 8. Naming a scope is the ordinary way to write an outward modifier, though, not a trick — so the lesson is not "the notes were wrong" but that the anchor catches people out even though the language reference states it plainly under Modifiers. Every note in this table is worth testing before believing.
 - `other` excludes the entity a modifier is written on, not merely the target: a modifier's scope is evaluated with the owner as `self`, and `other` drops `self` as well as the target or controller. So "other goblins" is `of other allies where tag:goblin`, with no need to tag the lord separately. The language reference describes `other` in terms of the target and the running entity's controller, which does not make this obvious, and the Magic entry carried a needless workaround until it was checked.

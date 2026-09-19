@@ -280,16 +280,20 @@ status "Fury"
     gain stacks Strength
 
 # --- 22. ref Slime Boss: split into two when at half hp ---------------------------------
-# Workaround: splits immediately rather than telegraphing a Split intent.
+# A phase gates the Split, and `retelegraph` re-rolls the intent the moment the threshold is
+# crossed, so the player is shown the Split before it happens rather than after.
 
 enemy "Slime King"
   hp 40
-  on self.damaged:
-    if self.alive and self.hp <= self.max_hp / 2:
-      create Slimeling 2
-      created.max_hp = self.hp
-      created.hp = self.hp
-      kill self
+  phase Whole when hp > max_hp / 2
+  phase Broken when hp <= max_hp / 2, retelegraph
+  move "Slam" phase Whole:
+    deal 8 to player
+  move "Split" phase Broken:
+    create Slimeling 2
+    created.max_hp = self.hp
+    created.hp = self.hp
+    kill self
 
 enemy "Slimeling"
   hp 20

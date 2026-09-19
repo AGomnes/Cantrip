@@ -208,6 +208,8 @@ enemy "Slime King"
   pattern cycle Chomp, Split
 ```
 
+Add `retelegraph` to a phase — `phase Broken when hp <= max_hp / 2, retelegraph` — and entering it re-rolls the enemy's intent there and then, so the player is shown the move the phase has just unlocked. It is opt-in because it gives up a guarantee that is otherwise worth having: ordinarily the intent shown during your turn is exactly the move that follows, and a re-telegraphing boss can change its mind after you have committed. A phase crossed by a killing blow re-telegraphs nothing, and a hit absorbed entirely by block cannot cross a threshold at all.
+
 A move with no `phase` is available in every phase; a move with one only while that phase is active. Conditions are evaluated against the enemy each time its intent is rolled, and the **last** declared phase whose condition holds is the one that applies — so thresholds can be written in the order they are thought of (three quarters, then half, then a quarter) and the deepest one that is true wins. Entering a phase restarts the pattern, because the old position counted through a list of moves that is no longer the same one. The phase is readable as `enemy.phase`, and is part of the saved game.
 
 The next move (the intent, readable as `enemy.intent`) is rolled when the battle starts, when an enemy spawns or is created mid-battle, and after each enemy turn. Inside a move, `self` is the enemy and `target` is the player. `use Chant` makes an enemy perform one of its moves.
