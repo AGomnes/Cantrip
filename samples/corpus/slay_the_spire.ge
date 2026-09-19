@@ -132,14 +132,14 @@ card "Rot Pact"
     exhaust event.card
 
 # --- 9. ref Barricade: block is not removed at turn start -----------------------------------
-# Workaround: cancel the reset. The turn-start reset is the only thing that raises
-# block_changed with new == 0 (damage writes block directly), so this is exact today.
+# The reset says outright that it is a reset, so this refuses that and nothing else. An effect
+# that means to strip block still strips it.
 
 card "Bastion"
   cost 3
   tags power
   on before_block_changed(target:owner):
-    if event.new == 0: cancel
+    if event.reset: cancel
 
 # --- 10. ref Burst: the next skill this turn is played twice ------------------------------
 # Workaround: the status is applied while Reverb is resolving, and a listener that becomes

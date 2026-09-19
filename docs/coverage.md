@@ -21,7 +21,7 @@ gedsl lint samples/corpus
 
 | Game | Effects | Works | Workaround | Not expressible |
 |---|---|---|---|---|
-| Slay the Spire | 23 | 18 | 5 | 0 |
+| Slay the Spire | 23 | 20 | 3 | 0 |
 | Monster Train | 10 | 8 | 1 | 1 |
 | Hearthstone | 10 | 6 | 1 | 3 |
 | Balatro | 7 | 3 | 1 | 3 |
@@ -29,7 +29,7 @@ gedsl lint samples/corpus
 | Magic | 10 | 7 | 1 | 2 |
 | Inscryption | 8 | 6 | 1 | 1 |
 | Dominion | 8 | 5 | 1 | 2 |
-| **Total** | **84** | **58** | **11** | **15** |
+| **Total** | **84** | **60** | **9** | **15** |
 
 Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics. Inscryption models creatures the same way, with sigils as `keyword` definitions applied to them and bones as a declared `resource`. Dominion is treasure and victory cards as cards, with actions, buys and coins as declared resources that establish and refresh themselves each turn.
 
@@ -45,13 +45,13 @@ Units and minions in Monster Train and Hearthstone are modelled as `actor` defin
 | 6 | Blade Dance | Knife Flurry | Works | Creates exhausting Shivs in hand |
 | 7 | Accuracy | Honed Edge | Works | `modify damage of enemies where card:Shiv` on the power card itself. A modifier with no scope is anchored to what it is written on — for a card, its own damage — and naming a scope reaches past that |
 | 8 | Corruption | Rot Pact | Works | Skills cost 0 and exhaust |
-| 9 | Barricade | Bastion | Workaround | Cancels the turn-start block reset by listening for `before_block_changed` with `new == 0` |
+| 9 | Barricade | Bastion | Works | `on before_block_changed(target:owner): if event.reset: cancel`. The reset marks the change it raises, so this refuses that and nothing else — an effect that means to strip block still strips it |
 | 10 | Burst | Reverb | Workaround | The next skill is replayed. A listener that becomes active during an event also hears that event's after phase, so Echo needs `not card:Reverb` |
 | 11 | Reaper | Soul Reap | Workaround | Heals for unblocked damage dealt. Verbs return nothing, so the card differences the history counter around the attack, holding it in a `let` |
 | 12 | Envenom | Venom Coat | Works | Unblocked attack damage applies Poison |
 | 13 | Pain | Ache | Works | A curse that hurts while held |
 | 14 | Pen Nib | Quill Nib | Works | Every tenth attack deals double, with a counter stat |
-| 15 | Anchor | Heavy Anchor | Workaround | Block granted on `battle_start` is wiped by the first turn's reset, so it is granted on the first `turn_start` instead |
+| 15 | Anchor | Heavy Anchor | Works | `on turn_start once per battle: block 10`. The battle sequence is documented — `battle_start`, then the turn start that resets block — so granting it on the first turn is the ordinary way to write this, and the `Naive Anchor` test beside it shows what the intuitive version does |
 | 16 | Snecko Eye | Serpent Eye | Works | Drawn cards get a random cost |
 | 17 | Artifact | Nullify | Works | Cancels the next debuff |
 | 18 | Intangible | Phased | Works | Damage taken is clamped to 1 |
@@ -170,7 +170,7 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 7. **Definition pools** (Hearthstone #10). "A random spell", "three random cards with tag X".
 8. **Grouping over collections** (Balatro #7). Count by rank or suit, distinct values, runs.
 9. **Ordered modifier resolution** (Balatro #5). Resolve by source position instead of fixed layers, as an option.
-10. **Cancellable resets** (Slay the Spire #9, #15).
+10. **Delivered: cancellable resets.** A reset marks the `<stat>_changed` event it raises, so `if event.reset: cancel` refuses a reset and nothing else — Bastion keeps block across turns while an effect that means to strip block still strips it (Slay the Spire #9). The other row filed here was never a gap: the battle sequence is documented, `battle_start` before the turn start that resets block, so Heavy Anchor granting on the first turn is the ordinary spelling rather than a trick (#15).
 11. **Cooldown as a modifier channel** (Dota 2 #5).
 12. **Space and richer boards** (Dota 2 #6, #7; Monster Train #10). Built-in geometry, or a documented host contract for it.
 13. **Not a gap: the modifier anchor.** A modifier with no `of` scope is anchored to the entity it is written on — a card to its own damage, a status to its host, a relic to its controller — and naming a scope reaches past that. Both rows once filed here (Slay the Spire #7, Hearthstone #4) were expressible that way all along, as Dota 2 #4 already was, and excluding yourself is covered by `of other allies`. The rule is set out under Modifiers in the language reference, both the default anchor and what `of` replaces it with; these corpus entries had simply not followed it.
@@ -187,6 +187,7 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 - Knife Juggler's `if event.target != self` guard is expressible as a filter clause, `on created(kind:actor, not target:self)`.
 - The other four held up, and each fails by a measurable amount when the trick is taken out. Kobold Geomancer's Arcane Shot lands 2 instead of 3 without its `of` scope; a Shiv lands 4 instead of 8 without one; Titan Blade deals 26 instead of 23 if the doubled Strength is written as tripled, because the modifier applies its own multiple on top; and Abstract Joker scores 33 instead of 231 if it listens on the after phase rather than the before. Heavy Anchor needed no probe at all: the corpus already ships a `Naive Anchor` relic and a test asserting that block granted on `battle_start` is wiped to 0. A deliberate counter-example beside the entry is the best evidence in this table, and more of these notes could carry one.
 - Dominion settled four things nothing had tested. `discard N` and `exhaust N` resolve through the chooser inside a DSL test with no `answer` needed, as long as the candidates are identical or there is only one. A card in hand is active, so it can react from there without ever being played. `choose N from group as name` binds something `replay` accepts. And a trap: a stat set in setup is wiped by its own `reset_on turn_start`, because setup runs before the battle starts — grant it with a statement instead.
+- Twice now a row has looked like a workaround only because a documented ordering rule was not being followed — the modifier anchor, and the battle sequence that puts `battle_start` before the turn start which resets block. Both times the instinct to reason by analogy with another row pointed the wrong way, and both times the language reference settled it in a sentence. Check the reference before filing a gap.
 - Re-telegraphing turned out to be a conflict between two guarantees rather than a missing hook. "The telegraph never lies" and "a boss re-telegraphs when it transforms" cannot both hold unconditionally, and an existing test pins the first across twelve turns — the intent shown is asserted to be the move used. That is what made the feature opt-in per phase instead of a change to how intents work. Replacing Slime King's `on self.damaged` listener with a phase-gated move also took four GE306 self-retrigger notes out of the corpus, which is a fair sign the listener was doing more than it looked like.
 - Declaring a resource used to establish the stat on nobody, so its reset was silently inert and Dominion carried a relic whose only job was to bring `actions` into being. A reset now creates the stat it resets, that relic is deleted, and the four action counts it had been inflating came back to what the tests always asserted.
 - Eight of these workarounds have been examined rather than trusted, and four were self-inflicted: the Goblin Chief's separate tag, the Juggler's body guard, Honed Edge's extra status, and Stun — which really can stop a unit from acting, by cancelling `move` in the before phase. What is real is narrower, and it is the anchoring rule: drop the `of` scope and Kobold Geomancer's Arcane Shot lands 2 instead of 3, and a Shiv lands 4 instead of 8. Naming a scope is the ordinary way to write an outward modifier, though, not a trick — so the lesson is not "the notes were wrong" but that the anchor catches people out even though the language reference states it plainly under Modifiers. Every note in this table is worth testing before believing.

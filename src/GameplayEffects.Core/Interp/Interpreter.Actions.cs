@@ -44,7 +44,13 @@ namespace GameplayEffects.Runtime
         /// removes statuses whose counter runs out and kills actors whose hp reaches zero.
         /// Returns the change actually applied.
         /// </summary>
-        public Num ChangeStat(Entity entity, string stat, AssignOperator op, Num amount, EvalContext context, SourceSpan span = default)
+        /// <param name="fromReset">
+        /// True when a <c>reset_on</c> rule is doing this, which puts <c>event.reset</c> on the
+        /// <c>&lt;stat&gt;_changed</c> event. Content that wants to stop a reset can then say so
+        /// exactly, instead of inferring it from the value — "block became 0" is also true of an
+        /// effect that legitimately sets block to 0.
+        /// </param>
+        public Num ChangeStat(Entity entity, string stat, AssignOperator op, Num amount, EvalContext context, SourceSpan span = default, bool fromReset = false)
         {
             if (entity.IsRemoved) return Num.Zero;
 
@@ -84,6 +90,7 @@ namespace GameplayEffects.Runtime
                 gameEvent.Data["stat"] = Value.FromText(stat);
                 gameEvent.Data["old"] = Value.FromNumber(current);
                 gameEvent.Data["new"] = Value.FromNumber(desired);
+                gameEvent.Data["reset"] = Value.FromBool(fromReset);
                 Raise(gameEvent, context, Apply);
             }
             else
@@ -158,7 +165,7 @@ namespace GameplayEffects.Runtime
 
                 EvalContext context = SystemContext(actor);
                 Num value = EvaluateNumber(rule.ResetTo, context);
-                ChangeStat(actor, rule.Stat, AssignOperator.Set, value, context);
+                ChangeStat(actor, rule.Stat, AssignOperator.Set, value, context, fromReset: true);
             }
         }
 

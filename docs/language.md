@@ -247,6 +247,8 @@ resource "mana"
 
 A bound that names another stat (`max max_hp`) only applies to entities that have that stat. A reset happens as part of its event, to the entities the event concerns (its target and source): `before_` listeners see the old value, ordinary listeners see the new one. So "gain 1 energy at the start of your turn" works as expected.
 
+A reset raises the ordinary `<stat>_changed` event, and marks it: `event.reset` is true only when a `reset_on` rule is doing the writing. That is how content refuses a reset without having to infer one from the value — `on before_block_changed: if event.reset: cancel` keeps block across turns, while an effect that means to set block to 0 still does.
+
 A reset also **establishes** the stat. An entity that did not have it gets it, so declaring `resource "actions"` with `reset_to 1` gives every actor whose turn begins one action, without anything having to grant it first. A reset whose value names another stat is the exception and is still skipped for an entity without that stat — which is why an enemy never acquires `energy` from `reset_to max_energy`.
 
 ## Listeners
