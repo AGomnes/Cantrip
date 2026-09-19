@@ -17,14 +17,8 @@ resource "coins"
   reset_to 0
   reset_on turn_start
 
-# A declared resource sets bounds and a reset rule, but gives nobody the stat: a reset skips an
-# entity that does not already have it, and only the host API establishes the player's stats. So
-# the turn's allowance is granted from content instead, which both establishes and refreshes it.
-
-relic "Turn Order"
-  on turn_start:
-    gain 1 actions
-    gain 1 buys
+# The turn's allowance is the resource declarations above and nothing else: a reset establishes
+# the stat as well as refreshing it, so each turn starts with one action and one buy.
 
 card "Copper"
   cost 0

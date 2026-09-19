@@ -146,7 +146,14 @@ namespace GameplayEffects.Runtime
             foreach (ResourceRule rule in Content.Resources.Values.OrderBy(r => r.Stat, StringComparer.Ordinal))
             {
                 if (rule.ResetTo == null || !string.Equals(rule.ResetOn, trigger, StringComparison.OrdinalIgnoreCase)) continue;
-                if (!actor.HasStat(rule.Stat)) continue;
+
+                // The reset establishes the stat rather than skipping whoever lacks it. A resource
+                // declared with `reset_to` is a per-turn allowance, and requiring something to have
+                // granted it first made the declaration silently inert.
+                //
+                // A reset whose value names another stat is still skipped for an entity without that
+                // stat, which is what keeps an enemy from acquiring `energy` from `reset_to
+                // max_energy`.
                 if (rule.ResetTo is NameExpr bound && !actor.HasStat(bound.Name)) continue;
 
                 EvalContext context = SystemContext(actor);

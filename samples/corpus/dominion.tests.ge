@@ -1,14 +1,13 @@
 # Tests for dominion.ge. Player: 80 hp, 3 energy, seed 1. Plain enemies have 10 hp.
-# Two things to know. These cards cost coins, and coins reset to nothing at the start of a turn,
-# so coins are granted with a statement rather than in setup: setup runs before the battle, and
-# the turn_start reset would wipe them. And the turn's actions and buys come from the Turn Order
-# relic, because a declared resource establishes the stat on nobody by itself.
+# One thing to know: these cards cost coins, and coins reset to nothing at the start of a turn,
+# so coins are granted with a statement rather than in setup, because setup runs before the
+# battle starts and the turn_start reset would wipe them. Actions and buys need no such help —
+# their declarations establish them.
 # Each test also avoids depending on which card the chooser picks, by offering identical
 # candidates or only one.
 
 test "dom Hamlet draws a card and adds two actions"
   enemy hp 10
-  relic "Turn Order"
   deck Copper
   hand Hamlet
   gain 3 coins to player
@@ -18,7 +17,6 @@ test "dom Hamlet draws a card and adds two actions"
 
 test "dom Bazaar adds one of everything"
   enemy hp 10
-  relic "Turn Order"
   deck Copper
   hand Bazaar
   gain 5 coins to player
@@ -29,7 +27,6 @@ test "dom Bazaar adds one of everything"
 
 test "dom Larder trades two cards for two others"
   enemy hp 10
-  relic "Turn Order"
   deck Copper, Copper
   hand Copper, Copper, Copper, Larder
   gain 2 coins to player
@@ -53,7 +50,6 @@ test "dom Bulwark reacts from hand without being played"
 
 test "dom Regent plays an action twice"
   enemy hp 10
-  relic "Turn Order"
   deck Copper, Copper
   hand Regent, Hamlet
   gain 4 coins to player
