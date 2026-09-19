@@ -69,9 +69,21 @@ actor "Zealot"
   hp 12
   attack 4
 
-# --- 6. ref a hero striking from the back rank ----------------------------------------------
-# Not expressible: rank is position, and which ranks a skill may reach is a targeting rule.
-# `position` can be read, but nothing lets content say "this skill only hits ranks one and two".
+# --- 6. ref a skill that only reaches the front ranks ---------------------------------------
+# Workaround. Reach is a targeting rule, and the `targetable` channel takes rules, so a skill can
+# say which ranks it may be pointed at: positions are counted from zero, so ranks one and two are
+# `position > 1`. The wart is `card:Pike`, which makes the card name itself — the qualifier
+# compares names and there is no `card:self`, so without it the limit would apply to every card
+# played while this one sat in hand. Reach is still a property of the board rather than of the
+# skill, so a hero's own rank does not enter into it.
+
+card "Pike"
+  cost 1
+  target enemy
+  tags attack
+  modify targetable of enemies where card:Pike, it.position > 1: set 0
+  effect:
+    deal 5 to target
 
 # --- 7. ref camping between fights ----------------------------------------------------------
 # Not expressible: camping happens between battles, and nothing here models a run of battles

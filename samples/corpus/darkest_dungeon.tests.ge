@@ -57,3 +57,13 @@ test "dd Faltering survives one lethal blow a battle"
   expect not created.first.dead
   deal 50 to created
   expect created.first.dead
+
+test "dd a rank-limited skill only reaches the front two ranks"
+  enemy hp 10
+  enemy hp 10
+  enemy hp 10
+  play Pike
+  expect enemy.hp == 5
+  play Pike on enemy2
+  expect enemy2.hp == 5
+  expect enemy3.hp == 10

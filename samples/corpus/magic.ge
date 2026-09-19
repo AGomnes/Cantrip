@@ -68,8 +68,8 @@ relic "Blood Tithe"
 # read, and a payment step content can describe.
 
 # --- 8. ref Flying: only creatures with flying may block it ---------------------------------
-# Not expressible: the same gap as Taunt. There is no blocking step, and target validity has
-# no rules content can add to.
+# Not expressible: target validity does take rules now — see Taunt in hearthstone.ge — but Flying
+# decides who may *block* an attacker, and there is no blocking step for a rule to attach to.
 
 # --- 9. ref Deathtouch: any damage it deals is lethal ---------------------------------------
 

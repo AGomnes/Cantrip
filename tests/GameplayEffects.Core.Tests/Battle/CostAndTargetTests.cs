@@ -87,6 +87,13 @@ namespace GameplayEffects.Tests.Battle
               stacking none
               modify targetable: set 0
 
+            card "Pike"
+              cost 0
+              target enemy
+              modify targetable of enemies where card:Pike, it.position > 1: set 0
+              effect:
+                deal 5 to target
+
             enemy "Alpha"
               hp 30
 
@@ -394,6 +401,27 @@ namespace GameplayEffects.Tests.Battle
             Assert.Equal(PlayResult.InvalidTarget, runtime.Play("Jab"));
             Assert.Equal(30, alpha.GetInt("hp"));
             Assert.Equal(3, player.GetInt("energy"));
+        }
+
+        [Fact]
+        public void A_cards_own_reach_limit_applies_to_it_and_to_nothing_else()
+        {
+            CardRuntime runtime = Setup(out _);
+            runtime.SpawnEnemy("Alpha");
+            runtime.SpawnEnemy("Beta");
+            Entity gamma = runtime.SpawnEnemy("Gamma");
+            Entity pike = runtime.AddCard("Pike", Zones.Hand);
+            runtime.AddCard("Jab", Zones.Hand);
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+
+            // Positions count from zero, so Gamma is the third rank and out of the pike's reach.
+            Assert.Equal(2, gamma.Position);
+            Assert.Equal(PlayResult.InvalidTarget, runtime.Play(pike, gamma));
+
+            // `card:Pike` is what keeps the limit on its own card while the pike waits in hand.
+            Assert.Equal(PlayResult.Played, runtime.Play("Jab", gamma));
+            Assert.Equal(27, gamma.GetInt("hp"));
+            Assert.Equal(Zones.Hand, pike.Zone);
         }
 
         [Fact]
