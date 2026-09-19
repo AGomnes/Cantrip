@@ -247,8 +247,28 @@ namespace GameplayEffects.Runtime
 
             bool ignoreBlock = call.Flag("ignore_block") || call.Flag("pierce") || call.Flag("unblockable") || call.Flag("true_damage");
 
+            Num dealt = Num.Zero;
             foreach (Entity target in targets.ToArray())
-                DealDamage(call.Context.Source, target, amount, tags, ignoreBlock, call.Context, call.Span);
+                dealt += DealDamage(call.Context.Source, target, amount, tags, ignoreBlock, call.Context, call.Span);
+
+            BindResult(call, dealt);
+        }
+
+        /// <summary>
+        /// Binds what a verb actually achieved to the name in its <c>into</c> clause, as in
+        /// <c>deal 4 to all enemies into dealt</c>.
+        /// </summary>
+        /// <remarks>
+        /// Damage, healing and block are all worth asking about after the fact, because what lands is
+        /// not what was asked for: block absorbs it, modifiers change it, a target dies part way. The
+        /// alternative in content was to read a history counter either side of the line and subtract,
+        /// which is a lot of ceremony for "how much did that do".
+        /// </remarks>
+        private static void BindResult(VerbCall call, Num total)
+        {
+            if (call.Node.Clause("into") is not NameExpr name) return;
+
+            call.Context.SetLocal(name.Name, Value.FromNumber(total));
         }
 
         /// <summary>
@@ -272,7 +292,7 @@ namespace GameplayEffects.Runtime
             if (targets.Count == 0)
                 throw call.Error("nobody to attack. Write `attack <who>`, or give the effect a `target`.");
 
-            Num amount = Num.FromInt(attacker.GetInt("attack"));
+            Num swing = Num.FromInt(attacker.GetInt("attack"));
 
             // An attack carries the attacker's own tags, the way a status's damage carries its.
             var tags = new List<string>(attacker.Tags);
@@ -285,8 +305,11 @@ namespace GameplayEffects.Runtime
 
             bool ignoreBlock = call.Flag("ignore_block") || call.Flag("pierce") || call.Flag("unblockable") || call.Flag("true_damage");
 
+            Num landed = Num.Zero;
             foreach (Entity target in targets.ToArray())
-                DealDamage(attacker, target, amount, tags, ignoreBlock, call.Context, call.Span);
+                landed += DealDamage(attacker, target, swing, tags, ignoreBlock, call.Context, call.Span);
+
+            BindResult(call, landed);
         }
 
         /// <summary>

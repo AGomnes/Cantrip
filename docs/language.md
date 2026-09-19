@@ -517,6 +517,8 @@ A bare name resolves in this order: local variables (`let` bindings, `for each` 
 | `use` | In an enemy, performs one of its moves. |
 | `log` | `log values...` writes to the runtime's `Logged` event. |
 
+**`into`** binds what a damage verb actually achieved, so an effect can act on it: `deal 4 to all enemies into dealt`, then `heal dealt`. The number is what landed, summed across the targets — after modifiers changed the amount, after block absorbed what it could, and counting only what a dying target could still take, which is rarely the number the line asked for. Available on `deal`, `damage` and `attack`.
+
 Games add verbs with `runtime.RegisterVerb`.
 
 ## Content-defined verbs

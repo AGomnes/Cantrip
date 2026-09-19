@@ -125,6 +125,15 @@ namespace GameplayEffects.Linting
                         Commands.Add(command);
                         if (command.Clause("as") is NameExpr alias && string.Equals(command.Verb, "choose", StringComparison.OrdinalIgnoreCase))
                             Locals.Add(alias.Name);
+
+                        // `deal 4 to all enemies into dealt` binds what landed, the way
+                        // `choose ... as` binds what was chosen. Only the verbs that honour the
+                        // clause bind anything, so a name written on one that ignores it still warns.
+                        if (command.Clause("into") is NameExpr bound
+                            && (string.Equals(command.Verb, "deal", StringComparison.OrdinalIgnoreCase)
+                                || string.Equals(command.Verb, "damage", StringComparison.OrdinalIgnoreCase)
+                                || string.Equals(command.Verb, "attack", StringComparison.OrdinalIgnoreCase)))
+                            Locals.Add(bound.Name);
                         break;
                     case ForEachNode loop:
                         Locals.Add(loop.Variable);

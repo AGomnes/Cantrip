@@ -161,16 +161,15 @@ status "Echo"
     stacks -1
 
 # --- 11. ref Reaper: heal for the unblocked damage dealt -----------------------------------
-# Workaround: verbs return nothing, so the card reads the history counter either side of the
-# attack and heals the difference. The counter itself is now held in a local.
+# `into` binds what the attack actually landed — past block, and only what a dying enemy could
+# still take — so the card simply heals that.
 
 card "Soul Reap"
   cost 2
   tags attack, exhaust
   effect:
-    let before = damage_dealt_this_turn
-    deal 4 to all enemies
-    heal damage_dealt_this_turn - before
+    deal 4 to all enemies into dealt
+    heal dealt
 
 # --- 12. ref Envenom: unblocked attack damage poisons -------------------------------------
 
