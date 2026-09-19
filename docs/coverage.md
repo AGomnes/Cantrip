@@ -29,9 +29,10 @@ gedsl lint samples/corpus
 | Magic | 10 | 7 | 1 | 2 |
 | Inscryption | 8 | 6 | 1 | 1 |
 | Dominion | 8 | 5 | 1 | 2 |
-| **Total** | **84** | **60** | **9** | **15** |
+| Darkest Dungeon | 8 | 5 | 0 | 3 |
+| **Total** | **92** | **66** | **8** | **18** |
 
-Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics. Inscryption models creatures the same way, with sigils as `keyword` definitions applied to them and bones as a declared `resource`. Dominion is treasure and victory cards as cards, with actions, buys and coins as declared resources that establish and refresh themselves each turn.
+Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics. Inscryption models creatures the same way, with sigils as `keyword` definitions applied to them and bones as a declared `resource`. Dominion is treasure and victory cards as cards, with actions, buys and coins as declared resources that establish and refresh themselves each turn. Darkest Dungeon has heroes as actors, stress as a declared resource with bounds and no reset, and trinkets as `item` definitions.
 
 ## Slay the Spire
 
@@ -159,6 +160,19 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 | 7 | Buying from the supply | | Not expressible | A supply is piles of definitions, so gaining "a card from the Silver pile" needs definition pools. Costs themselves are fine — `cost 5 coins` is refused when unaffordable — but there is no buy phase and nothing to buy from |
 | 8 | Militia | | Not expressible | There is one player, and enemies are actors without hands or decks, so an effect reaching into another player's hand has nobody to reach |
 
+## Darkest Dungeon
+
+| # | Mechanic | Ours | Status | Notes |
+|---|---|---|---|---|
+| 1 | Stress | Dread | Works | `resource "stress"` with `min 0 max 200` and no reset, so it accumulates across turns instead of refreshing. Both bounds are tested |
+| 2 | Affliction at 100 stress | Focus Ring | Works | `on any.stress_changed: if event.new >= 100` — a threshold on a custom stat's own change event, which is how content notices a resource crossing a line rather than polling it. Declared as an `item` |
+| 3 | Rally | Rally | Works | `lose 25 stress`, which the resource's floor stops below zero |
+| 4 | Bleed | Bleeding, Lash | Works | `decay 1 on turn_end` beside a `turn_end` listener; the listener sees the stacks before they tick down |
+| 5 | Death's Door | Faltering | Works | `on instead_of_died(target:owner) once per battle: heal 1 to owner` |
+| 6 | Rank-limited skills | | Not expressible | Rank is position, and which ranks a skill may reach is a targeting rule. `position` can be read, but nothing lets content say "this skill only reaches ranks one and two". The same gap as Taunt |
+| 7 | Camping between fights | | Not expressible | Camping happens between battles, and nothing models a run of battles with stress and health carried across them. The same shape as Inscryption's candles |
+| 8 | Virtue or affliction | | Not expressible | At the threshold a hero becomes one of several afflictions, or rarely a virtue. Picking a random definition from a pool is gap 7 — the threshold itself works, see #2 |
+
 ## Gaps, most useful first
 
 1. **Delivered: time-based triggers.** `on every 1s:` fires on the clock, and both Poison Sting (#2) and Mana Font (#8) are written with it. Nothing is left in this area that the language cannot say.
@@ -187,6 +201,8 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 - Knife Juggler's `if event.target != self` guard is expressible as a filter clause, `on created(kind:actor, not target:self)`.
 - The other four held up, and each fails by a measurable amount when the trick is taken out. Kobold Geomancer's Arcane Shot lands 2 instead of 3 without its `of` scope; a Shiv lands 4 instead of 8 without one; Titan Blade deals 26 instead of 23 if the doubled Strength is written as tripled, because the modifier applies its own multiple on top; and Abstract Joker scores 33 instead of 231 if it listens on the after phase rather than the before. Heavy Anchor needed no probe at all: the corpus already ships a `Naive Anchor` relic and a test asserting that block granted on `battle_start` is wiped to 0. A deliberate counter-example beside the entry is the best evidence in this table, and more of these notes could carry one.
 - Dominion settled four things nothing had tested. `discard N` and `exhaust N` resolve through the chooser inside a DSL test with no `answer` needed, as long as the candidates are identical or there is only one. A card in hand is active, so it can react from there without ever being played. `choose N from group as name` binds something `replay` accepts. And a trap: a stat set in setup is wiped by its own `reset_on turn_start`, because setup runs before the battle starts — grant it with a statement instead.
+- `item` works as a declaration and behaves like a relic, but there is no `item` setup verb in the test language: a test grants one with `relic`. Darkest Dungeon is the first content anywhere to declare an `item` at all.
+- Listening on a custom stat's change event works, and needs nothing declared for it: `on any.stress_changed` fires for a `resource` the content declared, and the linter does not complain that nothing raises it, because its stat inventory counts resource declarations. I expected a warning there and was wrong, which is worth recording in the direction it fell.
 - The checklist in architecture.md earned its keep on the first new binding form since it was written. `into` binds a name, the linter did not know that, and every use of the bound name warned GE302 — exactly the failure the list predicts for a form the linter has not been taught. The corpus lint caught it, because that folder has been clean all along and two warnings stood out. Lint tests now pin both halves: a name bound by a verb that honours the clause is known, and one written on a verb that ignores it is still a real mistake.
 - Twice now a row has looked like a workaround only because a documented ordering rule was not being followed — the modifier anchor, and the battle sequence that puts `battle_start` before the turn start which resets block. Both times the instinct to reason by analogy with another row pointed the wrong way, and both times the language reference settled it in a sentence. Check the reference before filing a gap.
 - Re-telegraphing turned out to be a conflict between two guarantees rather than a missing hook. "The telegraph never lies" and "a boss re-telegraphs when it transforms" cannot both hold unconditionally, and an existing test pins the first across twelve turns — the intent shown is asserted to be the move used. That is what made the feature opt-in per phase instead of a change to how intents work. Replacing Slime King's `on self.damaged` listener with a phase-gated move also took four GE306 self-retrigger notes out of the corpus, which is a fair sign the listener was doing more than it looked like.

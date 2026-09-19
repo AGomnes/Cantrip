@@ -1,0 +1,59 @@
+# Tests for darkest_dungeon.ge. Player: 80 hp, 3 energy, seed 1. Plain enemies have 10 hp.
+# Stress has no reset, so it survives a turn boundary; that is the point of it.
+
+test "dd stress accumulates and stops at its bound"
+  enemy hp 10
+  play Dread on player
+  expect player.stress == 40
+  play Dread on player
+  expect player.stress == 80
+  end turn
+  expect player.stress == 80
+
+test "dd crossing 100 stress afflicts the hero"
+  enemy hp 10
+  relic "Focus Ring"
+  play Dread on player
+  play Dread on player
+  expect not player.has(Afflicted)
+  play Dread on player
+  expect player.stress == 120
+  expect player.has(Afflicted)
+
+test "dd stress stops at its upper bound"
+  enemy hp 10
+  repeat 6:
+    play Dread on player
+  expect player.stress == 200
+
+test "dd an affliction weakens what the hero deals"
+  enemy hp 30
+  apply Afflicted 1 to player
+  play Lash on enemy
+  expect enemy.hp == 28
+
+test "dd Rally relieves stress without going below nothing"
+  enemy hp 10
+  play Dread on player
+  play Rally on player
+  expect player.stress == 15
+  play Rally on player
+  expect player.stress == 0
+
+test "dd Bleeding ticks each turn and wears off"
+  enemy hp 30
+  play Lash on enemy
+  expect enemy.hp == 27
+  end turn
+  expect enemy.hp == 24
+  end turn
+  expect enemy.hp == 22
+
+test "dd Faltering survives one lethal blow a battle"
+  enemy hp 10
+  create Zealot
+  apply Faltering 1 to created
+  deal 50 to created
+  expect not created.first.dead
+  deal 50 to created
+  expect created.first.dead

@@ -1,0 +1,82 @@
+# Coverage corpus: Darkest Dungeon style effects. Heroes are actors on the player's side, stress
+# is a declared resource with bounds and no reset, and trinkets are `item` definitions.
+# Names are our own. Classification and notes: docs/coverage.md.   Tests: darkest_dungeon.tests.ge.
+
+resource "stress"
+  min 0
+  max 200
+
+# --- 1. ref stress: it accumulates and never refreshes --------------------------------------
+# A resource with bounds and no reset. Nothing establishes it, so it springs into being the
+# first time something adds to it, and the max is what stops it running away.
+
+card "Dread"
+  cost 0
+  target ally
+  tags affliction
+  effect:
+    gain 40 stress to target
+
+# --- 2. ref affliction at 100 stress --------------------------------------------------------
+# A threshold on a custom stat's own change event, which is the only way to notice a resource
+# crossing a line rather than polling it. Declared as an `item`, which behaves like a relic —
+# though a test has to grant it with `relic`, since there is no `item` setup verb.
+
+status "Afflicted"
+  tags debuff
+  stacking none
+  modify damage: x0.75
+
+item "Focus Ring"
+  on any.stress_changed:
+    if event.new >= 100 and not event.target.has(Afflicted):
+      apply Afflicted 1 to event.target
+
+# --- 3. ref Rally: relieve stress ------------------------------------------------------------
+
+card "Rally"
+  cost 1
+  target ally
+  effect:
+    lose 25 stress to target
+
+# --- 4. ref Bleed: damage over the next turns -----------------------------------------------
+
+status "Bleeding"
+  tags debuff, dot
+  stacking intensity
+  decay 1 on turn_end
+  on owner.turn_end:
+    deal stacks to owner, ignore block
+
+card "Lash"
+  cost 1
+  target enemy
+  tags attack
+  effect:
+    deal 3 to target
+    apply Bleeding 3 to target
+
+# --- 5. ref Death's Door: the first lethal blow is survived ----------------------------------
+
+status "Faltering"
+  tags debuff
+  stacking none
+  on instead_of_died(target:owner) once per battle:
+    heal 1 to owner
+
+actor "Zealot"
+  hp 12
+  attack 4
+
+# --- 6. ref a hero striking from the back rank ----------------------------------------------
+# Not expressible: rank is position, and which ranks a skill may reach is a targeting rule.
+# `position` can be read, but nothing lets content say "this skill only hits ranks one and two".
+
+# --- 7. ref camping between fights ----------------------------------------------------------
+# Not expressible: camping happens between battles, and nothing here models a run of battles
+# with stress and health carried across them. The same shape as Inscryption's candles.
+
+# --- 8. ref virtue or affliction, chosen at random ------------------------------------------
+# Not expressible: at 100 stress a hero becomes one of several afflictions, or rarely a virtue.
+# Picking a random definition from a pool is gap 7; the threshold itself works (see 2).
