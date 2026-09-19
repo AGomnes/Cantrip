@@ -80,3 +80,30 @@ actor "Knife Juggler"
 verb trade(minion, victim):
   attack victim with minion
   attack minion with victim
+
+# --- 8. ref Taunt: the other side must attack this minion -----------------------------------------------------
+# Target selection has rules content can add to: the `targetable` channel, asked over a base of 1
+# before a card accepts a target. While this is attached, the other side's single-target cards can
+# only be pointed at something that also has Taunt. The predicate is `not it.has(Taunt)` rather than
+# a comparison with the owner, so two taunting minions leave each other available instead of
+# cancelling out, and `source:enemies` is what keeps a taunt from constraining its own side. Area
+# and random effects are not filtered, which is the rule these games actually have.
+
+status "Taunt"
+  stacking none
+  modify targetable of allies where source:enemies, not it.has(Taunt): set 0
+
+# --- 9. ref Silence: remove a minion's abilities --------------------------------------------------------------
+# Not expressible: nothing can switch off an entity's own listeners and modifiers. Removing a status
+# works, but a minion's printed abilities are not statuses.
+
+# --- 10. ref Discover: choose one of three random cards -------------------------------------------------------
+# Not expressible: picking random definitions from a pool is gap 7.
+
+# --- 11. ref Stealth: this minion cannot be targeted ----------------------------------------------------------
+# The same channel with no scope at all, which anchors to the host like any other modifier. A blast
+# still reaches it; only pointing a card at it is refused.
+
+status "Stealth"
+  stacking none
+  modify targetable: set 0

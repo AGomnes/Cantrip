@@ -23,14 +23,14 @@ gedsl lint samples/corpus
 |---|---|---|---|---|
 | Slay the Spire | 23 | 21 | 2 | 0 |
 | Monster Train | 10 | 8 | 1 | 1 |
-| Hearthstone | 10 | 6 | 1 | 3 |
+| Hearthstone | 11 | 8 | 1 | 2 |
 | Balatro | 7 | 3 | 1 | 3 |
 | Dota 2 (real time) | 8 | 5 | 0 | 3 |
 | Magic | 10 | 7 | 1 | 2 |
 | Inscryption | 8 | 6 | 1 | 1 |
 | Dominion | 8 | 5 | 1 | 2 |
 | Darkest Dungeon | 8 | 5 | 0 | 3 |
-| **Total** | **92** | **66** | **8** | **18** |
+| **Total** | **93** | **68** | **8** | **17** |
 
 Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics. Inscryption models creatures the same way, with sigils as `keyword` definitions applied to them and bones as a declared `resource`. Dominion is treasure and victory cards as cards, with actions, buys and coins as declared resources that establish and refresh themselves each turn. Darkest Dungeon has heroes as actors, stress as a declared resource with bounds and no reset, and trinkets as `item` definitions.
 
@@ -88,9 +88,10 @@ Units and minions in Monster Train and Hearthstone are modelled as `actor` defin
 | 5 | Dire Wolf Alpha (adjacency aura) | Dire Wolf | Works | `modify attack of adjacent(self): +1` |
 | 6 | Knife Juggler | Knife Juggler | Workaround | A listener that becomes active during an event hears it, so the Juggler must leave its own summon out. `not target:self` says it as a filter rather than a guard in the body, but it still has to be said |
 | 7 | Minion combat | `trade` verb | Works | The `attack` verb makes each creature the source of its own hit. A content verb still spells the trade out, which is where combat rules belong |
-| 8 | Taunt | | Not expressible | Target selection has no rules content can add to, such as "must target a Taunt minion" |
+| 8 | Taunt | Taunt | Works | `modify targetable of allies where source:enemies, not it.has(Taunt): set 0`. The `targetable` channel is asked before a card accepts a target, and the chooser is only offered what passes |
 | 9 | Silence | | Not expressible | Nothing can switch off an entity's own listeners and modifiers |
 | 10 | Discover | | Not expressible | No way to pick random definitions from a pool, such as "three random spells" |
+| 11 | Stealth | Stealth | Works | The same channel with no scope, so it anchors to its host: `modify targetable: set 0`. Only pointing a card at it is refused; a blast still reaches it |
 
 A Deathrattle that draws a card needs to name who draws — `draw 1 to player` — because `draw` otherwise draws for the running entity's controller, and a minion controls itself.
 
@@ -177,7 +178,7 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 
 1. **Delivered: time-based triggers.** `on every 1s:` fires on the clock, and both Poison Sting (#2) and Mana Font (#8) are written with it. Nothing is left in this area that the language cannot say.
 2. **Delivered: re-telegraphing when a phase changes.** `phase Broken when hp <= max_hp / 2, retelegraph` re-rolls the enemy's intent the moment a hit moves it into that phase, so a boss shows the move the phase has just unlocked (Slay the Spire #22). It is opt-in on purpose: ordinarily the intent shown during the player's turn is exactly the move that follows, and only a phase that asks gives that up. A killing blow re-telegraphs nothing, and a hit absorbed entirely by block cannot cross a threshold.
-3. **Target validity** (Hearthstone #8; Magic #8). Nothing content writes can add a rule to target selection: `TryResolveTarget` consults the definition's `target` word and hard-coded validity and raises no event, so "must target a Taunt minion" and "only fliers may block it" have nowhere to attach. Two things once filed here have left it. Action blocking is expressible — a stunned unit loses its move by cancelling `move` in the before phase (Dota 2 #3) — and Multistrike (Monster Train #4) is a duplication problem rather than a targeting one.
+3. **Delivered in part: target validity.** Content adds rules to target selection through the `targetable` channel, asked over a base of 1 before a card accepts a target. A taunt is a scope speaking for others — `modify targetable of allies where source:enemies, not it.has(Taunt): set 0` (Hearthstone #8) — and the same channel with no scope anchors to its own host, which is stealth (Hearthstone #11). The chooser is only offered candidates that pass, so a rule narrows what a player may pick rather than making the play fail, and a card left with nothing to point at is refused. It was a query channel rather than a cancellable event precisely because candidates must be filtered *before* the chooser is asked, and an event that can deal damage cannot honestly be used as a question. What is left: Magic's Flying (#8) needs a blocking step, which is a phase of combat rather than a targeting rule, and Darkest Dungeon's ranks (#6) need reach to be a property of a skill and position to be real space (gap 12). Enemy moves and the `attack` verb do not go through card target selection at all, so a taunt does not constrain them either. Two things once filed here had already left: action blocking is expressible — a stunned unit loses its move by cancelling `move` in the before phase (Dota 2 #3) — and Multistrike (Monster Train #4) is a duplication problem rather than a targeting one.
 4. **Verbs that return values** (no corpus citation). The case that prompted this is gone: `into` binds what a damage verb landed, so Soul Reap no longer differences a counter (#11). What is still missing is a verb *returning* anything — `VerbHandler` is `delegate void`, a content verb's body is a statement block with no result channel, and `let x = shatter target` would need a command to be usable as an expression, which is a parser change reaching the walker, the canonical printer and the linter. Worth doing when something needs it; nothing in the corpus does yet.
 5. **Effects as values** (Balatro #6, Hearthstone #9). Copying and disabling another entity's effects; section 3.11 already lists this as a stress test.
 6. **Listeners registered during an event hear that event** (Slay the Spire #10, Hearthstone #6). The clean "not myself" filter already exists — `not target:self`, `not card:Reverb` — so what is left to decide is whether the default should change, since every listener of this shape has to remember to exclude itself.

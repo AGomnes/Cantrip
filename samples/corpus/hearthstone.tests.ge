@@ -50,3 +50,34 @@ test "hs trading minions"
   create Footman
   trade created.first enemy
   expect enemy.hp == 2 and created.first.dead
+
+# A refused play fails a test rather than being assertable, so these show the constraint the other
+# way round: an untargeted card is only offered what it may point at, and picks from that.
+
+test "hs Taunt leaves the chooser nothing else to pick"
+  enemy hp 20
+  enemy hp 20
+  apply Taunt 1 to enemy2
+  play "Arcane Shot"
+  expect enemy.hp == 20 and enemy2.hp == 18
+
+test "hs two Taunts leave each other available"
+  enemy hp 20
+  enemy hp 20
+  enemy hp 20
+  apply Taunt 1 to enemy2
+  apply Taunt 1 to enemy3
+  play "Arcane Shot" on enemy3
+  expect enemy3.hp == 18
+  play "Arcane Shot" on enemy2
+  expect enemy2.hp == 18
+  expect enemy.hp == 20
+
+test "hs Stealth cannot be pointed at but a blast still finds it"
+  enemy hp 20
+  enemy hp 20
+  apply Stealth 1 to enemy
+  play "Arcane Shot"
+  expect enemy.hp == 20 and enemy2.hp == 18
+  deal 2 to enemies
+  expect enemy.hp == 18

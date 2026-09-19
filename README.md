@@ -42,7 +42,7 @@ An early MVP of the core, per step 1 of the plan in the design notes. It is not 
 - The DSL: cards, statuses, relics, enemies with move patterns, abilities, keywords, resources, rulesets, content-defined verbs, and test blocks
 - Everything is an entity: statuses are entities attached to their host, so `stacks -1` and `remove tag:dot` need no special cases
 - Events with `before`, `instead` and `after` phases, deterministic listener ordering, loop protection and `once per turn/battle/run/chain` limits
-- A layered modifier pipeline (add, multiply, clamp, override) with sensible default scopes and explicit `of` scopes
+- A layered modifier pipeline (add, multiply, clamp, override) with sensible default scopes and explicit `of` scopes, which is also how content adds rules to target selection
 - A tree-walking interpreter, a battle runtime (turns, card play, draw, enemy intents) and a fixed-timestep tick clock for real time
 - Deterministic fixed-point math and RNG, state hashing, and save/load snapshots that replay exactly
 - Hot reload: edit content and a running game picks it up, keeping the state the game has changed
@@ -51,7 +51,7 @@ An early MVP of the core, per step 1 of the plan in the design notes. It is not 
 - The `gedsl` command-line tool
 - A Godot 4.6 addon: one node drives a battle from GDScript, `.ge` files import so they reach an exported build, and an editor dock shows problems, DSL tests and card text ([docs/godot.md](docs/godot.md))
 
-**Not yet**: live debugging from the Godot editor, an export smoke test, Asset Library packaging, the compiled backend, spatial selectors (`within` needs a host), `every Xs` triggers, the VS Code extension, and the full coverage corpus. See [Roadmap](#roadmap) and the gaps in [docs/coverage.md](docs/coverage.md).
+**Not yet**: an export smoke test, Asset Library packaging, the compiled backend, spatial selectors (`within` needs a host), the VS Code extension, and the full coverage corpus. See [Roadmap](#roadmap) and the gaps in [docs/coverage.md](docs/coverage.md).
 
 ## Building
 
@@ -217,7 +217,7 @@ Following section 7 of the design notes:
 2. **Save/load and deterministic math**: done.
 3. **Validate turn-based**: build inside a real roguelite.
 4. **Validate real-time**: the tick clock exists; it needs a real-time project, spatial selectors and allocation-free event paths.
-5. **Coverage corpus**: 92 effects from Slay the Spire, Monster Train, Hearthstone, Balatro, Dota 2, Magic, Inscryption, Dominion and Darkest Dungeon so far: 66 work directly, 8 need a workaround and 18 are not expressible yet ([docs/coverage.md](docs/coverage.md)). The design notes aim for about 150.
+5. **Coverage corpus**: 93 effects from Slay the Spire, Monster Train, Hearthstone, Balatro, Dota 2, Magic, Inscryption, Dominion and Darkest Dungeon so far: 68 work directly, 8 need a workaround and 17 are not expressible yet ([docs/coverage.md](docs/coverage.md)). The design notes aim for about 150.
 6. **Release**: the Godot addon is done and packaged — node, importer, export check, editor dock, debugger tabs showing a running game's causality tree and what each live entity is made of, pause, step and breakpoints over the debug channel, and a demo. A packaged build has been run to prove content reaches it. Still to do: a docs site and a cookbook.
 7. **Project setup**: the name is still to be chosen.
 

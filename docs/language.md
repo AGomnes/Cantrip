@@ -90,6 +90,8 @@ card "Whirlwind"
 | `target any` | Any living actor, or none. |
 | (none) | No target. |
 
+A card that names a target also consults the [`targetable`](#modifiers) channel, which is how content adds its own rules to target selection, such as a taunt.
+
 Tags with built-in behaviour:
 
 | Tag | Behaviour |
@@ -351,7 +353,7 @@ relic "Siege Engine"
 
 **Amounts** pick the layer: `+N` or `-N` (add), `xN` or `*N` (multiply; `x50%` is half), `clamp A..B` or `clamp N` (clamp; a single number is a ceiling), `=N` or `set N` (override). Values pass through the layers in ruleset order, add, multiply, clamp, override by default. Within the override layer the most recently created source wins. Damage, block and healing are rounded down after modifiers.
 
-**Channels** are `damage`, `damage_taken`, `block`, `block_taken`, `heal`, `heal_taken`, `cost`, `draw`, or any stat name (`max_hp`, `armor`...).
+**Channels** are `damage`, `damage_taken`, `block`, `block_taken`, `heal`, `heal_taken`, `cost`, `draw`, `targetable`, or any stat name (`max_hp`, `armor`...).
 
 **Default scope.** Without `of`, a modifier applies relative to its **anchor**: a status's host, a relic's holder, or the card itself for a modifier written on a card.
 
@@ -365,6 +367,20 @@ relic "Siege Engine"
 **`of` scope** replaces the default: the modifier applies when the value being computed belongs to someone in the group. The group is read from the modifier owner's side, so `of enemies` on the player's relic always means the player's enemies. A `where` on the group reads stats from the candidate (`hp > 20`) but tests qualifiers such as `tag:` and `source:` against the value being computed, like a `where` on the modifier.
 
 **Filters** (`where`) see the value being computed: `tag:fire` checks the damage's tags and the card's tags, `source:self` compares the source's controller with the modifier owner's. Roles and group names such as `source:enemies` and `allies.count` are read from the modifier owner's side, whoever is acting.
+
+**Target validity.** The `targetable` channel is asked before a card accepts a target, over a base of 1: zero or less means the card may not be pointed at that entity. With no scope it anchors to its owner like any other modifier, so `modify targetable: set 0` on a status hides its host. A scope is how one entity speaks for others, which is what a taunt is:
+
+```
+status "Taunt"
+  stacking none
+  modify targetable of allies where source:enemies, not it.has(Taunt): set 0
+```
+
+While that is attached, the other side's `target enemy` cards may only be pointed at something that also has Taunt. Write the predicate as `not it.has(Taunt)` rather than a comparison with the owner, so that two taunting entities leave each other available instead of cancelling out. `source:enemies` is what keeps a taunt from constraining its own side's cards.
+
+Only the `target` words that name someone ask: `enemy`, `ally` and `any`. `target self` is not a choice, so nothing is asked of it. The chooser is offered only the candidates that pass, so a rule narrows what a player may pick rather than making the play fail, and a card left with nothing to point at is refused as `InvalidTarget`. Area and random effects use the selectors under [Expressions](#expressions) and are not filtered, so a blast still reaches what a card may not single out — which is the rule these games actually have.
+
+Because the query carries the card being played, a `where` on the group must write `it.` to mean the candidate: a bare `tag:` there tests the card, not the entity being considered.
 
 Stat reads are cached and the cache is invalidated by any change to the game state.
 

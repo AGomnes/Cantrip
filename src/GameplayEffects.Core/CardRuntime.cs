@@ -508,29 +508,76 @@ namespace GameplayEffects
                 {
                     if (target == null)
                     {
-                        IReadOnlyList<Entity> enemies = State.Actors(opposing);
+                        IReadOnlyList<Entity> enemies = Targetable(card, player, State.Actors(opposing));
                         if (enemies.Count == 0) return false;
                         target = enemies.Count == 1
                             ? enemies[0]
                             : Chooser.Choose(new ChoiceRequest("choose a target", enemies, 1, 1, player, card.Definition!.Syntax.Span), State)?.FirstOrDefault(enemies.Contains) ?? enemies[0];
                     }
-                    return target.Kind == EntityKind.Actor && target.IsAlive && target.Team == opposing;
+                    return target.Kind == EntityKind.Actor && target.IsAlive && target.Team == opposing && IsTargetable(card, player, target);
                 }
 
                 case "ally":
                     target ??= player;
-                    return target.Kind == EntityKind.Actor && target.IsAlive && target.Team == player.Team;
+                    return target.Kind == EntityKind.Actor && target.IsAlive && target.Team == player.Team && IsTargetable(card, player, target);
 
                 case "self":
                     target = player;
                     return true;
 
                 case "any":
-                    return target == null || (target.Kind == EntityKind.Actor && target.IsAlive);
+                    return target == null || (target.Kind == EntityKind.Actor && target.IsAlive && IsTargetable(card, player, target));
 
                 default:
                     return true;
             }
+        }
+
+        // Target validity ----------------------------------------------------------------------
+
+        private const string TargetableChannel = "targetable";
+
+        /// <summary>
+        /// Whether one entity may be named as this card's target. Content adds rules to target
+        /// selection through the <c>targetable</c> channel, where a value of zero or less means
+        /// "not this one". With no <c>of</c> scope a modifier anchors to its owner, so
+        /// <c>modify targetable: set 0</c> on a status hides its host; a scope is how one entity
+        /// speaks for others, which is what Taunt needs:
+        /// <c>modify targetable of allies where source:enemies, not it.has(Taunt): set 0</c>.
+        /// </summary>
+        /// <remarks>
+        /// Only the <c>target</c> words that name someone ask — <c>enemy</c>, <c>ally</c> and
+        /// <c>any</c>. <c>target self</c> is not a choice, so nothing is asked of it. Area and
+        /// random effects resolve through the interpreter's own selectors rather than here, which is
+        /// deliberate: Taunt constrains what a card may be pointed at, not what a blast reaches.
+        /// The query carries the card, so a <c>where</c> on the group must say <c>it.</c> to mean the
+        /// candidate; a bare <c>tag:</c> there tests the card being played.
+        /// </remarks>
+        private bool IsTargetable(Entity card, Entity chooser, Entity candidate)
+        {
+            if (!State.Modifiers.HasChannel(TargetableChannel)) return true;
+
+            var query = new ModifierQuery(TargetableChannel)
+            {
+                Subject = candidate,
+                Source = chooser,
+                Card = card,
+                Tags = card.Tags.ToArray(),
+            };
+            return State.Modifiers.Compute(query, Num.One) > Num.Zero;
+        }
+
+        /// <summary>Those of a group the card may actually be pointed at, in the group's own order.</summary>
+        private IReadOnlyList<Entity> Targetable(Entity card, Entity chooser, IReadOnlyList<Entity> candidates)
+        {
+            if (!State.Modifiers.HasChannel(TargetableChannel)) return candidates;
+
+            var allowed = new List<Entity>();
+            foreach (Entity candidate in candidates)
+            {
+                if (IsTargetable(card, chooser, candidate)) allowed.Add(candidate);
+            }
+            return allowed;
         }
 
         // Enemies ------------------------------------------------------------------------------

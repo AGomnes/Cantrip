@@ -79,10 +79,21 @@ namespace GameplayEffects.Tests.Battle
             relic "Codex"
               modify cost of cards where tag:fire: -1
 
+            status "Taunt"
+              stacking none
+              modify targetable of allies where source:enemies, not it.has(Taunt): set 0
+
+            status "Stealth"
+              stacking none
+              modify targetable: set 0
+
             enemy "Alpha"
               hp 30
 
             enemy "Beta"
+              hp 30
+
+            enemy "Gamma"
               hp 30
             """;
 
@@ -292,6 +303,97 @@ namespace GameplayEffects.Tests.Battle
             Assert.Equal(74, player.GetInt("hp"));
             Assert.Equal(PlayResult.Played, runtime.Play("Mend", player));
             Assert.Equal(78, player.GetInt("hp"));
+        }
+
+        // Target validity -----------------------------------------------------------------------
+
+        [Fact]
+        public void A_taunt_minion_makes_its_companions_unavailable()
+        {
+            CardRuntime runtime = Setup(out _);
+            Entity alpha = runtime.SpawnEnemy("Alpha");
+            Entity beta = runtime.SpawnEnemy("Beta");
+            runtime.AddCard("Jab", Zones.Hand);
+            runtime.AddCard("Jab", Zones.Hand);
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+            runtime.ApplyStatus("Taunt", beta);
+
+            Assert.Equal(PlayResult.InvalidTarget, runtime.Play("Jab", alpha));
+            Assert.Equal(PlayResult.Played, runtime.Play("Jab", beta));
+
+            Assert.Equal(30, alpha.GetInt("hp"));
+            Assert.Equal(27, beta.GetInt("hp"));
+        }
+
+        [Fact]
+        public void Two_taunt_minions_are_both_available_and_nothing_else_is()
+        {
+            var chooser = new BattleRecordingChooser(new ScriptedChooser("Gamma"));
+            CardRuntime runtime = Setup(out _, chooser);
+            Entity alpha = runtime.SpawnEnemy("Alpha");
+            Entity beta = runtime.SpawnEnemy("Beta");
+            Entity gamma = runtime.SpawnEnemy("Gamma");
+            runtime.AddCard("Jab", Zones.Hand);
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+            runtime.ApplyStatus("Taunt", beta);
+            runtime.ApplyStatus("Taunt", gamma);
+
+            Assert.Equal(PlayResult.Played, runtime.Play("Jab"));
+
+            // Each Taunt leaves the other in: the rule is "must have Taunt", not "must be me".
+            ChoiceRequest request = Assert.Single(chooser.Requests);
+            Assert.Equal(new[] { beta, gamma }, request.Options);
+            Assert.Equal(30, alpha.GetInt("hp"));
+            Assert.Equal(27, gamma.GetInt("hp"));
+        }
+
+        [Fact]
+        public void A_taunt_constrains_the_other_side_and_not_its_own()
+        {
+            CardRuntime runtime = Setup(out Entity player);
+            Entity alpha = runtime.SpawnEnemy("Alpha");
+            runtime.AddCard("Mend", Zones.Hand);
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+            player.SetBase("hp", 70);
+            runtime.ApplyStatus("Taunt", player);
+
+            // `source:enemies` is what keeps a taunting entity from blocking its own side's cards.
+            Assert.Equal(PlayResult.Played, runtime.Play("Mend", player));
+            Assert.Equal(74, player.GetInt("hp"));
+            Assert.Equal(30, alpha.GetInt("hp"));
+        }
+
+        [Fact]
+        public void A_scopeless_targetable_modifier_hides_only_its_host()
+        {
+            CardRuntime runtime = Setup(out _);
+            Entity alpha = runtime.SpawnEnemy("Alpha");
+            Entity beta = runtime.SpawnEnemy("Beta");
+            runtime.AddCard("Jab", Zones.Hand);
+            runtime.AddCard("Whirlwind", Zones.Hand);
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+            runtime.ApplyStatus("Stealth", alpha);
+
+            Assert.Equal(PlayResult.InvalidTarget, runtime.Play("Jab", alpha));
+            Assert.Equal(PlayResult.Played, runtime.Play("Jab", beta));
+
+            // An area effect is not target selection, so it reaches the hidden one anyway.
+            Assert.Equal(PlayResult.Played, runtime.Play("Whirlwind"));
+            Assert.Equal(15, alpha.GetInt("hp"));
+        }
+
+        [Fact]
+        public void Nothing_targetable_refuses_the_card_instead_of_choosing_anyway()
+        {
+            CardRuntime runtime = Setup(out Entity player);
+            Entity alpha = runtime.SpawnEnemy("Alpha");
+            runtime.AddCard("Jab", Zones.Hand);
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+            runtime.ApplyStatus("Stealth", alpha);
+
+            Assert.Equal(PlayResult.InvalidTarget, runtime.Play("Jab"));
+            Assert.Equal(30, alpha.GetInt("hp"));
+            Assert.Equal(3, player.GetInt("energy"));
         }
 
         [Fact]
