@@ -495,6 +495,13 @@ namespace GameplayEffects.Runtime
                     if (anchor.Kind == EntityKind.Card) return query.Subject == anchor;
                     return query.Subject != null && query.Subject.Controller == anchor.Controller;
 
+                case "cooldown":
+                    // The same division as `cost`: written on the ability it governs that ability,
+                    // written on a relic or a status it governs every ability the holder has. Compared
+                    // against the owner rather than the anchor, because an ability's anchor is its host.
+                    if (owner.Kind == EntityKind.Ability) return query.Subject == owner;
+                    return query.Subject != null && query.Subject.Controller == anchor.Controller;
+
                 default:
                     return query.Subject == anchor;
             }

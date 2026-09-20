@@ -48,6 +48,27 @@ enemy "Brute"
 relic "War Banner"
   modify damage of everyone where source:allies: x1.25
 
+# --- 5. ref cooldown reduction ------------------------------------------------------------------
+# `cooldown` is a modifier channel, so an item can shorten what every ability of its holder waits.
+# Written on the ability instead, it would shorten only that one — the division `cost` makes between
+# a card and its owner's cards. Modifiers see the cooldown already converted into clock units, so
+# `x0.5` means half whether the ability says `4s` or `2 turns`.
+
+ability "Chain Bolt"
+  cooldown 4s
+  effect:
+    deal 3 to enemies
+
+relic "Arcane Vestments"
+  modify cooldown: x0.5
+
+# --- 6. ref Crystal Nova: damage in an area ----------------------------------------------------
+# Not expressible: `within` parses, but its meaning has to come from a host that knows about space,
+# and a DSL test has none.
+
+# --- 7. ref Blink: move somewhere else ---------------------------------------------------------
+# Not expressible: actors have a board slot, not a position in space. The same gap as 6.
+
 # --- 8. ref Mana regeneration: mana trickles back every second ----------------------------
 
 relic "Mana Font"

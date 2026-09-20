@@ -225,7 +225,7 @@ ability "Frost Nova"
     apply Chill 1 for 3s to enemies
 ```
 
-Real-time games create the runtime with a `TickClock` and call `runtime.Tick()` from their fixed timestep. `GrantAbility` attaches an ability to an actor; `UseAbility` runs it if it is off cooldown and starts the cooldown. Durations with `s` or `ms` convert to ticks on a tick clock; `turns` convert on a turn clock. Using seconds on a turn clock is an error.
+Real-time games create the runtime with a `TickClock` and call `runtime.Tick()` from their fixed timestep. `GrantAbility` attaches an ability to an actor; `UseAbility` runs it if it is off cooldown and starts the cooldown. Durations with `s` or `ms` convert to ticks on a tick clock; `turns` convert on a turn clock. Using seconds on a turn clock is an error. A cooldown goes through the [`cooldown` modifier channel](#modifiers), so content can shorten it.
 
 ## Resources
 
@@ -353,7 +353,7 @@ relic "Siege Engine"
 
 **Amounts** pick the layer: `+N` or `-N` (add), `xN` or `*N` (multiply; `x50%` is half), `clamp A..B` or `clamp N` (clamp; a single number is a ceiling), `=N` or `set N` (override). Values pass through the layers in ruleset order, add, multiply, clamp, override by default. Within the override layer the most recently created source wins. Damage, block and healing are rounded down after modifiers.
 
-**Channels** are `damage`, `damage_taken`, `block`, `block_taken`, `heal`, `heal_taken`, `cost`, `draw`, `targetable`, or any stat name (`max_hp`, `armor`...).
+**Channels** are `damage`, `damage_taken`, `block`, `block_taken`, `heal`, `heal_taken`, `cost`, `draw`, `targetable`, `cooldown`, or any stat name (`max_hp`, `armor`...).
 
 **Default scope.** Without `of`, a modifier applies relative to its **anchor**: a status's host, a relic's holder, or the card itself for a modifier written on a card.
 
@@ -381,6 +381,15 @@ While that is attached, the other side's `target enemy` cards may only be pointe
 Only the `target` words that name someone ask: `enemy`, `ally` and `any`. `target self` is not a choice, so nothing is asked of it. The chooser is offered only the candidates that pass, so a rule narrows what a player may pick rather than making the play fail, and a card left with nothing to point at is refused as `InvalidTarget`. Area and random effects use the selectors under [Expressions](#expressions) and are not filtered, so a blast still reaches what a card may not single out — which is the rule these games actually have.
 
 Because the query carries the card being played, a `where` on the group must write `it.` to mean the candidate: a bare `tag:` there tests the card, not the entity being considered.
+
+**Cooldowns.** `cooldown` is a channel as well, so content can shorten what an ability waits:
+
+```
+relic "Arcane Vestments"
+  modify cooldown: x0.5
+```
+
+On a relic or a status that shortens every ability its holder has; written on the ability itself it shortens only that one — the same division `cost` makes between a card and its owner's cards. Modifiers see the cooldown already converted into clock units, so a multiplier means the same thing whether the ability was written `8s` or `2 turns`. An additive amount is therefore in clock units, ticks in real time and turns otherwise, which is why a multiplier is the spelling that travels between clocks. The result rounds up, the way a duration rounds up when it converts, and never falls below nothing. The text a card prints still shows the cooldown as written, as a printed cost does.
 
 Stat reads are cached and the cache is invalidated by any change to the game state.
 

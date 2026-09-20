@@ -664,10 +664,37 @@ namespace GameplayEffects
             if (ability.Definition?.Property("cooldown")?.First is NumberExpr cooldown
                 && State.Clock.TryConvert(cooldown.Value, cooldown.Unit, out long units))
             {
-                ability.SetBase("ready_at", Num.FromInt(State.Clock.Now + units));
+                ability.SetBase("ready_at", Num.FromInt(State.Clock.Now + CooldownOf(ability, owner, units)));
             }
 
             return used;
+        }
+
+        private const string CooldownChannel = "cooldown";
+
+        /// <summary>
+        /// How long an ability waits, in clock units, after the <c>cooldown</c> channel has had it.
+        /// </summary>
+        /// <remarks>
+        /// Modifiers see the converted duration rather than the number content wrote, so <c>x0.75</c>
+        /// means the same three quarters whether the ability was authored in seconds or in turns.
+        /// The cost of that choice is that an additive amount is in clock units — ticks in real time,
+        /// turns otherwise — so a multiplier is the spelling that travels. Rounding is up, matching
+        /// how a duration converts in the first place rather than how damage rounds down, and a
+        /// cooldown never falls below nothing. The text a card prints still shows the cooldown as
+        /// written, the way a printed cost does.
+        /// </remarks>
+        private long CooldownOf(Entity ability, Entity owner, long units)
+        {
+            if (!State.Modifiers.HasChannel(CooldownChannel)) return units;
+
+            var query = new ModifierQuery(CooldownChannel)
+            {
+                Subject = ability,
+                Source = owner,
+                Tags = ability.Tags.ToArray(),
+            };
+            return Math.Max(0, State.Modifiers.Compute(query, Num.FromInt(units)).Ceiling().ToInt());
         }
 
         private void OnClockAdvanced(long now)

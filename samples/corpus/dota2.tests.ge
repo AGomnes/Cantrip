@@ -54,3 +54,17 @@ test "dota Mana Font regenerates mana once a second"
   expect player.mana == 1
   tick 20
   expect player.mana == 3
+
+# `cast` fails a test when an ability is not ready, so the reduction is shown the other way round:
+# four seconds halved is twenty ticks, and the second cast lands there. Without the Vestments it
+# would still be waiting.
+test "dota Arcane Vestments halves what an ability waits"
+  realtime 10
+  enemy hp 30
+  relic "Arcane Vestments"
+  grant "Chain Bolt"
+  cast "Chain Bolt"
+  expect enemy.hp == 27
+  tick 20
+  cast "Chain Bolt"
+  expect enemy.hp == 24
