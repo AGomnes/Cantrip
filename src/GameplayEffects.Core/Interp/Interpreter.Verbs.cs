@@ -36,6 +36,7 @@ namespace GameplayEffects.Runtime
             RegisterVerb("lose", call => VerbGainOrLose(call, AssignOperator.Subtract));
             RegisterVerb("add", VerbAdd);
             RegisterVerb("choose", VerbChoose);
+            RegisterVerb("discover", VerbDiscover);
             RegisterVerb("cancel", VerbCancel);
             RegisterVerb("kill", VerbKill);
             RegisterVerb("log", call => Log(string.Join(" ", Enumerable.Range(0, call.ArgumentCount).Select(i => Show(call.Argument(i))))));
@@ -465,6 +466,127 @@ namespace GameplayEffects.Runtime
             IReadOnlyList<Entity> chosen = Choose($"choose {count}", options, Math.Min(count, options.Count), Math.Min(count, options.Count), chooser, call);
 
             call.Context.SetLocal(name, chosen.Count == 1 ? Value.FromEntity(chosen[0]) : Value.FromEntities(chosen));
+        }
+
+        /// <summary>
+        /// <c>discover 3 cards where tag:spell as picked</c>: offers definitions and binds the one
+        /// chosen, ready for <c>create</c> or <c>apply</c>.
+        /// </summary>
+        /// <remarks>
+        /// The kind is read as syntax and never evaluated, so <c>cards</c> and <c>statuses</c> here
+        /// mean kinds of content and cannot collide with the live groups those words name everywhere
+        /// else. Offering one candidate is a random pick with no decision in it, so the same verb
+        /// serves "the player discovers a spell" and "the hero takes one of these afflictions": the
+        /// chooser is only consulted when there is genuinely something to choose between.
+        /// </remarks>
+        private void VerbDiscover(VerbCall call)
+        {
+            int count = call.Number(0, Num.One).ToInt();
+            if (count <= 0) throw call.Error("needs a positive number of candidates, as in `discover 3 cards`.");
+
+            ExprNode source = call.ArgumentNode(1) ?? throw call.Error("expected a kind to discover, as in `discover 3 cards`.");
+            ExprNode? filter = null;
+            if (source is WhereExpr where)
+            {
+                filter = where.Predicate;
+                source = where.Source;
+            }
+
+            string written = source is NameExpr named
+                ? named.Name
+                : throw call.Error("expected a kind such as `cards` or `statuses`.");
+            string kind = DiscoverableKind(written) ?? throw call.Error(
+                $"`{written}` is not a kind of content. Discover cards, statuses, relics, items, keywords, abilities, enemies or actors.");
+
+            IReadOnlyList<EntityDefinition> pool = Content.Pool(kind);
+            if (filter != null) pool = FilterWhereDefinitions(pool, filter, call.Context);
+            if (pool.Count == 0) throw call.Error($"no `{kind}` in content matches, so there is nothing to discover.");
+
+            List<EntityDefinition> offered = DrawDefinitions(pool, count, call.Flag("weighted"));
+            if (offered.Count == 0) throw call.Error($"every `{kind}` that matched has a weight of zero, so nothing can be drawn.");
+
+            EntityDefinition chosen = offered.Count == 1
+                ? offered[0]
+                : ChooseDefinition($"discover 1 of {offered.Count}", offered, call.Context.Controller, call);
+
+            string name = call.Node.Clause("as") is NameExpr alias ? alias.Name : "discovered";
+            call.Context.SetLocal(name, Value.FromDefinition(chosen));
+        }
+
+        /// <summary>
+        /// Draws without replacement, one bounded roll per candidate taken rather than a shuffle.
+        /// A shuffle costs one roll short of the whole list, which would make every later roll in a
+        /// run depend on how much content happens to be loaded; this way the cost is what was asked
+        /// for, and adding a card to a pool cannot shift anything else.
+        /// </summary>
+        private List<EntityDefinition> DrawDefinitions(IReadOnlyList<EntityDefinition> pool, int count, bool weighted)
+        {
+            var remaining = new List<EntityDefinition>(pool);
+            var drawn = new List<EntityDefinition>();
+
+            while (drawn.Count < count && remaining.Count > 0)
+            {
+                int index;
+                if (weighted)
+                {
+                    var weights = new List<Num>(remaining.Count);
+                    foreach (EntityDefinition candidate in remaining) weights.Add(WeightOf(candidate));
+
+                    index = State.Rng.PickWeighted(weights);
+                    // Every remaining weight is zero, which is content saying "never these".
+                    if (index < 0) break;
+                }
+                else
+                {
+                    index = State.Rng.NextInt(0, remaining.Count - 1);
+                }
+
+                drawn.Add(remaining[index]);
+                remaining.RemoveAt(index);
+            }
+            return drawn;
+        }
+
+        /// <summary>
+        /// A definition's <c>weight</c>, which <c>IsConfigProperty</c> keeps out of its stats on
+        /// purpose, so it is read from the property rather than from <c>Stats</c>.
+        /// </summary>
+        private static Num WeightOf(EntityDefinition definition)
+        {
+            PropertyNode? property = definition.Property("weight");
+            if (property != null && property.Values.Count > 0 && property.Values[0] is NumberExpr number) return number.Value;
+            return Num.One;
+        }
+
+        private static string? DiscoverableKind(string written) => written.ToLowerInvariant() switch
+        {
+            "card" or "cards" => "card",
+            "status" or "statuses" => "status",
+            "relic" or "relics" => "relic",
+            "item" or "items" => "item",
+            "keyword" or "keywords" => "keyword",
+            "ability" or "abilities" => "ability",
+            "enemy" or "enemies" => "enemy",
+            "actor" or "actors" => "actor",
+            _ => null,
+        };
+
+        internal EntityDefinition ChooseDefinition(string prompt, IReadOnlyList<EntityDefinition> options, Entity? chooser, VerbCall call)
+        {
+            EntityDefinition? picked = null;
+            if (Chooser is IDefinitionChooser provider)
+            {
+                EntityDefinition? answer = provider.ChooseDefinition(new DefinitionChoice(prompt, options, chooser, call.Span), State);
+                if (answer != null && options.Contains(answer)) picked = answer;
+            }
+
+            // A provider that cannot answer an offer of content gets the first candidate, the same
+            // way a short answer to an entity choice is topped up from the front.
+            picked ??= options[0];
+
+            State.Trace.Record(State.Clock.Now, "choice", prompt, chooser?.ToString(), span: call.Span,
+                values: State.Trace.Enabled ? new Dictionary<string, object> { ["chosen"] = picked.Name } : null);
+            return picked;
         }
 
         internal IReadOnlyList<Entity> Choose(string prompt, IReadOnlyList<Entity> options, int min, int max, Entity? chooser, VerbCall call)

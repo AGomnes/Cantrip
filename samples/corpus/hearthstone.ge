@@ -45,7 +45,7 @@ card "Elven Archer"
 card "Arcane Shot"
   cost 1
   target enemy
-  tags spell
+  tags spell, arcane
   effect:
     deal 2 to target
 
@@ -98,7 +98,36 @@ status "Taunt"
 # works, but a minion's printed abilities are not statuses.
 
 # --- 10. ref Discover: choose one of three random cards -------------------------------------------------------
-# Not expressible: picking random definitions from a pool is gap 7.
+# `discover` offers content nothing has been made from yet, then binds what was chosen: the two
+# candidates nobody picked never become cards at all, so no `created` listener hears about them.
+# The kind is read as written rather than evaluated, so `cards` here means a kind of content and not
+# the live cards a player is holding. Discovery is deliberately not tagged, or it would turn up among
+# its own candidates.
+#
+# The pool is `tag:arcane` rather than `tag:spell` because a discovery draws from a curated set, the
+# way the real card offers spells of your own class. That also keeps it honest here: a pool is drawn
+# from every definition loaded, and this folder loads all nine games at once, so `tag:spell` would
+# offer Magic's and Slay the Spire's cards too.
+
+card "Frostbolt"
+  cost 2
+  target enemy
+  tags spell, arcane
+  effect:
+    deal 3 to target
+
+card "Healing Touch"
+  cost 3
+  target ally
+  tags spell, arcane
+  effect:
+    heal 8 to target
+
+card "Discovery"
+  cost 1
+  effect:
+    discover 3 cards where tag:arcane as found
+    create found into hand
 
 # --- 11. ref Stealth: this minion cannot be targeted ----------------------------------------------------------
 # The same channel with no scope at all, which anchors to the host like any other modifier. A blast

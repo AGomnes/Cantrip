@@ -68,6 +68,7 @@ namespace GameplayEffects.Runtime
             Card = parent.Card;
             Event = parent.Event;
             It = parent.It;
+            ItDefinition = parent.ItDefinition;
             ItIsFocus = parent.ItIsFocus;
             Focus = parent.Focus;
             Chain = parent.Chain;
@@ -90,6 +91,13 @@ namespace GameplayEffects.Runtime
 
         /// <summary>The candidate being tested inside <c>where</c>, or the subject of a modifier.</summary>
         public Entity? It { get; set; }
+
+        /// <summary>
+        /// The candidate being tested inside a <c>where</c> over definitions, as <c>discover</c> uses:
+        /// content that nothing has been made from yet. Never set at the same time as <see cref="It"/>,
+        /// so only one kind of candidate is ever in focus.
+        /// </summary>
+        public GameplayEffects.Content.EntityDefinition? ItDefinition { get; set; }
 
         /// <summary>
         /// True while evaluating a <c>where</c> predicate: qualifiers such as <c>tag:fire</c> then test
@@ -210,11 +218,48 @@ namespace GameplayEffects.Runtime
         IReadOnlyList<Entity> Choose(ChoiceRequest request, GameState state);
     }
 
+    /// <summary>
+    /// An offer of content that does not exist yet: the three cards a Discover shows before one of
+    /// them is made. Kept apart from <see cref="ChoiceRequest"/>, whose options are live entities
+    /// addressed by id all the way out to the editor bridge.
+    /// </summary>
+    public sealed class DefinitionChoice
+    {
+        public DefinitionChoice(string prompt, IReadOnlyList<GameplayEffects.Content.EntityDefinition> options, Entity? chooser, SourceSpan span)
+        {
+            Prompt = prompt;
+            Options = options;
+            Chooser = chooser;
+            Span = span;
+        }
+
+        public string Prompt { get; }
+        public IReadOnlyList<GameplayEffects.Content.EntityDefinition> Options { get; }
+
+        /// <summary>The actor making the choice.</summary>
+        public Entity? Chooser { get; }
+
+        public SourceSpan Span { get; }
+    }
+
+    /// <summary>
+    /// Implemented by a chooser that can answer an offer of definitions. Optional: a provider that
+    /// does not implement it is given the first candidate, the way <see cref="IChoiceProvider"/>
+    /// answers that fall short are topped up from the front.
+    /// </summary>
+    public interface IDefinitionChooser
+    {
+        GameplayEffects.Content.EntityDefinition? ChooseDefinition(DefinitionChoice request, GameState state);
+    }
+
     /// <summary>Always takes the first options offered. Deterministic, and the default.</summary>
-    public sealed class FirstOptionChooser : IChoiceProvider
+    public sealed class FirstOptionChooser : IChoiceProvider, IDefinitionChooser
     {
         public IReadOnlyList<Entity> Choose(ChoiceRequest request, GameState state) =>
             request.Options.Take(Math.Max(request.Min, Math.Min(request.Max, request.Options.Count))).ToList();
+
+        public GameplayEffects.Content.EntityDefinition? ChooseDefinition(DefinitionChoice request, GameState state) =>
+            request.Options.Count == 0 ? null : request.Options[0];
     }
 
     /// <summary>Picks uniformly at random from its own forked RNG stream, so it never disturbs game rolls.</summary>
@@ -237,7 +282,7 @@ namespace GameplayEffects.Runtime
     /// Answers from a queue of names, for tests and replays. Each answer is a comma-separated list
     /// of entity names; when the queue runs dry it falls back to the first options.
     /// </summary>
-    public sealed class ScriptedChooser : IChoiceProvider
+    public sealed class ScriptedChooser : IChoiceProvider, IDefinitionChooser
     {
         private readonly Queue<string> _answers = new Queue<string>();
 
@@ -262,6 +307,24 @@ namespace GameplayEffects.Runtime
                 if (match != null) chosen.Add(match);
             }
             return chosen;
+        }
+
+        /// <summary>
+        /// Answers a definition offer from the same queue, so a test says <c>answer Fireball</c>
+        /// whether the options are live cards or cards that do not exist yet.
+        /// </summary>
+        public GameplayEffects.Content.EntityDefinition? ChooseDefinition(DefinitionChoice request, GameState state)
+        {
+            if (request.Options.Count == 0) return null;
+            if (_answers.Count == 0) return request.Options[0];
+
+            foreach (string name in _answers.Dequeue().Split(',').Select(n => n.Trim()).Where(n => n.Length > 0))
+            {
+                GameplayEffects.Content.EntityDefinition? match = request.Options
+                    .FirstOrDefault(o => string.Equals(o.Name, name, StringComparison.OrdinalIgnoreCase));
+                if (match != null) return match;
+            }
+            return request.Options[0];
         }
     }
 }

@@ -67,3 +67,10 @@ test "dd a rank-limited skill only reaches the front two ranks"
   play Pike on enemy2
   expect enemy2.hp == 5
   expect enemy3.hp == 10
+
+# What is asserted is membership of the pool, not which member the seed happened to pick: the weights
+# themselves are pinned deterministically in the core tests, where a weight of zero is never drawn.
+test "dd the breaking point lands one affliction or, rarely, a virtue"
+  enemy hp 10
+  play "Breaking Point" on player
+  expect player.has(Paranoid) or player.has(Ruminating) or player.has(Stalwart)

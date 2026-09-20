@@ -90,9 +90,11 @@ card "Regent"
       replay picked
 
 # --- 7. ref buying from the supply ----------------------------------------------------------
-# Not expressible: a supply is a set of piles of definitions, and gaining "a card from the
-# Silver pile" needs definition pools. Costs themselves are fine now — `cost 5 coins` is a
-# cost the card is refused for — but there is no buy phase and nothing to buy from.
+# Not expressible, though no longer for want of pools: `discover` can offer cards from content (see
+# hearthstone.ge), but a supply pile runs out and a definition cannot hold a count, being one
+# immutable object shared by everything made from it. Costs are fine — `cost 5 coins` is a cost the
+# card is refused for — so what is missing is a buy phase, since nothing ever spends `buys`, and a
+# cost in two currencies at once.
 
 # --- 8. ref Militia: every other player discards down to three ------------------------------
 # Not expressible: there is one player. Enemies are actors without hands or decks, so an

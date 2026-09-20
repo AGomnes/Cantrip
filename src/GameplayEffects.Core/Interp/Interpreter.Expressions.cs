@@ -133,7 +133,7 @@ namespace GameplayEffects.Runtime
                 case "owner": return Value.FromEntity(context.Self?.Owner ?? context.Self);
                 case "source": return Value.FromEntity(context.Source);
                 case "target": return Value.FromEntity(context.Target);
-                case "it": return Value.FromEntity(context.It);
+                case "it": return context.ItDefinition != null ? Value.FromDefinition(context.ItDefinition) : Value.FromEntity(context.It);
                 case "card": return Value.FromEntity(context.Card ?? (context.Self?.Kind == EntityKind.Card ? context.Self : null));
                 case "player": return Value.FromEntity(State.Player);
                 case "controller": return Value.FromEntity(controller);
@@ -184,6 +184,10 @@ namespace GameplayEffects.Runtime
             // Inside `where`, bare stat names read from the candidate: `cards where cost > 1`.
             if (context.It != null && context.It.HasStat(name)) return Value.FromNumber(context.It.Get(name));
             if (context.Self != null && context.Self.HasStat(name)) return Value.FromNumber(context.Self.Get(name));
+
+            // The same courtesy for a definition candidate: `discover 3 cards where cost <= 2`.
+            if (context.ItDefinition != null && context.ItDefinition.Stats.TryGetValue(name, out Num printed))
+                return Value.FromNumber(printed);
 
             // When a status and a card share a name (Burn, Wound), a bare name in an expression means
             // the status: `apply`, `has`, `on` and member access all want it. Verbs that want the
@@ -726,10 +730,31 @@ namespace GameplayEffects.Runtime
             var result = new List<Entity>();
             EvalContext probe = context.Derive();
             probe.ItIsFocus = true;
+            probe.ItDefinition = null;
 
             foreach (Entity candidate in source)
             {
                 probe.It = candidate;
+                if (EvaluateCondition(predicate, probe)) result.Add(candidate);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// The same filter over definitions rather than live entities, for <c>discover</c>. Clears
+        /// <see cref="EvalContext.It"/> so a definition candidate can never be mistaken for one in
+        /// play, which is what keeps the qualifier tests honest.
+        /// </summary>
+        internal List<EntityDefinition> FilterWhereDefinitions(IReadOnlyList<EntityDefinition> source, ExprNode predicate, EvalContext context)
+        {
+            var result = new List<EntityDefinition>();
+            EvalContext probe = context.Derive();
+            probe.It = null;
+            probe.ItIsFocus = false;
+
+            foreach (EntityDefinition candidate in source)
+            {
+                probe.ItDefinition = candidate;
                 if (EvaluateCondition(predicate, probe)) result.Add(candidate);
             }
             return result;
@@ -743,6 +768,8 @@ namespace GameplayEffects.Runtime
         /// </summary>
         internal bool TestQualified(QualifiedName q, EvalContext context)
         {
+            if (context.ItDefinition != null) return TestQualifiedDefinition(q, context.ItDefinition);
+
             switch (q.Qualifier)
             {
                 case "tag":
@@ -792,6 +819,39 @@ namespace GameplayEffects.Runtime
 
                 default:
                     return false;
+            }
+        }
+
+        /// <summary>
+        /// Qualifiers against a definition, inside a <c>where</c> over content rather than over the
+        /// board. Only what a definition can actually answer is honoured; anything about being in
+        /// play is an error rather than a silent false, so content is told the difference instead of
+        /// quietly matching nothing.
+        /// </summary>
+        private static bool TestQualifiedDefinition(QualifiedName q, EntityDefinition candidate)
+        {
+            switch (q.Qualifier)
+            {
+                case "tag":
+                case "keyword":
+                    return candidate.Tags.Any(tag => string.Equals(tag, q.Name, StringComparison.OrdinalIgnoreCase));
+
+                case "kind":
+                case "type":
+                    return string.Equals(candidate.KindName, q.Name, StringComparison.OrdinalIgnoreCase)
+                        || candidate.Tags.Any(tag => string.Equals(tag, q.Name, StringComparison.OrdinalIgnoreCase));
+
+                case "name":
+                    return string.Equals(candidate.Name, q.Name, StringComparison.OrdinalIgnoreCase);
+
+                case "rarity":
+                    return string.Equals(candidate.Word("rarity"), q.Name, StringComparison.OrdinalIgnoreCase);
+
+                default:
+                    throw new RuntimeError(
+                        $"`{q.Qualifier}:` asks about something in play, and `{candidate.Name}` is content nothing has been made from yet. " +
+                        "Filter a discovery by `tag:`, `kind:`, `name:`, `rarity:`, or a printed property such as `it.cost`.",
+                        SourceSpan.None);
             }
         }
 

@@ -38,6 +38,12 @@ namespace GameplayEffects.Content
         private readonly Dictionary<string, List<EntityDefinition>> _byName =
             new Dictionary<string, List<EntityDefinition>>(StringComparer.OrdinalIgnoreCase);
 
+        // Pools sorted for the RNG, rebuilt whenever Generation moves. See Pool().
+        private readonly Dictionary<string, IReadOnlyList<EntityDefinition>> _pools =
+            new Dictionary<string, IReadOnlyList<EntityDefinition>>(StringComparer.OrdinalIgnoreCase);
+
+        private int _poolGeneration = -1;
+
         private readonly Dictionary<string, VerbDefinition> _verbs =
             new Dictionary<string, VerbDefinition>(StringComparer.OrdinalIgnoreCase);
 
@@ -271,6 +277,39 @@ namespace GameplayEffects.Content
         }
 
         /// <summary>First match among several kinds, in the order given.</summary>
+        /// <summary>
+        /// Every definition declared with one keyword, in a stated order: sorted by
+        /// <c>kind:name</c> with <see cref="StringComparer.OrdinalIgnoreCase"/>, the same key and
+        /// comparer <see cref="Fingerprint"/> sorts by. Cached until content changes.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="Definitions"/> enumerates a dictionary, and a reload removes then re-adds its
+        /// entries, so its order is not a contract and must never reach the RNG. Anything that picks
+        /// content at random reads it from here instead, or the same seed would stop replaying.
+        /// </remarks>
+        public IReadOnlyList<EntityDefinition> Pool(string kind)
+        {
+            if (string.IsNullOrEmpty(kind)) return Array.Empty<EntityDefinition>();
+
+            if (_poolGeneration != Generation)
+            {
+                _pools.Clear();
+                _poolGeneration = Generation;
+            }
+
+            if (_pools.TryGetValue(kind, out IReadOnlyList<EntityDefinition>? cached)) return cached;
+
+            var members = new List<EntityDefinition>();
+            foreach (EntityDefinition definition in _definitions.Values)
+            {
+                if (string.Equals(definition.KindName, kind, StringComparison.OrdinalIgnoreCase)) members.Add(definition);
+            }
+            members.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.KindName + ":" + a.Name, b.KindName + ":" + b.Name));
+
+            _pools[kind] = members;
+            return members;
+        }
+
         public EntityDefinition? FindAny(string name, params string[] kinds)
         {
             foreach (string kind in kinds)

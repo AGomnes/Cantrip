@@ -123,7 +123,9 @@ namespace GameplayEffects.Linting
                 {
                     case CommandNode command:
                         Commands.Add(command);
-                        if (command.Clause("as") is NameExpr alias && string.Equals(command.Verb, "choose", StringComparison.OrdinalIgnoreCase))
+                        if (command.Clause("as") is NameExpr alias
+                            && (string.Equals(command.Verb, "choose", StringComparison.OrdinalIgnoreCase)
+                                || string.Equals(command.Verb, "discover", StringComparison.OrdinalIgnoreCase)))
                             Locals.Add(alias.Name);
 
                         // `deal 4 to all enemies into dealt` binds what landed, the way

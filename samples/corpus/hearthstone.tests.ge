@@ -81,3 +81,15 @@ test "hs Stealth cannot be pointed at but a blast still finds it"
   expect enemy.hp == 20 and enemy2.hp == 18
   deal 2 to enemies
   expect enemy.hp == 18
+
+test "hs Discover creates the spell that was chosen and nothing else"
+  enemy hp 20
+  answer Frostbolt
+  play Discovery
+  expect hand.count == 1
+  expect hand.first.name == "Frostbolt"
+
+test "hs Discover with nobody answering still takes exactly one"
+  enemy hp 20
+  play Discovery
+  expect hand.count == 1

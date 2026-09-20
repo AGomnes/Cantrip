@@ -90,5 +90,32 @@ card "Pike"
 # with stress and health carried across them. The same shape as Inscryption's candles.
 
 # --- 8. ref virtue or affliction, chosen at random ------------------------------------------
-# Not expressible: at 100 stress a hero becomes one of several afflictions, or rarely a virtue.
-# Picking a random definition from a pool is gap 7; the threshold itself works (see 2).
+# `discover 1 ... , weighted` is a pick with nothing to decide, so it asks nobody and simply rolls.
+# "Rarely a virtue" is a weight: three afflictions at 5 against one virtue at 1. `weight` is already
+# a config property that enemy moves are chosen by, so it costs no new notation and never becomes a
+# stat on the status itself.
+
+status "Paranoid"
+  tags debuff, affliction
+  stacking none
+  weight 5
+  modify damage: x0.75
+
+status "Ruminating"
+  tags debuff, affliction
+  stacking none
+  weight 5
+  modify damage_taken: +2
+
+status "Stalwart"
+  tags buff, virtue
+  stacking none
+  weight 1
+  modify damage: x1.5
+
+card "Breaking Point"
+  cost 0
+  target ally
+  effect:
+    discover 1 statuses where tag:affliction or tag:virtue, weighted as mood
+    apply mood 1 to target

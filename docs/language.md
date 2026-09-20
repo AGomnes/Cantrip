@@ -527,6 +527,7 @@ A bare name resolves in this order: local variables (`let` bindings, `for each` 
 | `destroy` | `destroy [who]`. Defaults to itself. |
 | `kill` | `kill [who]`. Defaults to the target. |
 | `choose` | `choose N from group [as name]`. Binds the result to `chosen`, or to the name after `as`: one entity, or a group when more than one is chosen. |
+| `discover` | `discover N <kind> [where filter] [, weighted] [as name]`. Offers N pieces of content and binds the one chosen to `discovered`, or to the name after `as`. See below. |
 | `emit` | `emit event [amount] [to who]` raises a custom event. |
 | `cancel` | In a `before_` or `instead_of_` listener, cancels the event. |
 | `replay` | `replay card [on target]` resolves a card's effect again, for free. |
@@ -534,6 +535,33 @@ A bare name resolves in this order: local variables (`let` bindings, `for each` 
 | `log` | `log values...` writes to the runtime's `Logged` event. |
 
 **`into`** binds what a damage verb actually achieved, so an effect can act on it: `deal 4 to all enemies into dealt`, then `heal dealt`. The number is what landed, summed across the targets — after modifiers changed the amount, after block absorbed what it could, and counting only what a dying target could still take, which is rarely the number the line asked for. Available on `deal`, `damage` and `attack`.
+
+**`discover`** picks from content itself rather than from what is on the board, which is what "a random spell" or "one of these afflictions" needs:
+
+```
+card "Discovery"
+  cost 1
+  effect:
+    discover 3 cards where tag:spell as found
+    create found into hand
+
+card "Breaking Point"
+  cost 0
+  target ally
+  effect:
+    discover 1 statuses where tag:affliction or tag:virtue, weighted as mood
+    apply mood 1 to target
+```
+
+The kind is one of `cards`, `statuses`, `relics`, `items`, `keywords`, `abilities`, `enemies` or `actors` (singular reads the same). It is taken as the word that was written rather than evaluated, so it names a kind of content here and cannot be confused with the live group the same word means everywhere else.
+
+What is bound is a definition, not an entity, and `create`, `apply`, `shuffle` and the rest already accept one — nothing exists until a verb makes it, so the candidates nobody chose raise no `created` event and leave no trace.
+
+**Offering one candidate is a random pick with no decision in it**, so the chooser is never asked and no prompt appears: `discover 1` is how content rolls on a table, and `discover 3` is how it asks. With `, weighted`, each candidate's `weight` property decides its share (default 1, and a weight of 0 is never drawn) — the same property an enemy's moves are weighted by, so "rarely a virtue" is a 1 against three 5s. Without it every candidate is equally likely.
+
+Filters see a definition, so they test what is printed on it rather than anything about being in play: `tag:`, `kind:`, `name:`, `rarity:`, and properties through `it` (`it.cost <= 2`) or bare (`cost <= 2`). A qualifier that only makes sense for something in play, such as `zone:`, is an error rather than a quiet no-match — as is discovering from a filter nothing matches.
+
+Picks come from the game's own seeded RNG and cost one roll per candidate taken, never a shuffle of everything loaded, so the same seed discovers the same content on a replay and adding content to a pool does not disturb any other roll. Candidates are ordered by kind and name before anything is drawn, never by the order content happened to load in.
 
 Games add verbs with `runtime.RegisterVerb`.
 

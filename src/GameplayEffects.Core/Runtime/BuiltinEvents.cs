@@ -135,6 +135,7 @@ namespace GameplayEffects.Runtime
             ["lose"] = new[] { StatusApplied, StatusResisted, StatusRemoved, Died, Killed },
             ["add"] = new[] { StatusApplied, StatusResisted },
             ["choose"] = NoEvents,
+            ["discover"] = NoEvents,
             ["cancel"] = NoEvents,
             ["kill"] = new[] { Died, Killed },
             ["log"] = NoEvents,
