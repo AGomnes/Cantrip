@@ -48,6 +48,18 @@ No switch over node types in this codebase is exhaustive, so the compiler will n
 
 `let`, enemy `phase` and `on every ...:` were each added by working down this list.
 
+### Adding a verb
+
+The parser knows nothing about verbs, so a new one introduces no AST node and the list above does not apply to it. Three other places have to learn about it:
+
+| Place | What goes wrong when it is missed |
+|---|---|
+| `Interpreter.RegisterVerb` | nothing runs the verb |
+| `BuiltinEvents.VerbEvents` | `IsKnownVerb` is that table, so the linter calls the verb unknown (GE301). This one fails loudly: `BuiltinEventsTests.The_verb_catalogue_matches_the_registered_verbs` walks every registered verb and refuses any the table does not list |
+| `Linter.Facts.VisitStatement` | a clause that binds a name is not recorded there, so every use of the bound name warns GE302 |
+
+`attack` and `discover` were added this way. The `into` clause is what taught the third row its lesson: it shipped without being recorded, every use of the name it bound warned, and the corpus lint caught it only because that folder had been clean all along.
+
 ## Content
 
 `ContentLibrary` parses files and registers definitions keyed by kind and name. Loading a file again replaces exactly what it contributed, which is the basis for hot reload. Diagnostics are kept per file.

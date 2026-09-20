@@ -64,3 +64,19 @@ card "Glass Queen"
     player.mult *= 2
     chance 25%:
       destroy self
+
+# --- 5. ref joker order: the left one applies first ------------------------------------------------------------
+# Not expressible: jokers apply left to right, so a xMult joker sitting before a +Mult joker scores
+# less than the same pair the other way round. The modifier pipeline resolves by layer — add, then
+# multiply, then clamp, then override — and never by the position of the thing that declared it.
+# Gap 9, and it wants to be a ruleset option rather than a change to how layers work.
+
+# --- 6. ref Blueprint: copy the joker beside it ----------------------------------------------------------------
+# Not expressible: copying another entity's ability needs effects to be values that can be read and
+# run. Gap 5, which the design notes already list as a stress test. Silence (hearthstone.ge #9) is
+# the same gap from the other side: switching an entity's own effects off.
+
+# --- 7. ref poker hands: pairs, flushes and straights ----------------------------------------------------------
+# Not expressible: scoring a hand means grouping the cards played — counting by rank, counting by
+# suit, finding runs of consecutive values. Nothing here groups a collection by a key or counts
+# distinct values; `where` filters and `.count` counts, which is not enough for a flush. Gap 8.

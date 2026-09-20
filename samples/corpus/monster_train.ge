@@ -99,3 +99,8 @@ status "Burnout"
   decay 1
   on turn_end:
     if stacks <= 1: kill owner
+
+# --- 10. ref floors and capacity ------------------------------------------------------------------------
+# Not expressible: there is one board row per side. Monster Train stacks three floors, each with its own
+# capacity, and units move between them — which needs a richer board than a single line of slots, not
+# just more slots in the line. Gap 12, the same one Dota 2's area damage and Blink are waiting on.
