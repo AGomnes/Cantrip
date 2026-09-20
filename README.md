@@ -51,7 +51,7 @@ An early MVP of the core, per step 1 of the plan in the design notes. It is not 
 - The `gedsl` command-line tool
 - A Godot 4.6 addon: one node drives a battle from GDScript, `.ge` files import so they reach an exported build, and an editor dock shows problems, DSL tests and card text ([docs/godot.md](docs/godot.md))
 
-**Not yet**: an export smoke test, Asset Library packaging, the compiled backend, spatial selectors (`within` needs a host), the VS Code extension, and the full coverage corpus. See [Roadmap](#roadmap) and the gaps in [docs/coverage.md](docs/coverage.md).
+**Not yet**: Asset Library packaging, the compiled backend, spatial selectors (`within` needs a host), the VS Code extension, and the full coverage corpus. The export smoke test exists but runs on demand rather than on every push, because Godot's export templates are about a gigabyte. See [Roadmap](#roadmap) and the gaps in [docs/coverage.md](docs/coverage.md).
 
 ## Building
 
