@@ -51,8 +51,8 @@ namespace Cantrip.Content
             new Dictionary<string, ResourceRule>(StringComparer.OrdinalIgnoreCase);
 
         private readonly List<TestDefinition> _tests = new List<TestDefinition>();
-        private readonly Dictionary<string, SourceFileNode> _files = new Dictionary<string, SourceFileNode>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, DiagnosticBag> _fileDiagnostics = new Dictionary<string, DiagnosticBag>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, SourceFileNode> _files = new Dictionary<string, SourceFileNode>(FileNames);
+        private readonly Dictionary<string, DiagnosticBag> _fileDiagnostics = new Dictionary<string, DiagnosticBag>(FileNames);
         /// <summary>Ruleset blocks in load order. A list, not a dictionary, so "last loaded" survives unloads.</summary>
         private readonly List<(string File, RulesetDeclNode Syntax)> _rulesets = new List<(string, RulesetDeclNode)>();
 
@@ -203,10 +203,23 @@ namespace Cantrip.Content
         }
 
         /// <summary>
-        /// File names compare case-insensitively, matching the file table. File watchers on Windows
-        /// report the same file with whatever casing they like, and a reload must still replace it.
+        /// File names compare case-insensitively and with either slash, matching the file table. File
+        /// watchers on Windows report the same file with whatever casing they like, and
+        /// <see cref="LoadFolder"/> spells a Windows path with backslashes where a game may write
+        /// <c>content/cards.cantrip</c>; a reload must replace the file either way.
         /// </summary>
-        private static bool SameFile(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+        private static bool SameFile(string a, string b) => FileNames.Equals(a, b);
+
+        private static readonly FileNameComparer FileNames = new FileNameComparer();
+
+        private sealed class FileNameComparer : IEqualityComparer<string>
+        {
+            public bool Equals(string? a, string? b) => string.Equals(Normalize(a), Normalize(b), StringComparison.OrdinalIgnoreCase);
+
+            public int GetHashCode(string name) => StringComparer.OrdinalIgnoreCase.GetHashCode(Normalize(name)!);
+
+            private static string? Normalize(string? name) => name?.Replace('\\', '/');
+        }
 
         private void Register(DeclarationNode declaration, string file, DiagnosticBag diagnostics)
         {

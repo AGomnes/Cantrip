@@ -75,10 +75,20 @@ cd "$work/HexDuel"
 dotnet cantrip test content | tee "$work/test.txt"
 grep -q "3 passed, 0 failed" "$work/test.txt"
 
-# The game is interactive: play card 1 three times and end the turn, until someone falls.
-dotnet build --nologo -v quiet > /dev/null
-for _ in $(seq 1 30); do printf '1\n1\n1\n\n'; done | dotnet bin/Debug/net*/HexDuel.dll > "$work/game.txt"
-tail -n 1 "$work/game.txt"
-grep -q -E "^(The Ghoul falls\.|You fall\.)$" "$work/game.txt"
+# The first compile of the Program.cs the reader pastes in: its errors must reach the log.
+dotnet build --nologo -v quiet
+
+# The game is interactive: play card 1 three times and end the turn, until someone falls. The
+# result can land on the same line as the last prompt, so match the end of the line, and check the
+# game ended before the input ran out, because Program.cs also says "You fall." when it does.
+rounds=30
+for _ in $(seq 1 $rounds); do printf '1\n1\n1\n\n'; done | dotnet bin/Debug/net*/HexDuel.dll > "$work/game.txt"
+last="$(tail -n 1 "$work/game.txt")"
+echo "$last"
+case "$last" in
+  *"The Ghoul falls."|*"You fall.") ;;
+  *) echo "The game did not end." >&2; exit 1 ;;
+esac
+[ "$(grep -o 'Play a card by number' "$work/game.txt" | wc -l)" -le $((rounds * 4)) ] || { echo "The game did not end before the input ran out." >&2; exit 1; }
 
 echo "== The quickstart works as written."

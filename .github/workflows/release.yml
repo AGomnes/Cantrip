@@ -1,9 +1,10 @@
 name: Release
 
 # Pushing a tag such as v0.1.0-preview.1 publishes that version: the Cantrip.Core and Cantrip.Cli
-# packages to nuget.org, and a GitHub release with the packages and the Godot addon zip. Nothing
-# is published unless every check before it passes, and the tag must match the version set in
-# Directory.Build.props, which is the only place a version lives.
+# packages to nuget.org, and a GitHub release with the packages and the Godot addon zip. A package
+# on nuget.org cannot be deleted, only unlisted, so publishing is the last job and everything that
+# can fail runs first: the tag must match the version in Directory.Build.props, the whole CI
+# workflow must pass at the tagged commit, and the quickstart must work against the packages built.
 #
 # Publishing uses nuget.org Trusted Publishing: GitHub vouches for this repository and this workflow
 # file, and nuget.org hands back an API key that lasts an hour, so no long-lived key is stored anywhere.
@@ -13,22 +14,26 @@ on:
   push:
     tags: ['v*']
 
+# Read-only by default. Only the publish job, which runs no build or test code, gets more.
 permissions:
-  contents: write   # create the GitHub release
-  id-token: write   # ask GitHub for the token that nuget.org exchanges for a temporary API key
+  contents: read
 
 jobs:
-  release:
+  check:
     runs-on: ubuntu-latest
-
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.0.x
 
       - name: Check the tag matches the version and publishing is set up
+        id: version
         env:
           NUGET_USER: ${{ secrets.NUGET_USER }}
         run: |
@@ -41,36 +46,46 @@ jobs:
             echo "::error::The NUGET_USER repository secret (your nuget.org profile name) is not set, so nothing can be published."
             exit 1
           fi
-          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  # Everything CI checks on a push to main, at exactly the commit being released: both platforms,
+  # the slice simulation, and the Godot job, which is the only place the addon's code is compiled.
+  ci:
+    needs: check
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: [check, ci]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
 
       - name: Build
         run: dotnet build Cantrip.sln -c Release
 
-      - name: Unit tests
-        run: |
-          dotnet test tests/Cantrip.Core.Tests -c Release --no-build
-          dotnet test tests/Cantrip.Godot.Tests -c Release --no-build
-
-      - name: DSL tests and lint
-        run: |
-          for folder in samples/basic samples/corpus samples/slice; do
-            dotnet run --project src/Cantrip.Cli -c Release --no-build -- lint "$folder"
-            dotnet run --project src/Cantrip.Cli -c Release --no-build -- test "$folder"
-          done
-
       - name: Pack
         run: |
-          dotnet pack src/Cantrip.Core -c Release --no-build -o "$RUNNER_TEMP/packages"
-          dotnet pack src/Cantrip.Cli -c Release --no-build -o "$RUNNER_TEMP/packages"
-          ls -l "$RUNNER_TEMP/packages"
+          dotnet pack src/Cantrip.Core -c Release --no-build -o "$RUNNER_TEMP/release/packages"
+          dotnet pack src/Cantrip.Cli -c Release --no-build -o "$RUNNER_TEMP/release/packages"
+          ls -l "$RUNNER_TEMP/release/packages"
 
       # The last gate: a stranger's first fifteen minutes, run against exactly these packages.
       - name: Quickstart from these packages
-        run: bash tools/quickstart-smoke.sh "$RUNNER_TEMP/packages"
+        run: bash tools/quickstart-smoke.sh "$RUNNER_TEMP/release/packages"
 
       - name: Package the Godot addon
-        run: bash tools/package-addon.sh "$RUNNER_TEMP/addon"
+        run: bash tools/package-addon.sh "$RUNNER_TEMP/release/addon"
 
+      # The changelog's links are relative, which works in the repository but not in a release body,
+      # so each one is pointed at the file as it is at this tag.
       - name: Release notes from the changelog
         run: |
           # Literal matching on purpose: as a regex, "[0.1.0-preview.1]" is a character class.
@@ -78,11 +93,39 @@ jobs:
             index($0, "## [" v "]") == 1 { on = 1; next }
             on && index($0, "## [") == 1 { exit }
             on { print }
-          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
-          if [ ! -s "$RUNNER_TEMP/notes.md" ]; then
+          ' CHANGELOG.md > "$RUNNER_TEMP/release/notes.md"
+          if [ ! -s "$RUNNER_TEMP/release/notes.md" ]; then
             echo "::error::CHANGELOG.md has no section for [$VERSION]."
             exit 1
           fi
+          sed -i -E "s|\]\(([^)#:][^):]*)\)|](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/\1)|g" "$RUNNER_TEMP/release/notes.md"
+          cat "$RUNNER_TEMP/release/notes.md"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: ${{ runner.temp }}/release
+          if-no-files-found: error
+
+  # The only job allowed to publish. It checks nothing out and builds nothing, so no third-party
+  # build or test code ever runs where the repository token or the nuget.org key is available.
+  publish:
+    needs: [check, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the GitHub release
+      id-token: write   # ask GitHub for the token that nuget.org exchanges for a temporary API key
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: ${{ runner.temp }}/release
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
 
       # The temporary key lasts an hour, so it is fetched only now, after every check has passed.
       - name: Log in to nuget.org
@@ -97,7 +140,7 @@ jobs:
         env:
           NUGET_API_KEY: ${{ steps.nuget.outputs.NUGET_API_KEY }}
         run: |
-          dotnet nuget push "$RUNNER_TEMP/packages/*.nupkg" \
+          dotnet nuget push "$RUNNER_TEMP/release/packages/*.nupkg" \
             --api-key "$NUGET_API_KEY" \
             --source https://api.nuget.org/v3/index.json \
             --skip-duplicate
@@ -109,7 +152,8 @@ jobs:
           prerelease=""
           case "$VERSION" in *-*) prerelease="--prerelease" ;; esac
           gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
             --title "Cantrip $VERSION" \
-            --notes-file "$RUNNER_TEMP/notes.md" \
+            --notes-file "$RUNNER_TEMP/release/notes.md" \
             $prerelease \
-            "$RUNNER_TEMP"/packages/*.nupkg "$RUNNER_TEMP"/packages/*.snupkg "$RUNNER_TEMP"/addon/*.zip
+            "$RUNNER_TEMP"/release/packages/*.nupkg "$RUNNER_TEMP"/release/packages/*.snupkg "$RUNNER_TEMP"/release/addon/*.zip

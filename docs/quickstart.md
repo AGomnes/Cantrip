@@ -167,14 +167,17 @@ The whole rules engine is behind those few calls. Nothing in `Program.cs` knows 
 - [language.md](language.md) is the full language reference: every declaration, event, verb and modifier.
 - [godot.md](godot.md) runs the same content in Godot 4.6 through an addon, with an editor dock for problems, tests and card text.
 - [csharp.md](csharp.md) covers the rest of the C# side: saving and loading, hot reload, player choices a UI answers, and tracing why something happened.
-- `samples/slice` is a bigger example, a five-floor roguelite, and `src/Cantrip.Sim` plays it thousands of times with a bot to show how balanced it is.
+- `samples/slice` is a bigger example, a five-floor roguelite, and `src/Cantrip.Sim` plays it with a bot, 500 runs by default, and reports win rates by card, relic and encounter.
 
 ## Working from source
 
-To track unreleased changes or work on Cantrip itself, clone it and reference the project instead of the package:
+To track unreleased changes or work on Cantrip itself, clone it next to your project and reference the source instead of the package. From inside `HexDuel`:
 
 ```
+cd ..
 git clone https://github.com/AGomnes/Cantrip.git
+cd HexDuel
+dotnet remove package Cantrip.Core
 dotnet add reference ../Cantrip/src/Cantrip.Core/Cantrip.Core.csproj
 dotnet run --project ../Cantrip/src/Cantrip.Cli -- test content
 ```

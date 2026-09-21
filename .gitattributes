@@ -7,3 +7,4 @@
 *.md      text
 *.cantrip text
 *.sln     text eol=crlf
+*.sh      text eol=lf

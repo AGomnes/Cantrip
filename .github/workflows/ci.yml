@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The release workflow calls this one, so a version is only published from a commit that passes
+  # all of it: both platforms, the simulation and the Godot job.
+  workflow_call:
+
+# Nothing here writes to the repository. Stated, so a caller with wider rights cannot widen it.
+permissions:
+  contents: read
 
 jobs:
   build:

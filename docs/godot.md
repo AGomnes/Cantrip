@@ -9,12 +9,13 @@ inside the project's own assembly — only the engine library itself can be a DL
 ## Installing
 
 1. Copy `addons/cantrip/` into your project.
-2. Add the rules engine to your project from NuGet, in the folder with your `.csproj`:
+2. Add the rules engine to your project from NuGet, in the folder with your `.csproj`, at the same
+   version as the addon (the addon's is in its `plugin.cfg`):
    ```
-   dotnet add package Cantrip.Core --prerelease
+   dotnet add package Cantrip.Core --version 0.1.0-preview.1
    ```
-   Use the version that matches the addon: both carry the same version number, and the addon's is
-   in `plugin.cfg`. This repository's own demo uses a project reference to the source instead.
+   `--prerelease` alone would install the newest preview, which may not match the addon you have.
+   This repository's own demo uses a project reference to the source instead.
 3. **Build the C# project before enabling the plugin.** Until the assembly exists, Godot cannot
    load a C# plugin and every `[GlobalClass]` node is invisible — with no error to explain why.
 4. Enable *Cantrip* in Project Settings → Plugins.

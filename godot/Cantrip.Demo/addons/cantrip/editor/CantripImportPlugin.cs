@@ -1,3 +1,4 @@
+#nullable enable
 #if TOOLS
 using Cantrip.Content;
 using Cantrip.Diagnostics;

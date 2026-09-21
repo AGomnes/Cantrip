@@ -1,6 +1,6 @@
 # Coverage corpus
 
-The plan calls for about 150 reference effects from existing games, to measure how much the language can express without new C#. This page tracks that corpus.
+This page collects effects from existing games, re-created under our own names, to measure how much the language can express without new C#. This page tracks that corpus.
 
 Effects are reproduced under our own names in [`samples/corpus`](../samples/corpus), each expressible one with at least one DSL test. Run them with:
 

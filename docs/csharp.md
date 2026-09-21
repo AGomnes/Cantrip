@@ -4,8 +4,17 @@ Everything a game does with Cantrip goes through `ContentLibrary`, which loads a
 
 ## Load content and play a battle
 
-The examples use the Fireball, Frozen and Kindling content from the [README](../README.md), plus a few ordinary cards and an enemy.
+The examples use the Fireball, Frozen, Burn and Kindling content from the [README](../README.md), plus the Strike, Defend and Jaw Worm in [samples/basic](../samples/basic/content.cantrip). The types live in a handful of namespaces; this page's snippets use:
 
+```csharp
+using Cantrip;               // CardRuntime, RuntimeOptions, PlayResult, Num
+using Cantrip.Content;       // ContentLibrary
+using Cantrip.Runtime;       // Entity, Zones, GameEvent, Value, the choosers, GameSnapshot
+using Cantrip.Descriptions;  // DescriptionBuilder, Description
+using Cantrip.Diagnostics;   // Diagnostic
+using Cantrip.Linting;       // Linter, LintOptions
+using Cantrip.Testing;       // DslTestRunner
+```
 
 ```csharp
 var content = new ContentLibrary();
@@ -50,6 +59,16 @@ runtime.RegisterVerb("corrupt", call =>
         target.SetBase("corruption", target.GetBase("corruption") + amount);
 });
 ```
+
+The linter only knows the verbs content defines, so tell it about yours, or it reports each use as an unknown verb (CT301):
+
+```csharp
+var options = new LintOptions();
+options.HostVerbs.Add("corrupt");
+IReadOnlyList<Diagnostic> problems = Linter.Lint(content, options);
+```
+
+The `cantrip` tool cannot run a verb that lives in your game, so content tests that use one belong in your game's own test suite, through `DslTestRunner` with the verb registered.
 
 ## The host
 
@@ -99,6 +118,8 @@ if (runtime.Play(card) == PlayResult.ChoicePending)
 
 Nothing happens until the action completes: host events are held back, so the game never animates a hit that was rolled back.
 
+One exception for now: `discover`, which offers content that does not exist yet, is only put to a chooser that implements `IDefinitionChooser`. `DeferredChooser` and `RandomChooser` do not, so under them `discover` takes the first offer instead of asking. It is listed under known limitations in the [changelog](../CHANGELOG.md).
+
 ## Hot reload
 
 Load the changed files, then rebind the running game:
@@ -115,6 +136,7 @@ Stats the game has changed keep their values; a card still at its printed cost t
 A snapshot is plain data, taken between actions; restoring it into a runtime with the same content continues the game exactly:
 
 ```csharp
+// using System.Text.Json;
 GameSnapshot save = runtime.Capture();
 string json = JsonSerializer.Serialize(save);
 runtime.Restore(JsonSerializer.Deserialize<GameSnapshot>(json)!);
@@ -122,13 +144,15 @@ runtime.Restore(JsonSerializer.Deserialize<GameSnapshot>(json)!);
 
 ## Rules text with live values
 
-For card frames and tooltips, descriptions show the numbers as they are now, after modifiers:
+For card frames and tooltips, descriptions show the numbers as they are now, after modifiers. With a relic in play that multiplies fire damage by 1.5, such as Pyromancer's Codex in samples/basic:
 
 ```csharp
 Description text = new DescriptionBuilder(content).Describe(card, runtime, target: worm);
 text.ToPlainText();   // "Hurl a ball of flame for 9 damage. Kill it to draw 1."
 text.ToMarkup();      // "Hurl a ball of flame for ~~6~~ 9 damage. ..."
 ```
+
+With nothing modifying it, the same card reads "for 6 damage", and the markup has nothing struck through.
 
 ## Tracing, linting and tests
 

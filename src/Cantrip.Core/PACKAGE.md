@@ -39,5 +39,5 @@ This is a **preview**. The API and the save format may change between previews; 
 
 - [Quickstart](https://github.com/AGomnes/Cantrip/blob/main/docs/quickstart.md): from nothing to a playable battle in about fifteen minutes
 - [Language reference](https://github.com/AGomnes/Cantrip/blob/main/docs/language.md)
-- The companion command-line tool, for testing and linting content: `dotnet tool install Cantrip.Cli --prerelease`
+- The companion command-line tool, for testing and linting content: run `dotnet new tool-manifest`, then `dotnet tool install Cantrip.Cli --prerelease`, and use it as `dotnet cantrip`
 - [Source, issues and changelog](https://github.com/AGomnes/Cantrip)

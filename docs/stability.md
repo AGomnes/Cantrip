@@ -15,7 +15,7 @@ The public API, the language, and the ability to load a save made with any earli
 
 ## Determinism
 
-The same content, seed and inputs produce the same game on every machine: fixed-point maths, a seeded generator and explicit orderings, with no floating point or hash-order dependence in the rules. CI plays the same simulated games on Linux and Windows, and they have matched to the last figure. A difference between machines is a bug, and the most important kind to report.
+The same content, seed and inputs produce the same game on every machine: fixed-point maths, a seeded generator and explicit orderings, with no floating point or hash-order dependence in the rules. CI runs the same tests and simulated games on Linux and Windows x64, and the content tests assert exact numbers on both. Nothing yet compares the two platforms' state hashes directly, and macOS and ARM are untested. A difference between machines is a bug, and the most important kind to report.
 
 ## Real time
 

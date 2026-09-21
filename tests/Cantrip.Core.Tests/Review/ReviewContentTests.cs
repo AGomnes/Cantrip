@@ -29,6 +29,26 @@ namespace Cantrip.Tests.Review
         }
 
         /// <summary>
+        /// On Windows <c>LoadFolder</c> records <c>content\cards.cantrip</c>, while a game reloading
+        /// the file naturally writes <c>content/cards.cantrip</c>. File names compared only by case,
+        /// so the reload did not replace the file: it reported every definition as a duplicate and
+        /// the running game kept the old rules.
+        /// </summary>
+        [Fact]
+        [Trait("Regression", "unload-file-name-slashes")]
+        public void Reloading_a_file_with_the_other_slash_replaces_its_definitions()
+        {
+            var content = new ContentLibrary();
+            content.LoadText("card \"Strike\"\n  cost 1\n", "content\\cards.cantrip");
+
+            DiagnosticBag reload = content.LoadText("card \"Strike\"\n  cost 2\n", "content/cards.cantrip");
+
+            Assert.False(reload.HasErrors, reload.ToString());
+            Assert.Equal(2, content.Find("Strike", "card")!.Stats["cost"].ToInt());
+            Assert.Single(content.Files);
+        }
+
+        /// <summary>
         /// The parser accepts <c>event</c> and <c>encounter</c> as declaration keywords, but nothing
         /// consumes them, so they loaded as inert definitions and content that used them looked
         /// finished while nothing ever ran. They are refused until they mean something.

@@ -1,3 +1,4 @@
+#nullable enable
 #if TOOLS
 using System;
 using System.Collections.Generic;

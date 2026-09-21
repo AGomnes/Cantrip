@@ -9,15 +9,19 @@ scripts by file path inside your project's own assembly.
 ## Installing
 
 1. Copy `addons/cantrip/` into your project.
-2. Add the rules engine from NuGet, in the folder with your `.csproj`, using the version in this
-   addon's `plugin.cfg`:
+2. Add the rules engine from NuGet, in the folder with your `.csproj`. The version must match this
+   addon's, which is also in `plugin.cfg`:
    ```
-   dotnet add package Cantrip.Core --prerelease
+   dotnet add package Cantrip.Core --version 0.1.0-preview.1
    ```
-   Offline, a copy of its DLL works too:
+   Offline, reference the DLL instead. The Cantrip.Core `.nupkg` attached to the GitHub release is
+   a zip file: copy `lib/netstandard2.1/Cantrip.Core.dll` (and `Cantrip.Core.xml`, for editor help)
+   out of it into a folder such as `lib/` beside your `.csproj`. It has no dependencies. Keep it
+   out of `addons/cantrip/`, which an update replaces, and out of any `bin/` folder, which most
+   `.gitignore` files leave out of your commits:
    ```xml
    <Reference Include="Cantrip.Core">
-     <HintPath>addons/cantrip/bin/Cantrip.Core.dll</HintPath>
+     <HintPath>lib/Cantrip.Core.dll</HintPath>
    </Reference>
    ```
 3. **Build the C# project before enabling the plugin.** Until the assembly exists, Godot cannot

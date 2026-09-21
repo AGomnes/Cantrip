@@ -26,6 +26,14 @@ namespace Cantrip.GodotAdapter.Tests.Shared
             string addon = Regex.Match(plugin, "^version=\"([^\"]*)\"", RegexOptions.Multiline).Groups[1].Value;
 
             Assert.Equal(packages, addon);
+
+            // Both install guides pin the package to the addon's version, because --prerelease alone
+            // would fetch the newest preview whether or not it matches the addon in hand.
+            string pin = "dotnet add package Cantrip.Core --version " + packages;
+            foreach (string guide in new[] { Path.Combine("godot", "Cantrip.Demo", "addons", "cantrip", "README.md"), Path.Combine("docs", "godot.md") })
+            {
+                Assert.True(File.ReadAllText(Path.Combine(root, guide)).Contains(pin), guide + " should say: " + pin);
+            }
         }
 
         private static string RepositoryRoot()

@@ -25,9 +25,9 @@ By contributing you agree that your contribution is licensed under the [MIT lice
 
 ## Releasing (maintainer)
 
-1. Set the version in `Directory.Build.props` (`VersionPrefix`, `VersionSuffix`) and the same version in `godot/Cantrip.Demo/addons/cantrip/plugin.cfg`; a test fails while they differ.
+1. Set the version in `Directory.Build.props` (`VersionPrefix`, `VersionSuffix`), and the same version in `godot/Cantrip.Demo/addons/cantrip/plugin.cfg` and in the `dotnet add package Cantrip.Core --version ...` line of both Godot install guides (the addon's README and `docs/godot.md`); a test fails while any of them differ.
 2. Rename the changelog's `[Unreleased]` section to the version and date, and start a new empty `[Unreleased]` above it.
 3. Move the lines of `src/Cantrip.Core/PublicAPI.Unshipped.txt` to the end of `PublicAPI.Shipped.txt`, leaving only `#nullable enable` in Unshipped.
-4. Commit, wait for CI, then tag and push: `git tag v0.1.0-preview.1` and `git push origin v0.1.0-preview.1`.
+4. Commit and push, then tag that commit and push the tag: `git tag v0.1.0-preview.1` and `git push origin v0.1.0-preview.1`.
 
-The tag starts `.github/workflows/release.yml`. It refuses a tag that does not match the version, runs every test, packs both packages, follows the quickstart against them in an empty folder, and only then publishes to nuget.org through Trusted Publishing (a policy on nuget.org for this repository and `release.yml`, plus a `NUGET_USER` repository secret holding the nuget.org profile name; no API key is stored) and creates the GitHub release with the packages and the Godot addon zip, taking the notes from the changelog. A package on nuget.org cannot be deleted, only unlisted, so everything that can fail runs before that step.
+The tag starts `.github/workflows/release.yml`. It refuses a tag that does not match the version, runs the whole CI workflow at the tagged commit (both platforms, the slice simulation and the Godot job), packs both packages, follows the quickstart against them in an empty folder, and only then, in a separate job that runs no build or test code, publishes to nuget.org through Trusted Publishing (a policy on nuget.org for this repository and `release.yml`, plus a `NUGET_USER` repository secret holding the nuget.org profile name; no API key is stored) and creates the GitHub release with the packages and the Godot addon zip, taking the notes from the changelog. A package on nuget.org cannot be deleted, only unlisted, so everything that can fail runs before that step.

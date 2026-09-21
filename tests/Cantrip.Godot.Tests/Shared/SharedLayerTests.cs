@@ -50,6 +50,25 @@ namespace Cantrip.GodotAdapter.Tests.Shared
             Assert.True(missing.Count == 0, "Not compiled into the test assembly: " + string.Join(", ", missing));
         }
 
+        /// <summary>
+        /// The addon is C# source compiled inside the user's own project, which does not enable
+        /// nullable annotations. This repository enables them project-wide, which hides the problem:
+        /// without the directive in each file, a user's first build shows a warning for every <c>?</c>.
+        /// </summary>
+        [Fact]
+        public void Every_addon_source_file_enables_nullable_itself()
+        {
+            string addon = Directory.GetParent(SharedDirectory())!.FullName;
+            var missing = new List<string>();
+            foreach (string file in Directory.GetFiles(addon, "*.cs", SearchOption.AllDirectories))
+            {
+                using var reader = new StreamReader(file);
+                if (reader.ReadLine()?.Trim() != "#nullable enable") missing.Add(Path.GetRelativePath(addon, file));
+            }
+
+            Assert.True(missing.Count == 0, "First line should be `#nullable enable`: " + string.Join(", ", missing));
+        }
+
         private static string SharedDirectory()
         {
             DirectoryInfo? directory = new DirectoryInfo(AppContext.BaseDirectory);
