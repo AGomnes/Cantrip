@@ -11,12 +11,18 @@ status Burn
     deal stacks to owner, ignore block
     stacks -1
 
-# Chill softens its host's hits and wears off; three stacks at once freeze it (see `chill`).
+# Chill softens its host's hits and wears off. Reaching three stacks freezes the host, however the
+# Chill arrived: the status watches its own host. That works on the first application too, because a
+# listener that becomes active during an event hears it (gap 6 in docs/coverage.md); the tests pin it.
 status Chill
   tags frost, debuff
   stacking intensity
   decay 1
   modify damage: -stacks
+  on status_applied(Chill, target:owner):
+    if owner.Chill >= 3:
+      remove Chill from owner
+      apply Frozen 1 to owner
 
 # A frozen actor loses its next move. A fire hit shatters the ice for extra damage.
 status Frozen
@@ -35,11 +41,3 @@ status Strength
   stacking intensity
   modify damage: +stacks
 
-# --- Verbs -----------------------------------------------------------------------------------
-
-verb chill(n, who):
-  for each t in who:
-    apply Chill n to t
-    if t.Chill >= 3:
-      remove Chill from t
-      apply Frozen 1 to t

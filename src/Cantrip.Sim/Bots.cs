@@ -145,14 +145,12 @@ namespace Cantrip.Sim
             {
                 score -= enemy.GetInt("hp");
                 // Damage still to come, at a discount, and hits already softened.
-                score += 0.8 * Stacks(enemy, "Burn");
-                score += 0.5 * Stacks(enemy, "Chill");
-                score -= 1.0 * Stacks(enemy, "Strength");
+                score += 0.8 * enemy.CounterOf("Burn");
+                score += 0.5 * enemy.CounterOf("Chill");
+                score -= 1.0 * enemy.CounterOf("Strength");
             }
             return score;
         }
-
-        private static int Stacks(Entity entity, string status) => entity.FindAttached(status)?.GetInt("stacks") ?? 0;
 
         public int PickReward(IReadOnlyList<string> offer, CardRuntime runtime) => _rng.NextInt(0, offer.Count - 1);
 

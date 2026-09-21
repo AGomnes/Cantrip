@@ -95,6 +95,19 @@ PlayResult result = runtime.Play("Fireball", worm);   // Played, NotEnoughEnergy
 runtime.EndTurn();
 ```
 
+Asking before acting, for a UI or a bot:
+
+```csharp
+foreach (Entity card in runtime.State.ZoneOf(player, Zones.Hand))
+{
+    bool playable = runtime.CanPlay(card);                  // in hand, affordable, has a legal target
+    IReadOnlyList<Entity> targets = runtime.LegalTargets(card);   // after taunt, stealth and the like
+}
+
+int hp = worm.GetInt("hp");            // stats, after modifiers
+int burn = worm.CounterOf("Burn");     // a status's stacks (or duration); Get("Burn") is 0
+```
+
 Verbs implemented in C#:
 
 ```csharp

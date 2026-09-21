@@ -134,3 +134,31 @@ test "Mana Crystal gives a fourth energy every turn"
   enemy hp 40
   end turn
   expect player.energy == 4
+
+test "Three Chill applied at once freeze"
+  enemy "Cinder Imp"
+  apply Chill 3 to enemy
+  expect enemy.has(Frozen)
+  expect enemy.Chill == 0
+
+test "Chill applied one at a time freezes on the third"
+  enemy "Cinder Imp"
+  apply Chill 1 to enemy
+  apply Chill 1 to enemy
+  expect not enemy.has(Frozen)
+  apply Chill 1 to enemy
+  expect enemy.has(Frozen)
+  expect enemy.Chill == 0
+
+test "Chill on a whole room freezes only those that reach three"
+  enemy hp 30
+  enemy hp 30
+  apply Chill 2 to enemy1
+  play Blizzard
+  expect enemy1.has(Frozen) and enemy1.Chill == 0
+  expect not enemy2.has(Frozen) and enemy2.Chill == 2
+
+test "Chill on the player freezes the player too"
+  enemy hp 30
+  apply Chill 3 to player
+  expect player.has(Frozen)

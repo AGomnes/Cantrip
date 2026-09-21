@@ -6,7 +6,7 @@ relic "Ember Charm"
 
 relic "Frost Sigil"
   on battle_start:
-    chill 1 to all enemies
+    apply Chill 1 to all enemies
 
 relic "Healing Herb"
   on battle_end:

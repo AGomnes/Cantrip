@@ -27,7 +27,7 @@ card Rime
   tags attack, frost, starter
   effect:
     deal 4 to target
-    chill 1 to target
+    apply Chill 1 to target
 
 # --- Rewards: fire ---------------------------------------------------------------------------
 
@@ -75,14 +75,14 @@ card Frostbolt
   tags attack, frost, reward
   effect:
     deal 5 to target
-    chill 2 to target
+    apply Chill 2 to target
 
 card "Cold Snap"
   cost 0
   target enemy
   tags skill, frost, reward
   effect:
-    chill 1 to target
+    apply Chill 1 to target
     draw 1
 
 card "Glacial Wall"
@@ -90,14 +90,14 @@ card "Glacial Wall"
   tags skill, frost, reward
   effect:
     block 12
-    chill 1 to all enemies
+    apply Chill 1 to all enemies
 
 card Blizzard
   cost 2
   tags attack, frost, exhaust, reward
   effect:
     deal 5 to all enemies
-    chill 2 to all enemies
+    apply Chill 2 to all enemies
 
 # --- Rewards: arcane -------------------------------------------------------------------------
 

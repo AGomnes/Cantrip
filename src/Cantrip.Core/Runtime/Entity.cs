@@ -173,7 +173,11 @@ namespace Cantrip.Runtime
         /// <summary>The stored value, before modifiers.</summary>
         public Num GetBase(string stat) => _base.TryGetValue(stat, out Num value) ? value : Num.Zero;
 
-        /// <summary>The value after every active modifier has been applied.</summary>
+        /// <summary>
+        /// The value after every active modifier has been applied. This reads stats only: a status
+        /// such as Burn is not a stat, so <c>Get("Burn")</c> is 0 where content's <c>enemy.Burn</c>
+        /// is its stacks. Use <see cref="CounterOf"/> for that.
+        /// </summary>
         public Num Get(string stat) => State.Modifiers.ComputeStat(this, stat, GetBase(stat));
 
         /// <summary>Stat value rounded to an integer, for the common case of reading hp, block or cost.</summary>
