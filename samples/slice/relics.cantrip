@@ -12,3 +12,6 @@ relic "Healing Herb"
   on battle_end:
     if event.won:
       heal 6
+
+relic "Mana Crystal"
+  modify max_energy: +1

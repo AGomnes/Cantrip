@@ -128,3 +128,9 @@ test "Healing Herb heals after a won battle"
   enemy hp 5
   play Zap on enemy
   expect player.hp == 56
+
+test "Mana Crystal gives a fourth energy every turn"
+  relic "Mana Crystal"
+  enemy hp 40
+  end turn
+  expect player.energy == 4

@@ -1,6 +1,8 @@
 # --- Enemies ---------------------------------------------------------------------------------
-# Tuned with src/Cantrip.Sim so the greedy bot wins about 60% of runs and the random bot about 10%,
-# with the damage taken rising floor by floor. Re-run it after changing any number here.
+# Tuned with src/Cantrip.Sim. The greedy bot wins about 64% fighting the elite whenever healthy and about
+# 80% when it decides floor 3 by playing out both paths, which it then fights about a fifth of the
+# time; the random bot wins about 5%. Damage taken rises floor by floor, and the Archmage gains
+# Strength so a long fight punishes a weak deck. Re-run it after changing any number here.
 
 enemy "Cinder Imp"
   hp 24
@@ -39,20 +41,20 @@ enemy "Stone Golem"
   move Harden:
     block 10
   move Slam:
-    deal 14 to player
+    deal 11 to player
   pattern cycle Harden, Slam, Slam
 
 # --- Boss ------------------------------------------------------------------------------------
 
 enemy Archmage
-  hp 90
+  hp 120
   phase Calm when hp > max_hp / 2
   phase Unbound when hp <= max_hp / 2, retelegraph
   move Bolt phase Calm:
     deal 11 to player
   move Barrier phase Calm:
     block 12
-    gain 1 Strength
+    gain 2 Strength
   move Meteor phase Unbound:
     deal 16 to player
   move Drain phase Unbound:
