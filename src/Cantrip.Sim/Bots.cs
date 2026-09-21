@@ -22,17 +22,17 @@ namespace Cantrip.Sim
         /// <summary>Every card in hand that can be paid for now, with each target it may be aimed at.</summary>
         public static List<(int Card, int Target)> Legal(CardRuntime runtime)
         {
-            Entity player = runtime.Player!;
             var plays = new List<(int, int)>();
-            foreach (Entity card in runtime.State.ZoneOf(player, Zones.Hand).ToArray())
+            foreach (Entity card in runtime.State.ZoneOf(runtime.Player, Zones.Hand).ToArray())
             {
-                if (card.HasTag("unplayable")) continue;
-                if (!runtime.IsXCost(card) && player.GetInt(runtime.CostResourceOf(card)) < runtime.CostOf(card)) continue;
+                if (!runtime.CanPlay(card)) continue;
 
-                string? mode = card.Definition?.Word("target");
-                if (string.Equals(mode, "enemy", StringComparison.OrdinalIgnoreCase))
+                // An enemy or ally card is aimed at each legal target in turn; anything else is
+                // played at nothing and resolves its own target, as a self card does.
+                string mode = runtime.TargetMode(card);
+                if (mode == "enemy" || mode == "ally")
                 {
-                    foreach (Entity enemy in runtime.State.Actors(Team.Enemy)) plays.Add((card.Id, enemy.Id));
+                    foreach (Entity target in runtime.LegalTargets(card)) plays.Add((card.Id, target.Id));
                 }
                 else
                 {

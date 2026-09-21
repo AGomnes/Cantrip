@@ -497,12 +497,57 @@ namespace Cantrip
             return card == null ? PlayResult.NotInHand : Play(card, target);
         }
 
+        /// <summary>
+        /// What the card asks to be aimed at: <c>enemy</c>, <c>ally</c>, <c>self</c>, <c>any</c>,
+        /// or <c>none</c> for a card with no <c>target</c> line.
+        /// </summary>
+        public string TargetMode(Entity card) => card.Definition?.Word("target") ?? "none";
+
+        /// <summary>
+        /// The entities this card may be pointed at right now, in board order, after content's
+        /// <c>targetable</c> rules: exactly what <see cref="Play"/> accepts. Empty for a card that
+        /// takes no target. A <c>target any</c> card may also be played at nothing, which this
+        /// list cannot say, so a UI that wants to offer that asks <see cref="TargetMode"/>.
+        /// </summary>
+        public IReadOnlyList<Entity> LegalTargets(Entity card)
+        {
+            if (card == null) throw new ArgumentNullException(nameof(card));
+
+            Entity player = card.Controller;
+            switch (TargetMode(card))
+            {
+                case "enemy": return Targetable(card, player, State.Actors(Opposing(player)));
+                case "ally": return Targetable(card, player, State.Actors(player.Team));
+                case "self": return new[] { player };
+                case "any": return Targetable(card, player, State.Actors());
+                default: return Array.Empty<Entity>();
+            }
+        }
+
+        /// <summary>
+        /// Whether <see cref="Play"/> would accept this card now, aimed somewhere legal: it is in
+        /// hand, playable, affordable, and a card that needs someone to point at has someone.
+        /// Content can still cancel it while it resolves, which no check made in advance can see.
+        /// </summary>
+        public bool CanPlay(Entity card)
+        {
+            if (card == null) throw new ArgumentNullException(nameof(card));
+            if (card.Kind != EntityKind.Card || card.IsRemoved || card.Zone != Zones.Hand) return false;
+            if (card.HasTag("unplayable")) return false;
+            if (!IsXCost(card) && card.Controller.GetInt(CostResourceOf(card)) < CostOf(card)) return false;
+
+            string mode = TargetMode(card);
+            return (mode != "enemy" && mode != "ally") || LegalTargets(card).Count > 0;
+        }
+
+        private static Team Opposing(Entity actor) => actor.Team == Team.Enemy ? Team.Player : Team.Enemy;
+
         private bool TryResolveTarget(Entity card, ref Entity? target)
         {
             Entity player = card.Controller;
-            Team opposing = player.Team == Team.Enemy ? Team.Player : Team.Enemy;
+            Team opposing = Opposing(player);
 
-            switch (card.Definition?.Word("target") ?? "none")
+            switch (TargetMode(card))
             {
                 case "enemy":
                 {

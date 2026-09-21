@@ -314,41 +314,34 @@ namespace Cantrip.GodotAdapter
             return card == null ? 0 : core.CostOf(card);
         }
 
+        /// <summary>
+        /// Whether <c>Play</c> would accept the card now: in hand, affordable in whatever it is
+        /// priced in, and with a legal target if it needs one.
+        /// </summary>
         public bool CanPlay(int cardId)
         {
             CardRuntime core = EnsureRuntime();
             Entity? card = core.State.Find(cardId);
-            if (card == null || card.Kind != EntityKind.Card || card.Zone != Zones.Hand) return false;
-            if (card.HasTag("unplayable")) return false;
-
-            return core.IsXCost(card) || card.Controller.GetInt("energy") >= core.CostOf(card);
+            return card != null && core.CanPlay(card);
         }
 
         /// <summary>"enemy", "ally", "self", "any" or "none": what the card asks to be aimed at.</summary>
         public string GetTargetMode(int cardId)
         {
-            Entity? card = EnsureRuntime().State.Find(cardId);
-            return card?.Definition?.Word("target") ?? "none";
+            CardRuntime core = EnsureRuntime();
+            Entity? card = core.State.Find(cardId);
+            return card == null ? "none" : core.TargetMode(card);
         }
 
-        /// <summary>The entities that card may be aimed at, so a UI can highlight them.</summary>
+        /// <summary>
+        /// The entities that card may be aimed at after content's <c>targetable</c> rules, so a UI
+        /// highlights exactly what <c>Play</c> accepts.
+        /// </summary>
         public Godot.Collections.Array GetLegalTargets(int cardId)
         {
             CardRuntime core = EnsureRuntime();
             Entity? card = core.State.Find(cardId);
-            if (card == null) return new Godot.Collections.Array();
-
-            Team side = card.Controller.Team;
-            Team opposing = side == Team.Enemy ? Team.Player : Team.Enemy;
-
-            switch (GetTargetMode(cardId))
-            {
-                case "enemy": return VariantMap.Ids(core.State.Actors(opposing));
-                case "ally": return VariantMap.Ids(core.State.Actors(side));
-                case "self": return new Godot.Collections.Array { card.Controller.Id };
-                case "any": return VariantMap.Ids(core.State.Actors());
-                default: return new Godot.Collections.Array();
-            }
+            return card == null ? new Godot.Collections.Array() : VariantMap.Ids(core.LegalTargets(card));
         }
 
         /// <summary>The rules text with live values, ready for a card frame.</summary>

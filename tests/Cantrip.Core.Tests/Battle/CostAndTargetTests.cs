@@ -403,6 +403,85 @@ namespace Cantrip.Tests.Battle
             Assert.Equal(3, player.GetInt("energy"));
         }
 
+        // Asking in advance ----------------------------------------------------------------------
+
+        [Fact]
+        [Trait("Regression", "legal-targets-ignored-targetable")]
+        public void Legal_targets_follow_a_taunt_exactly_as_play_does()
+        {
+            CardRuntime runtime = Setup(out _);
+            Entity alpha = runtime.SpawnEnemy("Alpha");
+            Entity beta = runtime.SpawnEnemy("Beta");
+            Entity jab = runtime.AddCard("Jab", Zones.Hand);
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+
+            Assert.Equal(new[] { alpha, beta }, runtime.LegalTargets(jab));
+
+            runtime.ApplyStatus("Taunt", beta);
+
+            Assert.Equal(new[] { beta }, runtime.LegalTargets(jab));
+            Assert.Equal(PlayResult.InvalidTarget, runtime.Play(jab, alpha));
+        }
+
+        [Fact]
+        public void A_card_with_nothing_to_point_at_cannot_be_played()
+        {
+            CardRuntime runtime = Setup(out _);
+            Entity alpha = runtime.SpawnEnemy("Alpha");
+            Entity jab = runtime.AddCard("Jab", Zones.Hand);
+            Entity shout = runtime.AddCard("Shout", Zones.Hand);
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+            runtime.ApplyStatus("Stealth", alpha);
+
+            Assert.Empty(runtime.LegalTargets(jab));
+            Assert.False(runtime.CanPlay(jab));
+            Assert.Equal(PlayResult.InvalidTarget, runtime.Play(jab));
+
+            // An untargeted card needs no one.
+            Assert.True(runtime.CanPlay(shout));
+        }
+
+        [Fact]
+        public void Can_play_checks_the_cost_after_modifiers_and_where_the_card_is()
+        {
+            CardRuntime runtime = Setup(out Entity player);
+            runtime.SpawnEnemy("Alpha");
+            runtime.AddRelic("Codex");
+            Entity fire = runtime.AddCard("Fire Bolt", Zones.Hand);
+            Entity plain = runtime.AddCard("Plain Bolt", Zones.Hand);
+            Entity whirlwind = runtime.AddCard("Whirlwind", Zones.Hand);
+            Entity drawn = runtime.AddCard("Jab", Zones.Draw);
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+            player.SetBase("energy", 1);
+
+            Assert.True(runtime.CanPlay(fire));       // 2, less 1 for the Codex
+            Assert.False(runtime.CanPlay(plain));
+            Assert.True(runtime.CanPlay(whirlwind));  // X costs are always playable
+            Assert.False(runtime.CanPlay(drawn));     // not in hand
+        }
+
+        [Fact]
+        public void Target_modes_and_their_legal_targets()
+        {
+            CardRuntime runtime = Setup(out Entity player);
+            Entity alpha = runtime.SpawnEnemy("Alpha");
+            Entity mend = runtime.AddCard("Mend", Zones.Hand);
+            Entity self = runtime.AddCard("Self Harm", Zones.Hand);
+            Entity zap = runtime.AddCard("Zap", Zones.Hand);
+            Entity shout = runtime.AddCard("Shout", Zones.Hand);
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+
+            Assert.Equal("ally", runtime.TargetMode(mend));
+            Assert.Equal(new[] { player }, runtime.LegalTargets(mend));
+            Assert.Equal("self", runtime.TargetMode(self));
+            Assert.Equal(new[] { player }, runtime.LegalTargets(self));
+            Assert.Equal("any", runtime.TargetMode(zap));
+            Assert.Equal(2, runtime.LegalTargets(zap).Count);
+            Assert.Contains(alpha, runtime.LegalTargets(zap));
+            Assert.Equal("none", runtime.TargetMode(shout));
+            Assert.Empty(runtime.LegalTargets(shout));
+        }
+
         [Fact]
         public void A_cards_own_reach_limit_applies_to_it_and_to_nothing_else()
         {
