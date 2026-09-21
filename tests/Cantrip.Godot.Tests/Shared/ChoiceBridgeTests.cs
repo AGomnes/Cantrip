@@ -22,6 +22,72 @@ namespace Cantrip.GodotAdapter.Tests.Shared
             return runtime;
         }
 
+        private const string OfferContent = @"enemy ""Dummy""
+  hp 20
+
+card ""Spark""
+  cost 0
+  tags spell
+
+card ""Flare""
+  cost 0
+  tags spell
+
+card ""Glint""
+  cost 0
+  tags spell
+
+card ""Scholar""
+  cost 0
+  effect:
+    discover 3 cards where tag:spell as found
+    create found into hand
+";
+
+        /// <summary>Plays a card that discovers, which asks for one of three offered cards.</summary>
+        private static CardRuntime Offering(out ChoiceBridge bridge)
+        {
+            var runtime = new CardRuntime(Cantrip.Content.ContentLibrary.FromText(OfferContent), new RuntimeOptions { Seed = 1, Chooser = new DeferredChooser() });
+            runtime.CreatePlayer();
+            runtime.SpawnEnemy("Dummy");
+            runtime.AddCard("Scholar", Zones.Hand);
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Scholar"));
+
+            bridge = new ChoiceBridge();
+            bridge.Sync(runtime.Pending);
+            return runtime;
+        }
+
+        [Fact]
+        public void An_offer_is_answered_by_position()
+        {
+            CardRuntime runtime = Offering(out ChoiceBridge bridge);
+
+            Assert.True(bridge.Current!.IsOffer);
+            Assert.Equal(new[] { 0, 1, 2 }, bridge.OptionIds);
+
+            ChoiceAnswer answer = bridge.Validate(bridge.CurrentId, new[] { 2 });
+            Assert.True(answer.Accepted, answer.Message);
+
+            string picked = runtime.Pending!.Definitions[answer.EntityIds[0]].Name;
+            Assert.Equal(PlayResult.Played, runtime.Answer(runtime.Pending.Definitions[answer.EntityIds[0]]));
+            Assert.Equal(picked, runtime.State.ZoneOf(runtime.Player, Zones.Hand).Single().Name);
+        }
+
+        [Fact]
+        public void An_offer_refuses_a_position_it_does_not_have_and_more_than_one_pick()
+        {
+            Offering(out ChoiceBridge bridge);
+
+            ChoiceAnswer outside = bridge.Validate(bridge.CurrentId, new[] { 3 });
+            Assert.Equal(ChoiceRejection.UnknownOption, outside.Reason);
+            Assert.StartsWith("Offer 3", outside.Message);
+
+            Assert.Equal(ChoiceRejection.TooMany, bridge.Validate(bridge.CurrentId, new[] { 0, 1 }).Reason);
+            Assert.Equal(ChoiceRejection.TooFew, bridge.Validate(bridge.CurrentId, new int[0]).Reason);
+        }
+
         [Fact]
         public void A_pending_choice_gets_a_number_and_keeps_it()
         {

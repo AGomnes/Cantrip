@@ -236,6 +236,17 @@ namespace Cantrip.Testing
                 }
                 else
                 {
+                    // `enemy Ghoul` with no Ghoul defined. Stats come in pairs, so a bare word with
+                    // nothing to pair it with can only have meant an enemy's name.
+                    if (nodes.Count % 2 == 1 && nodes[0] is NameExpr missing)
+                    {
+                        string? close = Suggest.Closest(missing.Name, _runtime.Content.Pool("enemy").Select(d => d.Name));
+                        throw Fail(
+                            $"No enemy named `{missing.Name}` is defined." + (close == null ? string.Empty : $" Did you mean `{close}`?") +
+                            $" Define it with `enemy {missing.Name}`, or write `enemy \"{missing.Name}\" hp 20` for a plain enemy with that label.",
+                            call.Span);
+                    }
+
                     string name = nodes.Count > 0 && nodes[0] is StringExpr label ? label.Value : "Enemy";
                     if (nodes.Count > 0 && nodes[0] is StringExpr) index = 1;
                     enemy = State.Spawn(name, EntityKind.Actor, null, Team.Enemy, Zones.Board);

@@ -391,7 +391,7 @@ namespace Cantrip.GodotAdapter
             PendingChoice? pending = _choices.Current;
             return pending == null
                 ? new Godot.Collections.Dictionary()
-                : VariantMap.Choice(_choices.CurrentId, pending, TrackedStats);
+                : VariantMap.Choice(_choices.CurrentId, pending, TrackedStats, OfferText);
         }
 
         /// <summary>
@@ -412,7 +412,11 @@ namespace Cantrip.GodotAdapter
                 };
             }
 
-            string result = Act(() => Word(core.Answer(answer.EntityIds)));
+            // An offer is answered with the position of the pick; the core wants the definition itself.
+            PendingChoice pending = _choices.Current!;
+            string result = pending.IsOffer
+                ? Act(() => Word(core.Answer(pending.Definitions[answer.EntityIds[0]])))
+                : Act(() => Word(core.Answer(answer.EntityIds)));
             return new Godot.Collections.Dictionary
             {
                 ["accepted"] = true,
@@ -546,6 +550,9 @@ namespace Cantrip.GodotAdapter
             return _core;
         }
 
+        /// <summary>The rules text of an offered candidate, as a reward or discover screen shows it.</summary>
+        private string OfferText(Cantrip.Content.EntityDefinition offered) => Describer().Describe(offered).ToPlainText();
+
         private DescriptionBuilder Describer()
         {
             if (_describer == null || _describerGeneration != Content.Generation)
@@ -637,7 +644,7 @@ namespace Cantrip.GodotAdapter
             _announcedChoice = id;
 
             PendingChoice? pending = _choices.Current;
-            if (pending != null) EmitSignal(SignalName.ChoiceRequested, VariantMap.Choice(id, pending, TrackedStats));
+            if (pending != null) EmitSignal(SignalName.ChoiceRequested, VariantMap.Choice(id, pending, TrackedStats, OfferText));
         }
 
         private static Godot.Collections.Dictionary Refused(string reason, string message) =>

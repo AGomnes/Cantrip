@@ -203,23 +203,49 @@ namespace Cantrip.GodotAdapter
 
         /// <summary>
         /// A decision the rules are waiting on. The options are entity ids and views both: a UI
-        /// needs the names to show, and the ids to answer with.
+        /// needs the names to show, and the ids to answer with. An offer of content that does not
+        /// exist yet, as <c>discover</c> makes, has <c>kind</c> "offer": its <c>option_ids</c> are
+        /// the positions 0, 1, 2... and each option is the candidate's name, kind, tags and rules
+        /// text, which <paramref name="describe"/> supplies.
         /// </summary>
-        public static Godot.Collections.Dictionary Choice(int requestId, PendingChoice choice, IReadOnlyList<string>? stats = null)
+        public static Godot.Collections.Dictionary Choice(
+            int requestId,
+            PendingChoice choice,
+            IReadOnlyList<string>? stats = null,
+            Func<Cantrip.Content.EntityDefinition, string>? describe = null)
         {
             if (choice == null) throw new ArgumentNullException(nameof(choice));
 
             var options = new Godot.Collections.Array();
             var ids = new Godot.Collections.Array();
-            for (int i = 0; i < choice.Options.Count; i++)
+            if (choice.IsOffer)
             {
-                options.Add(Entity(EntityView.Of(choice.Options[i], stats)));
-                ids.Add(choice.Options[i].Id);
+                for (int i = 0; i < choice.Definitions.Count; i++)
+                {
+                    Cantrip.Content.EntityDefinition offered = choice.Definitions[i];
+                    options.Add(new Godot.Collections.Dictionary
+                    {
+                        ["name"] = offered.Name,
+                        ["kind"] = offered.KindName,
+                        ["tags"] = Strings(offered.Tags),
+                        ["text"] = describe?.Invoke(offered) ?? string.Empty,
+                    });
+                    ids.Add(i);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < choice.Options.Count; i++)
+                {
+                    options.Add(Entity(EntityView.Of(choice.Options[i], stats)));
+                    ids.Add(choice.Options[i].Id);
+                }
             }
 
             return new Godot.Collections.Dictionary
             {
                 ["id"] = requestId,
+                ["kind"] = choice.IsOffer ? "offer" : "entities",
                 ["prompt"] = choice.Prompt,
                 ["min"] = choice.Min,
                 ["max"] = choice.Max,

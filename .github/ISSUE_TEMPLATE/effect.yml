@@ -1,0 +1,29 @@
+name: An effect Cantrip cannot express
+description: A card, relic, status or ability from a game you know that the language cannot write, or can only write awkwardly.
+title: "Effect: "
+labels: ["coverage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the most useful thing an outside user can tell this project: it is how docs/coverage.md grows and how the language finds out what it is missing.
+  - type: input
+    id: game
+    attributes:
+      label: Game and effect
+      placeholder: e.g. Slay the Spire, Corpse Explosion
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What the effect does
+      description: In plain words, including how it interacts with other effects if that is the hard part.
+    validations:
+      required: true
+  - type: textarea
+    id: attempt
+    attributes:
+      label: What you tried in Cantrip, if anything
+      description: Your attempt and where it fell short, or the workaround you used.
+      render: text

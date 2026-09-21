@@ -46,7 +46,10 @@ namespace Cantrip.GodotAdapter
         /// <summary>Why it was rejected, ready to show or log. Empty when accepted.</summary>
         public string Message { get; }
 
-        /// <summary>The ids to hand to <c>CardRuntime.Answer</c>, in the order they were given.</summary>
+        /// <summary>
+        /// The ids to hand to <c>CardRuntime.Answer</c>, in the order they were given. For an offer of
+        /// content they are positions in <c>PendingChoice.Definitions</c> instead.
+        /// </summary>
         public IReadOnlyList<int> EntityIds { get; }
 
         public override string ToString() => Accepted ? "accepted" : Reason + ": " + Message;
@@ -97,10 +100,23 @@ namespace Cantrip.GodotAdapter
 
             _options.Clear();
             _optionOrder.Clear();
-            for (int i = 0; i < choice.Options.Count; i++)
+            if (choice.IsOffer)
             {
-                Entity option = choice.Options[i];
-                if (option != null && _options.Add(option.Id)) _optionOrder.Add(option.Id);
+                // An offer of content has no entities yet: its options are the positions of the
+                // candidates in the offer, and the UI answers with the position it picked.
+                for (int i = 0; i < choice.Definitions.Count; i++)
+                {
+                    _options.Add(i);
+                    _optionOrder.Add(i);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < choice.Options.Count; i++)
+                {
+                    Entity option = choice.Options[i];
+                    if (option != null && _options.Add(option.Id)) _optionOrder.Add(option.Id);
+                }
             }
 
             return CurrentId;
@@ -161,11 +177,11 @@ namespace Cantrip.GodotAdapter
                     int id = entityIds[i];
                     if (!_options.Contains(id))
                     {
-                        return Reject(ChoiceRejection.UnknownOption, "Entity " + id + " is not one of the options for \"" + choice.Prompt + "\".");
+                        return Reject(ChoiceRejection.UnknownOption, Describe(choice, id) + " is not one of the options for \"" + choice.Prompt + "\".");
                     }
                     if (!seen.Add(id))
                     {
-                        return Reject(ChoiceRejection.DuplicateOption, "Entity " + id + " was chosen twice.");
+                        return Reject(ChoiceRejection.DuplicateOption, Describe(choice, id) + " was chosen twice.");
                     }
                     chosen.Add(id);
                 }
@@ -185,5 +201,7 @@ namespace Cantrip.GodotAdapter
 
         private static ChoiceAnswer Reject(ChoiceRejection reason, string message) =>
             new ChoiceAnswer(reason, message, NoIds);
+
+        private static string Describe(PendingChoice choice, int option) => (choice.IsOffer ? "Offer " : "Entity ") + option;
     }
 }

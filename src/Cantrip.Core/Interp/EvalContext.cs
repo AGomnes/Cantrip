@@ -263,7 +263,7 @@ namespace Cantrip.Runtime
     }
 
     /// <summary>Picks uniformly at random from its own forked RNG stream, so it never disturbs game rolls.</summary>
-    public sealed class RandomChooser : IChoiceProvider
+    public sealed class RandomChooser : IChoiceProvider, IDefinitionChooser
     {
         private readonly Rng _rng;
 
@@ -276,6 +276,9 @@ namespace Cantrip.Runtime
             int count = request.Min >= request.Max ? request.Max : _rng.NextInt(request.Min, request.Max);
             return options.Take(Math.Min(count, options.Count)).ToList();
         }
+
+        public Cantrip.Content.EntityDefinition? ChooseDefinition(DefinitionChoice request, GameState state) =>
+            request.Options.Count == 0 ? null : request.Options[_rng.NextInt(0, request.Options.Count - 1)];
     }
 
     /// <summary>

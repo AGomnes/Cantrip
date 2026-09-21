@@ -277,7 +277,27 @@ namespace Cantrip.Syntax
 
         private string ParseDeclarationName(string keyword)
         {
-            if (Check(TokenKind.String) || Check(TokenKind.Identifier)) return Advance().Text;
+            if (Check(TokenKind.String)) return Advance().Text;
+
+            if (Check(TokenKind.Identifier))
+            {
+                Token first = Advance();
+                if (!Check(TokenKind.Identifier)) return first.Text;
+
+                // `card Heavy Blow`: a bare name ends at the first space. Say what to write, then
+                // carry on as if it had been quoted, so one slip is one error rather than a cascade.
+                var words = new List<string> { first.Text };
+                Token last = first;
+                while (Check(TokenKind.Identifier))
+                {
+                    last = Advance();
+                    words.Add(last.Text);
+                }
+
+                string name = string.Join(" ", words);
+                _diagnostics.Error("CT0029", $"A name with spaces must be in quotes: {keyword} \"{name}\".", first.Span.To(last.Span));
+                return name;
+            }
 
             _diagnostics.Error("CT0013", $"`{keyword}` must be followed by a name.", Current.Span);
             return "<unnamed>";
@@ -723,10 +743,34 @@ namespace Cantrip.Syntax
             if (!Match(TokenKind.Indent)) return BlockNode.Empty(span);
 
             var statements = new List<StatementNode>();
-            while (!Check(TokenKind.Dedent) && !Check(TokenKind.EndOfFile))
+
+            // Lines indented under a line that opens no block. Each is reported once and parsed as
+            // if it were not indented, and its matching dedent is consumed here, so the block does
+            // not end early and scatter errors over the lines that follow.
+            int stray = 0;
+            while (!Check(TokenKind.EndOfFile))
             {
                 SkipNewlines();
-                if (Check(TokenKind.Dedent) || Check(TokenKind.EndOfFile)) break;
+                if (Check(TokenKind.EndOfFile)) break;
+
+                if (Check(TokenKind.Dedent))
+                {
+                    if (stray == 0) break;
+                    stray--;
+                    _index++;
+                    continue;
+                }
+
+                if (Check(TokenKind.Indent))
+                {
+                    _diagnostics.Error(
+                        "CT0030",
+                        "This line is indented further than the line above it, which does not open a block. Only a line ending in `:`, such as `effect:` or `if target.dead:`, can have lines indented under it.",
+                        Current.Span);
+                    stray++;
+                    _index++;
+                    continue;
+                }
 
                 int before = _index;
                 StatementNode? statement = ParseStatement();

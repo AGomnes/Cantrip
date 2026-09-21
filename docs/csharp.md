@@ -8,7 +8,7 @@ The examples use the Fireball, Frozen, Burn and Kindling content from the [READM
 
 ```csharp
 using Cantrip;               // CardRuntime, RuntimeOptions, PlayResult, Num
-using Cantrip.Content;       // ContentLibrary
+using Cantrip.Content;       // ContentLibrary, EntityDefinition
 using Cantrip.Runtime;       // Entity, Zones, GameEvent, Value, the choosers, GameSnapshot
 using Cantrip.Descriptions;  // DescriptionBuilder, Description
 using Cantrip.Diagnostics;   // Diagnostic
@@ -118,7 +118,17 @@ if (runtime.Play(card) == PlayResult.ChoicePending)
 
 Nothing happens until the action completes: host events are held back, so the game never animates a hit that was rolled back.
 
-One exception for now: `discover`, which offers content that does not exist yet, is only put to a chooser that implements `IDefinitionChooser`. `DeferredChooser` and `RandomChooser` do not, so under them `discover` takes the first offer instead of asking. It is listed under known limitations in the [changelog](../CHANGELOG.md).
+`discover` offers content that does not exist yet, so its pending choice lists candidates rather than entities: `IsOffer` is true, `Options` is empty, and `Definitions` holds what is on offer. Answer with the definition the player picked:
+
+```csharp
+if (runtime.Pending!.IsOffer)
+{
+    EntityDefinition picked = runtime.Pending.Definitions[0];   // ... whichever the player chose
+    runtime.Answer(picked);
+}
+```
+
+A chooser that answers on the spot handles offers through `IDefinitionChooser`; `RandomChooser` and `ScriptedChooser` already do.
 
 ## Hot reload
 

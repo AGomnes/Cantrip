@@ -1,0 +1,4 @@
+# The Godot Asset Library downloads this repository as an archive. Only the addon belongs in it.
+/**        export-ignore
+/addons    !export-ignore
+/addons/** !export-ignore

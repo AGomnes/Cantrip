@@ -1,0 +1,35 @@
+name: Bug report
+description: Content does something other than what the language reference says, or something crashes.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The best bug report is a failing `test` block: it describes the problem and proves the fix at once. See the Tests section of docs/language.md.
+  - type: textarea
+    id: content
+    attributes:
+      label: The smallest content that shows it
+      description: A `.cantrip` file, ideally with a `test` block that fails.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `dotnet cantrip --version`, or the Cantrip.Core package version.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, `dotnet --version`, and your Godot version if the addon is involved.
+      render: text

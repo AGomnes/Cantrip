@@ -134,3 +134,12 @@ jobs:
 
       - name: Editor dock self-test
         run: timeout 300 "$GODOT" --headless --path godot/Cantrip.Demo --import -- --cantrip-selftest
+
+      # The addon as a user gets it: the release zip unzipped into a blank Godot project outside the
+      # repository, Cantrip.Core added the way docs/godot.md says, then a battle from GDScript. The
+      # demo above inherits this repository's build settings, so only this shows a user's view.
+      - name: Install into a blank project
+        run: |
+          dotnet pack src/Cantrip.Core -c Release -o "$RUNNER_TEMP/feed"
+          bash tools/package-addon.sh "$RUNNER_TEMP/addon"
+          bash tools/godot-install-smoke.sh "$GODOT" "$RUNNER_TEMP"/addon/*.zip "$RUNNER_TEMP/feed"

@@ -714,7 +714,7 @@ Numbers range to about ±9.2 trillion when written, and stay exact in multiplica
 
 | Codes | Source |
 |---|---|
-| CT0001-CT0028 | lexer and parser (indentation, unexpected tokens, invalid numbers, nesting deeper than 256) |
+| CT0001-CT0030 | lexer and parser (indentation, unexpected tokens, invalid numbers, nesting deeper than 256, names with spaces, lines indented under a line that opens no block) |
 | CT0101-CT0113 | loading content (duplicate definitions and verbs, unknown stacking modes or flags, pattern moves, several rulesets, the reserved `event` and `encounter` declarations) |
 | CT0201-CT0202 | ruleset settings |
 | CT301 | unknown verb |

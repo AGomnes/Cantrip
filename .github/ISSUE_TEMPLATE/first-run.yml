@@ -1,0 +1,43 @@
+name: First-run report
+description: You tried Cantrip for the first time. Tell us where it was smooth and where you got stuck.
+title: "First run: "
+labels: ["first-run"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for trying Cantrip. A stranger's first hour is the part of a project its author can no longer see, so every stumble you report is worth more than a fix you could make yourself. Short and rough is fine.
+  - type: dropdown
+    id: path
+    attributes:
+      label: What did you try?
+      options:
+        - The quickstart (docs/quickstart.md)
+        - The Godot addon (docs/godot.md)
+        - Cantrip in my own game
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: stuck
+    attributes:
+      label: Where did you get stuck, confused, or have to guess?
+      description: The step, what you did, what happened, and what you expected. Paste error messages as they appeared.
+    validations:
+      required: true
+  - type: textarea
+    id: smooth
+    attributes:
+      label: What went well?
+      description: Optional, but it tells us what not to break.
+  - type: input
+    id: time
+    attributes:
+      label: Roughly how long did it take?
+      placeholder: e.g. 20 minutes to a playable battle, or gave up after 40
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, the output of `dotnet --version`, your Godot version if you used the addon, and `dotnet cantrip --version` if you got that far.
+      render: text

@@ -4,7 +4,15 @@ Versions follow [semantic versioning](https://semver.org). While the major versi
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- `discover` can be answered by the player. Under `DeferredChooser`, which the Godot node uses, it pauses like any other choice: `PendingChoice.IsOffer` is true, `Definitions` lists the candidates, and `CardRuntime.Answer(EntityDefinition)` replays the action with the pick. In GDScript the pending choice has `"kind": "offer"`, each option carries the candidate's name, kind, tags and rules text, and the answer is its position. `RandomChooser` now picks among offers at random instead of taking the first.
+- `tools/godot-install-smoke.sh`, run by CI on every push and before every release, installs the addon from its zip into a blank Godot project outside the repository, following docs/godot.md, and plays a battle from GDScript.
+
+### Changed
+
+- `cantrip validate` also reports the linter's errors, such as an unknown verb, so a typo like `aply` no longer passes as "0 errors". Warnings stay with `lint`.
+- Clearer messages for mistakes made in the first hour: a declaration name with spaces is one error saying to quote it (CT0029), a line indented under a line that opens no block is one error saying which lines can (CT0030), and a test naming an enemy nothing defines says so and how to fix it.
 
 ## [0.1.0-preview.1] - 2026-09-21
 

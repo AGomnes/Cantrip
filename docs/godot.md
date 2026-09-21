@@ -146,6 +146,18 @@ if rules.Play(card, 0) == "pending":
 Nothing reaches the game for the rolled-back attempt: no events, no animations.
 `CancelChoice()` abandons it, leaving the game exactly as it was.
 
+Most choices are between things already in play, and `option_ids` are their entity ids. `discover`
+offers content that does not exist yet, so its request has `"kind": "offer"`: each of `options` is a
+candidate's `name`, `kind`, `tags` and rules `text`, and `option_ids` are simply their positions,
+`[0, 1, 2]`. Answer with the position of the one the player picked:
+
+```gdscript
+var request: Dictionary = rules.GetPendingChoice()
+if request["kind"] == "offer":
+    show_cards(request["options"])                       # name, kind, tags and text of each
+    rules.AnswerChoice(request["id"], [picked_position])
+```
+
 ## Saving
 
 ```gdscript
@@ -229,6 +241,18 @@ godot --headless --path godot/Cantrip.Demo res://demo/battle.tscn -- --demo-auto
 The `ExportRelease` build is the cheap proof that no editor-only code escaped `#if TOOLS`; both
 scenes exit non-zero on failure. Always give Godot a timeout: a script that cannot parse never
 quits.
+
+The demo inherits this repository's build settings, so it cannot show what a user's own project
+sees. `tools/godot-install-smoke.sh` can: it unzips the addon into a blank Godot project outside the
+repository, adds Cantrip.Core with the command in [Installing](#installing), fails on any build
+warning or a plugin that does not load, and plays a battle from GDScript, a discover offer included.
+CI runs it on every push and before every release:
+
+```
+dotnet pack src/Cantrip.Core -c Release -o /tmp/feed
+tools/package-addon.sh /tmp/addon
+tools/godot-install-smoke.sh "$GODOT" /tmp/addon/cantrip-godot-*.zip /tmp/feed
+```
 
 ## Not done yet
 

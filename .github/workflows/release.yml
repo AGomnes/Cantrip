@@ -10,6 +10,10 @@ name: Release
 # file, and nuget.org hands back an API key that lasts an hour, so no long-lived key is stored anywhere.
 # It needs a trusted publishing policy on nuget.org (owner AGomnes, repository Cantrip, workflow file
 # release.yml) and one repository secret, NUGET_USER: the nuget.org profile name, not the email.
+#
+# The released addon is also copied to AGomnes/cantrip-godot, which has addons/cantrip at its root,
+# the layout the Godot Asset Library installs from. That needs a second secret, ADDON_REPO_TOKEN: a
+# fine-grained token with Contents read and write on that one repository.
 on:
   push:
     tags: ['v*']
@@ -36,6 +40,7 @@ jobs:
         id: version
         env:
           NUGET_USER: ${{ secrets.NUGET_USER }}
+          ADDON_REPO_TOKEN: ${{ secrets.ADDON_REPO_TOKEN }}
         run: |
           version=$(dotnet msbuild src/Cantrip.Core/Cantrip.Core.csproj -getProperty:Version)
           if [ "v$version" != "$GITHUB_REF_NAME" ]; then
@@ -44,6 +49,10 @@ jobs:
           fi
           if [ -z "$NUGET_USER" ]; then
             echo "::error::The NUGET_USER repository secret (your nuget.org profile name) is not set, so nothing can be published."
+            exit 1
+          fi
+          if [ -z "$ADDON_REPO_TOKEN" ]; then
+            echo "::error::The ADDON_REPO_TOKEN repository secret is not set, so the addon repository cannot be updated."
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -82,7 +91,9 @@ jobs:
         run: bash tools/quickstart-smoke.sh "$RUNNER_TEMP/release/packages"
 
       - name: Package the Godot addon
-        run: bash tools/package-addon.sh "$RUNNER_TEMP/release/addon"
+        run: |
+          bash tools/package-addon.sh "$RUNNER_TEMP/release/addon"
+          cp -r tools/addon-repo "$RUNNER_TEMP/release/addon-repo"
 
       # The changelog's links are relative, which works in the repository but not in a release body,
       # so each one is pointed at the file as it is at this tag.
@@ -106,6 +117,7 @@ jobs:
           name: release
           path: ${{ runner.temp }}/release
           if-no-files-found: error
+          include-hidden-files: true   # the addon repository's .gitattributes
 
   # The only job allowed to publish. It checks nothing out and builds nothing, so no third-party
   # build or test code ever runs where the repository token or the nuget.org key is available.
@@ -149,6 +161,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          files=("$RUNNER_TEMP"/release/packages/*.nupkg "$RUNNER_TEMP"/release/packages/*.snupkg "$RUNNER_TEMP"/release/addon/*.zip)
+          # A re-run after a later step failed finds the release already there: refresh its files.
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
+            exit 0
+          fi
           prerelease=""
           case "$VERSION" in *-*) prerelease="--prerelease" ;; esac
           gh release create "$GITHUB_REF_NAME" \
@@ -156,4 +174,28 @@ jobs:
             --title "Cantrip $VERSION" \
             --notes-file "$RUNNER_TEMP/release/notes.md" \
             $prerelease \
-            "$RUNNER_TEMP"/release/packages/*.nupkg "$RUNNER_TEMP"/release/packages/*.snupkg "$RUNNER_TEMP"/release/addon/*.zip
+            "${files[@]}"
+
+      # AGomnes/cantrip-godot holds only the addon, at its root, which is the layout the Godot Asset
+      # Library installs from. It is replaced wholesale by each release, committed and tagged with
+      # the same version; a re-run that finds the tag already there leaves it alone.
+      - name: Update the addon repository
+        env:
+          TOKEN: ${{ secrets.ADDON_REPO_TOKEN }}
+        run: |
+          work="$RUNNER_TEMP/addon-repo-clone"
+          git clone --quiet "https://x-access-token:${TOKEN}@github.com/AGomnes/cantrip-godot.git" "$work"
+          cd "$work"
+          if git rev-parse -q --verify "refs/tags/$GITHUB_REF_NAME" > /dev/null; then
+            echo "cantrip-godot already has $GITHUB_REF_NAME."
+            exit 0
+          fi
+          git rm -r -q --ignore-unmatch addons
+          unzip -q "$RUNNER_TEMP"/release/addon/*.zip -d .
+          cp "$RUNNER_TEMP/release/addon-repo/README.md" "$RUNNER_TEMP/release/addon-repo/.gitattributes" .
+          git add -A
+          git -c user.name="Alexander Gomnes" -c user.email="alexander.gomnes@hotmail.com" \
+            commit -q -m "Cantrip $VERSION" -m "Released from https://github.com/AGomnes/Cantrip/releases/tag/$GITHUB_REF_NAME"
+          git tag "$GITHUB_REF_NAME"
+          git push --quiet origin HEAD:main "$GITHUB_REF_NAME"
+          echo "cantrip-godot $GITHUB_REF_NAME is $(git rev-parse HEAD)"

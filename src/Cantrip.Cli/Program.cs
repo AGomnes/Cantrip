@@ -18,7 +18,7 @@ namespace Cantrip.Cli
         private const string Usage = @"cantrip - tools for the Cantrip DSL
 
 usage:
-  cantrip validate <path>...          parse and load content, report problems
+  cantrip validate <path>...          load content and report its errors, including unknown verbs and names
   cantrip lint <path>... [options]    load content and run static checks
   cantrip test <path>... [options]    run the `test` blocks in content
   cantrip describe <path>... [--name <name>]
@@ -160,12 +160,19 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
         private static int Validate(ContentLibrary content)
         {
             bool ok = Report(content);
+
+            // Loading catches what cannot be parsed; a misspelled verb such as `aply` parses fine and
+            // only fails when a card runs it. Those are the linter's errors, so validate reports them
+            // too, and leaves the linter's warnings and notes to `lint`.
+            List<Diagnostic> broken = Linter.Lint(content).Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
+            Print(broken);
+
             int definitions = content.Definitions.Count();
             DiagnosticBag diagnostics = content.Diagnostics;
             Console.WriteLine(
                 $"{content.Files.Count()} file(s), {definitions} definition(s), {content.Verbs.Count()} verb(s), {content.Tests.Count} test(s): " +
-                $"{diagnostics.Errors.Count()} error(s), {diagnostics.Warnings.Count()} warning(s)");
-            return ok ? 0 : 1;
+                $"{diagnostics.Errors.Count() + broken.Count} error(s), {diagnostics.Warnings.Count()} warning(s)");
+            return ok && broken.Count == 0 ? 0 : 1;
         }
 
         private static int Test(ContentLibrary content, string? filter, bool trace)

@@ -4,6 +4,8 @@ Thanks for looking. Cantrip is maintained by one person, so the most useful cont
 
 ## Issues are the best way in
 
+The [issue forms](https://github.com/AGomnes/Cantrip/issues/new/choose) ask for what each kind of report needs:
+
 - **Bugs**: the smallest `.cantrip` file that shows the problem, what you expected, and what happened, plus the output of `cantrip --version`. A failing `test` block is ideal, because it describes the problem and proves the fix at once.
 - **Effects the language cannot express**: name the game and the card, relic or ability, and say what it does. That is how [docs/coverage.md](docs/coverage.md) grows, and it is the most valuable thing an outside user can tell this project.
 - **Rough edges**: anything that confused you in the [quickstart](docs/quickstart.md) or the docs. If you had to guess, the docs are wrong.

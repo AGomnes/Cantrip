@@ -778,10 +778,36 @@ namespace Cantrip
         public PlayResult Answer(IEnumerable<int> entityIds)
         {
             if (Pending == null) throw new InvalidOperationException("No choice is pending.");
+            if (Pending.IsOffer) throw new InvalidOperationException("This choice offers content, not entities: answer it with Answer(EntityDefinition).");
+            return Replay(entityIds);
+        }
+
+        /// <summary>
+        /// Answers a pending offer of content, as <c>discover</c> makes, with the candidate the
+        /// player picked from <see cref="PendingChoice.Definitions"/>, and replays the action.
+        /// </summary>
+        public PlayResult Answer(EntityDefinition chosen)
+        {
+            if (chosen == null) throw new ArgumentNullException(nameof(chosen));
+            if (Pending == null) throw new InvalidOperationException("No choice is pending.");
+            if (!Pending.IsOffer) throw new InvalidOperationException("This choice is between entities: answer it with their ids.");
+
+            int index = -1;
+            for (int i = 0; i < Pending.Definitions.Count; i++)
+            {
+                if (ReferenceEquals(Pending.Definitions[i], chosen)) { index = i; break; }
+            }
+            if (index < 0) throw new ArgumentException($"{chosen} was not one of the offers for \"{Pending.Prompt}\".", nameof(chosen));
+
+            return Replay(new[] { index });
+        }
+
+        private PlayResult Replay(IEnumerable<int> answer)
+        {
             if (!(Chooser is DeferredChooser deferred)) throw new InvalidOperationException("Answering a choice needs a DeferredChooser.");
 
             Func<PlayResult> replay = _replay ?? throw new InvalidOperationException("There is no action to replay.");
-            deferred.Add(entityIds);
+            deferred.Add(answer);
             Pending = null;
             _replay = null;
             return replay();
@@ -859,6 +885,21 @@ namespace Cantrip
                     pending.Request.Max,
                     Live(chooserId),
                     pending.Request.Span);
+                _replay = replay;
+                return PlayResult.ChoicePending;
+            }
+            catch (OfferPendingException pending)
+            {
+                Interpreter.AbandonPending();
+                Interpreter.DiscardHostBuffer();
+
+                // Definitions are immutable content, so they survive the rollback as they are.
+                int chooserId = pending.Offer.Chooser?.Id ?? 0;
+
+                Restore(before);
+                State.Trace.TruncateTo(traceMark);
+
+                Pending = new PendingChoice(pending.Offer.Prompt, pending.Offer.Options, Live(chooserId), pending.Offer.Span);
                 _replay = replay;
                 return PlayResult.ChoicePending;
             }

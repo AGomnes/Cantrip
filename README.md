@@ -70,7 +70,7 @@ None of these knows about the others. A Fireball on a frozen enemy deals its 6 d
 
 ## Status
 
-**Preview: 0.1.0-preview.1.** The core has unit tests and content tests, and a small roguelite has been built with it and played headlessly by a bot, but no shipped game uses Cantrip yet. The API, the language and the save format may change between previews; [docs/stability.md](docs/stability.md) says how. Known gaps are in the [changelog](CHANGELOG.md): real time (a tick clock and abilities with cooldowns) is experimental, `discover` cannot yet be answered by a UI, and the Godot addon has only been installed by its author.
+**Preview: 0.1.0-preview.1.** The core has unit tests and content tests, and a small roguelite has been built with it and played headlessly by a bot, but no shipped game uses Cantrip yet. The API, the language and the save format may change between previews; [docs/stability.md](docs/stability.md) says how. Known gaps are in the [changelog](CHANGELOG.md): real time (a tick clock and abilities with cooldowns) is experimental, and the Godot addon has so far been installed only by its author and by an automated test.
 
 Cantrip is written and maintained by one person. Feedback is the most useful thing right now, especially effects from your game that the language cannot express. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -128,7 +128,7 @@ Your game learns what happened, to animate it, from events: damage, cards moving
 Installed as a local tool, the commands run as `dotnet cantrip ...`:
 
 ```
-dotnet cantrip validate <path>...                 load content and report errors that stop it loading
+dotnet cantrip validate <path>...                 load content and report its errors, including unknown verbs
 dotnet cantrip lint <path>... [--suppress codes]  report likely mistakes too (unknown names, events nothing raises)
 dotnet cantrip test <path>... [--filter text] [--trace]
 dotnet cantrip describe <path>... [--name name]   print generated rules text
