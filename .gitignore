@@ -53,3 +53,6 @@ scratch/
 
 ## Agent worktrees (scratch checkouts, never part of the project)
 .claude/worktrees/
+
+## Design notes (kept local, not published)
+gameplay-effects-dsl.md
