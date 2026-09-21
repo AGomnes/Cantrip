@@ -1,4 +1,4 @@
-# Sample content: every example from the design notes, plus the basics needed to run them.
+# Sample content: small examples of the main features, plus the basics needed to run them.
 # Load with:  cantrip test samples/basic
 
 # --- Cards -------------------------------------------------------------------------------
@@ -140,7 +140,7 @@ enemy "Jaw Worm"
 
 # --- Real time ---------------------------------------------------------------------------
 
-# The design notes write `to enemies within 5m`. `within` needs a host that knows about
+# The natural spelling is `to enemies within 5m`, but `within` needs a host that knows about
 # space (IEffectHost.TryCall), so this headless sample hits every enemy instead.
 ability "Frost Nova"
   cooldown 8s

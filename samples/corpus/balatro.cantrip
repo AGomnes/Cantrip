@@ -73,7 +73,7 @@ card "Glass Queen"
 
 # --- 6. ref Blueprint: copy the joker beside it ----------------------------------------------------------------
 # Not expressible: copying another entity's ability needs effects to be values that can be read and
-# run. Gap 5, which the design notes already list as a stress test. Silence (hearthstone.cantrip #9) is
+# run: gap 5 in docs/coverage.md. Silence (hearthstone.cantrip #9) is
 # the same gap from the other side: switching an entity's own effects off.
 
 # --- 7. ref poker hands: pairs, flushes and straights ----------------------------------------------------------

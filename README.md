@@ -33,7 +33,7 @@ This README describes what exists today.
 
 ## Status
 
-An early MVP of the core, per step 1 of the plan in the design notes. It is not yet a Godot plugin.
+Early. The core, the command-line tools and a Godot addon all work, and a small roguelite has been built and played with them, but no shipped game uses Cantrip yet.
 
 **Working now**
 
@@ -217,7 +217,7 @@ IReadOnlyList<DslTestResult> results = new DslTestRunner(content).RunAll();
 | `src/Cantrip.Cli` | The `cantrip` tool |
 | `src/Cantrip.Sim` | Plays whole runs of the slice with a bot and reports win rate, deaths, and how each card and encounter fares |
 | `tests/Cantrip.Core.Tests` | Unit tests |
-| `samples/basic` | Every example from the design notes, with DSL tests |
+| `samples/basic` | Small examples of the main features, with DSL tests |
 | `samples/corpus` | Reference effects from existing games, with DSL tests |
 | `samples/slice` | A small roguelite (a witch climbing a tower, fire against frost), with DSL tests |
 | `godot/Cantrip.Demo` | The Godot 4.6 addon, with demo content and headless tests |
@@ -226,13 +226,13 @@ IReadOnlyList<DslTestResult> results = new DslTestRunner(content).RunAll();
 
 ## Roadmap
 
-Following section 7 of the design notes:
+The plan, in order:
 
 1. **MVP core**: done (entities, events, statuses, modifiers, turn clock, tree-walk interpreter, trace log).
 2. **Save/load and deterministic math**: done.
-3. **Validate turn-based**: build inside a real roguelite.
+3. **Validate turn-based**: in progress. `samples/slice` is a small roguelite, played thousands of times by `src/Cantrip.Sim`; what building it found, and what has been fixed since, is in [docs/slice-friction.md](docs/slice-friction.md). Still to do: a game people actually play.
 4. **Validate real-time**: the tick clock exists; it needs a real-time project, spatial selectors and allocation-free event paths.
-5. **Coverage corpus**: 93 effects from Slay the Spire, Monster Train, Hearthstone, Balatro, Dota 2, Magic, Inscryption, Dominion and Darkest Dungeon so far: 71 work directly, 9 need a workaround and 13 are not expressible yet ([docs/coverage.md](docs/coverage.md)). The design notes aim for about 150.
+5. **Coverage corpus**: 93 effects from Slay the Spire, Monster Train, Hearthstone, Balatro, Dota 2, Magic, Inscryption, Dominion and Darkest Dungeon so far: 71 work directly, 9 need a workaround and 13 are not expressible yet ([docs/coverage.md](docs/coverage.md)). The aim is about 150.
 6. **Release**: the Godot addon is done and packaged — node, importer, export check, editor dock, debugger tabs showing a running game's causality tree and what each live entity is made of, pause, step and breakpoints over the debug channel, and a demo. A packaged build has been run to prove content reaches it. Still to do: a docs site and a cookbook.
 7. **Project setup**: named Cantrip. Still to do: a contribution policy.
 
