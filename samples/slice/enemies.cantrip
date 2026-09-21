@@ -1,0 +1,58 @@
+# --- Enemies ---------------------------------------------------------------------------------
+
+enemy "Cinder Imp"
+  hp 20
+  move Claw:
+    deal 6 to player
+  move Ember:
+    deal 3 to player
+    apply Burn 2 to player
+  pattern cycle Claw, Ember
+
+# A creature of frost cannot be chilled, so a frost deck has to find another way through it.
+enemy "Frost Wisp"
+  hp 16
+  immune Chill
+  move Touch:
+    deal 5 to player
+  move Mist:
+    block 6
+  pattern random_no_repeat
+
+enemy "Tower Guard"
+  hp 38
+  move Brace:
+    block 8
+    gain 2 Strength
+  move Bash:
+    deal 9 to player
+  pattern cycle Brace, Bash, Bash
+
+# --- Elite -----------------------------------------------------------------------------------
+# Stone does not burn, so a fire deck has to find another way through it.
+
+enemy "Stone Golem"
+  hp 65
+  immune Burn
+  move Harden:
+    block 14
+  move Slam:
+    deal 14 to player
+  pattern cycle Harden, Slam, Slam
+
+# --- Boss ------------------------------------------------------------------------------------
+
+enemy Archmage
+  hp 110
+  phase Calm when hp > max_hp / 2
+  phase Unbound when hp <= max_hp / 2, retelegraph
+  move Bolt phase Calm:
+    deal 11 to player
+  move Barrier phase Calm:
+    block 12
+    gain 1 Strength
+  move Meteor phase Unbound:
+    deal 20 to player
+  move Drain phase Unbound:
+    deal 8 to player
+    heal 8

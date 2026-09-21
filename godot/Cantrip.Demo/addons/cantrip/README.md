@@ -42,6 +42,6 @@ solution file beside the project to export a .NET game at all.
 
 Full documentation, including the two rules GDScript imposes (members keep their C# PascalCase
 names, and a C# default argument is not a default in GDScript), is in `docs/godot.md` in the
-project repository: https://github.com/AGomnes/DSL
+project repository: https://github.com/AGomnes/Cantrip
 
 MIT licensed.

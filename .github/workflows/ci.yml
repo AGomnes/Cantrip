@@ -47,6 +47,17 @@ jobs:
         if: hashFiles('samples/corpus/**') != ''
         run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- test samples/corpus
 
+      - name: Lint samples/slice
+        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- lint samples/slice
+
+      - name: DSL tests (samples/slice)
+        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- test samples/slice
+
+      # Whole runs of the slice, played by a bot. It fails on any run that throws, which is how a
+      # rules loop or a runtime error in content shows up long before a person would find it.
+      - name: Simulate the slice
+        run: dotnet run --project src/Cantrip.Sim -c Release --no-build -- --runs 100
+
   godot:
     # Everything that can only break inside a real engine: importing content, the Variant
     # boundary, signals, and the GDScript call path. Linux only, because this is about the

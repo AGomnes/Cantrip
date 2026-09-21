@@ -199,9 +199,11 @@ IReadOnlyList<DslTestResult> results = new DslTestRunner(content).RunAll();
 |---|---|
 | `src/Cantrip.Core` | Parser, content loading, entities, events, modifiers, interpreter, runtime, linter, descriptions, test runner |
 | `src/Cantrip.Cli` | The `cantrip` tool |
+| `src/Cantrip.Sim` | Plays whole runs of the slice with a bot and reports win rate, deaths, and how each card and encounter fares |
 | `tests/Cantrip.Core.Tests` | Unit tests |
 | `samples/basic` | Every example from the design notes, with DSL tests |
 | `samples/corpus` | Reference effects from existing games, with DSL tests |
+| `samples/slice` | A small roguelite (a witch climbing a tower, fire against frost), with DSL tests |
 | `godot/Cantrip.Demo` | The Godot 4.6 addon, with demo content and headless tests |
 | `tests/Cantrip.Godot.Tests` | The adapter's engine-free layer, tested without Godot |
 | `tools` | Packaging the addon as a zip someone can drop into their own project |

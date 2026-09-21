@@ -1,0 +1,14 @@
+# --- Relics ----------------------------------------------------------------------------------
+# One is offered after beating the elite.
+
+relic "Ember Charm"
+  modify damage where tag:fire, source:self: +3
+
+relic "Frost Sigil"
+  on battle_start:
+    chill 1 to all enemies
+
+relic "Healing Herb"
+  on battle_end:
+    if event.won:
+      heal 6

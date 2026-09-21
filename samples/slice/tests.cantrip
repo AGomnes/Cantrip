@@ -1,0 +1,130 @@
+# Tests for the slice. Each test starts with a fresh player (80 hp, 3 energy) and seed 1.
+
+# --- Statuses --------------------------------------------------------------------------------
+
+test "Burn ticks at its host's turn end, ignoring block, and decays"
+  enemy hp 20 block 10
+  play Kindle on enemy
+  end turn
+  expect enemy.hp == 16
+  expect enemy.Burn == 3
+
+test "A Burn tick does not shatter Frozen"
+  enemy hp 30
+  apply Frozen 1 to enemy
+  apply Burn 2 to enemy
+  end turn
+  expect enemy.hp == 28
+
+test "Chill takes one point off each hit per stack"
+  enemy "Cinder Imp"
+  play Rime on enemy
+  end turn
+  expect player.hp == 75
+
+test "Three stacks of Chill freeze, and a frozen enemy loses its move"
+  enemy "Cinder Imp"
+  play Frostbolt on enemy
+  play Rime on enemy
+  expect enemy.has(Frozen)
+  expect enemy.Chill == 0
+  end turn
+  expect player.hp == 80
+  expect not enemy.has(Frozen)
+
+test "A fire hit shatters Frozen for 8 more"
+  enemy hp 30
+  apply Frozen 1 to enemy
+  play Scorch on enemy
+  expect enemy.hp == 18
+  expect not enemy.has(Frozen)
+
+test "A Frost Wisp cannot be chilled"
+  enemy "Frost Wisp"
+  play Frostbolt on enemy
+  expect enemy.Chill == 0
+  expect enemy.hp == 11
+
+test "A Stone Golem does not burn"
+  enemy "Stone Golem"
+  play Kindle on enemy
+  expect enemy.Burn == 0
+
+# --- Cards -----------------------------------------------------------------------------------
+
+test "Stoke doubles Burn"
+  enemy hp 40
+  apply Burn 3 to enemy
+  play Stoke on enemy
+  expect enemy.Burn == 6
+
+test "Stoke on an enemy with no Burn does nothing"
+  enemy hp 40
+  play Stoke on enemy
+  expect enemy.Burn == 0
+
+test "Blizzard chills every enemy"
+  enemy hp 30
+  enemy hp 30
+  play Blizzard
+  expect enemy1.hp == 25 and enemy2.hp == 25
+  expect enemy1.Chill == 2 and enemy2.Chill == 2
+
+test "Glacial Wall can freeze a whole room at once"
+  enemy hp 30
+  enemy hp 30
+  apply Chill 2 to enemy1
+  play "Glacial Wall"
+  expect player.block == 12
+  expect enemy1.has(Frozen)
+  expect enemy2.Chill == 1
+
+test "Arcane Missiles fires three 3-damage bolts"
+  enemy hp 30
+  play "Arcane Missiles"
+  expect enemy.hp == 21
+
+test "Mana Surge gives two energy and exhausts"
+  enemy hp 30
+  play "Mana Surge"
+  expect player.energy == 5
+  expect count(exhaust) == 1
+
+test "Spellbook discovers a reward card into hand"
+  enemy hp 30
+  play Spellbook
+  expect count(hand) == 1
+  expect hand.first.has(tag:reward)
+
+# --- Enemies ---------------------------------------------------------------------------------
+
+test "Tower Guard braces, then hits harder"
+  enemy "Tower Guard"
+  end turn
+  expect enemy.block == 8
+  expect enemy.Strength == 2
+  end turn
+  expect player.hp == 69
+
+test "The Archmage turns Unbound at half health and shows its new move at once"
+  enemy Archmage
+  expect enemy.phase == "Calm"
+  deal 60 to enemy
+  expect enemy.phase == "Unbound"
+  expect enemy.intent == "Meteor"
+
+# --- Relics ----------------------------------------------------------------------------------
+
+test "Ember Charm adds 3 to fire damage and nothing else"
+  relic "Ember Charm"
+  enemy hp 40
+  play Scorch on enemy
+  play Zap on enemy
+  expect enemy.hp == 27
+
+test "Healing Herb heals after a won battle"
+  relic "Healing Herb"
+  player hp 50
+  enemy hp 5
+  play Zap on enemy
+  expect player.hp == 56

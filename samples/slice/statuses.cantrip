@@ -1,0 +1,45 @@
+# The slice: a witch climbing a tower, with fire and frost pulling against each other.
+# Load with:  cantrip test samples/slice      Simulate with:  dotnet run --project src/Cantrip.Sim
+
+# --- Statuses --------------------------------------------------------------------------------
+# Burn is deliberately not tagged fire: a fire hit shatters Frozen, and a tick of Burn should not.
+
+status Burn
+  tags burn, dot, debuff
+  stacking intensity
+  on turn_end:
+    deal stacks to owner, ignore block
+    stacks -1
+
+# Chill softens its host's hits and wears off; three stacks at once freeze it (see `chill`).
+status Chill
+  tags frost, debuff
+  stacking intensity
+  decay 1
+  modify damage: -stacks
+
+# A frozen actor loses its next move. A fire hit shatters the ice for extra damage.
+status Frozen
+  tags frost, control, debuff
+  stacking intensity
+  max_stacks 1
+  decay 1
+  on before_move(source:owner):
+    cancel
+  on owner.damaged(tag:fire):
+    remove Frozen from owner
+    deal 8 to owner
+
+status Strength
+  tags buff
+  stacking intensity
+  modify damage: +stacks
+
+# --- Verbs -----------------------------------------------------------------------------------
+
+verb chill(n, who):
+  for each t in who:
+    apply Chill n to t
+    if t.Chill >= 3:
+      remove Chill from t
+      apply Frozen 1 to t
