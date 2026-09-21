@@ -5,6 +5,8 @@
     <TargetFramework>net9.0</TargetFramework>
     <RootNamespace>Cantrip.Cli</RootNamespace>
     <AssemblyName>cantrip</AssemblyName>
+    <!-- Built for net9.0 but runs on any later runtime, so a machine with only a newer .NET can use it. -->
+    <RollForward>Major</RollForward>
     <Description>Command line tools for the Cantrip DSL: validate, lint and run DSL tests.</Description>
   </PropertyGroup>
 

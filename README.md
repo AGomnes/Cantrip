@@ -51,6 +51,8 @@ An early MVP of the core, per step 1 of the plan in the design notes. It is not 
 
 **Not yet**: Asset Library packaging, the compiled backend, spatial selectors (`within` needs a host), the VS Code extension, and the full coverage corpus. The export smoke test exists but runs on demand rather than on every push, because Godot's export templates are about a gigabyte. See [Roadmap](#roadmap) and the gaps in [docs/coverage.md](docs/coverage.md).
 
+New to Cantrip? [docs/quickstart.md](docs/quickstart.md) walks you from nothing to a playable battle.
+
 ## Building
 
 Requires the .NET 9 SDK or later.
@@ -201,6 +203,7 @@ IReadOnlyList<DslTestResult> results = new DslTestRunner(content).RunAll();
 
 ## Documentation
 
+- [docs/quickstart.md](docs/quickstart.md): start here. From nothing to a card battle you can play, in about fifteen minutes
 - [docs/language.md](docs/language.md): the DSL reference
 - [docs/architecture.md](docs/architecture.md): how the library is put together, and where to extend it
 - [docs/coverage.md](docs/coverage.md): which reference effects the language can express today
