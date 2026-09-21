@@ -214,6 +214,14 @@ namespace Cantrip.Content
             {
                 case EntityDeclNode entity:
                 {
+                    // Reserved words with no meaning yet. Loading them as inert definitions would let
+                    // content look finished while nothing ever ran it.
+                    if (entity.Kind == "event" || entity.Kind == "encounter")
+                    {
+                        diagnostics.Error("CT0113", $"`{entity.Kind}` declarations are reserved but not supported yet, so {entity.Kind} \"{entity.Name}\" would never run.", entity.Span);
+                        return;
+                    }
+
                     var key = (entity.Kind, entity.Name.ToLowerInvariant());
                     if (_definitions.TryGetValue(key, out EntityDefinition? existing))
                     {

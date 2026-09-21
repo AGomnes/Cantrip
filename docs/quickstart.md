@@ -2,47 +2,32 @@
 
 In about fifteen minutes this gets you from nothing to a small card battle you can play in a terminal: three cards, a status and an enemy written in Cantrip, checked by tests, and driven from C#. It assumes you know C# and the .NET command line, and nothing about Cantrip.
 
-## 1. Get Cantrip
+## 1. Make a project
 
-You need the [.NET 9 SDK](https://dotnet.microsoft.com/download) or later, and git.
+You need the [.NET 9 SDK](https://dotnet.microsoft.com/download) or later. Create a console project, add the library, and install the `cantrip` command-line tool into the project:
 
-Cantrip is not on NuGet yet, so you build it from source and reference the project:
-
+<!-- smoke: run -->
 ```
-git clone https://github.com/AGomnes/Cantrip.git
-cd Cantrip
-dotnet build src/Cantrip.Cli
-```
-
-Keep a shortcut to the command-line tool, run from inside the `Cantrip` folder so it records where the tool is; the rest of this guide calls it `cantrip`:
-
-```
-# PowerShell
-$cantripDll = "$PWD/src/Cantrip.Cli/bin/Debug/net9.0/cantrip.dll"
-function cantrip { dotnet $cantripDll @args }
-
-# bash
-alias cantrip="dotnet $PWD/src/Cantrip.Cli/bin/Debug/net9.0/cantrip.dll"
-```
-
-`cantrip --help` should now print the list of commands. The shortcut lasts until you close the terminal.
-
-## 2. Make a game
-
-Create a console project next to the clone and reference the library:
-
-```
-cd ..
 dotnet new console -o HexDuel
 cd HexDuel
-dotnet add reference ../Cantrip/src/Cantrip.Core/Cantrip.Core.csproj
+dotnet add package Cantrip.Core --prerelease
+dotnet new tool-manifest
+dotnet tool install Cantrip.Cli --prerelease
 mkdir content
 ```
 
-## 3. Write content
+The tool is installed for this project only, and runs as `dotnet cantrip`. Check it works:
+
+<!-- smoke: run -->
+```
+dotnet cantrip --version
+```
+
+## 2. Write content
 
 Content lives in `.cantrip` files. Create `content/game.cantrip`:
 
+<!-- smoke: file content/game.cantrip -->
 ```
 # A status: stacks add up, and at the end of its host's turn it deals that much damage and fades.
 status Hex
@@ -84,10 +69,11 @@ enemy Ghoul
 
 A few things to notice. Indentation makes the blocks. A number on a property (`cost 1`, `hp 30`) becomes a stat. `target` is the enemy the card was played on, and `target.Hex` reads that enemy's stacks of Hex. The `text` line is optional; without it Cantrip writes serviceable rules text itself.
 
-## 4. Test it
+## 3. Test it
 
 Tests live in content too. Create `content/tests.cantrip`:
 
+<!-- smoke: file content/tests.cantrip -->
 ```
 test "Strike deals 6"
   enemy Ghoul
@@ -111,17 +97,19 @@ test "A second Curse draws a card"
 
 Each test starts a fresh battle with a player on 80 hp and 3 energy. Run them, and the linter, which catches unknown names, events nothing raises and similar mistakes:
 
+<!-- smoke: run -->
 ```
-cantrip test content
-cantrip lint content
+dotnet cantrip test content
+dotnet cantrip lint content
 ```
 
 Both should report no failures. Break something on purpose, say `deal 6 to targt`, and run them again to see what a mistake looks like: a file, a line, and a suggestion.
 
-## 5. Play it from C#
+## 4. Play it from C#
 
 Replace `Program.cs` with:
 
+<!-- smoke: file Program.cs -->
 ```csharp
 using Cantrip;
 using Cantrip.Content;
@@ -174,9 +162,21 @@ Run it with `dotnet run`. Each line shows a card's cost and its rules text with 
 
 The whole rules engine is behind those few calls. Nothing in `Program.cs` knows what Hex does or how the Ghoul chooses its move; change `content/game.cantrip`, run again, and the game changes with it.
 
-## 6. Where next
+## 5. Where next
 
 - [language.md](language.md) is the full language reference: every declaration, event, verb and modifier.
 - [godot.md](godot.md) runs the same content in Godot 4.6 through an addon, with an editor dock for problems, tests and card text.
-- The README's "Using it from C#" section covers saving and loading, hot reload, player choices a UI answers, and tracing why something happened.
+- [csharp.md](csharp.md) covers the rest of the C# side: saving and loading, hot reload, player choices a UI answers, and tracing why something happened.
 - `samples/slice` is a bigger example, a five-floor roguelite, and `src/Cantrip.Sim` plays it thousands of times with a bot to show how balanced it is.
+
+## Working from source
+
+To track unreleased changes or work on Cantrip itself, clone it and reference the project instead of the package:
+
+```
+git clone https://github.com/AGomnes/Cantrip.git
+dotnet add reference ../Cantrip/src/Cantrip.Core/Cantrip.Core.csproj
+dotnet run --project ../Cantrip/src/Cantrip.Cli -- test content
+```
+
+The last line is the source equivalent of `dotnet cantrip test content`.

@@ -5,11 +5,30 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <RootNamespace>Cantrip</RootNamespace>
     <AssemblyName>Cantrip.Core</AssemblyName>
-    <Description>Engine-agnostic core for the Cantrip DSL: parser, entities, events, statuses, modifiers and the tree-walking interpreter.</Description>
+    <Description>Write cards, statuses, relics, enemies and abilities as short text files instead of code. The engine-free core of Cantrip: parser, content loading, entities, events, modifiers, interpreter, battle runtime, linter and DSL test runner.</Description>
+    <PackageId>Cantrip.Core</PackageId>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- Ship the XML docs so editors show them; members without docs stay quiet (CS1591). -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!--
+      PublicAPI.Shipped.txt lists the public surface each release shipped; the build warns (RS0016,
+      RS0017) when that surface changes without the change being written into PublicAPI.Unshipped.txt,
+      so an API change is always a visible diff. RS0026 flags overloads that both have optional
+      parameters; the ones it names shipped in 0.1.0-preview.1 and are kept for compatibility.
+    -->
+    <NoWarn>$(NoWarn);RS0026</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="Cantrip.Core.Tests" />
+    <None Include="PACKAGE.md" Pack="true" PackagePath="README.md" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
   </ItemGroup>
 
 </Project>

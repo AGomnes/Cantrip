@@ -58,6 +58,16 @@ jobs:
       - name: Simulate the slice
         run: dotnet run --project src/Cantrip.Sim -c Release --no-build -- --runs 100
 
+      # Pack the two NuGet packages and follow docs/quickstart.md word for word against them, in an
+      # empty folder. This is what a new user does first, so it is what must never break. Linux
+      # only: the packages are the same on both, and the script is bash.
+      - name: Quickstart from freshly packed packages
+        if: runner.os == 'Linux'
+        run: |
+          dotnet pack src/Cantrip.Core -c Release --no-build -o "$RUNNER_TEMP/feed"
+          dotnet pack src/Cantrip.Cli -c Release --no-build -o "$RUNNER_TEMP/feed"
+          bash tools/quickstart-smoke.sh "$RUNNER_TEMP/feed"
+
   godot:
     # Everything that can only break inside a real engine: importing content, the Variant
     # boundary, signals, and the GDScript call path. Linux only, because this is about the

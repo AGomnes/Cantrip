@@ -61,14 +61,15 @@ namespace Cantrip
     /// <summary>What an entity is. Everything in the game is an entity; this only affects defaults.</summary>
     public enum EntityKind
     {
-        Actor,
-        Card,
-        Status,
-        Relic,
-        Ability,
-        Keyword,
-        Item,
-        Global,
+        // Saved games store these as numbers: never renumber or reuse one, only add.
+        Actor = 0,
+        Card = 1,
+        Status = 2,
+        Relic = 3,
+        Ability = 4,
+        Keyword = 5,
+        Item = 6,
+        Global = 7,
     }
 
     /// <summary>Pacing of the action queue.</summary>

@@ -9,12 +9,12 @@ scripts by file path inside your project's own assembly.
 ## Installing
 
 1. Copy `addons/cantrip/` into your project.
-2. Reference the rules engine from your project's `.csproj`. It is not published as a package yet,
-   so today that means the library itself:
-   ```xml
-   <ProjectReference Include="path/to/Cantrip.Core.csproj" />
+2. Add the rules engine from NuGet, in the folder with your `.csproj`, using the version in this
+   addon's `plugin.cfg`:
    ```
-   or a copy of its DLL:
+   dotnet add package Cantrip.Core --prerelease
+   ```
+   Offline, a copy of its DLL works too:
    ```xml
    <Reference Include="Cantrip.Core">
      <HintPath>addons/cantrip/bin/Cantrip.Core.dll</HintPath>

@@ -9,13 +9,29 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <DeterministicSourcePaths Condition="'$(CI)' == 'true'">true</DeterministicSourcePaths>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Version">
+    <!--
+      The one place the release version lives. The release workflow refuses a tag that disagrees,
+      and a test holds the Godot addon's plugin.cfg to the same version.
+    -->
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionSuffix>preview.1</VersionSuffix>
   </PropertyGroup>
 
   <PropertyGroup Label="Package metadata">
     <Authors>Alexander Gomnæs</Authors>
+    <Copyright>Copyright (c) 2026 Alexander Gomnæs</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/AGomnes/Cantrip</PackageProjectUrl>
+    <PackageTags>gamedev;godot;card-game;roguelike;deckbuilder;dsl;rules-engine;scripting</PackageTags>
     <RepositoryUrl>https://github.com/AGomnes/Cantrip</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
 </Project>

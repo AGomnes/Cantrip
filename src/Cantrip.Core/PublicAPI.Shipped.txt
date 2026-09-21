@@ -1,0 +1,1364 @@
+#nullable enable
+Cantrip.CardRuntime
+Cantrip.CardRuntime.AddCard(string! name, string! zone = "draw", Cantrip.Runtime.Entity? owner = null) -> Cantrip.Runtime.Entity!
+Cantrip.CardRuntime.AddDeck(params string![]! names) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.CardRuntime.AddRelic(string! name, Cantrip.Runtime.Entity? owner = null) -> Cantrip.Runtime.Entity!
+Cantrip.CardRuntime.Answer(params int[]! entityIds) -> Cantrip.PlayResult
+Cantrip.CardRuntime.Answer(System.Collections.Generic.IEnumerable<Cantrip.Runtime.Entity!>! entities) -> Cantrip.PlayResult
+Cantrip.CardRuntime.Answer(System.Collections.Generic.IEnumerable<int>! entityIds) -> Cantrip.PlayResult
+Cantrip.CardRuntime.ApplyContentChanges() -> Cantrip.CardRuntime.ReloadReport!
+Cantrip.CardRuntime.ApplyStatus(string! status, Cantrip.Runtime.Entity! target, int stacks = 1, Cantrip.Runtime.Entity? source = null) -> Cantrip.Runtime.Entity?
+Cantrip.CardRuntime.CanCapture.get -> bool
+Cantrip.CardRuntime.CancelPending() -> void
+Cantrip.CardRuntime.CanPlay(Cantrip.Runtime.Entity! card) -> bool
+Cantrip.CardRuntime.Capture() -> Cantrip.Runtime.GameSnapshot!
+Cantrip.CardRuntime.CardRuntime(Cantrip.Content.ContentLibrary! content, Cantrip.RuntimeOptions? options = null) -> void
+Cantrip.CardRuntime.Chooser.get -> Cantrip.Runtime.IChoiceProvider!
+Cantrip.CardRuntime.Chooser.set -> void
+Cantrip.CardRuntime.Content.get -> Cantrip.Content.ContentLibrary!
+Cantrip.CardRuntime.CostOf(Cantrip.Runtime.Entity! card) -> int
+Cantrip.CardRuntime.CostResourceOf(Cantrip.Runtime.Entity! card) -> string!
+Cantrip.CardRuntime.CreatePlayer(string! name = "Player", int hp = 80, int maxEnergy = 3) -> Cantrip.Runtime.Entity!
+Cantrip.CardRuntime.EndTurn() -> void
+Cantrip.CardRuntime.Execute(string! statements, Cantrip.Runtime.Entity? self = null, Cantrip.Runtime.Entity? target = null) -> void
+Cantrip.CardRuntime.Execution.get -> Cantrip.ExecutionMode
+Cantrip.CardRuntime.Execution.set -> void
+Cantrip.CardRuntime.GrantAbility(string! name, Cantrip.Runtime.Entity! owner) -> Cantrip.Runtime.Entity!
+Cantrip.CardRuntime.Interpreter.get -> Cantrip.Runtime.Interpreter!
+Cantrip.CardRuntime.IsReady(Cantrip.Runtime.Entity! ability) -> bool
+Cantrip.CardRuntime.IsXCost(Cantrip.Runtime.Entity! card) -> bool
+Cantrip.CardRuntime.LegalTargets(Cantrip.Runtime.Entity! card) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.CardRuntime.Pending.get -> Cantrip.Runtime.PendingChoice?
+Cantrip.CardRuntime.Play(Cantrip.Runtime.Entity! card, Cantrip.Runtime.Entity? target = null) -> Cantrip.PlayResult
+Cantrip.CardRuntime.Play(string! cardName, Cantrip.Runtime.Entity? target = null) -> Cantrip.PlayResult
+Cantrip.CardRuntime.Player.get -> Cantrip.Runtime.Entity?
+Cantrip.CardRuntime.RegisterVerb(string! name, Cantrip.Runtime.VerbHandler! handler) -> void
+Cantrip.CardRuntime.ReloadReport
+Cantrip.CardRuntime.ReloadReport.Missing.get -> System.Collections.Generic.List<string!>!
+Cantrip.CardRuntime.ReloadReport.Rebound.get -> int
+Cantrip.CardRuntime.ReloadReport.ReloadReport() -> void
+Cantrip.CardRuntime.ReloadReport.RulesetChanged.get -> bool
+Cantrip.CardRuntime.Restore(Cantrip.Runtime.GameSnapshot! snapshot) -> void
+Cantrip.CardRuntime.RollIntent(Cantrip.Runtime.Entity! enemy) -> void
+Cantrip.CardRuntime.SpawnEnemy(string! name, int? hp = null) -> Cantrip.Runtime.Entity!
+Cantrip.CardRuntime.StartBattle(bool shuffle = true, bool drawOpeningHand = true) -> void
+Cantrip.CardRuntime.State.get -> Cantrip.Runtime.GameState!
+Cantrip.CardRuntime.TargetMode(Cantrip.Runtime.Entity! card) -> string!
+Cantrip.CardRuntime.Tick(int count = 1) -> void
+Cantrip.CardRuntime.UseAbility(Cantrip.Runtime.Entity! ability, Cantrip.Runtime.Entity? target = null) -> bool
+Cantrip.CardRuntime.Won.get -> bool?
+Cantrip.Content.ContentLibrary
+Cantrip.Content.ContentLibrary.AllNames.get -> System.Collections.Generic.IEnumerable<string!>!
+Cantrip.Content.ContentLibrary.BuildRuleset(Cantrip.Diagnostics.DiagnosticBag? diagnostics = null) -> Cantrip.Runtime.Ruleset!
+Cantrip.Content.ContentLibrary.ContentLibrary() -> void
+Cantrip.Content.ContentLibrary.Definitions.get -> System.Collections.Generic.IEnumerable<Cantrip.Content.EntityDefinition!>!
+Cantrip.Content.ContentLibrary.Diagnostics.get -> Cantrip.Diagnostics.DiagnosticBag!
+Cantrip.Content.ContentLibrary.Files.get -> System.Collections.Generic.IEnumerable<Cantrip.Syntax.SourceFileNode!>!
+Cantrip.Content.ContentLibrary.Find(string! name, string? kind = null) -> Cantrip.Content.EntityDefinition?
+Cantrip.Content.ContentLibrary.FindAny(string! name, params string![]! kinds) -> Cantrip.Content.EntityDefinition?
+Cantrip.Content.ContentLibrary.FindVerb(string! name) -> Cantrip.Content.VerbDefinition?
+Cantrip.Content.ContentLibrary.Fingerprint.get -> string!
+Cantrip.Content.ContentLibrary.Generation.get -> int
+Cantrip.Content.ContentLibrary.LoadFile(string! path) -> Cantrip.Diagnostics.DiagnosticBag!
+Cantrip.Content.ContentLibrary.LoadFolder(string! folder, string! extension = ".cantrip", bool recursive = true) -> Cantrip.Diagnostics.DiagnosticBag!
+Cantrip.Content.ContentLibrary.LoadText(string! text, string! file) -> Cantrip.Diagnostics.DiagnosticBag!
+Cantrip.Content.ContentLibrary.Pool(string! kind) -> System.Collections.Generic.IReadOnlyList<Cantrip.Content.EntityDefinition!>!
+Cantrip.Content.ContentLibrary.Resource(string! stat) -> Cantrip.Content.ResourceRule?
+Cantrip.Content.ContentLibrary.Resources.get -> System.Collections.Generic.IReadOnlyDictionary<string!, Cantrip.Content.ResourceRule!>!
+Cantrip.Content.ContentLibrary.RulesetSyntax.get -> Cantrip.Syntax.RulesetDeclNode?
+Cantrip.Content.ContentLibrary.Tests.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Content.TestDefinition!>!
+Cantrip.Content.ContentLibrary.Unload(string! file) -> void
+Cantrip.Content.ContentLibrary.Verbs.get -> System.Collections.Generic.IEnumerable<Cantrip.Content.VerbDefinition!>!
+Cantrip.Content.EnemyPatternKind
+Cantrip.Content.EnemyPatternKind.Cycle = 0 -> Cantrip.Content.EnemyPatternKind
+Cantrip.Content.EnemyPatternKind.Random = 1 -> Cantrip.Content.EnemyPatternKind
+Cantrip.Content.EnemyPatternKind.RandomNoRepeat = 2 -> Cantrip.Content.EnemyPatternKind
+Cantrip.Content.EntityDefinition
+Cantrip.Content.EntityDefinition.Blocks.get -> System.Collections.Generic.IReadOnlyDictionary<string!, Cantrip.Syntax.BlockMemberNode!>!
+Cantrip.Content.EntityDefinition.CostResource.get -> string!
+Cantrip.Content.EntityDefinition.DecayAmount.get -> Cantrip.Num
+Cantrip.Content.EntityDefinition.DecayOn.get -> string?
+Cantrip.Content.EntityDefinition.Effect.get -> Cantrip.Syntax.BlockNode?
+Cantrip.Content.EntityDefinition.Flags.get -> Cantrip.Content.StatusFlags
+Cantrip.Content.EntityDefinition.Flavour.get -> string?
+Cantrip.Content.EntityDefinition.HasTag(string! tag) -> bool
+Cantrip.Content.EntityDefinition.Kind.get -> Cantrip.EntityKind
+Cantrip.Content.EntityDefinition.KindName.get -> string!
+Cantrip.Content.EntityDefinition.Listeners.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.ListenerNode!>!
+Cantrip.Content.EntityDefinition.MaxStacks.get -> int?
+Cantrip.Content.EntityDefinition.Modifiers.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.ModifyNode!>!
+Cantrip.Content.EntityDefinition.Moves.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Content.MoveDefinition!>!
+Cantrip.Content.EntityDefinition.Name.get -> string!
+Cantrip.Content.EntityDefinition.Pattern.get -> Cantrip.Content.EnemyPatternKind
+Cantrip.Content.EntityDefinition.PatternMoves.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Cantrip.Content.EntityDefinition.Phases.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Content.PhaseDefinition!>!
+Cantrip.Content.EntityDefinition.Properties.get -> System.Collections.Generic.IReadOnlyDictionary<string!, Cantrip.Syntax.PropertyNode!>!
+Cantrip.Content.EntityDefinition.Property(string! name) -> Cantrip.Syntax.PropertyNode?
+Cantrip.Content.EntityDefinition.ReadString(string! property) -> string?
+Cantrip.Content.EntityDefinition.Stacking.get -> Cantrip.StackingMode
+Cantrip.Content.EntityDefinition.Stats.get -> System.Collections.Generic.IReadOnlyDictionary<string!, Cantrip.Num>!
+Cantrip.Content.EntityDefinition.Syntax.get -> Cantrip.Syntax.EntityDeclNode!
+Cantrip.Content.EntityDefinition.Tags.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Cantrip.Content.EntityDefinition.Text.get -> string?
+Cantrip.Content.EntityDefinition.TextOverride.get -> string?
+Cantrip.Content.EntityDefinition.Word(string! property) -> string?
+Cantrip.Content.MoveDefinition
+Cantrip.Content.MoveDefinition.Body.get -> Cantrip.Syntax.BlockNode!
+Cantrip.Content.MoveDefinition.MoveDefinition(string! name, Cantrip.Syntax.BlockNode! body, Cantrip.Num weight, string? phase = null) -> void
+Cantrip.Content.MoveDefinition.Name.get -> string!
+Cantrip.Content.MoveDefinition.Phase.get -> string?
+Cantrip.Content.MoveDefinition.Weight.get -> Cantrip.Num
+Cantrip.Content.PhaseDefinition
+Cantrip.Content.PhaseDefinition.Condition.get -> Cantrip.Syntax.ExprNode!
+Cantrip.Content.PhaseDefinition.Name.get -> string!
+Cantrip.Content.PhaseDefinition.PhaseDefinition(string! name, Cantrip.Syntax.ExprNode! condition, Cantrip.Diagnostics.SourceSpan span, bool retelegraph = false) -> void
+Cantrip.Content.PhaseDefinition.Retelegraph.get -> bool
+Cantrip.Content.PhaseDefinition.Span.get -> Cantrip.Diagnostics.SourceSpan
+Cantrip.Content.ResourceRule
+Cantrip.Content.ResourceRule.Max.get -> Cantrip.Syntax.ExprNode?
+Cantrip.Content.ResourceRule.Max.set -> void
+Cantrip.Content.ResourceRule.Min.get -> Cantrip.Syntax.ExprNode?
+Cantrip.Content.ResourceRule.Min.set -> void
+Cantrip.Content.ResourceRule.ResetOn.get -> string?
+Cantrip.Content.ResourceRule.ResetOn.set -> void
+Cantrip.Content.ResourceRule.ResetTo.get -> Cantrip.Syntax.ExprNode?
+Cantrip.Content.ResourceRule.ResetTo.set -> void
+Cantrip.Content.ResourceRule.ResourceRule(string! stat) -> void
+Cantrip.Content.ResourceRule.Stat.get -> string!
+Cantrip.Content.StatusFlags
+Cantrip.Content.StatusFlags.Buff = 1 -> Cantrip.Content.StatusFlags
+Cantrip.Content.StatusFlags.Debuff = 2 -> Cantrip.Content.StatusFlags
+Cantrip.Content.StatusFlags.Dispellable = 4 -> Cantrip.Content.StatusFlags
+Cantrip.Content.StatusFlags.Hidden = 16 -> Cantrip.Content.StatusFlags
+Cantrip.Content.StatusFlags.None = 0 -> Cantrip.Content.StatusFlags
+Cantrip.Content.StatusFlags.Persistent = 8 -> Cantrip.Content.StatusFlags
+Cantrip.Content.StatusFlags.UniquePerSource = 32 -> Cantrip.Content.StatusFlags
+Cantrip.Content.TestDefinition
+Cantrip.Content.TestDefinition.File.get -> string!
+Cantrip.Content.TestDefinition.Name.get -> string!
+Cantrip.Content.TestDefinition.Syntax.get -> Cantrip.Syntax.TestDeclNode!
+Cantrip.Content.VerbDefinition
+Cantrip.Content.VerbDefinition.Body.get -> Cantrip.Syntax.BlockNode!
+Cantrip.Content.VerbDefinition.Name.get -> string!
+Cantrip.Content.VerbDefinition.Parameters.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Cantrip.Content.VerbDefinition.Syntax.get -> Cantrip.Syntax.VerbDeclNode!
+Cantrip.Descriptions.Description
+Cantrip.Descriptions.Description.Cost.get -> Cantrip.Descriptions.DescriptionSegment?
+Cantrip.Descriptions.Description.Definition.get -> Cantrip.Content.EntityDefinition?
+Cantrip.Descriptions.Description.Find(string! placeholder) -> Cantrip.Descriptions.DescriptionSegment?
+Cantrip.Descriptions.Description.Flavour.get -> string?
+Cantrip.Descriptions.Description.IsEmpty.get -> bool
+Cantrip.Descriptions.Description.Level.get -> Cantrip.Descriptions.DescriptionLevel
+Cantrip.Descriptions.Description.Name.get -> string!
+Cantrip.Descriptions.Description.Segments.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Descriptions.DescriptionSegment!>!
+Cantrip.Descriptions.Description.ToMarkup() -> string!
+Cantrip.Descriptions.Description.Tooltips.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Descriptions.KeywordTooltip!>!
+Cantrip.Descriptions.Description.ToPlainText() -> string!
+Cantrip.Descriptions.Description.Values.get -> System.Collections.Generic.IEnumerable<Cantrip.Descriptions.DescriptionSegment!>!
+Cantrip.Descriptions.DescriptionBuilder
+Cantrip.Descriptions.DescriptionBuilder.Describe(Cantrip.Content.EntityDefinition! definition) -> Cantrip.Descriptions.Description!
+Cantrip.Descriptions.DescriptionBuilder.Describe(Cantrip.Runtime.Entity! entity, Cantrip.CardRuntime! runtime, Cantrip.Runtime.Entity? target = null) -> Cantrip.Descriptions.Description!
+Cantrip.Descriptions.DescriptionBuilder.DescribeIntent(Cantrip.Runtime.Entity! enemy, Cantrip.CardRuntime! runtime) -> Cantrip.Descriptions.Description!
+Cantrip.Descriptions.DescriptionBuilder.DescribeMove(Cantrip.Content.EntityDefinition! definition, string! moveName, Cantrip.CardRuntime? runtime = null, Cantrip.Runtime.Entity? enemy = null) -> Cantrip.Descriptions.Description!
+Cantrip.Descriptions.DescriptionBuilder.DescriptionBuilder(Cantrip.Content.ContentLibrary! content, Cantrip.Descriptions.IDescriptionLocalizer? localizer = null) -> void
+Cantrip.Descriptions.DescriptionBuilder.Validate(Cantrip.Content.EntityDefinition! definition) -> System.Collections.Generic.IReadOnlyList<Cantrip.Diagnostics.Diagnostic!>!
+Cantrip.Descriptions.DescriptionLevel
+Cantrip.Descriptions.DescriptionLevel.Auto = 0 -> Cantrip.Descriptions.DescriptionLevel
+Cantrip.Descriptions.DescriptionLevel.Custom = 1 -> Cantrip.Descriptions.DescriptionLevel
+Cantrip.Descriptions.DescriptionLevel.Override = 2 -> Cantrip.Descriptions.DescriptionLevel
+Cantrip.Descriptions.DescriptionSegment
+Cantrip.Descriptions.DescriptionSegment.Base.get -> Cantrip.Num
+Cantrip.Descriptions.DescriptionSegment.BaseText.get -> string!
+Cantrip.Descriptions.DescriptionSegment.Current.get -> Cantrip.Num
+Cantrip.Descriptions.DescriptionSegment.HasNumber.get -> bool
+Cantrip.Descriptions.DescriptionSegment.IsChanged.get -> bool
+Cantrip.Descriptions.DescriptionSegment.IsLinked.get -> bool
+Cantrip.Descriptions.DescriptionSegment.Kind.get -> Cantrip.Descriptions.SegmentKind
+Cantrip.Descriptions.DescriptionSegment.LowerIsBetter.get -> bool
+Cantrip.Descriptions.DescriptionSegment.Placeholder.get -> string?
+Cantrip.Descriptions.DescriptionSegment.Text.get -> string!
+Cantrip.Descriptions.DescriptionSegment.Trend.get -> Cantrip.Descriptions.ValueTrend
+Cantrip.Descriptions.DescriptionSegment.Unit.get -> string?
+Cantrip.Descriptions.EnglishDescriptions
+Cantrip.Descriptions.EnglishDescriptions.EnglishDescriptions() -> void
+Cantrip.Descriptions.IDescriptionLocalizer
+Cantrip.Descriptions.IDescriptionLocalizer.Flavour(Cantrip.Content.EntityDefinition! definition) -> string?
+Cantrip.Descriptions.IDescriptionLocalizer.Name(Cantrip.Content.EntityDefinition! definition) -> string?
+Cantrip.Descriptions.IDescriptionLocalizer.Phrase(string! key) -> string?
+Cantrip.Descriptions.IDescriptionLocalizer.Text(Cantrip.Content.EntityDefinition! definition) -> string?
+Cantrip.Descriptions.KeywordTooltip
+Cantrip.Descriptions.KeywordTooltip.Definition.get -> Cantrip.Content.EntityDefinition!
+Cantrip.Descriptions.KeywordTooltip.Description.get -> Cantrip.Descriptions.Description!
+Cantrip.Descriptions.KeywordTooltip.Name.get -> string!
+Cantrip.Descriptions.SegmentKind
+Cantrip.Descriptions.SegmentKind.Text = 0 -> Cantrip.Descriptions.SegmentKind
+Cantrip.Descriptions.SegmentKind.Value = 1 -> Cantrip.Descriptions.SegmentKind
+Cantrip.Descriptions.ValueTrend
+Cantrip.Descriptions.ValueTrend.Buffed = 1 -> Cantrip.Descriptions.ValueTrend
+Cantrip.Descriptions.ValueTrend.Debuffed = 2 -> Cantrip.Descriptions.ValueTrend
+Cantrip.Descriptions.ValueTrend.Unchanged = 0 -> Cantrip.Descriptions.ValueTrend
+Cantrip.Diagnostics.Diagnostic
+Cantrip.Diagnostics.Diagnostic.Code.get -> string!
+Cantrip.Diagnostics.Diagnostic.Diagnostic(Cantrip.Diagnostics.DiagnosticSeverity severity, string! code, string! message, Cantrip.Diagnostics.SourceSpan span, string? suggestion = null) -> void
+Cantrip.Diagnostics.Diagnostic.Message.get -> string!
+Cantrip.Diagnostics.Diagnostic.Severity.get -> Cantrip.Diagnostics.DiagnosticSeverity
+Cantrip.Diagnostics.Diagnostic.Span.get -> Cantrip.Diagnostics.SourceSpan
+Cantrip.Diagnostics.Diagnostic.Suggestion.get -> string?
+Cantrip.Diagnostics.DiagnosticBag
+Cantrip.Diagnostics.DiagnosticBag.Add(Cantrip.Diagnostics.Diagnostic! diagnostic) -> void
+Cantrip.Diagnostics.DiagnosticBag.AddRange(System.Collections.Generic.IEnumerable<Cantrip.Diagnostics.Diagnostic!>! diagnostics) -> void
+Cantrip.Diagnostics.DiagnosticBag.Count.get -> int
+Cantrip.Diagnostics.DiagnosticBag.DiagnosticBag() -> void
+Cantrip.Diagnostics.DiagnosticBag.Error(string! code, string! message, Cantrip.Diagnostics.SourceSpan span, string? suggestion = null) -> void
+Cantrip.Diagnostics.DiagnosticBag.Errors.get -> System.Collections.Generic.IEnumerable<Cantrip.Diagnostics.Diagnostic!>!
+Cantrip.Diagnostics.DiagnosticBag.GetEnumerator() -> System.Collections.Generic.IEnumerator<Cantrip.Diagnostics.Diagnostic!>!
+Cantrip.Diagnostics.DiagnosticBag.HasErrors.get -> bool
+Cantrip.Diagnostics.DiagnosticBag.Info(string! code, string! message, Cantrip.Diagnostics.SourceSpan span, string? suggestion = null) -> void
+Cantrip.Diagnostics.DiagnosticBag.ThrowIfErrors() -> void
+Cantrip.Diagnostics.DiagnosticBag.Warn(string! code, string! message, Cantrip.Diagnostics.SourceSpan span, string? suggestion = null) -> void
+Cantrip.Diagnostics.DiagnosticBag.Warnings.get -> System.Collections.Generic.IEnumerable<Cantrip.Diagnostics.Diagnostic!>!
+Cantrip.Diagnostics.DiagnosticSeverity
+Cantrip.Diagnostics.DiagnosticSeverity.Error = 2 -> Cantrip.Diagnostics.DiagnosticSeverity
+Cantrip.Diagnostics.DiagnosticSeverity.Info = 0 -> Cantrip.Diagnostics.DiagnosticSeverity
+Cantrip.Diagnostics.DiagnosticSeverity.Warning = 1 -> Cantrip.Diagnostics.DiagnosticSeverity
+Cantrip.Diagnostics.DslException
+Cantrip.Diagnostics.DslException.Diagnostics.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Diagnostics.Diagnostic!>!
+Cantrip.Diagnostics.DslException.DslException(Cantrip.Diagnostics.Diagnostic! diagnostic) -> void
+Cantrip.Diagnostics.DslException.DslException(System.Collections.Generic.IReadOnlyList<Cantrip.Diagnostics.Diagnostic!>! diagnostics) -> void
+Cantrip.Diagnostics.SourceSpan
+Cantrip.Diagnostics.SourceSpan.Column.get -> int
+Cantrip.Diagnostics.SourceSpan.Equals(Cantrip.Diagnostics.SourceSpan other) -> bool
+Cantrip.Diagnostics.SourceSpan.File.get -> string!
+Cantrip.Diagnostics.SourceSpan.IsNone.get -> bool
+Cantrip.Diagnostics.SourceSpan.Length.get -> int
+Cantrip.Diagnostics.SourceSpan.Line.get -> int
+Cantrip.Diagnostics.SourceSpan.SourceSpan() -> void
+Cantrip.Diagnostics.SourceSpan.SourceSpan(string! file, int line, int column, int length) -> void
+Cantrip.Diagnostics.SourceSpan.To(Cantrip.Diagnostics.SourceSpan other) -> Cantrip.Diagnostics.SourceSpan
+Cantrip.Diagnostics.Suggest
+Cantrip.EntityKind
+Cantrip.EntityKind.Ability = 4 -> Cantrip.EntityKind
+Cantrip.EntityKind.Actor = 0 -> Cantrip.EntityKind
+Cantrip.EntityKind.Card = 1 -> Cantrip.EntityKind
+Cantrip.EntityKind.Global = 7 -> Cantrip.EntityKind
+Cantrip.EntityKind.Item = 6 -> Cantrip.EntityKind
+Cantrip.EntityKind.Keyword = 5 -> Cantrip.EntityKind
+Cantrip.EntityKind.Relic = 3 -> Cantrip.EntityKind
+Cantrip.EntityKind.Status = 2 -> Cantrip.EntityKind
+Cantrip.EventPhase
+Cantrip.EventPhase.After = 2 -> Cantrip.EventPhase
+Cantrip.EventPhase.Before = 0 -> Cantrip.EventPhase
+Cantrip.EventPhase.Instead = 1 -> Cantrip.EventPhase
+Cantrip.ExecutionMode
+Cantrip.ExecutionMode.Headless = 0 -> Cantrip.ExecutionMode
+Cantrip.ExecutionMode.Live = 1 -> Cantrip.ExecutionMode
+Cantrip.Linting.Linter
+Cantrip.Linting.LintOptions
+Cantrip.Linting.LintOptions.HostEvents.get -> System.Collections.Generic.ISet<string!>!
+Cantrip.Linting.LintOptions.HostNames.get -> System.Collections.Generic.ISet<string!>!
+Cantrip.Linting.LintOptions.HostVerbs.get -> System.Collections.Generic.ISet<string!>!
+Cantrip.Linting.LintOptions.LintOptions() -> void
+Cantrip.Linting.LintOptions.Suppressed.get -> System.Collections.Generic.ISet<string!>!
+Cantrip.ModifierLayer
+Cantrip.ModifierLayer.Add = 0 -> Cantrip.ModifierLayer
+Cantrip.ModifierLayer.Clamp = 2 -> Cantrip.ModifierLayer
+Cantrip.ModifierLayer.Multiply = 1 -> Cantrip.ModifierLayer
+Cantrip.ModifierLayer.Override = 3 -> Cantrip.ModifierLayer
+Cantrip.Num
+Cantrip.Num.Ceiling() -> Cantrip.Num
+Cantrip.Num.CompareTo(Cantrip.Num other) -> int
+Cantrip.Num.Equals(Cantrip.Num other) -> bool
+Cantrip.Num.Floor() -> Cantrip.Num
+Cantrip.Num.IsNegative.get -> bool
+Cantrip.Num.IsZero.get -> bool
+Cantrip.Num.Num() -> void
+Cantrip.Num.Raw.get -> long
+Cantrip.Num.Round() -> Cantrip.Num
+Cantrip.Num.ToDouble() -> double
+Cantrip.Num.ToInt() -> int
+Cantrip.Num.ToString(string? format, System.IFormatProvider? formatProvider) -> string!
+Cantrip.PlayResult
+Cantrip.PlayResult.Cancelled = 6 -> Cantrip.PlayResult
+Cantrip.PlayResult.ChoicePending = 7 -> Cantrip.PlayResult
+Cantrip.PlayResult.InvalidTarget = 5 -> Cantrip.PlayResult
+Cantrip.PlayResult.NotACard = 1 -> Cantrip.PlayResult
+Cantrip.PlayResult.NotEnoughEnergy = 4 -> Cantrip.PlayResult
+Cantrip.PlayResult.NotInHand = 2 -> Cantrip.PlayResult
+Cantrip.PlayResult.Played = 0 -> Cantrip.PlayResult
+Cantrip.PlayResult.Unplayable = 3 -> Cantrip.PlayResult
+Cantrip.Rng
+Cantrip.Rng.Chance(Cantrip.Num percent) -> bool
+Cantrip.Rng.Fork(ulong salt) -> Cantrip.Rng!
+Cantrip.Rng.GetState() -> (ulong S0, ulong S1, ulong S2, ulong S3)
+Cantrip.Rng.NextInt(int minInclusive, int maxInclusive) -> int
+Cantrip.Rng.NextNum(Cantrip.Num min, Cantrip.Num max) -> Cantrip.Num
+Cantrip.Rng.NextUInt64() -> ulong
+Cantrip.Rng.Pick<T>(System.Collections.Generic.IReadOnlyList<T>! items) -> T
+Cantrip.Rng.PickWeighted(System.Collections.Generic.IReadOnlyList<Cantrip.Num>! weights) -> int
+Cantrip.Rng.Reseed(ulong seed) -> void
+Cantrip.Rng.Rng(ulong s0, ulong s1, ulong s2, ulong s3) -> void
+Cantrip.Rng.Rng(ulong seed) -> void
+Cantrip.Rng.Seed.get -> ulong
+Cantrip.Rng.SetState((ulong S0, ulong S1, ulong S2, ulong S3) state) -> void
+Cantrip.Rng.Shuffle<T>(System.Collections.Generic.IList<T>! items) -> void
+Cantrip.Runtime.BuiltinEvent
+Cantrip.Runtime.BuiltinEvent.Description.get -> string!
+Cantrip.Runtime.BuiltinEvent.Name.get -> string!
+Cantrip.Runtime.BuiltinEvents
+Cantrip.Runtime.Chain
+Cantrip.Runtime.Chain.Contains(int listenerId) -> bool
+Cantrip.Runtime.Chain.Depth.get -> int
+Cantrip.Runtime.Chain.Extend(int listenerId) -> Cantrip.Runtime.Chain!
+Cantrip.Runtime.Chain.ListenerId.get -> int
+Cantrip.Runtime.Chain.Parent.get -> Cantrip.Runtime.Chain?
+Cantrip.Runtime.Chain.RootId.get -> long
+Cantrip.Runtime.ChoicePendingException
+Cantrip.Runtime.ChoicePendingException.ChoicePendingException(Cantrip.Runtime.ChoiceRequest! request) -> void
+Cantrip.Runtime.ChoicePendingException.Request.get -> Cantrip.Runtime.ChoiceRequest!
+Cantrip.Runtime.ChoiceRequest
+Cantrip.Runtime.ChoiceRequest.ChoiceRequest(string! prompt, System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>! options, int min, int max, Cantrip.Runtime.Entity? chooser, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Runtime.ChoiceRequest.Chooser.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.ChoiceRequest.Max.get -> int
+Cantrip.Runtime.ChoiceRequest.Min.get -> int
+Cantrip.Runtime.ChoiceRequest.Options.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.Runtime.ChoiceRequest.Prompt.get -> string!
+Cantrip.Runtime.ChoiceRequest.Span.get -> Cantrip.Diagnostics.SourceSpan
+Cantrip.Runtime.DeferredChooser
+Cantrip.Runtime.DeferredChooser.AnswerCount.get -> int
+Cantrip.Runtime.DeferredChooser.Choose(Cantrip.Runtime.ChoiceRequest! request, Cantrip.Runtime.GameState! state) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.Runtime.DeferredChooser.DeferredChooser() -> void
+Cantrip.Runtime.DefinitionChoice
+Cantrip.Runtime.DefinitionChoice.Chooser.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.DefinitionChoice.DefinitionChoice(string! prompt, System.Collections.Generic.IReadOnlyList<Cantrip.Content.EntityDefinition!>! options, Cantrip.Runtime.Entity? chooser, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Runtime.DefinitionChoice.Options.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Content.EntityDefinition!>!
+Cantrip.Runtime.DefinitionChoice.Prompt.get -> string!
+Cantrip.Runtime.DefinitionChoice.Span.get -> Cantrip.Diagnostics.SourceSpan
+Cantrip.Runtime.EffectHostBase
+Cantrip.Runtime.EffectHostBase.EffectHostBase() -> void
+Cantrip.Runtime.Entity
+Cantrip.Runtime.Entity.AddTag(string! tag) -> void
+Cantrip.Runtime.Entity.Attached.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.Runtime.Entity.Controller.get -> Cantrip.Runtime.Entity!
+Cantrip.Runtime.Entity.CounterOf(string! statusName) -> int
+Cantrip.Runtime.Entity.Definition.get -> Cantrip.Content.EntityDefinition?
+Cantrip.Runtime.Entity.FindAttached(string! name) -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.Entity.Get(string! stat) -> Cantrip.Num
+Cantrip.Runtime.Entity.GetBase(string! stat) -> Cantrip.Num
+Cantrip.Runtime.Entity.GetInt(string! stat) -> int
+Cantrip.Runtime.Entity.HasStat(string! stat) -> bool
+Cantrip.Runtime.Entity.HasTag(string! tag) -> bool
+Cantrip.Runtime.Entity.Id.get -> int
+Cantrip.Runtime.Entity.Intent.get -> string?
+Cantrip.Runtime.Entity.IsAlive.get -> bool
+Cantrip.Runtime.Entity.IsDead.get -> bool
+Cantrip.Runtime.Entity.IsRemoved.get -> bool
+Cantrip.Runtime.Entity.Kind.get -> Cantrip.EntityKind
+Cantrip.Runtime.Entity.Name.get -> string!
+Cantrip.Runtime.Entity.Owner.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.Entity.Phase.get -> string?
+Cantrip.Runtime.Entity.Position.get -> int
+Cantrip.Runtime.Entity.RemoveTag(string! tag) -> void
+Cantrip.Runtime.Entity.Sequence.get -> long
+Cantrip.Runtime.Entity.SetBase(string! stat, Cantrip.Num value) -> void
+Cantrip.Runtime.Entity.Source.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.Entity.StacksOf(string! statusName) -> int
+Cantrip.Runtime.Entity.State.get -> Cantrip.Runtime.GameState!
+Cantrip.Runtime.Entity.StatNames.get -> System.Collections.Generic.IEnumerable<string!>!
+Cantrip.Runtime.Entity.Tags.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+Cantrip.Runtime.Entity.Team.get -> Cantrip.Team
+Cantrip.Runtime.Entity.Zone.get -> string!
+Cantrip.Runtime.EntitySnapshot
+Cantrip.Runtime.EntitySnapshot.Attached.get -> System.Collections.Generic.List<int>!
+Cantrip.Runtime.EntitySnapshot.Attached.set -> void
+Cantrip.Runtime.EntitySnapshot.DefinitionKind.get -> string?
+Cantrip.Runtime.EntitySnapshot.DefinitionKind.set -> void
+Cantrip.Runtime.EntitySnapshot.DefinitionName.get -> string?
+Cantrip.Runtime.EntitySnapshot.DefinitionName.set -> void
+Cantrip.Runtime.EntitySnapshot.EntitySnapshot() -> void
+Cantrip.Runtime.EntitySnapshot.Id.get -> int
+Cantrip.Runtime.EntitySnapshot.Id.set -> void
+Cantrip.Runtime.EntitySnapshot.Intent.get -> string?
+Cantrip.Runtime.EntitySnapshot.Intent.set -> void
+Cantrip.Runtime.EntitySnapshot.IsDead.get -> bool
+Cantrip.Runtime.EntitySnapshot.IsDead.set -> void
+Cantrip.Runtime.EntitySnapshot.IsRemoved.get -> bool
+Cantrip.Runtime.EntitySnapshot.IsRemoved.set -> void
+Cantrip.Runtime.EntitySnapshot.Kind.get -> int
+Cantrip.Runtime.EntitySnapshot.Kind.set -> void
+Cantrip.Runtime.EntitySnapshot.LastMove.get -> string?
+Cantrip.Runtime.EntitySnapshot.LastMove.set -> void
+Cantrip.Runtime.EntitySnapshot.Name.get -> string!
+Cantrip.Runtime.EntitySnapshot.Name.set -> void
+Cantrip.Runtime.EntitySnapshot.OwnerId.get -> int
+Cantrip.Runtime.EntitySnapshot.OwnerId.set -> void
+Cantrip.Runtime.EntitySnapshot.PatternIndex.get -> int
+Cantrip.Runtime.EntitySnapshot.PatternIndex.set -> void
+Cantrip.Runtime.EntitySnapshot.Phase.get -> string?
+Cantrip.Runtime.EntitySnapshot.Phase.set -> void
+Cantrip.Runtime.EntitySnapshot.Position.get -> int
+Cantrip.Runtime.EntitySnapshot.Position.set -> void
+Cantrip.Runtime.EntitySnapshot.Sequence.get -> long
+Cantrip.Runtime.EntitySnapshot.Sequence.set -> void
+Cantrip.Runtime.EntitySnapshot.SourceId.get -> int
+Cantrip.Runtime.EntitySnapshot.SourceId.set -> void
+Cantrip.Runtime.EntitySnapshot.Stats.get -> System.Collections.Generic.Dictionary<string!, long>!
+Cantrip.Runtime.EntitySnapshot.Stats.set -> void
+Cantrip.Runtime.EntitySnapshot.Tags.get -> System.Collections.Generic.List<string!>!
+Cantrip.Runtime.EntitySnapshot.Tags.set -> void
+Cantrip.Runtime.EntitySnapshot.Team.get -> int
+Cantrip.Runtime.EntitySnapshot.Team.set -> void
+Cantrip.Runtime.EntitySnapshot.Zone.get -> string!
+Cantrip.Runtime.EntitySnapshot.Zone.set -> void
+Cantrip.Runtime.EvalContext
+Cantrip.Runtime.EvalContext.Card.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.EvalContext.Card.set -> void
+Cantrip.Runtime.EvalContext.Chain.get -> Cantrip.Runtime.Chain!
+Cantrip.Runtime.EvalContext.Chain.set -> void
+Cantrip.Runtime.EvalContext.Controller.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.EvalContext.Derive() -> Cantrip.Runtime.EvalContext!
+Cantrip.Runtime.EvalContext.EvalContext(Cantrip.Runtime.Entity? self) -> void
+Cantrip.Runtime.EvalContext.Event.get -> Cantrip.Runtime.GameEvent?
+Cantrip.Runtime.EvalContext.Event.set -> void
+Cantrip.Runtime.EvalContext.Focus.get -> Cantrip.Runtime.ModifierQuery?
+Cantrip.Runtime.EvalContext.Focus.set -> void
+Cantrip.Runtime.EvalContext.It.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.EvalContext.It.set -> void
+Cantrip.Runtime.EvalContext.ItDefinition.get -> Cantrip.Content.EntityDefinition?
+Cantrip.Runtime.EvalContext.ItDefinition.set -> void
+Cantrip.Runtime.EvalContext.ItIsFocus.get -> bool
+Cantrip.Runtime.EvalContext.ItIsFocus.set -> void
+Cantrip.Runtime.EvalContext.LocalNames() -> System.Collections.Generic.IEnumerable<string!>!
+Cantrip.Runtime.EvalContext.Self.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.EvalContext.Self.set -> void
+Cantrip.Runtime.EvalContext.SetLocal(string! name, Cantrip.Runtime.Value value) -> void
+Cantrip.Runtime.EvalContext.Source.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.EvalContext.Source.set -> void
+Cantrip.Runtime.EvalContext.Target.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.EvalContext.Target.set -> void
+Cantrip.Runtime.EvalContext.TryGetLocal(string! name, out Cantrip.Runtime.Value value) -> bool
+Cantrip.Runtime.EvalContext.UndoScope.get -> Cantrip.Runtime.ScheduledAction?
+Cantrip.Runtime.EvalContext.UndoScope.set -> void
+Cantrip.Runtime.EventBus
+Cantrip.Runtime.EventBus.Candidates(string! eventName, Cantrip.EventPhase phase, Cantrip.Runtime.Ruleset! rules, Cantrip.Team activeTeam) -> System.Collections.Generic.List<Cantrip.Runtime.Listener!>!
+Cantrip.Runtime.EventBus.Count.get -> int
+Cantrip.Runtime.EventBus.EventBus() -> void
+Cantrip.Runtime.EventBus.HasListeners(string! eventName, Cantrip.EventPhase phase) -> bool
+Cantrip.Runtime.EventBus.OwnedBy(Cantrip.Runtime.Entity! owner) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Listener!>!
+Cantrip.Runtime.EventBus.Periodic.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Listener!>!
+Cantrip.Runtime.FirstOptionChooser
+Cantrip.Runtime.FirstOptionChooser.Choose(Cantrip.Runtime.ChoiceRequest! request, Cantrip.Runtime.GameState! state) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.Runtime.FirstOptionChooser.ChooseDefinition(Cantrip.Runtime.DefinitionChoice! request, Cantrip.Runtime.GameState! state) -> Cantrip.Content.EntityDefinition?
+Cantrip.Runtime.FirstOptionChooser.FirstOptionChooser() -> void
+Cantrip.Runtime.GameEvent
+Cantrip.Runtime.GameEvent.Amount.get -> Cantrip.Num
+Cantrip.Runtime.GameEvent.Amount.set -> void
+Cantrip.Runtime.GameEvent.Cancelled.get -> bool
+Cantrip.Runtime.GameEvent.Cancelled.set -> void
+Cantrip.Runtime.GameEvent.Card.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.GameEvent.Card.set -> void
+Cantrip.Runtime.GameEvent.Data.get -> System.Collections.Generic.Dictionary<string!, Cantrip.Runtime.Value>!
+Cantrip.Runtime.GameEvent.GameEvent(string! name) -> void
+Cantrip.Runtime.GameEvent.Name.get -> string!
+Cantrip.Runtime.GameEvent.Phase.get -> Cantrip.EventPhase
+Cantrip.Runtime.GameEvent.Replaced.get -> bool
+Cantrip.Runtime.GameEvent.Source.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.GameEvent.Source.set -> void
+Cantrip.Runtime.GameEvent.Tags.get -> System.Collections.Generic.HashSet<string!>!
+Cantrip.Runtime.GameEvent.Target.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.GameEvent.Target.set -> void
+Cantrip.Runtime.GameEvent.TraceId.get -> long
+Cantrip.Runtime.GameSnapshot
+Cantrip.Runtime.GameSnapshot.ActiveTeam.get -> int
+Cantrip.Runtime.GameSnapshot.ActiveTeam.set -> void
+Cantrip.Runtime.GameSnapshot.BattleHistory.get -> System.Collections.Generic.Dictionary<string!, long>!
+Cantrip.Runtime.GameSnapshot.BattleHistory.set -> void
+Cantrip.Runtime.GameSnapshot.BattleNumber.get -> int
+Cantrip.Runtime.GameSnapshot.BattleNumber.set -> void
+Cantrip.Runtime.GameSnapshot.ClockNow.get -> long
+Cantrip.Runtime.GameSnapshot.ClockNow.set -> void
+Cantrip.Runtime.GameSnapshot.Entities.get -> System.Collections.Generic.List<Cantrip.Runtime.EntitySnapshot!>!
+Cantrip.Runtime.GameSnapshot.Entities.set -> void
+Cantrip.Runtime.GameSnapshot.FormatVersion.get -> int
+Cantrip.Runtime.GameSnapshot.FormatVersion.set -> void
+Cantrip.Runtime.GameSnapshot.GameSnapshot() -> void
+Cantrip.Runtime.GameSnapshot.InBattle.get -> bool
+Cantrip.Runtime.GameSnapshot.InBattle.set -> void
+Cantrip.Runtime.GameSnapshot.ListenerDues.get -> System.Collections.Generic.List<Cantrip.Runtime.ListenerDueSnapshot!>!
+Cantrip.Runtime.GameSnapshot.ListenerDues.set -> void
+Cantrip.Runtime.GameSnapshot.ListenerLimits.get -> System.Collections.Generic.List<Cantrip.Runtime.ListenerLimitSnapshot!>!
+Cantrip.Runtime.GameSnapshot.ListenerLimits.set -> void
+Cantrip.Runtime.GameSnapshot.NextChainRoot.get -> long
+Cantrip.Runtime.GameSnapshot.NextChainRoot.set -> void
+Cantrip.Runtime.GameSnapshot.NextEntityId.get -> int
+Cantrip.Runtime.GameSnapshot.NextEntityId.set -> void
+Cantrip.Runtime.GameSnapshot.NextScheduleId.get -> long
+Cantrip.Runtime.GameSnapshot.NextScheduleId.set -> void
+Cantrip.Runtime.GameSnapshot.NextSequence.get -> long
+Cantrip.Runtime.GameSnapshot.NextSequence.set -> void
+Cantrip.Runtime.GameSnapshot.PlayerId.get -> int
+Cantrip.Runtime.GameSnapshot.PlayerId.set -> void
+Cantrip.Runtime.GameSnapshot.Rng.get -> ulong[]!
+Cantrip.Runtime.GameSnapshot.Rng.set -> void
+Cantrip.Runtime.GameSnapshot.Scheduled.get -> System.Collections.Generic.List<Cantrip.Runtime.ScheduledSnapshot!>!
+Cantrip.Runtime.GameSnapshot.Scheduled.set -> void
+Cantrip.Runtime.GameSnapshot.SkipNextDraw.get -> bool
+Cantrip.Runtime.GameSnapshot.SkipNextDraw.set -> void
+Cantrip.Runtime.GameSnapshot.Turn.get -> int
+Cantrip.Runtime.GameSnapshot.Turn.set -> void
+Cantrip.Runtime.GameSnapshot.TurnHistory.get -> System.Collections.Generic.Dictionary<string!, long>!
+Cantrip.Runtime.GameSnapshot.TurnHistory.set -> void
+Cantrip.Runtime.GameSnapshot.Won.get -> bool?
+Cantrip.Runtime.GameSnapshot.Won.set -> void
+Cantrip.Runtime.GameSnapshot.Zones.get -> System.Collections.Generic.List<Cantrip.Runtime.ZoneSnapshot!>!
+Cantrip.Runtime.GameSnapshot.Zones.set -> void
+Cantrip.Runtime.GameState
+Cantrip.Runtime.GameState.ActiveTeam.get -> Cantrip.Team
+Cantrip.Runtime.GameState.Actors(Cantrip.Team? team = null) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.Runtime.GameState.Attach(Cantrip.Runtime.Entity! parent, Cantrip.Runtime.Entity! child) -> void
+Cantrip.Runtime.GameState.BattleNumber.get -> int
+Cantrip.Runtime.GameState.Clock.get -> Cantrip.Runtime.IGameClock!
+Cantrip.Runtime.GameState.ComputeHash() -> ulong
+Cantrip.Runtime.GameState.Content.get -> Cantrip.Content.ContentLibrary!
+Cantrip.Runtime.GameState.Entities.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.Runtime.GameState.Events.get -> Cantrip.Runtime.EventBus!
+Cantrip.Runtime.GameState.Find(int id) -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.GameState.FindByName(string! name) -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.GameState.GameState(Cantrip.Content.ContentLibrary! content, Cantrip.Runtime.Ruleset! rules, Cantrip.Runtime.IGameClock! clock, ulong seed) -> void
+Cantrip.Runtime.GameState.History(string! key, Cantrip.Runtime.Entity? who = null, bool battle = false) -> Cantrip.Num
+Cantrip.Runtime.GameState.InBattle.get -> bool
+Cantrip.Runtime.GameState.Instantiate(Cantrip.Content.EntityDefinition! definition, Cantrip.Runtime.Entity? owner = null, Cantrip.Team team = Cantrip.Team.Neutral, string! zone = "") -> Cantrip.Runtime.Entity!
+Cantrip.Runtime.GameState.IsActive(Cantrip.Runtime.Entity! entity) -> bool
+Cantrip.Runtime.GameState.Modifiers.get -> Cantrip.Runtime.ModifierPipeline!
+Cantrip.Runtime.GameState.MoveTo(Cantrip.Runtime.Entity! entity, string! zone, bool toTop = false) -> void
+Cantrip.Runtime.GameState.Player.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.GameState.Remove(Cantrip.Runtime.Entity! entity) -> void
+Cantrip.Runtime.GameState.Rng.get -> Cantrip.Rng!
+Cantrip.Runtime.GameState.Rules.get -> Cantrip.Runtime.Ruleset!
+Cantrip.Runtime.GameState.Scheduled.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.ScheduledAction!>!
+Cantrip.Runtime.GameState.Spawn(string! name, Cantrip.EntityKind kind, Cantrip.Runtime.Entity? owner = null, Cantrip.Team team = Cantrip.Team.Neutral, string! zone = "") -> Cantrip.Runtime.Entity!
+Cantrip.Runtime.GameState.Trace.get -> Cantrip.Runtime.TraceLog!
+Cantrip.Runtime.GameState.Turn.get -> int
+Cantrip.Runtime.GameState.Version.get -> long
+Cantrip.Runtime.GameState.ZoneOf(Cantrip.Runtime.Entity? owner, string! zone) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.Runtime.IChoiceProvider
+Cantrip.Runtime.IChoiceProvider.Choose(Cantrip.Runtime.ChoiceRequest! request, Cantrip.Runtime.GameState! state) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.Runtime.IDefinitionChooser
+Cantrip.Runtime.IDefinitionChooser.ChooseDefinition(Cantrip.Runtime.DefinitionChoice! request, Cantrip.Runtime.GameState! state) -> Cantrip.Content.EntityDefinition?
+Cantrip.Runtime.IEffectHost
+Cantrip.Runtime.IEffectHost.OnEvent(Cantrip.Runtime.GameEvent! gameEvent) -> void
+Cantrip.Runtime.IEffectHost.TryCall(string! function, System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Value>! arguments, Cantrip.Runtime.EvalContext! context, out Cantrip.Runtime.Value value) -> bool
+Cantrip.Runtime.IEffectHost.TryResolveName(string! name, Cantrip.Runtime.EvalContext! context, out Cantrip.Runtime.Value value) -> bool
+Cantrip.Runtime.IGameClock
+Cantrip.Runtime.IGameClock.Advanced -> System.Action<long>?
+Cantrip.Runtime.IGameClock.Now.get -> long
+Cantrip.Runtime.IGameClock.Restore(long now) -> void
+Cantrip.Runtime.IGameClock.TryConvert(Cantrip.Num amount, string? unit, out long units) -> bool
+Cantrip.Runtime.IModifierEvaluator
+Cantrip.Runtime.IModifierEvaluator.Amount(Cantrip.Runtime.Modifier! modifier, Cantrip.Runtime.ModifierQuery! query) -> Cantrip.Runtime.Value
+Cantrip.Runtime.IModifierEvaluator.Applies(Cantrip.Runtime.Modifier! modifier, Cantrip.Runtime.ModifierQuery! query) -> bool
+Cantrip.Runtime.Interpreter
+Cantrip.Runtime.Interpreter.AddTag(Cantrip.Runtime.Entity! entity, string! tag, Cantrip.Runtime.EvalContext! context) -> void
+Cantrip.Runtime.Interpreter.AdjustStatusStacks(Cantrip.Runtime.Entity! host, string! statusName, Cantrip.Syntax.AssignOperator op, Cantrip.Num amount, Cantrip.Runtime.EvalContext! context, Cantrip.Diagnostics.SourceSpan span = default(Cantrip.Diagnostics.SourceSpan)) -> void
+Cantrip.Runtime.Interpreter.Amount(Cantrip.Runtime.Modifier! modifier, Cantrip.Runtime.ModifierQuery! query) -> Cantrip.Runtime.Value
+Cantrip.Runtime.Interpreter.Applies(Cantrip.Runtime.Modifier! modifier, Cantrip.Runtime.ModifierQuery! query) -> bool
+Cantrip.Runtime.Interpreter.ApplyStatus(Cantrip.Content.EntityDefinition! definition, Cantrip.Runtime.Entity! host, Cantrip.Num stacks, long? durationUnits, Cantrip.Runtime.EvalContext! context, Cantrip.Diagnostics.SourceSpan span = default(Cantrip.Diagnostics.SourceSpan)) -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.Interpreter.Breakpoints.get -> Cantrip.Runtime.TriggerBreakpoints!
+Cantrip.Runtime.Interpreter.ChangeStat(Cantrip.Runtime.Entity! entity, string! stat, Cantrip.Syntax.AssignOperator op, Cantrip.Num amount, Cantrip.Runtime.EvalContext! context, Cantrip.Diagnostics.SourceSpan span = default(Cantrip.Diagnostics.SourceSpan), bool fromReset = false) -> Cantrip.Num
+Cantrip.Runtime.Interpreter.Chooser.get -> Cantrip.Runtime.IChoiceProvider!
+Cantrip.Runtime.Interpreter.Chooser.set -> void
+Cantrip.Runtime.Interpreter.Content.get -> Cantrip.Content.ContentLibrary!
+Cantrip.Runtime.Interpreter.Create(Cantrip.Content.EntityDefinition! definition, Cantrip.Runtime.Entity? owner, string? zone, Cantrip.Runtime.EvalContext! context) -> Cantrip.Runtime.Entity!
+Cantrip.Runtime.Interpreter.DealDamage(Cantrip.Runtime.Entity? source, Cantrip.Runtime.Entity! target, Cantrip.Num amount, System.Collections.Generic.IEnumerable<string!>! tags, bool ignoreBlock, Cantrip.Runtime.EvalContext! context, Cantrip.Diagnostics.SourceSpan span = default(Cantrip.Diagnostics.SourceSpan)) -> Cantrip.Num
+Cantrip.Runtime.Interpreter.Destroy(Cantrip.Runtime.Entity! entity, Cantrip.Runtime.EvalContext! context) -> void
+Cantrip.Runtime.Interpreter.Drain() -> void
+Cantrip.Runtime.Interpreter.Draw(Cantrip.Runtime.Entity! actor, int count, Cantrip.Runtime.EvalContext! context) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.Runtime.Interpreter.Evaluate(Cantrip.Syntax.ExprNode! node, Cantrip.Runtime.EvalContext! context) -> Cantrip.Runtime.Value
+Cantrip.Runtime.Interpreter.EvaluateCondition(Cantrip.Syntax.ExprNode! node, Cantrip.Runtime.EvalContext! context) -> bool
+Cantrip.Runtime.Interpreter.EvaluateNumber(Cantrip.Syntax.ExprNode! node, Cantrip.Runtime.EvalContext! context) -> Cantrip.Num
+Cantrip.Runtime.Interpreter.Execute(Cantrip.Syntax.BlockNode! block, Cantrip.Runtime.EvalContext! context) -> void
+Cantrip.Runtime.Interpreter.ExpireTimedStatuses() -> void
+Cantrip.Runtime.Interpreter.GainBlock(Cantrip.Runtime.Entity? source, Cantrip.Runtime.Entity! target, Cantrip.Num amount, Cantrip.Runtime.EvalContext! context, Cantrip.Diagnostics.SourceSpan span = default(Cantrip.Diagnostics.SourceSpan)) -> Cantrip.Num
+Cantrip.Runtime.Interpreter.Heal(Cantrip.Runtime.Entity? source, Cantrip.Runtime.Entity! target, Cantrip.Num amount, Cantrip.Runtime.EvalContext! context, Cantrip.Diagnostics.SourceSpan span = default(Cantrip.Diagnostics.SourceSpan)) -> Cantrip.Num
+Cantrip.Runtime.Interpreter.Host.get -> Cantrip.Runtime.IEffectHost!
+Cantrip.Runtime.Interpreter.Interpreter(Cantrip.Runtime.GameState! state, Cantrip.Runtime.IEffectHost? host = null) -> void
+Cantrip.Runtime.Interpreter.IsBuiltinVerb(string! name) -> bool
+Cantrip.Runtime.Interpreter.IsTrue(Cantrip.Runtime.Value value, Cantrip.Runtime.EvalContext! context) -> bool
+Cantrip.Runtime.Interpreter.IsVerb(string! name) -> bool
+Cantrip.Runtime.Interpreter.Kill(Cantrip.Runtime.Entity! target, Cantrip.Runtime.Entity? source, Cantrip.Runtime.EvalContext! context) -> bool
+Cantrip.Runtime.Interpreter.Logged -> System.Action<string!>?
+Cantrip.Runtime.Interpreter.MoveCard(Cantrip.Runtime.Entity! card, string! zone, string! eventName, Cantrip.Runtime.EvalContext! context, bool toTop = false) -> bool
+Cantrip.Runtime.Interpreter.Next.get -> Cantrip.Runtime.PendingTrigger?
+Cantrip.Runtime.Interpreter.Pause() -> void
+Cantrip.Runtime.Interpreter.Paused.get -> bool
+Cantrip.Runtime.Interpreter.PendingTriggers.get -> int
+Cantrip.Runtime.Interpreter.ProcessDecay(Cantrip.Runtime.Entity! host, string! trigger) -> void
+Cantrip.Runtime.Interpreter.Raise(Cantrip.Runtime.GameEvent! gameEvent, Cantrip.Runtime.EvalContext! context, System.Action? action = null, System.Action? committed = null) -> bool
+Cantrip.Runtime.Interpreter.RegisterVerb(string! name, Cantrip.Runtime.VerbHandler! handler) -> void
+Cantrip.Runtime.Interpreter.RemoveMatching(Cantrip.Runtime.Entity! host, Cantrip.Runtime.Value what, Cantrip.Runtime.EvalContext! context, Cantrip.Diagnostics.SourceSpan span = default(Cantrip.Diagnostics.SourceSpan)) -> int
+Cantrip.Runtime.Interpreter.RemoveStatus(Cantrip.Runtime.Entity! status, Cantrip.Runtime.EvalContext! context) -> void
+Cantrip.Runtime.Interpreter.ResetResources(Cantrip.Runtime.Entity! actor, string! trigger) -> void
+Cantrip.Runtime.Interpreter.Resume() -> void
+Cantrip.Runtime.Interpreter.RollIntent(Cantrip.Runtime.Entity! enemy) -> void
+Cantrip.Runtime.Interpreter.Rules.get -> Cantrip.Runtime.Ruleset!
+Cantrip.Runtime.Interpreter.ShuffleDiscardIntoDraw(Cantrip.Runtime.Entity! actor, Cantrip.Runtime.EvalContext! context) -> void
+Cantrip.Runtime.Interpreter.ShuffleZone(Cantrip.Runtime.Entity! actor, string! zone) -> void
+Cantrip.Runtime.Interpreter.State.get -> Cantrip.Runtime.GameState!
+Cantrip.Runtime.Interpreter.TryDrainStep() -> bool
+Cantrip.Runtime.Interpreter.VerbNames.get -> System.Collections.Generic.IEnumerable<string!>!
+Cantrip.Runtime.Listener
+Cantrip.Runtime.Listener.EventName.get -> string!
+Cantrip.Runtime.Listener.Id.get -> int
+Cantrip.Runtime.Listener.IntervalUnits.get -> long
+Cantrip.Runtime.Listener.NextDueAt.get -> long
+Cantrip.Runtime.Listener.Order.get -> long
+Cantrip.Runtime.Listener.Owner.get -> Cantrip.Runtime.Entity!
+Cantrip.Runtime.Listener.Phase.get -> Cantrip.EventPhase
+Cantrip.Runtime.Listener.Priority.get -> int
+Cantrip.Runtime.Listener.Scope.get -> string?
+Cantrip.Runtime.Listener.Syntax.get -> Cantrip.Syntax.ListenerNode!
+Cantrip.Runtime.ListenerDueSnapshot
+Cantrip.Runtime.ListenerDueSnapshot.DueAt.get -> long
+Cantrip.Runtime.ListenerDueSnapshot.DueAt.set -> void
+Cantrip.Runtime.ListenerDueSnapshot.Index.get -> int
+Cantrip.Runtime.ListenerDueSnapshot.Index.set -> void
+Cantrip.Runtime.ListenerDueSnapshot.ListenerDueSnapshot() -> void
+Cantrip.Runtime.ListenerDueSnapshot.OwnerId.get -> int
+Cantrip.Runtime.ListenerDueSnapshot.OwnerId.set -> void
+Cantrip.Runtime.ListenerLimitSnapshot
+Cantrip.Runtime.ListenerLimitSnapshot.Index.get -> int
+Cantrip.Runtime.ListenerLimitSnapshot.Index.set -> void
+Cantrip.Runtime.ListenerLimitSnapshot.ListenerLimitSnapshot() -> void
+Cantrip.Runtime.ListenerLimitSnapshot.OwnerId.get -> int
+Cantrip.Runtime.ListenerLimitSnapshot.OwnerId.set -> void
+Cantrip.Runtime.ListenerLimitSnapshot.Window.get -> long
+Cantrip.Runtime.ListenerLimitSnapshot.Window.set -> void
+Cantrip.Runtime.ListenerOrdering
+Cantrip.Runtime.ListenerOrdering.ActivePlayer = 2 -> Cantrip.Runtime.ListenerOrdering
+Cantrip.Runtime.ListenerOrdering.PlayOrder = 1 -> Cantrip.Runtime.ListenerOrdering
+Cantrip.Runtime.ListenerOrdering.Priority = 0 -> Cantrip.Runtime.ListenerOrdering
+Cantrip.Runtime.LoopProtection
+Cantrip.Runtime.LoopProtection.DepthOnly = 0 -> Cantrip.Runtime.LoopProtection
+Cantrip.Runtime.LoopProtection.OncePerChain = 1 -> Cantrip.Runtime.LoopProtection
+Cantrip.Runtime.Modifier
+Cantrip.Runtime.Modifier.Channel.get -> string!
+Cantrip.Runtime.Modifier.Id.get -> int
+Cantrip.Runtime.Modifier.Layer.get -> Cantrip.ModifierLayer
+Cantrip.Runtime.Modifier.Order.get -> long
+Cantrip.Runtime.Modifier.Owner.get -> Cantrip.Runtime.Entity!
+Cantrip.Runtime.Modifier.Syntax.get -> Cantrip.Syntax.ModifyNode!
+Cantrip.Runtime.ModifierPipeline
+Cantrip.Runtime.ModifierPipeline.CacheHits.get -> long
+Cantrip.Runtime.ModifierPipeline.Compute(Cantrip.Runtime.ModifierQuery! query, Cantrip.Num baseValue) -> Cantrip.Num
+Cantrip.Runtime.ModifierPipeline.ComputeStat(Cantrip.Runtime.Entity! entity, string! stat, Cantrip.Num baseValue) -> Cantrip.Num
+Cantrip.Runtime.ModifierPipeline.Count.get -> int
+Cantrip.Runtime.ModifierPipeline.Evaluator.get -> Cantrip.Runtime.IModifierEvaluator?
+Cantrip.Runtime.ModifierPipeline.Evaluator.set -> void
+Cantrip.Runtime.ModifierPipeline.Explain(Cantrip.Runtime.ModifierQuery! query, Cantrip.Num baseValue) -> Cantrip.Runtime.ModifierResult!
+Cantrip.Runtime.ModifierPipeline.HasChannel(string! channel) -> bool
+Cantrip.Runtime.ModifierPipeline.OnChannel(string! channel) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Modifier!>!
+Cantrip.Runtime.ModifierPipeline.OwnedBy(Cantrip.Runtime.Entity! owner) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Modifier!>!
+Cantrip.Runtime.ModifierQuery
+Cantrip.Runtime.ModifierQuery.Card.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.ModifierQuery.Card.set -> void
+Cantrip.Runtime.ModifierQuery.Channel.get -> string!
+Cantrip.Runtime.ModifierQuery.ModifierQuery(string! channel) -> void
+Cantrip.Runtime.ModifierQuery.Source.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.ModifierQuery.Source.set -> void
+Cantrip.Runtime.ModifierQuery.Subject.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.ModifierQuery.Subject.set -> void
+Cantrip.Runtime.ModifierQuery.Tags.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+Cantrip.Runtime.ModifierQuery.Tags.set -> void
+Cantrip.Runtime.ModifierResult
+Cantrip.Runtime.ModifierResult.Base.get -> Cantrip.Num
+Cantrip.Runtime.ModifierResult.Final.get -> Cantrip.Num
+Cantrip.Runtime.ModifierResult.Steps.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.ModifierStep>!
+Cantrip.Runtime.ModifierStep
+Cantrip.Runtime.ModifierStep.After.get -> Cantrip.Num
+Cantrip.Runtime.ModifierStep.Amount.get -> Cantrip.Num
+Cantrip.Runtime.ModifierStep.Before.get -> Cantrip.Num
+Cantrip.Runtime.ModifierStep.Modifier.get -> Cantrip.Runtime.Modifier!
+Cantrip.Runtime.ModifierStep.ModifierStep() -> void
+Cantrip.Runtime.ModifierStep.ModifierStep(Cantrip.Runtime.Modifier! modifier, Cantrip.Num amount, Cantrip.Num before, Cantrip.Num after) -> void
+Cantrip.Runtime.PendingChoice
+Cantrip.Runtime.PendingChoice.Chooser.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.PendingChoice.Max.get -> int
+Cantrip.Runtime.PendingChoice.Min.get -> int
+Cantrip.Runtime.PendingChoice.Options.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.Runtime.PendingChoice.Prompt.get -> string!
+Cantrip.Runtime.PendingChoice.Span.get -> Cantrip.Diagnostics.SourceSpan
+Cantrip.Runtime.PendingTrigger
+Cantrip.Runtime.PendingTrigger.Description.get -> string!
+Cantrip.Runtime.PendingTrigger.EventName.get -> string!
+Cantrip.Runtime.PendingTrigger.ListenerId.get -> int
+Cantrip.Runtime.PendingTrigger.PendingTrigger() -> void
+Cantrip.Runtime.PendingTrigger.Span.get -> Cantrip.Diagnostics.SourceSpan
+Cantrip.Runtime.QualifiedName
+Cantrip.Runtime.QualifiedName.Name.get -> string!
+Cantrip.Runtime.QualifiedName.QualifiedName(string! qualifier, string! name) -> void
+Cantrip.Runtime.QualifiedName.Qualifier.get -> string!
+Cantrip.Runtime.RandomChooser
+Cantrip.Runtime.RandomChooser.Choose(Cantrip.Runtime.ChoiceRequest! request, Cantrip.Runtime.GameState! state) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.Runtime.RandomChooser.RandomChooser(ulong seed) -> void
+Cantrip.Runtime.Ruleset
+Cantrip.Runtime.Ruleset.AfterEvents.get -> bool
+Cantrip.Runtime.Ruleset.AfterEvents.set -> void
+Cantrip.Runtime.Ruleset.BeforeEvents.get -> bool
+Cantrip.Runtime.Ruleset.BeforeEvents.set -> void
+Cantrip.Runtime.Ruleset.HandSize.get -> int
+Cantrip.Runtime.Ruleset.HandSize.set -> void
+Cantrip.Runtime.Ruleset.InsteadEvents.get -> bool
+Cantrip.Runtime.Ruleset.InsteadEvents.set -> void
+Cantrip.Runtime.Ruleset.Loops.get -> Cantrip.Runtime.LoopProtection
+Cantrip.Runtime.Ruleset.Loops.set -> void
+Cantrip.Runtime.Ruleset.MaxCallDepth.get -> int
+Cantrip.Runtime.Ruleset.MaxCallDepth.set -> void
+Cantrip.Runtime.Ruleset.MaxDepth.get -> int
+Cantrip.Runtime.Ruleset.MaxDepth.set -> void
+Cantrip.Runtime.Ruleset.MaxHandSize.get -> int
+Cantrip.Runtime.Ruleset.MaxHandSize.set -> void
+Cantrip.Runtime.Ruleset.MaxStepsPerAction.get -> int
+Cantrip.Runtime.Ruleset.MaxStepsPerAction.set -> void
+Cantrip.Runtime.Ruleset.ModifierLayers.get -> System.Collections.Generic.IReadOnlyList<Cantrip.ModifierLayer>!
+Cantrip.Runtime.Ruleset.ModifierLayers.set -> void
+Cantrip.Runtime.Ruleset.Ordering.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.ListenerOrdering>!
+Cantrip.Runtime.Ruleset.Ordering.set -> void
+Cantrip.Runtime.Ruleset.Ruleset() -> void
+Cantrip.Runtime.Ruleset.SameAs(Cantrip.Runtime.Ruleset! other) -> bool
+Cantrip.Runtime.Ruleset.Triggers.get -> Cantrip.Runtime.TriggerResolution
+Cantrip.Runtime.Ruleset.Triggers.set -> void
+Cantrip.Runtime.RuntimeError
+Cantrip.Runtime.RuntimeError.Detail.get -> string!
+Cantrip.Runtime.RuntimeError.RuntimeError(string! message, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Runtime.RuntimeError.Span.get -> Cantrip.Diagnostics.SourceSpan
+Cantrip.Runtime.ScheduledAction
+Cantrip.Runtime.ScheduledAction.Bindings.get -> System.Collections.Generic.Dictionary<string!, Cantrip.Runtime.Value>!
+Cantrip.Runtime.ScheduledAction.Body.get -> Cantrip.Syntax.BlockNode?
+Cantrip.Runtime.ScheduledAction.Deadline.get -> string?
+Cantrip.Runtime.ScheduledAction.DueAt.get -> long
+Cantrip.Runtime.ScheduledAction.Id.get -> long
+Cantrip.Runtime.ScheduledAction.Owner.get -> Cantrip.Runtime.Entity!
+Cantrip.Runtime.ScheduledAction.Timing.get -> Cantrip.Runtime.ScheduleTiming
+Cantrip.Runtime.ScheduledAction.Undo.get -> System.Collections.Generic.List<Cantrip.Runtime.TemporaryChange!>!
+Cantrip.Runtime.ScheduledSnapshot
+Cantrip.Runtime.ScheduledSnapshot.Bindings.get -> System.Collections.Generic.Dictionary<string!, Cantrip.Runtime.ValueSnapshot!>!
+Cantrip.Runtime.ScheduledSnapshot.Bindings.set -> void
+Cantrip.Runtime.ScheduledSnapshot.Block.get -> string?
+Cantrip.Runtime.ScheduledSnapshot.Block.set -> void
+Cantrip.Runtime.ScheduledSnapshot.Deadline.get -> string?
+Cantrip.Runtime.ScheduledSnapshot.Deadline.set -> void
+Cantrip.Runtime.ScheduledSnapshot.DueAt.get -> long
+Cantrip.Runtime.ScheduledSnapshot.DueAt.set -> void
+Cantrip.Runtime.ScheduledSnapshot.Id.get -> long
+Cantrip.Runtime.ScheduledSnapshot.Id.set -> void
+Cantrip.Runtime.ScheduledSnapshot.OwnerId.get -> int
+Cantrip.Runtime.ScheduledSnapshot.OwnerId.set -> void
+Cantrip.Runtime.ScheduledSnapshot.ScheduledSnapshot() -> void
+Cantrip.Runtime.ScheduledSnapshot.Timing.get -> int
+Cantrip.Runtime.ScheduledSnapshot.Timing.set -> void
+Cantrip.Runtime.ScheduledSnapshot.Undo.get -> System.Collections.Generic.List<Cantrip.Runtime.UndoSnapshot!>!
+Cantrip.Runtime.ScheduledSnapshot.Undo.set -> void
+Cantrip.Runtime.ScheduleTiming
+Cantrip.Runtime.ScheduleTiming.AtTime = 0 -> Cantrip.Runtime.ScheduleTiming
+Cantrip.Runtime.ScheduleTiming.NextTurn = 1 -> Cantrip.Runtime.ScheduleTiming
+Cantrip.Runtime.ScheduleTiming.Until = 2 -> Cantrip.Runtime.ScheduleTiming
+Cantrip.Runtime.ScriptedChooser
+Cantrip.Runtime.ScriptedChooser.Choose(Cantrip.Runtime.ChoiceRequest! request, Cantrip.Runtime.GameState! state) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.Runtime.ScriptedChooser.ChooseDefinition(Cantrip.Runtime.DefinitionChoice! request, Cantrip.Runtime.GameState! state) -> Cantrip.Content.EntityDefinition?
+Cantrip.Runtime.ScriptedChooser.Enqueue(string! answer) -> void
+Cantrip.Runtime.ScriptedChooser.Remaining.get -> int
+Cantrip.Runtime.ScriptedChooser.ScriptedChooser(params string![]! answers) -> void
+Cantrip.Runtime.TemporaryChange
+Cantrip.Runtime.TemporaryChange.Attached.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.TemporaryChange.Delta.get -> Cantrip.Num
+Cantrip.Runtime.TemporaryChange.Entity.get -> Cantrip.Runtime.Entity!
+Cantrip.Runtime.TemporaryChange.Stat.get -> string?
+Cantrip.Runtime.TemporaryChange.Tag.get -> string?
+Cantrip.Runtime.TemporaryChange.TemporaryChange(Cantrip.Runtime.Entity! entity, string? tag = null, Cantrip.Runtime.Entity? attached = null, string? stat = null, Cantrip.Num delta = default(Cantrip.Num)) -> void
+Cantrip.Runtime.TickClock
+Cantrip.Runtime.TickClock.Advanced -> System.Action<long>?
+Cantrip.Runtime.TickClock.Now.get -> long
+Cantrip.Runtime.TickClock.Restore(long now) -> void
+Cantrip.Runtime.TickClock.Tick(int count = 1) -> void
+Cantrip.Runtime.TickClock.TickClock(int ticksPerSecond = 60) -> void
+Cantrip.Runtime.TickClock.TicksPerSecond.get -> int
+Cantrip.Runtime.TickClock.TryConvert(Cantrip.Num amount, string? unit, out long units) -> bool
+Cantrip.Runtime.TraceEntry
+Cantrip.Runtime.TraceEntry.Description.get -> string!
+Cantrip.Runtime.TraceEntry.Id.get -> long
+Cantrip.Runtime.TraceEntry.Kind.get -> string!
+Cantrip.Runtime.TraceEntry.Listener.get -> string?
+Cantrip.Runtime.TraceEntry.ParentId.get -> long?
+Cantrip.Runtime.TraceEntry.Source.get -> string?
+Cantrip.Runtime.TraceEntry.Span.get -> Cantrip.Diagnostics.SourceSpan
+Cantrip.Runtime.TraceEntry.Time.get -> long
+Cantrip.Runtime.TraceEntry.Values.get -> System.Collections.Generic.IReadOnlyDictionary<string!, object!>!
+Cantrip.Runtime.TraceLog
+Cantrip.Runtime.TraceLog.Ancestors(long id) -> System.Collections.Generic.IEnumerable<Cantrip.Runtime.TraceEntry!>!
+Cantrip.Runtime.TraceLog.Capacity.get -> int?
+Cantrip.Runtime.TraceLog.Capacity.set -> void
+Cantrip.Runtime.TraceLog.Children(long id) -> System.Collections.Generic.IEnumerable<Cantrip.Runtime.TraceEntry!>!
+Cantrip.Runtime.TraceLog.Clear() -> void
+Cantrip.Runtime.TraceLog.CurrentParent.get -> long?
+Cantrip.Runtime.TraceLog.Dropped.get -> long
+Cantrip.Runtime.TraceLog.Enabled.get -> bool
+Cantrip.Runtime.TraceLog.Enabled.set -> void
+Cantrip.Runtime.TraceLog.Entries.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.TraceEntry!>!
+Cantrip.Runtime.TraceLog.Find(long id) -> Cantrip.Runtime.TraceEntry?
+Cantrip.Runtime.TraceLog.FormatTree() -> string!
+Cantrip.Runtime.TraceLog.Record(long time, string! kind, string! description, string? source = null, string? listener = null, Cantrip.Diagnostics.SourceSpan span = default(Cantrip.Diagnostics.SourceSpan), System.Collections.Generic.IReadOnlyDictionary<string!, object!>? values = null, long? parentOverride = null) -> long
+Cantrip.Runtime.TraceLog.Scope(long id) -> System.IDisposable!
+Cantrip.Runtime.TraceLog.TraceLog() -> void
+Cantrip.Runtime.TraceLog.TruncateTo(int count) -> void
+Cantrip.Runtime.TriggerBreakpoints
+Cantrip.Runtime.TriggerBreakpoints.Add(string! file, int line) -> void
+Cantrip.Runtime.TriggerBreakpoints.AddEvent(string! eventName) -> void
+Cantrip.Runtime.TriggerBreakpoints.Any.get -> bool
+Cantrip.Runtime.TriggerBreakpoints.Clear() -> void
+Cantrip.Runtime.TriggerBreakpoints.Count.get -> int
+Cantrip.Runtime.TriggerBreakpoints.Remove(string! file, int line) -> bool
+Cantrip.Runtime.TriggerBreakpoints.RemoveEvent(string! eventName) -> bool
+Cantrip.Runtime.TriggerBreakpoints.TriggerBreakpoints() -> void
+Cantrip.Runtime.TriggerResolution
+Cantrip.Runtime.TriggerResolution.Immediate = 1 -> Cantrip.Runtime.TriggerResolution
+Cantrip.Runtime.TriggerResolution.Queued = 0 -> Cantrip.Runtime.TriggerResolution
+Cantrip.Runtime.TurnClock
+Cantrip.Runtime.TurnClock.Advanced -> System.Action<long>?
+Cantrip.Runtime.TurnClock.AdvanceTurn() -> void
+Cantrip.Runtime.TurnClock.Now.get -> long
+Cantrip.Runtime.TurnClock.Restore(long now) -> void
+Cantrip.Runtime.TurnClock.TryConvert(Cantrip.Num amount, string? unit, out long units) -> bool
+Cantrip.Runtime.TurnClock.TurnClock() -> void
+Cantrip.Runtime.UndoSnapshot
+Cantrip.Runtime.UndoSnapshot.AttachedId.get -> int
+Cantrip.Runtime.UndoSnapshot.AttachedId.set -> void
+Cantrip.Runtime.UndoSnapshot.Delta.get -> long
+Cantrip.Runtime.UndoSnapshot.Delta.set -> void
+Cantrip.Runtime.UndoSnapshot.EntityId.get -> int
+Cantrip.Runtime.UndoSnapshot.EntityId.set -> void
+Cantrip.Runtime.UndoSnapshot.Stat.get -> string?
+Cantrip.Runtime.UndoSnapshot.Stat.set -> void
+Cantrip.Runtime.UndoSnapshot.Tag.get -> string?
+Cantrip.Runtime.UndoSnapshot.Tag.set -> void
+Cantrip.Runtime.UndoSnapshot.UndoSnapshot() -> void
+Cantrip.Runtime.Value
+Cantrip.Runtime.Value.AsBool() -> bool
+Cantrip.Runtime.Value.AsEntities() -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.Runtime.Value.Definition.get -> Cantrip.Content.EntityDefinition?
+Cantrip.Runtime.Value.Entity.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.Value.IsNone.get -> bool
+Cantrip.Runtime.Value.Kind.get -> Cantrip.Runtime.ValueKind
+Cantrip.Runtime.Value.Number.get -> Cantrip.Num
+Cantrip.Runtime.Value.Qualified.get -> Cantrip.Runtime.QualifiedName?
+Cantrip.Runtime.Value.RangeHigh.get -> Cantrip.Num
+Cantrip.Runtime.Value.Text.get -> string?
+Cantrip.Runtime.Value.Unit.get -> string?
+Cantrip.Runtime.Value.Value() -> void
+Cantrip.Runtime.ValueKind
+Cantrip.Runtime.ValueKind.Bool = 2 -> Cantrip.Runtime.ValueKind
+Cantrip.Runtime.ValueKind.Definition = 6 -> Cantrip.Runtime.ValueKind
+Cantrip.Runtime.ValueKind.Entity = 4 -> Cantrip.Runtime.ValueKind
+Cantrip.Runtime.ValueKind.List = 5 -> Cantrip.Runtime.ValueKind
+Cantrip.Runtime.ValueKind.None = 0 -> Cantrip.Runtime.ValueKind
+Cantrip.Runtime.ValueKind.Number = 1 -> Cantrip.Runtime.ValueKind
+Cantrip.Runtime.ValueKind.Qualified = 7 -> Cantrip.Runtime.ValueKind
+Cantrip.Runtime.ValueKind.Range = 8 -> Cantrip.Runtime.ValueKind
+Cantrip.Runtime.ValueKind.Text = 3 -> Cantrip.Runtime.ValueKind
+Cantrip.Runtime.ValueSnapshot
+Cantrip.Runtime.ValueSnapshot.DefinitionKind.get -> string?
+Cantrip.Runtime.ValueSnapshot.DefinitionKind.set -> void
+Cantrip.Runtime.ValueSnapshot.DefinitionName.get -> string?
+Cantrip.Runtime.ValueSnapshot.DefinitionName.set -> void
+Cantrip.Runtime.ValueSnapshot.Entities.get -> System.Collections.Generic.List<int>?
+Cantrip.Runtime.ValueSnapshot.Entities.set -> void
+Cantrip.Runtime.ValueSnapshot.High.get -> long
+Cantrip.Runtime.ValueSnapshot.High.set -> void
+Cantrip.Runtime.ValueSnapshot.Kind.get -> int
+Cantrip.Runtime.ValueSnapshot.Kind.set -> void
+Cantrip.Runtime.ValueSnapshot.Number.get -> long
+Cantrip.Runtime.ValueSnapshot.Number.set -> void
+Cantrip.Runtime.ValueSnapshot.Qualifier.get -> string?
+Cantrip.Runtime.ValueSnapshot.Qualifier.set -> void
+Cantrip.Runtime.ValueSnapshot.Text.get -> string?
+Cantrip.Runtime.ValueSnapshot.Text.set -> void
+Cantrip.Runtime.ValueSnapshot.Unit.get -> string?
+Cantrip.Runtime.ValueSnapshot.Unit.set -> void
+Cantrip.Runtime.ValueSnapshot.ValueSnapshot() -> void
+Cantrip.Runtime.VerbCall
+Cantrip.Runtime.VerbCall.Argument(int index) -> Cantrip.Runtime.Value
+Cantrip.Runtime.VerbCall.ArgumentCount.get -> int
+Cantrip.Runtime.VerbCall.ArgumentNode(int index) -> Cantrip.Syntax.ExprNode?
+Cantrip.Runtime.VerbCall.Clause(string! keyword) -> Cantrip.Runtime.Value
+Cantrip.Runtime.VerbCall.Context.get -> Cantrip.Runtime.EvalContext!
+Cantrip.Runtime.VerbCall.Error(string! message) -> Cantrip.Runtime.RuntimeError!
+Cantrip.Runtime.VerbCall.Flag(string! name) -> bool
+Cantrip.Runtime.VerbCall.HasClause(string! keyword) -> bool
+Cantrip.Runtime.VerbCall.Interpreter.get -> Cantrip.Runtime.Interpreter!
+Cantrip.Runtime.VerbCall.Node.get -> Cantrip.Syntax.CommandNode!
+Cantrip.Runtime.VerbCall.Number(int index, Cantrip.Num fallback) -> Cantrip.Num
+Cantrip.Runtime.VerbCall.Span.get -> Cantrip.Diagnostics.SourceSpan
+Cantrip.Runtime.VerbCall.State.get -> Cantrip.Runtime.GameState!
+Cantrip.Runtime.VerbCall.Targets(string! clause = "to", Cantrip.Runtime.Entity? fallback = null) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.Runtime.VerbCall.Verb.get -> string!
+Cantrip.Runtime.VerbHandler
+Cantrip.Runtime.Zones
+Cantrip.Runtime.ZoneSnapshot
+Cantrip.Runtime.ZoneSnapshot.Entities.get -> System.Collections.Generic.List<int>!
+Cantrip.Runtime.ZoneSnapshot.Entities.set -> void
+Cantrip.Runtime.ZoneSnapshot.OwnerId.get -> int
+Cantrip.Runtime.ZoneSnapshot.OwnerId.set -> void
+Cantrip.Runtime.ZoneSnapshot.Zone.get -> string!
+Cantrip.Runtime.ZoneSnapshot.Zone.set -> void
+Cantrip.Runtime.ZoneSnapshot.ZoneSnapshot() -> void
+Cantrip.RuntimeOptions
+Cantrip.RuntimeOptions.Chooser.get -> Cantrip.Runtime.IChoiceProvider?
+Cantrip.RuntimeOptions.Chooser.set -> void
+Cantrip.RuntimeOptions.Clock.get -> Cantrip.Runtime.IGameClock?
+Cantrip.RuntimeOptions.Clock.set -> void
+Cantrip.RuntimeOptions.Execution.get -> Cantrip.ExecutionMode
+Cantrip.RuntimeOptions.Execution.set -> void
+Cantrip.RuntimeOptions.Host.get -> Cantrip.Runtime.IEffectHost?
+Cantrip.RuntimeOptions.Host.set -> void
+Cantrip.RuntimeOptions.Rules.get -> Cantrip.Runtime.Ruleset?
+Cantrip.RuntimeOptions.Rules.set -> void
+Cantrip.RuntimeOptions.RuntimeOptions() -> void
+Cantrip.RuntimeOptions.Seed.get -> ulong
+Cantrip.RuntimeOptions.Seed.set -> void
+Cantrip.RuntimeOptions.Trace.get -> bool
+Cantrip.RuntimeOptions.Trace.set -> void
+Cantrip.StackingMode
+Cantrip.StackingMode.Both = 2 -> Cantrip.StackingMode
+Cantrip.StackingMode.Duration = 1 -> Cantrip.StackingMode
+Cantrip.StackingMode.Intensity = 0 -> Cantrip.StackingMode
+Cantrip.StackingMode.None = 3 -> Cantrip.StackingMode
+Cantrip.StackingMode.Refresh = 4 -> Cantrip.StackingMode
+Cantrip.StackingMode.Separate = 5 -> Cantrip.StackingMode
+Cantrip.Syntax.AssignNode
+Cantrip.Syntax.AssignNode.AssignNode(Cantrip.Syntax.ExprNode! target, Cantrip.Syntax.AssignOperator op, Cantrip.Syntax.ExprNode! value, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.AssignNode.Operator.get -> Cantrip.Syntax.AssignOperator
+Cantrip.Syntax.AssignNode.Target.get -> Cantrip.Syntax.ExprNode!
+Cantrip.Syntax.AssignNode.Value.get -> Cantrip.Syntax.ExprNode!
+Cantrip.Syntax.AssignOperator
+Cantrip.Syntax.AssignOperator.Add = 1 -> Cantrip.Syntax.AssignOperator
+Cantrip.Syntax.AssignOperator.Multiply = 3 -> Cantrip.Syntax.AssignOperator
+Cantrip.Syntax.AssignOperator.Set = 0 -> Cantrip.Syntax.AssignOperator
+Cantrip.Syntax.AssignOperator.Subtract = 2 -> Cantrip.Syntax.AssignOperator
+Cantrip.Syntax.AstPrinter
+Cantrip.Syntax.AstWalker
+Cantrip.Syntax.AstWalker.AstWalker() -> void
+Cantrip.Syntax.BinaryExpr
+Cantrip.Syntax.BinaryExpr.BinaryExpr(Cantrip.Syntax.BinaryOperator op, Cantrip.Syntax.ExprNode! left, Cantrip.Syntax.ExprNode! right, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.BinaryExpr.Left.get -> Cantrip.Syntax.ExprNode!
+Cantrip.Syntax.BinaryExpr.Operator.get -> Cantrip.Syntax.BinaryOperator
+Cantrip.Syntax.BinaryExpr.Right.get -> Cantrip.Syntax.ExprNode!
+Cantrip.Syntax.BinaryOperator
+Cantrip.Syntax.BinaryOperator.Add = 0 -> Cantrip.Syntax.BinaryOperator
+Cantrip.Syntax.BinaryOperator.And = 11 -> Cantrip.Syntax.BinaryOperator
+Cantrip.Syntax.BinaryOperator.Divide = 3 -> Cantrip.Syntax.BinaryOperator
+Cantrip.Syntax.BinaryOperator.Equal = 5 -> Cantrip.Syntax.BinaryOperator
+Cantrip.Syntax.BinaryOperator.Greater = 9 -> Cantrip.Syntax.BinaryOperator
+Cantrip.Syntax.BinaryOperator.GreaterOrEqual = 10 -> Cantrip.Syntax.BinaryOperator
+Cantrip.Syntax.BinaryOperator.Has = 16 -> Cantrip.Syntax.BinaryOperator
+Cantrip.Syntax.BinaryOperator.In = 15 -> Cantrip.Syntax.BinaryOperator
+Cantrip.Syntax.BinaryOperator.Less = 7 -> Cantrip.Syntax.BinaryOperator
+Cantrip.Syntax.BinaryOperator.LessOrEqual = 8 -> Cantrip.Syntax.BinaryOperator
+Cantrip.Syntax.BinaryOperator.Modulo = 4 -> Cantrip.Syntax.BinaryOperator
+Cantrip.Syntax.BinaryOperator.Multiply = 2 -> Cantrip.Syntax.BinaryOperator
+Cantrip.Syntax.BinaryOperator.NotEqual = 6 -> Cantrip.Syntax.BinaryOperator
+Cantrip.Syntax.BinaryOperator.On = 14 -> Cantrip.Syntax.BinaryOperator
+Cantrip.Syntax.BinaryOperator.Or = 12 -> Cantrip.Syntax.BinaryOperator
+Cantrip.Syntax.BinaryOperator.Per = 13 -> Cantrip.Syntax.BinaryOperator
+Cantrip.Syntax.BinaryOperator.Subtract = 1 -> Cantrip.Syntax.BinaryOperator
+Cantrip.Syntax.BlockMemberNode
+Cantrip.Syntax.BlockMemberNode.Arguments.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.ExprNode!>!
+Cantrip.Syntax.BlockMemberNode.BlockMemberNode(string! name, System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.ExprNode!>! arguments, Cantrip.Syntax.BlockNode! body, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.BlockMemberNode.Body.get -> Cantrip.Syntax.BlockNode!
+Cantrip.Syntax.BlockMemberNode.Name.get -> string!
+Cantrip.Syntax.BlockNode
+Cantrip.Syntax.BlockNode.BlockNode(System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.StatementNode!>! statements, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.BlockNode.Statements.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.StatementNode!>!
+Cantrip.Syntax.CallExpr
+Cantrip.Syntax.CallExpr.Arguments.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.ExprNode!>!
+Cantrip.Syntax.CallExpr.CallExpr(string! name, System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.ExprNode!>! arguments, Cantrip.Diagnostics.SourceSpan span, Cantrip.Syntax.ExprNode? receiver = null) -> void
+Cantrip.Syntax.CallExpr.Name.get -> string!
+Cantrip.Syntax.CallExpr.Receiver.get -> Cantrip.Syntax.ExprNode?
+Cantrip.Syntax.ChanceNode
+Cantrip.Syntax.ChanceNode.Body.get -> Cantrip.Syntax.BlockNode!
+Cantrip.Syntax.ChanceNode.ChanceNode(Cantrip.Syntax.ExprNode! probability, Cantrip.Syntax.BlockNode! body, Cantrip.Syntax.BlockNode? elseBody, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.ChanceNode.Else.get -> Cantrip.Syntax.BlockNode?
+Cantrip.Syntax.ChanceNode.Probability.get -> Cantrip.Syntax.ExprNode!
+Cantrip.Syntax.ClauseNode
+Cantrip.Syntax.ClauseNode.ClauseNode(string! keyword, Cantrip.Syntax.ExprNode? value, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.ClauseNode.Keyword.get -> string!
+Cantrip.Syntax.ClauseNode.Value.get -> Cantrip.Syntax.ExprNode?
+Cantrip.Syntax.CommandNode
+Cantrip.Syntax.CommandNode.Arguments.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.ExprNode!>!
+Cantrip.Syntax.CommandNode.Clause(string! keyword) -> Cantrip.Syntax.ExprNode?
+Cantrip.Syntax.CommandNode.Clauses.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.ClauseNode!>!
+Cantrip.Syntax.CommandNode.CommandNode(string! verb, System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.ExprNode!>! arguments, System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.ClauseNode!>! clauses, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.CommandNode.HasFlag(string! keyword) -> bool
+Cantrip.Syntax.CommandNode.Verb.get -> string!
+Cantrip.Syntax.DeclarationNode
+Cantrip.Syntax.DeclarationNode.DeclarationNode(string! name, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.DeclarationNode.Name.get -> string!
+Cantrip.Syntax.EntityDeclNode
+Cantrip.Syntax.EntityDeclNode.EntityDeclNode(string! kind, string! name, System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.MemberNode!>! members, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.EntityDeclNode.Kind.get -> string!
+Cantrip.Syntax.EntityDeclNode.Members.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.MemberNode!>!
+Cantrip.Syntax.ExprNode
+Cantrip.Syntax.ExprNode.ExprNode(Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.ForEachNode
+Cantrip.Syntax.ForEachNode.Body.get -> Cantrip.Syntax.BlockNode!
+Cantrip.Syntax.ForEachNode.ForEachNode(string! variable, Cantrip.Syntax.ExprNode! source, Cantrip.Syntax.BlockNode! body, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.ForEachNode.Source.get -> Cantrip.Syntax.ExprNode!
+Cantrip.Syntax.ForEachNode.Variable.get -> string!
+Cantrip.Syntax.IfNode
+Cantrip.Syntax.IfNode.Condition.get -> Cantrip.Syntax.ExprNode!
+Cantrip.Syntax.IfNode.Else.get -> Cantrip.Syntax.BlockNode?
+Cantrip.Syntax.IfNode.IfNode(Cantrip.Syntax.ExprNode! condition, Cantrip.Syntax.BlockNode! thenBlock, Cantrip.Syntax.BlockNode? elseBlock, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.IfNode.Then.get -> Cantrip.Syntax.BlockNode!
+Cantrip.Syntax.LabeledBlockNode
+Cantrip.Syntax.LabeledBlockNode.Body.get -> Cantrip.Syntax.BlockNode!
+Cantrip.Syntax.LabeledBlockNode.Label.get -> string!
+Cantrip.Syntax.LabeledBlockNode.LabeledBlockNode(string! label, Cantrip.Syntax.BlockNode! body, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.LetNode
+Cantrip.Syntax.LetNode.LetNode(string! name, Cantrip.Syntax.ExprNode! value, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.LetNode.Name.get -> string!
+Cantrip.Syntax.LetNode.Value.get -> Cantrip.Syntax.ExprNode!
+Cantrip.Syntax.Lexer
+Cantrip.Syntax.Lexer.Lexer(string! text, string! file, Cantrip.Diagnostics.DiagnosticBag! diagnostics) -> void
+Cantrip.Syntax.Lexer.Tokenize() -> System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.Token>!
+Cantrip.Syntax.LimitScope
+Cantrip.Syntax.LimitScope.Battle = 2 -> Cantrip.Syntax.LimitScope
+Cantrip.Syntax.LimitScope.Chain = 4 -> Cantrip.Syntax.LimitScope
+Cantrip.Syntax.LimitScope.None = 0 -> Cantrip.Syntax.LimitScope
+Cantrip.Syntax.LimitScope.Run = 3 -> Cantrip.Syntax.LimitScope
+Cantrip.Syntax.LimitScope.Turn = 1 -> Cantrip.Syntax.LimitScope
+Cantrip.Syntax.ListenerNode
+Cantrip.Syntax.ListenerNode.Body.get -> Cantrip.Syntax.BlockNode!
+Cantrip.Syntax.ListenerNode.EventName.get -> string!
+Cantrip.Syntax.ListenerNode.Filter.get -> Cantrip.Syntax.ExprNode?
+Cantrip.Syntax.ListenerNode.Interval.get -> Cantrip.Num
+Cantrip.Syntax.ListenerNode.IntervalUnit.get -> string?
+Cantrip.Syntax.ListenerNode.Limit.get -> Cantrip.Syntax.LimitScope
+Cantrip.Syntax.ListenerNode.ListenerNode(string! eventName, Cantrip.EventPhase phase, Cantrip.Syntax.ExprNode? filter, Cantrip.Syntax.BlockNode! body, Cantrip.Syntax.LimitScope limit, int priority, Cantrip.Diagnostics.SourceSpan span, Cantrip.Num interval = default(Cantrip.Num), string? intervalUnit = null) -> void
+Cantrip.Syntax.ListenerNode.Phase.get -> Cantrip.EventPhase
+Cantrip.Syntax.ListenerNode.Priority.get -> int
+Cantrip.Syntax.MemberExpr
+Cantrip.Syntax.MemberExpr.Member.get -> string!
+Cantrip.Syntax.MemberExpr.MemberExpr(Cantrip.Syntax.ExprNode! target, string! member, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.MemberExpr.Target.get -> Cantrip.Syntax.ExprNode!
+Cantrip.Syntax.MemberNode
+Cantrip.Syntax.MemberNode.MemberNode(Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.ModifyNode
+Cantrip.Syntax.ModifyNode.Amount.get -> Cantrip.Syntax.ExprNode!
+Cantrip.Syntax.ModifyNode.Channel.get -> string!
+Cantrip.Syntax.ModifyNode.Filter.get -> Cantrip.Syntax.ExprNode?
+Cantrip.Syntax.ModifyNode.Layer.get -> Cantrip.ModifierLayer
+Cantrip.Syntax.ModifyNode.ModifyNode(string! channel, Cantrip.Syntax.ExprNode? scope, Cantrip.Syntax.ExprNode? filter, Cantrip.ModifierLayer layer, Cantrip.Syntax.ExprNode! amount, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.ModifyNode.Scope.get -> Cantrip.Syntax.ExprNode?
+Cantrip.Syntax.NameExpr
+Cantrip.Syntax.NameExpr.Name.get -> string!
+Cantrip.Syntax.NameExpr.NameExpr(string! name, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.Node
+Cantrip.Syntax.Node.Node(Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.Node.Span.get -> Cantrip.Diagnostics.SourceSpan
+Cantrip.Syntax.NumberExpr
+Cantrip.Syntax.NumberExpr.NumberExpr(Cantrip.Num value, string? unit, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.NumberExpr.Unit.get -> string?
+Cantrip.Syntax.NumberExpr.Value.get -> Cantrip.Num
+Cantrip.Syntax.Parser
+Cantrip.Syntax.Parser.ParseExpression() -> Cantrip.Syntax.ExprNode!
+Cantrip.Syntax.Parser.ParseFile() -> Cantrip.Syntax.SourceFileNode!
+Cantrip.Syntax.Parser.Parser(System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.Token>! tokens, string! file, Cantrip.Diagnostics.DiagnosticBag! diagnostics) -> void
+Cantrip.Syntax.PropertyNode
+Cantrip.Syntax.PropertyNode.First.get -> Cantrip.Syntax.ExprNode?
+Cantrip.Syntax.PropertyNode.Name.get -> string!
+Cantrip.Syntax.PropertyNode.PropertyNode(string! name, System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.ExprNode!>! values, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.PropertyNode.Values.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.ExprNode!>!
+Cantrip.Syntax.QualifiedExpr
+Cantrip.Syntax.QualifiedExpr.Name.get -> string!
+Cantrip.Syntax.QualifiedExpr.QualifiedExpr(string! qualifier, string! name, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.QualifiedExpr.Qualifier.get -> string!
+Cantrip.Syntax.RangeExpr
+Cantrip.Syntax.RangeExpr.High.get -> Cantrip.Syntax.ExprNode!
+Cantrip.Syntax.RangeExpr.Low.get -> Cantrip.Syntax.ExprNode!
+Cantrip.Syntax.RangeExpr.RangeExpr(Cantrip.Syntax.ExprNode! low, Cantrip.Syntax.ExprNode! high, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.RepeatNode
+Cantrip.Syntax.RepeatNode.Body.get -> Cantrip.Syntax.BlockNode!
+Cantrip.Syntax.RepeatNode.Count.get -> Cantrip.Syntax.ExprNode!
+Cantrip.Syntax.RepeatNode.RepeatNode(Cantrip.Syntax.ExprNode! count, Cantrip.Syntax.BlockNode! body, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.RulesetDeclNode
+Cantrip.Syntax.RulesetDeclNode.RulesetDeclNode(System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.PropertyNode!>! settings, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.RulesetDeclNode.Settings.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.PropertyNode!>!
+Cantrip.Syntax.ScheduleKind
+Cantrip.Syntax.ScheduleKind.After = 1 -> Cantrip.Syntax.ScheduleKind
+Cantrip.Syntax.ScheduleKind.NextTurn = 0 -> Cantrip.Syntax.ScheduleKind
+Cantrip.Syntax.ScheduleKind.Until = 2 -> Cantrip.Syntax.ScheduleKind
+Cantrip.Syntax.ScheduleNode
+Cantrip.Syntax.ScheduleNode.Body.get -> Cantrip.Syntax.BlockNode!
+Cantrip.Syntax.ScheduleNode.Deadline.get -> string?
+Cantrip.Syntax.ScheduleNode.Delay.get -> Cantrip.Syntax.ExprNode?
+Cantrip.Syntax.ScheduleNode.Kind.get -> Cantrip.Syntax.ScheduleKind
+Cantrip.Syntax.ScheduleNode.ScheduleNode(Cantrip.Syntax.ScheduleKind kind, Cantrip.Syntax.ExprNode? delay, string? deadline, Cantrip.Syntax.BlockNode! body, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.SelectorExpr
+Cantrip.Syntax.SelectorExpr.Count.get -> Cantrip.Syntax.ExprNode?
+Cantrip.Syntax.SelectorExpr.Key.get -> string?
+Cantrip.Syntax.SelectorExpr.Modifier.get -> Cantrip.Syntax.SelectorModifier
+Cantrip.Syntax.SelectorExpr.SelectorExpr(Cantrip.Syntax.SelectorModifier modifier, Cantrip.Syntax.ExprNode! source, Cantrip.Syntax.ExprNode? count, string? key, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.SelectorExpr.Source.get -> Cantrip.Syntax.ExprNode!
+Cantrip.Syntax.SelectorModifier
+Cantrip.Syntax.SelectorModifier.All = 0 -> Cantrip.Syntax.SelectorModifier
+Cantrip.Syntax.SelectorModifier.Highest = 3 -> Cantrip.Syntax.SelectorModifier
+Cantrip.Syntax.SelectorModifier.Lowest = 2 -> Cantrip.Syntax.SelectorModifier
+Cantrip.Syntax.SelectorModifier.Other = 4 -> Cantrip.Syntax.SelectorModifier
+Cantrip.Syntax.SelectorModifier.Random = 1 -> Cantrip.Syntax.SelectorModifier
+Cantrip.Syntax.SourceFileNode
+Cantrip.Syntax.SourceFileNode.Declarations.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.DeclarationNode!>!
+Cantrip.Syntax.SourceFileNode.Path.get -> string!
+Cantrip.Syntax.SourceFileNode.SourceFileNode(string! path, System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.DeclarationNode!>! declarations, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.StatementNode
+Cantrip.Syntax.StatementNode.StatementNode(Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.StringExpr
+Cantrip.Syntax.StringExpr.StringExpr(string! value, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.StringExpr.Value.get -> string!
+Cantrip.Syntax.TestDeclNode
+Cantrip.Syntax.TestDeclNode.Body.get -> Cantrip.Syntax.BlockNode!
+Cantrip.Syntax.TestDeclNode.TestDeclNode(string! name, Cantrip.Syntax.BlockNode! body, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.Token
+Cantrip.Syntax.Token.Is(Cantrip.Syntax.TokenKind kind) -> bool
+Cantrip.Syntax.Token.IsKeyword(string! keyword) -> bool
+Cantrip.Syntax.Token.Kind.get -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.Token.Qualifier.get -> string?
+Cantrip.Syntax.Token.Span.get -> Cantrip.Diagnostics.SourceSpan
+Cantrip.Syntax.Token.Text.get -> string!
+Cantrip.Syntax.Token.Token() -> void
+Cantrip.Syntax.Token.Token(Cantrip.Syntax.TokenKind kind, string! text, Cantrip.Diagnostics.SourceSpan span, Cantrip.Num value = default(Cantrip.Num), string? unit = null, string? qualifier = null) -> void
+Cantrip.Syntax.Token.Unit.get -> string?
+Cantrip.Syntax.Token.Value.get -> Cantrip.Num
+Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.Arrow = 31 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.BangEqual = 23 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.Colon = 8 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.Comma = 9 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.Dedent = 3 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.Dot = 10 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.DotDot = 11 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.EndOfFile = 0 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.Equal = 21 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.EqualEqual = 22 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.Greater = 26 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.GreaterEqual = 27 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.Identifier = 4 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.Indent = 2 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.LeftBracket = 14 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.LeftParen = 12 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.Less = 24 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.LessEqual = 25 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.Minus = 17 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.MinusEqual = 29 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.Newline = 1 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.Number = 6 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.Percent = 20 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.Plus = 16 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.PlusEqual = 28 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.QualifiedName = 5 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.RightBracket = 15 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.RightParen = 13 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.Slash = 19 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.Star = 18 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.StarEqual = 30 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.TokenKind.String = 7 -> Cantrip.Syntax.TokenKind
+Cantrip.Syntax.UnaryExpr
+Cantrip.Syntax.UnaryExpr.Operand.get -> Cantrip.Syntax.ExprNode!
+Cantrip.Syntax.UnaryExpr.Operator.get -> Cantrip.Syntax.UnaryOperator
+Cantrip.Syntax.UnaryExpr.UnaryExpr(Cantrip.Syntax.UnaryOperator op, Cantrip.Syntax.ExprNode! operand, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.UnaryOperator
+Cantrip.Syntax.UnaryOperator.Negate = 0 -> Cantrip.Syntax.UnaryOperator
+Cantrip.Syntax.UnaryOperator.Not = 1 -> Cantrip.Syntax.UnaryOperator
+Cantrip.Syntax.VerbDeclNode
+Cantrip.Syntax.VerbDeclNode.Body.get -> Cantrip.Syntax.BlockNode!
+Cantrip.Syntax.VerbDeclNode.Parameters.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Cantrip.Syntax.VerbDeclNode.VerbDeclNode(string! name, System.Collections.Generic.IReadOnlyList<string!>! parameters, Cantrip.Syntax.BlockNode! body, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Syntax.WhereExpr
+Cantrip.Syntax.WhereExpr.Predicate.get -> Cantrip.Syntax.ExprNode!
+Cantrip.Syntax.WhereExpr.Source.get -> Cantrip.Syntax.ExprNode!
+Cantrip.Syntax.WhereExpr.WhereExpr(Cantrip.Syntax.ExprNode! source, Cantrip.Syntax.ExprNode! predicate, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Team
+Cantrip.Team.Enemy = 2 -> Cantrip.Team
+Cantrip.Team.Neutral = 0 -> Cantrip.Team
+Cantrip.Team.Player = 1 -> Cantrip.Team
+Cantrip.Testing.DslTestResult
+Cantrip.Testing.DslTestResult.Failure.get -> string?
+Cantrip.Testing.DslTestResult.FailureSpan.get -> Cantrip.Diagnostics.SourceSpan
+Cantrip.Testing.DslTestResult.Name.get -> string!
+Cantrip.Testing.DslTestResult.Passed.get -> bool
+Cantrip.Testing.DslTestResult.Test.get -> Cantrip.Content.TestDefinition!
+Cantrip.Testing.DslTestResult.Trace.get -> string?
+Cantrip.Testing.DslTestRunner
+Cantrip.Testing.DslTestRunner.DslTestRunner(Cantrip.Content.ContentLibrary! content) -> void
+Cantrip.Testing.DslTestRunner.Run(Cantrip.Content.TestDefinition! test) -> Cantrip.Testing.DslTestResult!
+Cantrip.Testing.DslTestRunner.RunAll(string? nameFilter = null) -> System.Collections.Generic.IReadOnlyList<Cantrip.Testing.DslTestResult!>!
+Cantrip.Testing.DslTestRunner.Trace.get -> bool
+Cantrip.Testing.DslTestRunner.Trace.set -> void
+const Cantrip.Content.ContentLibrary.DefaultExtension = ".cantrip" -> string!
+const Cantrip.Descriptions.DescriptionBuilder.IgnoredText = "CT403" -> string!
+const Cantrip.Descriptions.DescriptionBuilder.StaleText = "CT402" -> string!
+const Cantrip.Descriptions.DescriptionBuilder.UnknownPlaceholder = "CT401" -> string!
+const Cantrip.Linting.Linter.CancelAfterEvent = "CT308" -> string!
+const Cantrip.Linting.Linter.EventCycle = "CT306" -> string!
+const Cantrip.Linting.Linter.EventOutsideListener = "CT307" -> string!
+const Cantrip.Linting.Linter.StacksOutsideStatus = "CT311" -> string!
+const Cantrip.Linting.Linter.UnheardEvent = "CT305" -> string!
+const Cantrip.Linting.Linter.UnknownEvent = "CT304" -> string!
+const Cantrip.Linting.Linter.UnknownMove = "CT312" -> string!
+const Cantrip.Linting.Linter.UnknownName = "CT302" -> string!
+const Cantrip.Linting.Linter.UnknownTag = "CT303" -> string!
+const Cantrip.Linting.Linter.UnknownVerb = "CT301" -> string!
+const Cantrip.Linting.Linter.UnusedTarget = "CT309" -> string!
+const Cantrip.Linting.Linter.UnusedVerb = "CT310" -> string!
+const Cantrip.Num.Scale = 1000000 -> long
+const Cantrip.Runtime.BuiltinEvents.AbilityUsed = "ability_used" -> string!
+const Cantrip.Runtime.BuiltinEvents.BattleEnd = "battle_end" -> string!
+const Cantrip.Runtime.BuiltinEvents.BattleStart = "battle_start" -> string!
+const Cantrip.Runtime.BuiltinEvents.Blocked = "blocked" -> string!
+const Cantrip.Runtime.BuiltinEvents.CardPlayed = "card_played" -> string!
+const Cantrip.Runtime.BuiltinEvents.Created = "created" -> string!
+const Cantrip.Runtime.BuiltinEvents.Damaged = "damaged" -> string!
+const Cantrip.Runtime.BuiltinEvents.Destroyed = "destroyed" -> string!
+const Cantrip.Runtime.BuiltinEvents.Died = "died" -> string!
+const Cantrip.Runtime.BuiltinEvents.Discarded = "discarded" -> string!
+const Cantrip.Runtime.BuiltinEvents.Drawn = "drawn" -> string!
+const Cantrip.Runtime.BuiltinEvents.Every = "every" -> string!
+const Cantrip.Runtime.BuiltinEvents.Exhausted = "exhausted" -> string!
+const Cantrip.Runtime.BuiltinEvents.GainedBlock = "gained_block" -> string!
+const Cantrip.Runtime.BuiltinEvents.Healed = "healed" -> string!
+const Cantrip.Runtime.BuiltinEvents.Killed = "killed" -> string!
+const Cantrip.Runtime.BuiltinEvents.Move = "move" -> string!
+const Cantrip.Runtime.BuiltinEvents.Moved = "moved" -> string!
+const Cantrip.Runtime.BuiltinEvents.Obtained = "obtained" -> string!
+const Cantrip.Runtime.BuiltinEvents.Overkill = "overkill" -> string!
+const Cantrip.Runtime.BuiltinEvents.Shuffled = "shuffled" -> string!
+const Cantrip.Runtime.BuiltinEvents.StatChangedSuffix = "_changed" -> string!
+const Cantrip.Runtime.BuiltinEvents.StatusApplied = "status_applied" -> string!
+const Cantrip.Runtime.BuiltinEvents.StatusRemoved = "status_removed" -> string!
+const Cantrip.Runtime.BuiltinEvents.StatusResisted = "status_resisted" -> string!
+const Cantrip.Runtime.BuiltinEvents.TurnEnd = "turn_end" -> string!
+const Cantrip.Runtime.BuiltinEvents.TurnStart = "turn_start" -> string!
+const Cantrip.Runtime.GameSnapshot.CurrentFormat = 1 -> int
+const Cantrip.Runtime.Zones.Attached = "attached" -> string!
+const Cantrip.Runtime.Zones.Board = "board" -> string!
+const Cantrip.Runtime.Zones.Dead = "dead" -> string!
+const Cantrip.Runtime.Zones.Discard = "discard" -> string!
+const Cantrip.Runtime.Zones.Draw = "draw" -> string!
+const Cantrip.Runtime.Zones.Exhaust = "exhaust" -> string!
+const Cantrip.Runtime.Zones.Hand = "hand" -> string!
+const Cantrip.Runtime.Zones.None = "" -> string!
+const Cantrip.Runtime.Zones.Play = "play" -> string!
+const Cantrip.Runtime.Zones.Powers = "powers" -> string!
+const Cantrip.Runtime.Zones.Relics = "relics" -> string!
+override Cantrip.CardRuntime.ReloadReport.ToString() -> string!
+override Cantrip.Content.EntityDefinition.ToString() -> string!
+override Cantrip.Content.PhaseDefinition.ToString() -> string!
+override Cantrip.Descriptions.Description.ToString() -> string!
+override Cantrip.Descriptions.DescriptionSegment.ToString() -> string!
+override Cantrip.Descriptions.KeywordTooltip.ToString() -> string!
+override Cantrip.Diagnostics.Diagnostic.ToString() -> string!
+override Cantrip.Diagnostics.DiagnosticBag.ToString() -> string!
+override Cantrip.Diagnostics.SourceSpan.Equals(object? obj) -> bool
+override Cantrip.Diagnostics.SourceSpan.GetHashCode() -> int
+override Cantrip.Diagnostics.SourceSpan.ToString() -> string!
+override Cantrip.Num.Equals(object? obj) -> bool
+override Cantrip.Num.GetHashCode() -> int
+override Cantrip.Num.ToString() -> string!
+override Cantrip.Runtime.BuiltinEvent.ToString() -> string!
+override Cantrip.Runtime.Entity.ToString() -> string!
+override Cantrip.Runtime.GameEvent.ToString() -> string!
+override Cantrip.Runtime.Listener.ToString() -> string!
+override Cantrip.Runtime.Modifier.ToString() -> string!
+override Cantrip.Runtime.ModifierResult.ToString() -> string!
+override Cantrip.Runtime.ModifierStep.ToString() -> string!
+override Cantrip.Runtime.PendingChoice.ToString() -> string!
+override Cantrip.Runtime.PendingTrigger.ToString() -> string!
+override Cantrip.Runtime.QualifiedName.ToString() -> string!
+override Cantrip.Runtime.TraceEntry.ToString() -> string!
+override Cantrip.Runtime.Value.ToString() -> string!
+override Cantrip.Syntax.Token.ToString() -> string!
+override Cantrip.Testing.DslTestResult.ToString() -> string!
+static Cantrip.CardRuntime.FromText(string! text, Cantrip.RuntimeOptions? options = null) -> Cantrip.CardRuntime!
+static Cantrip.CardRuntime.ParseStatements(string! statements, string! file = "<execute>") -> Cantrip.Syntax.BlockNode!
+static Cantrip.Content.ContentLibrary.FromText(string! text, string! file = "<inline>") -> Cantrip.Content.ContentLibrary!
+static Cantrip.Descriptions.DescriptionBuilder.EffectHash(Cantrip.Content.EntityDefinition! definition) -> string!
+static Cantrip.Descriptions.DescriptionSegment.Number(Cantrip.Num baseValue, Cantrip.Num current, string? placeholder = null, string? unit = null, bool lowerIsBetter = false) -> Cantrip.Descriptions.DescriptionSegment!
+static Cantrip.Descriptions.DescriptionSegment.Plain(string! text) -> Cantrip.Descriptions.DescriptionSegment!
+static Cantrip.Descriptions.DescriptionSegment.Symbol(string! text, string? placeholder = null) -> Cantrip.Descriptions.DescriptionSegment!
+static Cantrip.Descriptions.EnglishDescriptions.Keys.get -> System.Collections.Generic.IEnumerable<string!>!
+static Cantrip.Diagnostics.Suggest.Closest(string! input, System.Collections.Generic.IEnumerable<string!>! candidates, int maxDistance = 3) -> string?
+static Cantrip.Linting.Linter.Lint(Cantrip.Content.ContentLibrary! content, Cantrip.Linting.LintOptions? options = null) -> System.Collections.Generic.IReadOnlyList<Cantrip.Diagnostics.Diagnostic!>!
+static Cantrip.Num.Abs(Cantrip.Num a) -> Cantrip.Num
+static Cantrip.Num.Clamp(Cantrip.Num value, Cantrip.Num min, Cantrip.Num max) -> Cantrip.Num
+static Cantrip.Num.FromInt(long value) -> Cantrip.Num
+static Cantrip.Num.FromRaw(long raw) -> Cantrip.Num
+static Cantrip.Num.implicit operator Cantrip.Num(int value) -> Cantrip.Num
+static Cantrip.Num.Max(Cantrip.Num a, Cantrip.Num b) -> Cantrip.Num
+static Cantrip.Num.Min(Cantrip.Num a, Cantrip.Num b) -> Cantrip.Num
+static Cantrip.Num.operator !=(Cantrip.Num a, Cantrip.Num b) -> bool
+static Cantrip.Num.operator *(Cantrip.Num a, Cantrip.Num b) -> Cantrip.Num
+static Cantrip.Num.operator +(Cantrip.Num a, Cantrip.Num b) -> Cantrip.Num
+static Cantrip.Num.operator -(Cantrip.Num a) -> Cantrip.Num
+static Cantrip.Num.operator -(Cantrip.Num a, Cantrip.Num b) -> Cantrip.Num
+static Cantrip.Num.operator /(Cantrip.Num a, Cantrip.Num b) -> Cantrip.Num
+static Cantrip.Num.operator <(Cantrip.Num a, Cantrip.Num b) -> bool
+static Cantrip.Num.operator <=(Cantrip.Num a, Cantrip.Num b) -> bool
+static Cantrip.Num.operator ==(Cantrip.Num a, Cantrip.Num b) -> bool
+static Cantrip.Num.operator >(Cantrip.Num a, Cantrip.Num b) -> bool
+static Cantrip.Num.operator >=(Cantrip.Num a, Cantrip.Num b) -> bool
+static Cantrip.Num.Parse(string! text) -> Cantrip.Num
+static Cantrip.Num.Percent(Cantrip.Num percent) -> Cantrip.Num
+static Cantrip.Num.TryParse(string! text, out Cantrip.Num value) -> bool
+static Cantrip.Runtime.BuiltinEvents.All.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.BuiltinEvent!>!
+static Cantrip.Runtime.BuiltinEvents.CanChangeStats(string! verb) -> bool
+static Cantrip.Runtime.BuiltinEvents.Find(string! name) -> Cantrip.Runtime.BuiltinEvent?
+static Cantrip.Runtime.BuiltinEvents.IsBuiltin(string! name) -> bool
+static Cantrip.Runtime.BuiltinEvents.IsKnownVerb(string! verb) -> bool
+static Cantrip.Runtime.BuiltinEvents.Names.get -> System.Collections.Generic.IReadOnlyList<string!>!
+static Cantrip.Runtime.BuiltinEvents.RaisedBy(string! verb) -> System.Collections.Generic.IReadOnlyList<string!>!
+static Cantrip.Runtime.BuiltinEvents.StatChanged(string! stat) -> string!
+static Cantrip.Runtime.BuiltinEvents.TryParseStatChanged(string! eventName, out string! stat) -> bool
+static Cantrip.Runtime.Chain.NewRoot(long rootId) -> Cantrip.Runtime.Chain!
+static Cantrip.Runtime.Ruleset.Default.get -> Cantrip.Runtime.Ruleset!
+static Cantrip.Runtime.Ruleset.FromSyntax(Cantrip.Syntax.RulesetDeclNode! syntax, Cantrip.Diagnostics.DiagnosticBag! diagnostics) -> Cantrip.Runtime.Ruleset!
+static Cantrip.Runtime.Value.FromBool(bool value) -> Cantrip.Runtime.Value
+static Cantrip.Runtime.Value.FromDefinition(Cantrip.Content.EntityDefinition! definition) -> Cantrip.Runtime.Value
+static Cantrip.Runtime.Value.FromEntities(System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>! entities) -> Cantrip.Runtime.Value
+static Cantrip.Runtime.Value.FromEntity(Cantrip.Runtime.Entity? entity) -> Cantrip.Runtime.Value
+static Cantrip.Runtime.Value.FromNumber(Cantrip.Num value, string? unit = null) -> Cantrip.Runtime.Value
+static Cantrip.Runtime.Value.FromQualified(string! qualifier, string! name) -> Cantrip.Runtime.Value
+static Cantrip.Runtime.Value.FromRange(Cantrip.Num low, Cantrip.Num high) -> Cantrip.Runtime.Value
+static Cantrip.Runtime.Value.FromText(string! text) -> Cantrip.Runtime.Value
+static Cantrip.Syntax.AstPrinter.IsComparison(Cantrip.Syntax.BinaryOperator op) -> bool
+static Cantrip.Syntax.AstPrinter.Print(Cantrip.Syntax.ExprNode! node) -> string!
+static Cantrip.Syntax.AstPrinter.Symbol(Cantrip.Syntax.BinaryOperator op) -> string!
+static Cantrip.Syntax.BlockNode.Empty(Cantrip.Diagnostics.SourceSpan span) -> Cantrip.Syntax.BlockNode!
+static Cantrip.Syntax.Lexer.Tokenize(string! text, string! file, Cantrip.Diagnostics.DiagnosticBag! diagnostics) -> System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.Token>!
+static Cantrip.Syntax.Parser.Parse(string! text, string! file, Cantrip.Diagnostics.DiagnosticBag! diagnostics) -> Cantrip.Syntax.SourceFileNode!
+static Cantrip.Testing.DslTestRunner.TestVerbs.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+static readonly Cantrip.Descriptions.EnglishDescriptions.Instance -> Cantrip.Descriptions.EnglishDescriptions!
+static readonly Cantrip.Diagnostics.SourceSpan.None -> Cantrip.Diagnostics.SourceSpan
+static readonly Cantrip.Num.MaxValue -> Cantrip.Num
+static readonly Cantrip.Num.MinValue -> Cantrip.Num
+static readonly Cantrip.Num.One -> Cantrip.Num
+static readonly Cantrip.Num.Zero -> Cantrip.Num
+static readonly Cantrip.Runtime.Value.False -> Cantrip.Runtime.Value
+static readonly Cantrip.Runtime.Value.None -> Cantrip.Runtime.Value
+static readonly Cantrip.Runtime.Value.True -> Cantrip.Runtime.Value
+virtual Cantrip.Descriptions.EnglishDescriptions.Flavour(Cantrip.Content.EntityDefinition! definition) -> string?
+virtual Cantrip.Descriptions.EnglishDescriptions.Name(Cantrip.Content.EntityDefinition! definition) -> string?
+virtual Cantrip.Descriptions.EnglishDescriptions.Phrase(string! key) -> string?
+virtual Cantrip.Descriptions.EnglishDescriptions.Text(Cantrip.Content.EntityDefinition! definition) -> string?
+virtual Cantrip.Runtime.EffectHostBase.OnEvent(Cantrip.Runtime.GameEvent! gameEvent) -> void
+virtual Cantrip.Runtime.EffectHostBase.TryCall(string! function, System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Value>! arguments, Cantrip.Runtime.EvalContext! context, out Cantrip.Runtime.Value value) -> bool
+virtual Cantrip.Runtime.EffectHostBase.TryResolveName(string! name, Cantrip.Runtime.EvalContext! context, out Cantrip.Runtime.Value value) -> bool
+virtual Cantrip.Runtime.VerbHandler.Invoke(Cantrip.Runtime.VerbCall! call) -> void
+virtual Cantrip.Syntax.AstWalker.VisitBlock(Cantrip.Syntax.BlockNode! block) -> void
+virtual Cantrip.Syntax.AstWalker.VisitExpression(Cantrip.Syntax.ExprNode! expression) -> void
+virtual Cantrip.Syntax.AstWalker.VisitStatement(Cantrip.Syntax.StatementNode! statement) -> void

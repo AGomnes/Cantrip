@@ -66,6 +66,9 @@ namespace Cantrip.Runtime
         /// instead listener fires, the action is skipped; after listeners are queued. Returns
         /// true when the default action actually ran.
         /// </summary>
+        /// <param name="gameEvent">The event; before listeners may change its amount or cancel it.</param>
+        /// <param name="context">Who is acting and on whose behalf, for the listeners and the action.</param>
+        /// <param name="action">The default action, skipped when the event is cancelled or replaced.</param>
         /// <param name="committed">
         /// Runs once the before phase has passed without cancelling, ahead of the instead phase.
         /// Card play uses it to pay the cost: a replaced effect still costs energy, a cancelled

@@ -7,21 +7,22 @@ namespace Cantrip.Runtime
 {
     public enum ValueKind
     {
-        None,
-        Number,
-        Bool,
-        Text,
-        Entity,
-        List,
+        // Saved games store these as numbers: never renumber or reuse one, only add.
+        None = 0,
+        Number = 1,
+        Bool = 2,
+        Text = 3,
+        Entity = 4,
+        List = 5,
 
         /// <summary>A reference to loaded content by name, such as <c>Poison</c> in <c>apply Poison 3</c>.</summary>
-        Definition,
+        Definition = 6,
 
         /// <summary>A <c>tag:fire</c> style predicate.</summary>
-        Qualified,
+        Qualified = 7,
 
         /// <summary>An unrolled <c>3..6</c>.</summary>
-        Range,
+        Range = 8,
     }
 
     /// <summary>

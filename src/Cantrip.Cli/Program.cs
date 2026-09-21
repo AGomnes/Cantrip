@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using Cantrip;
 using Cantrip.Content;
 using Cantrip.Descriptions;
@@ -23,6 +24,7 @@ usage:
   cantrip describe <path>... [--name <name>]
                                     print generated descriptions (all definitions, or one)
   cantrip repl <path>...              load content and run DSL statements interactively
+  cantrip --version                   print the version and the commit it was built from
 
 paths may be files or folders (folders load every *.cantrip file, recursively).
 
@@ -41,6 +43,13 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
             {
                 Console.WriteLine(Usage);
                 return args.Length == 0 ? 2 : 0;
+            }
+
+            if (args[0] is "--version" or "version")
+            {
+                // The informational version carries the commit after a +, so a bug report can name the exact build.
+                Console.WriteLine("cantrip " + (typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown"));
+                return 0;
             }
 
             string command = args[0];

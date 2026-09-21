@@ -7,6 +7,8 @@
     <AssemblyName>cantrip-sim</AssemblyName>
     <!-- Built for net9.0 but runs on any later runtime, so a machine with only a newer .NET can use it. -->
     <RollForward>Major</RollForward>
+    <!-- A tool for this repository, not something to install. -->
+    <IsPackable>false</IsPackable>
     <Description>Plays whole runs of the slice headlessly with a bot, and reports how they went.</Description>
   </PropertyGroup>
 

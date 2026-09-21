@@ -45,7 +45,7 @@ namespace Cantrip
 
     /// <summary>
     /// The entry point for games: load content, set up actors and decks, then drive
-    /// battles through <see cref="StartBattle"/>, <see cref="Play"/> and <see cref="EndTurn"/>, or
+    /// battles through <see cref="StartBattle"/>, <see cref="Play(Entity, Entity)"/> and <see cref="EndTurn"/>, or
     /// real-time play through <see cref="Tick"/> and <see cref="UseAbility"/>.
     /// </summary>
     public sealed class CardRuntime
@@ -505,7 +505,7 @@ namespace Cantrip
 
         /// <summary>
         /// The entities this card may be pointed at right now, in board order, after content's
-        /// <c>targetable</c> rules: exactly what <see cref="Play"/> accepts. Empty for a card that
+        /// <c>targetable</c> rules: exactly what <see cref="Play(Entity, Entity)"/> accepts. Empty for a card that
         /// takes no target. A <c>target any</c> card may also be played at nothing, which this
         /// list cannot say, so a UI that wants to offer that asks <see cref="TargetMode"/>.
         /// </summary>
@@ -525,7 +525,7 @@ namespace Cantrip
         }
 
         /// <summary>
-        /// Whether <see cref="Play"/> would accept this card now, aimed somewhere legal: it is in
+        /// Whether <see cref="Play(Entity, Entity)"/> would accept this card now, aimed somewhere legal: it is in
         /// hand, playable, affordable, and a card that needs someone to point at has someone.
         /// Content can still cancel it while it resolves, which no check made in advance can see.
         /// </summary>

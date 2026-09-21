@@ -29,6 +29,26 @@ namespace Cantrip.Tests.Review
         }
 
         /// <summary>
+        /// The parser accepts <c>event</c> and <c>encounter</c> as declaration keywords, but nothing
+        /// consumes them, so they loaded as inert definitions and content that used them looked
+        /// finished while nothing ever ran. They are refused until they mean something.
+        /// </summary>
+        [Theory]
+        [Trait("Regression", "reserved-declarations-silently-inert")]
+        [InlineData("event")]
+        [InlineData("encounter")]
+        public void Reserved_declarations_are_an_error_rather_than_silently_inert(string keyword)
+        {
+            var content = new ContentLibrary();
+
+            DiagnosticBag diagnostics = content.LoadText(keyword + " \"Ambush\"\n  on battle_start:\n    log 1\n", "run.cantrip");
+
+            Assert.True(diagnostics.HasErrors);
+            Assert.Contains("CT0113", diagnostics.ToString());
+            Assert.Null(content.Find("Ambush"));
+        }
+
+        /// <summary>
         /// RulesetSyntax takes the last value of a Dictionary, whose enumeration reuses freed slots
         /// after a removal. After an unload, a newly loaded ruleset can land before an older one.
         /// </summary>

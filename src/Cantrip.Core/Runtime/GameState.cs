@@ -27,14 +27,16 @@ namespace Cantrip.Runtime
 
     public enum ScheduleTiming
     {
+        // Saved games store these as numbers: never renumber or reuse one, only add.
+
         /// <summary>Runs once when the clock reaches <see cref="ScheduledAction.DueAt"/>.</summary>
-        AtTime,
+        AtTime = 0,
 
         /// <summary>Runs at the owner's next turn start.</summary>
-        NextTurn,
+        NextTurn = 1,
 
         /// <summary>Undoes <see cref="ScheduledAction.Undo"/> when <see cref="ScheduledAction.Deadline"/> fires.</summary>
-        Until,
+        Until = 2,
     }
 
     /// <summary>One thing an <c>until</c> block did, so it can be reverted at the deadline.</summary>

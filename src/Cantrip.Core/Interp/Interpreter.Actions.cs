@@ -44,6 +44,12 @@ namespace Cantrip.Runtime
         /// removes statuses whose counter runs out and kills actors whose hp reaches zero.
         /// Returns the change actually applied.
         /// </summary>
+        /// <param name="entity">The entity whose stat changes.</param>
+        /// <param name="stat">The stat, or a status counter such as <c>stacks</c>.</param>
+        /// <param name="op">How <paramref name="amount"/> combines with the current value.</param>
+        /// <param name="amount">The operand, before resource bounds.</param>
+        /// <param name="context">Who is acting, for the <c>&lt;stat&gt;_changed</c> event.</param>
+        /// <param name="span">Where in content the change was written, for traces and errors.</param>
         /// <param name="fromReset">
         /// True when a <c>reset_on</c> rule is doing this, which puts <c>event.reset</c> on the
         /// <c>&lt;stat&gt;_changed</c> event. Content that wants to stop a reset can then say so

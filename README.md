@@ -1,9 +1,22 @@
 # Cantrip
 
-A C# library for writing cards, statuses, relics, enemies and abilities as short text files instead of code. It targets Godot/.NET, keeps the rules engine free of engine references, and runs the same content turn-based or in real time.
+[![CI](https://github.com/AGomnes/Cantrip/actions/workflows/ci.yml/badge.svg)](https://github.com/AGomnes/Cantrip/actions/workflows/ci.yml)
+[![NuGet](https://img.shields.io/nuget/vpre/Cantrip.Core?label=Cantrip.Core)](https://www.nuget.org/packages/Cantrip.Core)
+
+**Write the rules of your card game as text, not code.**
+
+Cantrip is a rules language and engine for card games, deckbuilders and roguelites built with .NET, with an addon for Godot. Every card, status, relic, enemy and ability is a few lines in a `.cantrip` file. The engine works out how they all interact, your game drives it from C# or GDScript, and your content is tested like code.
+
+## Why
+
+The hard part of a card game is rarely a single card. It is how the cards combine: a relic that reacts when a status wears off, a status that changes what fire damage does, a boss that changes its moves at half health. Written in C#, every card becomes a class, every combination a special case, and every tweak a recompile.
+
+In Cantrip each effect is a few readable lines that say only what that effect does. Events, ordering, stacking, modifiers and targeting are the engine's job, so effects that were never written with each other in mind still combine correctly, and a designer can change a number, save, and see it in the running game.
+
+## What it looks like
 
 ```
-card "Fireball"
+card Fireball
   cost 2
   target enemy
   tags attack, fire
@@ -13,73 +26,51 @@ card "Fireball"
     if target.dead: draw 1
   text: "Hurl a ball of flame for {damage} damage. Kill it to draw {draw}."
 
-status "Frozen"
+status Frozen
   tags control, ice
   on owner.damaged(tag:fire):
     remove Frozen from owner
     deal 10 to owner
 
-relic "Kindling"
+relic Kindling
   on status_removed(tag:ice):
     apply Burn 2 to event.target
 
-test "Fireball kills a 6 HP enemy"
-  setup: enemy hp 6
+test "Fireball kills a 6 hp enemy"
+  enemy hp 6
   play Fireball on enemy
   expect enemy.dead
 ```
 
-This README describes what exists today.
+None of these three knows about the others. A Fireball on a frozen enemy deals its 6 damage; being fire, the hit shatters Frozen for 10 more; Frozen is an ice status, so its removal sets off Kindling, which burns the enemy. That chain comes from events, not from code that anticipated it. The `test` block at the end is content too, and `cantrip test` runs it.
+
+## What you get
+
+- **A language for game effects.** Cards, statuses, relics, enemies with move patterns and phases, abilities, resources and your own verbs. Listeners can act before, instead of or after any event, modifiers stack in predictable layers, and effects can be scheduled for next turn or undone at the end of this one.
+- **An engine that runs it.** Turns, card play, draw and enemy intents, with the same result from the same seed on every machine, save and load, hot reload while the game runs, and choices your UI answers in the middle of an effect.
+- **Tools for the people writing content.** Tests written in content, a linter that catches unknown names and effects that can never fire, rules text generated with live numbers ("deal ~~6~~ 9 damage"), and a trace of why everything happened.
+- **Engine independence.** The core targets `netstandard2.1` and references no engine. A [Godot 4.6 addon](docs/godot.md) adds a node for GDScript, an importer so content ships in exported builds, and an editor dock with problems, tests, card text and live debugging.
+- **Tested against real games.** A growing [corpus](docs/coverage.md) of effects from Slay the Spire, Monster Train, Hearthstone, Balatro, Magic, Inscryption, Dominion, Darkest Dungeon and Dota 2 records what the language expresses and what it cannot yet, and [`samples/slice`](samples/slice) is a small roguelite a bot plays thousands of times to check the balance.
 
 ## Status
 
-Early. The core, the command-line tools and a Godot addon all work, and a small roguelite has been built and played with them, but no shipped game uses Cantrip yet.
+**Preview: 0.1.0-preview.1.** Everything above works and is tested, and a small roguelite has been built and played with it, but no shipped game uses Cantrip yet. The API, the language and the save format may change between previews; [docs/stability.md](docs/stability.md) says how. The turn-based side is the focus: real time works but is experimental, since no real-time game has been built with it.
 
-**Working now**
+Feedback is the most useful thing right now, especially effects from your game that the language cannot express. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-- The DSL: cards, statuses, relics, enemies with move patterns, abilities, keywords, resources, rulesets, content-defined verbs, and test blocks
-- Everything is an entity: statuses are entities attached to their host, so `stacks -1` and `remove tag:dot` need no special cases
-- Events with `before`, `instead` and `after` phases, deterministic listener ordering, loop protection and `once per turn/battle/run/chain` limits
-- A layered modifier pipeline (add, multiply, clamp, override) with sensible default scopes and explicit `of` scopes, which is also how content adds rules to target selection
-- A tree-walking interpreter, a battle runtime (turns, card play, draw, enemy intents) and a fixed-timestep tick clock for real time
-- Deterministic fixed-point math and RNG, state hashing, and save/load snapshots that replay exactly
-- Hot reload: edit content and a running game picks it up, keeping the state the game has changed
-- Player choices a UI answers mid-effect: the action rolls back, reports what it needs, and replays exactly once answered
-- A causality trace, a static linter, generated and custom descriptions with live values, and a DSL test runner
-- The `cantrip` command-line tool
-- A Godot 4.6 addon: one node drives a battle from GDScript, `.cantrip` files import so they reach an exported build, and an editor dock shows problems, DSL tests and card text ([docs/godot.md](docs/godot.md))
+## Get started
 
-**Not yet**: Asset Library packaging, the compiled backend, spatial selectors (`within` needs a host), the VS Code extension, and the full coverage corpus. The export smoke test exists but runs on demand rather than on every push, because Godot's export templates are about a gigabyte. See [Roadmap](#roadmap) and the gaps in [docs/coverage.md](docs/coverage.md).
-
-New to Cantrip? [docs/quickstart.md](docs/quickstart.md) walks you from nothing to a playable battle.
-
-## Building
-
-Requires the .NET 9 SDK or later.
+Add the library, and the `cantrip` tool for checking and testing content:
 
 ```
-dotnet build Cantrip.sln
-dotnet test tests/Cantrip.Core.Tests
-dotnet run --project src/Cantrip.Cli -- test samples/basic
+dotnet add package Cantrip.Core --prerelease
+dotnet new tool-manifest
+dotnet tool install Cantrip.Cli --prerelease
 ```
 
-The core library targets `netstandard2.1` and C# 9, to keep Unity possible later. The CLI and tests target `net9.0`.
+With your `.cantrip` files in a `content` folder, `dotnet cantrip test content` runs their tests and `dotnet cantrip lint content` checks them. The [quickstart](docs/quickstart.md) goes from an empty folder to a battle you can play in about fifteen minutes. For Godot, the addon is a zip on each [release](https://github.com/AGomnes/Cantrip/releases); [docs/godot.md](docs/godot.md) covers installing it.
 
-## Command line
-
-```
-cantrip validate <path>...                 parse and load content, report problems
-cantrip lint <path>... [--suppress codes]  static checks (CT301-CT312, CT401-CT403)
-cantrip test <path>... [--filter text] [--trace]
-cantrip describe <path>... [--name name]   print generated descriptions
-cantrip repl <path>...                     run DSL statements against a live game
-```
-
-Paths are files or folders; folders load every `*.cantrip` file recursively. Exit code 0 means success, 1 means content errors or failing tests, 2 means bad usage.
-
-## Using it from C#
-
-Load content and play a battle:
+Playing a battle from C# looks like this:
 
 ```csharp
 var content = new ContentLibrary();
@@ -97,144 +88,55 @@ PlayResult result = runtime.Play("Fireball", worm);   // Played, NotEnoughEnergy
 runtime.EndTurn();
 ```
 
-Asking before acting, for a UI or a bot:
-
-```csharp
-foreach (Entity card in runtime.State.ZoneOf(player, Zones.Hand))
-{
-    bool playable = runtime.CanPlay(card);                  // in hand, affordable, has a legal target
-    IReadOnlyList<Entity> targets = runtime.LegalTargets(card);   // after taunt, stealth and the like
-}
-
-int hp = worm.GetInt("hp");            // stats, after modifiers
-int burn = worm.CounterOf("Burn");     // a status's stacks (or duration); Get("Burn") is 0
-```
-
-Verbs implemented in C#:
-
-```csharp
-runtime.RegisterVerb("corrupt", call =>
-{
-    Num amount = call.Number(0, Num.One);
-    foreach (Entity target in call.Targets("to"))
-        target.SetBase("corruption", target.GetBase("corruption") + amount);
-});
-```
-
-A host supplies what the library cannot know, such as presentation or spatial queries. Every member is optional:
-
-```csharp
-sealed class GameHost : EffectHostBase
-{
-    public override void OnEvent(GameEvent gameEvent)
-    {
-        // Presentation hangs off events; the rules have already resolved.
-        if (gameEvent.Name == "damaged" && gameEvent.Target != null)
-            ShowDamageNumber(gameEvent.Target, gameEvent.Amount.ToInt());
-    }
-
-    public override bool TryCall(string function, IReadOnlyList<Value> arguments, EvalContext context, out Value value)
-    {
-        // Answer `enemies within 5m` from the game's own world state here.
-        value = Value.None;
-        return false;
-    }
-}
-
-var runtime = new CardRuntime(content, new RuntimeOptions { Host = new GameHost() });
-```
-
-Choices (targets, `choose`, `discard 2`) go through a pluggable `IChoiceProvider`: `FirstOptionChooser` (the default), `RandomChooser`, `ScriptedChooser`, or your UI.
-
-```csharp
-runtime.Chooser = new RandomChooser(seed: 7);
-```
-
-A UI cannot answer on the spot, so it uses `DeferredChooser`. An action that needs a decision rolls back to where it started and says so; answering replays it, deterministically:
-
-```csharp
-runtime.Chooser = new DeferredChooser();
-
-if (runtime.Play(card) == PlayResult.ChoicePending)
-{
-    PendingChoice choice = runtime.Pending!;       // prompt, options, min, max
-    // ... ask the player, then ...
-    runtime.Answer(chosen.Id);                     // ChoicePending again if it needs another
-}
-```
-
-Nothing happens until the action completes: host events are held back, so the game never animates a hit that was rolled back.
-
-Hot reload. Load the changed files, then rebind the running game:
-
-```csharp
-content.LoadFile("content/cards.cantrip");
-CardRuntime.ReloadReport report = runtime.ApplyContentChanges();
-```
-
-Stats the game has changed keep their values; a card still at its printed cost takes the new one. Definitions that vanished are listed in the report, and their entities keep playing.
-
-Save and load. A snapshot is plain data, taken between actions; restoring it into a runtime with the same content continues the game exactly:
-
-```csharp
-GameSnapshot save = runtime.Capture();
-string json = JsonSerializer.Serialize(save);
-runtime.Restore(JsonSerializer.Deserialize<GameSnapshot>(json)!);
-```
-
-Descriptions with live values, for card frames and tooltips:
-
-```csharp
-Description text = new DescriptionBuilder(content).Describe(card, runtime, target: worm);
-text.ToPlainText();   // "Hurl a ball of flame for 9 damage. Kill it to draw 1."
-text.ToMarkup();      // "Hurl a ball of flame for ~~6~~ 9 damage. ..."
-```
-
-Tracing, linting and DSL tests:
-
-```csharp
-var traced = new CardRuntime(content, new RuntimeOptions { Trace = true });
-// ... play ...
-Console.WriteLine(traced.State.Trace.FormatTree());
-
-IReadOnlyList<Diagnostic> problems = Linter.Lint(content);
-IReadOnlyList<DslTestResult> results = new DslTestRunner(content).RunAll();
-```
+[docs/csharp.md](docs/csharp.md) covers the rest: asking what can be played, the host, player choices, saving, hot reload, rules text and tracing.
 
 ## Documentation
 
-- [docs/quickstart.md](docs/quickstart.md): start here. From nothing to a card battle you can play, in about fifteen minutes
-- [docs/language.md](docs/language.md): the DSL reference
-- [docs/architecture.md](docs/architecture.md): how the library is put together, and where to extend it
-- [docs/coverage.md](docs/coverage.md): which reference effects the language can express today
-- [docs/godot.md](docs/godot.md): the Godot addon, and the two rules GDScript imposes on it
+- [Quickstart](docs/quickstart.md): from nothing to a playable battle
+- [Language reference](docs/language.md): every declaration, event, verb and modifier
+- [Using Cantrip from C#](docs/csharp.md)
+- [The Godot addon](docs/godot.md)
+- [Architecture](docs/architecture.md): how the library fits together, and where to extend it
+- [Coverage](docs/coverage.md): which effects from existing games the language can express
+- [Stability](docs/stability.md): what may change between previews, and how to report a problem
+- [Changelog](CHANGELOG.md)
 
-## Project layout
+## Command line
+
+```
+cantrip validate <path>...                 parse and load content, report problems
+cantrip lint <path>... [--suppress codes]  static checks
+cantrip test <path>... [--filter text] [--trace]
+cantrip describe <path>... [--name name]   print generated rules text
+cantrip repl <path>...                     run statements against a live game
+cantrip --version
+```
+
+Installed as a local tool, each is run as `dotnet cantrip ...`. Paths are files or folders; a folder loads every `.cantrip` file under it. The exit code is 0 for success, 1 for content errors or failing tests and 2 for bad usage, so the tool drops straight into CI.
+
+## Working on Cantrip
+
+You need the .NET 9 SDK or later:
+
+```
+dotnet build Cantrip.sln
+dotnet test tests/Cantrip.Core.Tests
+dotnet run --project src/Cantrip.Cli -- test samples/basic
+```
 
 | Path | Contents |
 |---|---|
-| `src/Cantrip.Core` | Parser, content loading, entities, events, modifiers, interpreter, runtime, linter, descriptions, test runner |
+| `src/Cantrip.Core` | The library: parser, content loading, runtime, interpreter, linter, rules text, test runner |
 | `src/Cantrip.Cli` | The `cantrip` tool |
-| `src/Cantrip.Sim` | Plays whole runs of the slice with a bot and reports win rate, deaths, and how each card and encounter fares |
-| `tests/Cantrip.Core.Tests` | Unit tests |
-| `samples/basic` | Small examples of the main features, with DSL tests |
-| `samples/corpus` | Reference effects from existing games, with DSL tests |
-| `samples/slice` | A small roguelite (a witch climbing a tower, fire against frost), with DSL tests |
-| `godot/Cantrip.Demo` | The Godot 4.6 addon, with demo content and headless tests |
-| `tests/Cantrip.Godot.Tests` | The adapter's engine-free layer, tested without Godot |
-| `tools` | Packaging the addon as a zip someone can drop into their own project |
+| `src/Cantrip.Sim` | Plays whole runs of the slice with a bot and reports how they went |
+| `samples/basic` | Small examples of each feature |
+| `samples/corpus` | Effects from existing games |
+| `samples/slice` | A small roguelite: a witch climbing a tower, fire against frost |
+| `godot/Cantrip.Demo` | The Godot addon, a demo and headless tests |
+| `tests` | Unit tests for the library and for the addon's engine-free layer |
+| `tools` | Packaging the addon, and checking the quickstart against freshly built packages |
 
-## Roadmap
-
-The plan, in order:
-
-1. **MVP core**: done (entities, events, statuses, modifiers, turn clock, tree-walk interpreter, trace log).
-2. **Save/load and deterministic math**: done.
-3. **Validate turn-based**: in progress. `samples/slice` is a small roguelite, played thousands of times by `src/Cantrip.Sim`; what building it found, and what has been fixed since, is in [docs/slice-friction.md](docs/slice-friction.md). Still to do: a game people actually play.
-4. **Validate real-time**: the tick clock exists; it needs a real-time project, spatial selectors and allocation-free event paths.
-5. **Coverage corpus**: 93 effects from Slay the Spire, Monster Train, Hearthstone, Balatro, Dota 2, Magic, Inscryption, Dominion and Darkest Dungeon so far: 71 work directly, 9 need a workaround and 13 are not expressible yet ([docs/coverage.md](docs/coverage.md)). The aim is about 150.
-6. **Release**: the Godot addon is done and packaged — node, importer, export check, editor dock, debugger tabs showing a running game's causality tree and what each live entity is made of, pause, step and breakpoints over the debug channel, and a demo. A packaged build has been run to prove content reaches it. Still to do: a docs site and a cookbook.
-7. **Project setup**: named Cantrip. Still to do: a contribution policy.
+[CONTRIBUTING.md](CONTRIBUTING.md) has what a pull request needs, and how releases are made.
 
 ## License
 
