@@ -1,0 +1,60 @@
+# Tests for magic.cantrip. Player: 80 hp, 3 energy, seed 1. Plain enemies have 10 hp.
+
+test "mtg Spark Bolt burns for three"
+  enemy hp 20
+  play "Spark Bolt" on enemy
+  expect enemy.hp == 17
+
+test "mtg Muster makes two tokens"
+  enemy hp 20
+  play Muster
+  expect allies.count == 3
+
+test "mtg the Goblin Chief buffs the other goblins but not itself"
+  enemy hp 20
+  create "Goblin Skirmisher"
+  create "Goblin Skirmisher"
+  create "Goblin Chief"
+  expect (allies where attack == 3).count == 2
+  expect (allies where attack == 2).count == 1
+
+test "mtg Regrowth survives one death a turn"
+  enemy hp 20
+  create Militia
+  apply Regrowth 1 to created
+  deal 5 to created
+  expect not created.first.dead
+  deal 5 to created
+  expect created.first.dead
+
+test "mtg Denial counters the next spell, and is spent doing it"
+  enemy hp 20
+  relic Denial
+  play "Spark Bolt" on enemy
+  expect enemy.hp == 20
+  play "Spark Bolt" on enemy
+  expect enemy.hp == 17
+
+test "mtg Blood Tithe drains when a creature dies"
+  enemy hp 5
+  enemy hp 5
+  relic "Blood Tithe"
+  create Militia
+  kill created.first
+  expect enemy.hp == 4 and enemy2.hp == 4
+
+test "mtg Venomstrike kills whatever it damages"
+  enemy hp 20
+  create "Goblin Skirmisher"
+  apply Venomstrike 1 to created
+  attack enemy with created.first
+  expect enemy.dead
+
+test "mtg Soulbond gains you what the creature deals"
+  player hp 70
+  enemy hp 20
+  create "Goblin Skirmisher"
+  apply Soulbond 1 to created
+  attack enemy with created.first
+  expect enemy.hp == 18
+  expect player.hp == 72

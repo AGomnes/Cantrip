@@ -1,0 +1,101 @@
+# Coverage corpus: Dominion style deck building. Treasure and victory cards are cards, and
+# actions, buys and coins are declared resources that reset at the start of each turn.
+# Names are our own. Classification and notes: docs/coverage.md.   Tests: dominion.tests.cantrip.
+
+resource "actions"
+  min 0
+  reset_to 1
+  reset_on turn_start
+
+resource "buys"
+  min 0
+  reset_to 1
+  reset_on turn_start
+
+resource "coins"
+  min 0
+  reset_to 0
+  reset_on turn_start
+
+# The turn's allowance is the resource declarations above and nothing else: a reset establishes
+# the stat as well as refreshing it, so each turn starts with one action and one buy.
+
+card "Copper"
+  cost 0
+  tags treasure
+  effect:
+    gain 1 coins
+
+card "Estate"
+  cost 2 coins
+  tags victory
+
+# --- 1. ref Village: a card, and two more actions -------------------------------------------
+
+card "Hamlet"
+  cost 3 coins
+  tags action
+  effect:
+    draw 1
+    gain 2 actions
+
+# --- 2. ref Market: a little of everything --------------------------------------------------
+
+card "Bazaar"
+  cost 5 coins
+  tags action
+  effect:
+    draw 1
+    gain 1 actions
+    gain 1 buys
+    gain 1 coins
+
+# --- 3. ref Cellar: discard any number, draw that many --------------------------------------
+# Workaround: `discard N` takes a fixed count, so "any number" becomes a particular number.
+# The player still chooses which cards go, but not how many.
+
+card "Larder"
+  cost 2 coins
+  tags action
+  effect:
+    gain 1 actions
+    discard 2
+    draw 2
+
+# --- 4. ref Chapel: trash cards from your hand ----------------------------------------------
+
+card "Shrine"
+  cost 2 coins
+  tags action
+  effect:
+    exhaust 1
+
+# --- 5. ref Moat: a reaction held in hand ---------------------------------------------------
+# Cards in hand are active, so a card can react from there without being played at all.
+
+card "Bulwark"
+  cost 2 coins
+  tags action, reaction
+  on before_damaged(target:player) once per turn:
+    cancel
+
+# --- 6. ref Throne Room: play an action twice -----------------------------------------------
+
+card "Regent"
+  cost 4 coins
+  tags action
+  effect:
+    choose 1 from hand where tag:action as picked
+    repeat 2:
+      replay picked
+
+# --- 7. ref buying from the supply ----------------------------------------------------------
+# Not expressible, though no longer for want of pools: `discover` can offer cards from content (see
+# hearthstone.cantrip), but a supply pile runs out and a definition cannot hold a count, being one
+# immutable object shared by everything made from it. Costs are fine — `cost 5 coins` is a cost the
+# card is refused for — so what is missing is a buy phase, since nothing ever spends `buys`, and a
+# cost in two currencies at once.
+
+# --- 8. ref Militia: every other player discards down to three ------------------------------
+# Not expressible: there is one player. Enemies are actors without hands or decks, so an
+# effect that reaches into another player's hand has nobody to reach.

@@ -1,6 +1,4 @@
-# Gameplay Effects DSL
-
-*Working title.*
+# Cantrip
 
 A C# library for writing cards, statuses, relics, enemies and abilities as short text files instead of code. It targets Godot/.NET, keeps the rules engine free of engine references, and runs the same content turn-based or in real time.
 
@@ -48,8 +46,8 @@ An early MVP of the core, per step 1 of the plan in the design notes. It is not 
 - Hot reload: edit content and a running game picks it up, keeping the state the game has changed
 - Player choices a UI answers mid-effect: the action rolls back, reports what it needs, and replays exactly once answered
 - A causality trace, a static linter, generated and custom descriptions with live values, and a DSL test runner
-- The `gedsl` command-line tool
-- A Godot 4.6 addon: one node drives a battle from GDScript, `.ge` files import so they reach an exported build, and an editor dock shows problems, DSL tests and card text ([docs/godot.md](docs/godot.md))
+- The `cantrip` command-line tool
+- A Godot 4.6 addon: one node drives a battle from GDScript, `.cantrip` files import so they reach an exported build, and an editor dock shows problems, DSL tests and card text ([docs/godot.md](docs/godot.md))
 
 **Not yet**: Asset Library packaging, the compiled backend, spatial selectors (`within` needs a host), the VS Code extension, and the full coverage corpus. The export smoke test exists but runs on demand rather than on every push, because Godot's export templates are about a gigabyte. See [Roadmap](#roadmap) and the gaps in [docs/coverage.md](docs/coverage.md).
 
@@ -58,9 +56,9 @@ An early MVP of the core, per step 1 of the plan in the design notes. It is not 
 Requires the .NET 9 SDK or later.
 
 ```
-dotnet build GameplayEffects.sln
-dotnet test tests/GameplayEffects.Core.Tests
-dotnet run --project src/GameplayEffects.Cli -- test samples/basic
+dotnet build Cantrip.sln
+dotnet test tests/Cantrip.Core.Tests
+dotnet run --project src/Cantrip.Cli -- test samples/basic
 ```
 
 The core library targets `netstandard2.1` and C# 9, to keep Unity possible later. The CLI and tests target `net9.0`.
@@ -68,14 +66,14 @@ The core library targets `netstandard2.1` and C# 9, to keep Unity possible later
 ## Command line
 
 ```
-gedsl validate <path>...                 parse and load content, report problems
-gedsl lint <path>... [--suppress codes]  static checks (GE301-GE312, GE401-GE403)
-gedsl test <path>... [--filter text] [--trace]
-gedsl describe <path>... [--name name]   print generated descriptions
-gedsl repl <path>...                     run DSL statements against a live game
+cantrip validate <path>...                 parse and load content, report problems
+cantrip lint <path>... [--suppress codes]  static checks (CT301-CT312, CT401-CT403)
+cantrip test <path>... [--filter text] [--trace]
+cantrip describe <path>... [--name name]   print generated descriptions
+cantrip repl <path>...                     run DSL statements against a live game
 ```
 
-Paths are files or folders; folders load every `*.ge` file recursively. Exit code 0 means success, 1 means content errors or failing tests, 2 means bad usage.
+Paths are files or folders; folders load every `*.cantrip` file recursively. Exit code 0 means success, 1 means content errors or failing tests, 2 means bad usage.
 
 ## Using it from C#
 
@@ -155,7 +153,7 @@ Nothing happens until the action completes: host events are held back, so the ga
 Hot reload. Load the changed files, then rebind the running game:
 
 ```csharp
-content.LoadFile("content/cards.ge");
+content.LoadFile("content/cards.cantrip");
 CardRuntime.ReloadReport report = runtime.ApplyContentChanges();
 ```
 
@@ -199,13 +197,13 @@ IReadOnlyList<DslTestResult> results = new DslTestRunner(content).RunAll();
 
 | Path | Contents |
 |---|---|
-| `src/GameplayEffects.Core` | Parser, content loading, entities, events, modifiers, interpreter, runtime, linter, descriptions, test runner |
-| `src/GameplayEffects.Cli` | The `gedsl` tool |
-| `tests/GameplayEffects.Core.Tests` | Unit tests |
+| `src/Cantrip.Core` | Parser, content loading, entities, events, modifiers, interpreter, runtime, linter, descriptions, test runner |
+| `src/Cantrip.Cli` | The `cantrip` tool |
+| `tests/Cantrip.Core.Tests` | Unit tests |
 | `samples/basic` | Every example from the design notes, with DSL tests |
 | `samples/corpus` | Reference effects from existing games, with DSL tests |
-| `godot/GameplayEffects.Demo` | The Godot 4.6 addon, with demo content and headless tests |
-| `tests/GameplayEffects.Godot.Tests` | The adapter's engine-free layer, tested without Godot |
+| `godot/Cantrip.Demo` | The Godot 4.6 addon, with demo content and headless tests |
+| `tests/Cantrip.Godot.Tests` | The adapter's engine-free layer, tested without Godot |
 | `tools` | Packaging the addon as a zip someone can drop into their own project |
 
 ## Roadmap
@@ -218,7 +216,7 @@ Following section 7 of the design notes:
 4. **Validate real-time**: the tick clock exists; it needs a real-time project, spatial selectors and allocation-free event paths.
 5. **Coverage corpus**: 93 effects from Slay the Spire, Monster Train, Hearthstone, Balatro, Dota 2, Magic, Inscryption, Dominion and Darkest Dungeon so far: 71 work directly, 9 need a workaround and 13 are not expressible yet ([docs/coverage.md](docs/coverage.md)). The design notes aim for about 150.
 6. **Release**: the Godot addon is done and packaged — node, importer, export check, editor dock, debugger tabs showing a running game's causality tree and what each live entity is made of, pause, step and breakpoints over the debug channel, and a demo. A packaged build has been run to prove content reaches it. Still to do: a docs site and a cookbook.
-7. **Project setup**: the name is still to be chosen.
+7. **Project setup**: named Cantrip. Still to do: a contribution policy.
 
 ## License
 

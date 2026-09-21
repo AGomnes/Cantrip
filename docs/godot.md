@@ -8,25 +8,25 @@ inside the project's own assembly — only the engine library itself can be a DL
 
 ## Installing
 
-1. Copy `addons/gameplay_effects/` into your project.
+1. Copy `addons/cantrip/` into your project.
 2. Reference the rules engine from your project's `.csproj`. In this repository that is a project
    reference; for your own game it is a package reference or a DLL:
    ```xml
-   <ProjectReference Include="path/to/GameplayEffects.Core.csproj" />
+   <ProjectReference Include="path/to/Cantrip.Core.csproj" />
    ```
 3. **Build the C# project before enabling the plugin.** Until the assembly exists, Godot cannot
    load a C# plugin and every `[GlobalClass]` node is invisible — with no error to explain why.
-4. Enable *Gameplay Effects* in Project Settings → Plugins.
-5. Put `.ge` files under `res://content` (or set the node's `ContentFolder`).
+4. Enable *Cantrip* in Project Settings → Plugins.
+5. Put `.cantrip` files under `res://content` (or set the node's `ContentFolder`).
 
 To hand the addon to someone else, `tools/package-addon.sh` (or `package-addon.ps1` on Windows)
-writes a zip whose root is `addons/gameplay_effects`, which is what "unzip this into your project"
+writes a zip whose root is `addons/cantrip`, which is what "unzip this into your project"
 and the Asset Library both expect. It takes the version from `plugin.cfg`, so the two can never
 disagree.
 
 ## Two rules for GDScript
 
-Both are enforced by a smoke test in `godot/GameplayEffects.Demo/tests/`, because both fail in
+Both are enforced by a smoke test in `godot/Cantrip.Demo/tests/`, because both fail in
 confusing ways.
 
 - **Members keep their C# names.** `rules.CreatePlayer(...)`, `rules.EffectEvent`. There is no
@@ -39,7 +39,7 @@ confusing ways.
 ```gdscript
 extends Node
 
-@onready var rules: GameplayEffectsRuntime = $GameplayEffectsRuntime
+@onready var rules: CantripRuntime = $CantripRuntime
 
 func _ready() -> void:
     var problems: Array = rules.LoadContent("res://content")
@@ -72,15 +72,15 @@ func _on_choice_requested(request: Dictionary) -> void:
 ```
 
 A complete version of this, with a hand, enemy panels, intents and a log, is in
-`godot/GameplayEffects.Demo/demo/battle.tscn`. It also plays itself:
+`godot/Cantrip.Demo/demo/battle.tscn`. It also plays itself:
 
 ```
-godot --headless --path godot/GameplayEffects.Demo res://demo/battle.tscn -- --demo-auto
+godot --headless --path godot/Cantrip.Demo res://demo/battle.tscn -- --demo-auto
 ```
 
 ## The node
 
-`GameplayEffectsRuntime` is the only surface script touches. Entities cross as `int` ids (0 means
+`CantripRuntime` is the only surface script touches. Entities cross as `int` ids (0 means
 none) and everything else as dictionaries with snake_case keys. A C# game can skip all of that and
 use `Core`, the `CardRuntime` underneath.
 
@@ -161,7 +161,7 @@ does not invalidate saves; adding, renaming or deleting a definition does.
 
 ## Hot reload
 
-`ReloadContent()` reloads the `.ge` files and rebinds everything live to them. Stats the game has
+`ReloadContent()` reloads the `.cantrip` files and rebinds everything live to them. Stats the game has
 changed keep their values, while a card still at its printed cost takes the new one. The report
 says how many entities rebound, which definitions have gone, and whether the ruleset changed —
 a running game keeps the rules it started with.
@@ -174,9 +174,9 @@ converts through that clock.
 
 ## Content and exports
 
-`.ge` files are not resources, and Godot does not export plain files by default — content that
+`.cantrip` files are not resources, and Godot does not export plain files by default — content that
 works in the editor would simply be missing from a shipped game. The addon therefore imports each
-`.ge` into a small resource, and an export check fails the export when content would not reach the
+`.cantrip` into a small resource, and an export check fails the export when content would not reach the
 build. Loading always goes through the engine's file access, never `System.IO`: the engine's own
 `ContentLibrary.LoadFolder` cannot see inside an exported package.
 
@@ -189,7 +189,7 @@ Two things to know before exporting a .NET game, both of which cost an afternoon
   test is to run the packaged game.
 
 ```
-godot --headless --path godot/GameplayEffects.Demo --export-release "Linux" out/demo.x86_64
+godot --headless --path godot/Cantrip.Demo --export-release "Linux" out/demo.x86_64
 out/demo.x86_64 --headless -- --demo-auto
 ```
 
@@ -203,25 +203,25 @@ export templates are about a gigabyte.
 Enable the plugin and the dock appears at the bottom:
 
 - **Problems** — parse errors and lint findings in one list, in source order, click to open.
-- **Tests** — the `test` blocks in your content, run by the same runner as `gedsl test`, with a
+- **Tests** — the `test` blocks in your content, run by the same runner as `cantrip test`, with a
   causality trace on failure.
 - **Preview** — any definition's rules text with live values, its flavour, its keyword tooltips,
   and the hash to paste into `text_checked`.
 - **Source** — a viewer, because Godot cannot open a non-script file at a line. Syntax highlighting
   runs the engine's own lexer, so it cannot drift from the grammar.
 
-Running the editor headless with `--ge-selftest` exercises all of it without a mouse.
+Running the editor headless with `--cantrip-selftest` exercises all of it without a mouse.
 
 ## Verifying
 
 ```
-dotnet build godot/GameplayEffects.Demo/GameplayEffects.Demo.csproj
-dotnet build godot/GameplayEffects.Demo/GameplayEffects.Demo.csproj -c ExportRelease
-dotnet test tests/GameplayEffects.Godot.Tests
-godot --headless --path godot/GameplayEffects.Demo --import
-godot --headless --path godot/GameplayEffects.Demo res://tests/headless.tscn
-godot --headless --path godot/GameplayEffects.Demo res://tests/gdscript_smoke.tscn
-godot --headless --path godot/GameplayEffects.Demo res://demo/battle.tscn -- --demo-auto
+dotnet build godot/Cantrip.Demo/Cantrip.Demo.csproj
+dotnet build godot/Cantrip.Demo/Cantrip.Demo.csproj -c ExportRelease
+dotnet test tests/Cantrip.Godot.Tests
+godot --headless --path godot/Cantrip.Demo --import
+godot --headless --path godot/Cantrip.Demo res://tests/headless.tscn
+godot --headless --path godot/Cantrip.Demo res://tests/gdscript_smoke.tscn
+godot --headless --path godot/Cantrip.Demo res://demo/battle.tscn -- --demo-auto
 ```
 
 The `ExportRelease` build is the cheap proof that no editor-only code escaped `#if TOOLS`; both
@@ -231,7 +231,7 @@ quits.
 ## Not done yet
 
 **Live debugging** is built but only half proven. Run a game from the editor and the debugger gets
-two *Gameplay Effects* tabs. The first is the trace: turn recording on, pull the causality tree, and
+two *Cantrip* tabs. The first is the trace: turn recording on, pull the causality tree, and
 click a step to open the content line that caused it. It also holds the game: pause, and queued
 triggers wait; step, and exactly one of them resolves; or set a breakpoint on an event or a line of
 content, and the game stops itself the next time that trigger comes up. The second is *Entities*:

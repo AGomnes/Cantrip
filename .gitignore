@@ -36,7 +36,7 @@ coverage*.info
 .import/
 export_presets.cfg
 # ...except the demo's, which the export test needs in order to run at all.
-!godot/GameplayEffects.Demo/export_presets.cfg
+!godot/Cantrip.Demo/export_presets.cfg
 *.translation
 
 ## OS

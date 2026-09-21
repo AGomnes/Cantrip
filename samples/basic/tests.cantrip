@@ -1,0 +1,100 @@
+# Tests for content.cantrip. Each test starts with a fresh player (80 hp, 3 energy) and seed 1.
+
+test "Fireball kills a 6 HP enemy"
+  setup: enemy hp 6
+  play Fireball on enemy
+  expect enemy.dead
+
+test "Poison ticks at the end of the enemy's turn and decays"
+  enemy hp 20
+  apply Poison 3 to enemy
+  end turn
+  expect enemy.hp == 17
+  expect enemy.Poison == 2
+
+test "Fire damage shatters Frozen for 10 extra"
+  enemy hp 30
+  apply Frozen 1 to enemy
+  play "Flame Jab" on enemy
+  expect enemy.hp == 17
+  expect not enemy.has(Frozen)
+
+test "Kindling burns enemies when ice statuses are removed"
+  enemy hp 30
+  relic Kindling
+  apply Frozen 1 to enemy
+  play "Flame Jab" on enemy
+  expect enemy.Burn == 2
+
+test "shatter only hurts frozen enemies"
+  enemy hp 30
+  enemy hp 30
+  apply Frozen 1 to enemy
+  play Shatter on enemy
+  play Shatter on enemy2
+  expect enemy.hp == 20
+  expect enemy2.hp == 30
+
+test "Pyromancer's Codex boosts fire damage and discounts fire cards"
+  enemy hp 30
+  relic "Pyromancer's Codex"
+  play "Flame Jab" on enemy
+  expect enemy.hp == 26
+  expect player.energy == 3
+
+test "Jaw Worm chomps, then bellows, then chomps harder"
+  enemy "Jaw Worm"
+  player hp 50
+  end turn
+  expect player.hp == 39
+  end turn
+  expect enemy.Strength == 3
+  expect enemy.block == 6
+  end turn
+  expect player.hp == 25
+
+test "self-triggering relics stop after one pass"
+  player hp 50
+  relic "Echo Chamber"
+  heal 5
+  expect player.hp == 56
+
+test "Lizard Tail saves you once"
+  player hp 5
+  enemy hp 100
+  relic "Lizard Tail"
+  deal 10 to player
+  expect player.alive
+  expect player.hp == 40
+
+test "Flex's strength wears off at the end of the turn"
+  enemy hp 50
+  play Flex
+  play Strike on enemy
+  expect enemy.hp == 42
+  end turn
+  expect player.Strength == 0
+
+test "Prepare draws two extra cards next turn"
+  deck Strike Strike Strike Strike Strike Strike Strike Strike Strike Strike
+  play Prepare
+  end turn
+  expect hand.count == 7
+
+test "Vulnerable enemies take half again as much damage"
+  enemy hp 30
+  apply Vulnerable 2 to enemy
+  play Strike on enemy
+  expect enemy.hp == 21
+
+test "Frost Nova slows every enemy for three seconds"
+  realtime 10
+  enemy hp 10
+  enemy hp 10
+  grant "Frost Nova"
+  cast "Frost Nova"
+  expect enemy.Slow == 40 and enemy2.Slow == 40
+  tick 29
+  expect enemy.Slow == 40
+  tick 1
+  expect enemy.Slow == 0

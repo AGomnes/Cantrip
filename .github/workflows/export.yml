@@ -2,7 +2,7 @@ name: Export
 
 # Exporting needs Godot's export templates, which are about a gigabyte, so this is not part of
 # every push. It answers the one question no other test can: does the content actually reach a
-# packaged game? A .ge file is not a resource, and a build that quietly shipped without any
+# packaged game? A .cantrip file is not a resource, and a build that quietly shipped without any
 # content would start, run, and do nothing at all.
 on:
   workflow_dispatch:
@@ -48,14 +48,14 @@ jobs:
 
       - name: Build and import
         run: |
-          dotnet build godot/GameplayEffects.Demo/GameplayEffects.Demo.csproj
-          timeout 300 "$GODOT" --headless --path godot/GameplayEffects.Demo --import
+          dotnet build godot/Cantrip.Demo/Cantrip.Demo.csproj
+          timeout 300 "$GODOT" --headless --path godot/Cantrip.Demo --import
 
       # The export prints its failures and exits 0 anyway, so the log decides, not the status code.
       - name: Export
         run: |
           mkdir -p artifacts/export
-          timeout 900 "$GODOT" --headless --path godot/GameplayEffects.Demo \
+          timeout 900 "$GODOT" --headless --path godot/Cantrip.Demo \
             --export-release "Linux" "$PWD/artifacts/export/demo.x86_64" 2>&1 | tee export.log
           if grep -iqE '^ERROR|no solution file' export.log; then
             echo "The export reported errors; the build cannot be trusted."

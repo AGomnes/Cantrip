@@ -1,0 +1,24 @@
+; Godot project for the Cantrip adapter: the addon itself, a demo, and headless tests.
+;
+; The C# assembly must be built before Godot runs, or the plugin silently does not load and the
+; [GlobalClass] types are invisible to GDScript:
+;
+;   dotnet build godot/Cantrip.Demo/Cantrip.Demo.csproj
+;   Godot_v4.6.1-stable_mono_win64_console.exe --headless --path godot/Cantrip.Demo --import
+
+config_version=5
+
+[application]
+
+config/name="Cantrip"
+config/description="Cards, statuses, relics and abilities written as text files."
+config/features=PackedStringArray("4.6", "C#")
+run/main_scene="res://demo/battle.tscn"
+
+[dotnet]
+
+project/assembly_name="Cantrip.Demo"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/cantrip/plugin.cfg")

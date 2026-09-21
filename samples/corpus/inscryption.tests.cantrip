@@ -1,0 +1,52 @@
+# Tests for inscryption.cantrip. Player: 80 hp, 3 energy, seed 1. Plain enemies have 10 hp.
+
+test "insc every death leaves a bone"
+  enemy hp 5
+  relic "Bone Collector"
+  create Skeleton
+  kill created.first
+  expect player.bones == 1
+
+test "insc Bone Bargain spends two bones to summon"
+  enemy hp 10
+  player bones 2
+  play "Bone Bargain"
+  expect player.bones == 0
+  expect allies.count == 2
+
+test "insc Quills answers whoever struck it"
+  enemy hp 10 attack 2
+  create "Quilled Beast"
+  apply Quills 1 to created
+  attack created.first with enemy
+  expect enemy.hp == 9
+  expect created.first.hp == 1
+
+test "insc a Fledgling grows once, not every turn"
+  enemy hp 10
+  create Fledgling
+  end turn
+  expect created.first.attack == 2
+  end turn
+  expect created.first.attack == 2
+
+test "insc ants are as strong as the colony is large"
+  enemy hp 10
+  create "Ant Worker"
+  create "Ant Worker"
+  expect (allies where tag:ant).count == 2
+  expect (allies where attack == 2).count == 2
+
+test "insc a Sporebearer draws for you when it dies"
+  enemy hp 10
+  deck "Bone Bargain"
+  create Sporebearer
+  kill created.first
+  expect hand.count == 1
+
+test "insc Blood Offering eats an ant to make a skeleton"
+  enemy hp 10
+  create "Ant Worker"
+  play "Blood Offering"
+  expect (allies where tag:ant).count == 0
+  expect allies.count == 2

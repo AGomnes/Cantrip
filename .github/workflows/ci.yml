@@ -23,29 +23,29 @@ jobs:
           dotnet-version: 9.0.x
 
       - name: Build
-        run: dotnet build GameplayEffects.sln -c Release
+        run: dotnet build Cantrip.sln -c Release
 
       - name: Unit tests
-        run: dotnet test tests/GameplayEffects.Core.Tests -c Release --no-build
+        run: dotnet test tests/Cantrip.Core.Tests -c Release --no-build
 
       # The adapter's engine-free half: event buffering, view mapping, tick maths, choice ids.
       # It compiles the addon's shared/ files directly, so it needs no Godot at all.
       - name: Adapter tests
-        run: dotnet test tests/GameplayEffects.Godot.Tests -c Release --no-build
+        run: dotnet test tests/Cantrip.Godot.Tests -c Release --no-build
 
       # Each sample folder is its own game with its own definitions, so they are linted separately.
       - name: Lint samples/basic
-        run: dotnet run --project src/GameplayEffects.Cli -c Release --no-build -- lint samples/basic
+        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- lint samples/basic
 
       - name: Lint samples/corpus
-        run: dotnet run --project src/GameplayEffects.Cli -c Release --no-build -- lint samples/corpus
+        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- lint samples/corpus
 
       - name: DSL tests (samples/basic)
-        run: dotnet run --project src/GameplayEffects.Cli -c Release --no-build -- test samples/basic
+        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- test samples/basic
 
       - name: DSL tests (samples/corpus)
         if: hashFiles('samples/corpus/**') != ''
-        run: dotnet run --project src/GameplayEffects.Cli -c Release --no-build -- test samples/corpus
+        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- test samples/corpus
 
   godot:
     # Everything that can only break inside a real engine: importing content, the Variant
@@ -86,23 +86,23 @@ jobs:
       # runs, yet --import still exits 0, so a missing build would look like a pass.
       - name: Build the addon
         run: |
-          dotnet build godot/GameplayEffects.Demo/GameplayEffects.Demo.csproj
-          dotnet build godot/GameplayEffects.Demo/GameplayEffects.Demo.csproj -c ExportRelease
+          dotnet build godot/Cantrip.Demo/Cantrip.Demo.csproj
+          dotnet build godot/Cantrip.Demo/Cantrip.Demo.csproj -c ExportRelease
 
       - name: Import content
-        run: timeout 300 "$GODOT" --headless --path godot/GameplayEffects.Demo --import
+        run: timeout 300 "$GODOT" --headless --path godot/Cantrip.Demo --import
 
       # Each scene exits non-zero on a failed check. The timeouts matter: a script that cannot
       # parse never reaches its quit() and would otherwise hang the job.
       - name: Headless tests
-        run: timeout 300 "$GODOT" --headless --path godot/GameplayEffects.Demo res://tests/headless.tscn
+        run: timeout 300 "$GODOT" --headless --path godot/Cantrip.Demo res://tests/headless.tscn
 
       - name: GDScript smoke test
-        run: timeout 300 "$GODOT" --headless --path godot/GameplayEffects.Demo res://tests/gdscript_smoke.tscn
+        run: timeout 300 "$GODOT" --headless --path godot/Cantrip.Demo res://tests/gdscript_smoke.tscn
 
       # The demo is the worked example in docs/godot.md, so it has to keep working.
       - name: Demo plays itself
-        run: timeout 300 "$GODOT" --headless --path godot/GameplayEffects.Demo res://demo/battle.tscn -- --demo-auto
+        run: timeout 300 "$GODOT" --headless --path godot/Cantrip.Demo res://demo/battle.tscn -- --demo-auto
 
       - name: Editor dock self-test
-        run: timeout 300 "$GODOT" --headless --path godot/GameplayEffects.Demo --import -- --ge-selftest
+        run: timeout 300 "$GODOT" --headless --path godot/Cantrip.Demo --import -- --cantrip-selftest

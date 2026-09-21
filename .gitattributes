@@ -5,5 +5,5 @@
 *.csproj  text
 *.props   text
 *.md      text
-*.ge      text
+*.cantrip text
 *.sln     text eol=crlf

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- netstandard2.1 keeps the door open for Unity as well as Godot/.NET. -->
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <RootNamespace>Cantrip</RootNamespace>
+    <AssemblyName>Cantrip.Core</AssemblyName>
+    <Description>Engine-agnostic core for the Cantrip DSL: parser, entities, events, statuses, modifiers and the tree-walking interpreter.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Cantrip.Core.Tests" />
+  </ItemGroup>
+
+</Project>

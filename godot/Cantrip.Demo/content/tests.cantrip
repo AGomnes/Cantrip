@@ -1,0 +1,21 @@
+# Tests written in the DSL itself. The dock runs these, and so does `cantrip test`, so a designer
+# gets the same answer in the editor and in CI.
+
+test "Ember burns what it hits"
+  enemy Slime
+  play Ember on enemy
+  expect enemy.hp == 25
+  expect enemy.Burn == 2
+
+test "Burn ticks at the end of the turn"
+  enemy Slime
+  apply Burn 3 to enemy
+  end turn
+  expect enemy.hp == 27
+
+test "Guard holds"
+  enemy Slime
+  play Guard
+  expect player.block == 6
+  end turn
+  expect player.hp == 80

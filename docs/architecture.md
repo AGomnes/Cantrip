@@ -5,23 +5,23 @@ How the library is put together, what each part is responsible for, and where to
 ## Layers
 
 ```
- .ge files ──► Syntax ──► Content ──► Runtime + Interpreter ──► CardRuntime ──► your game
-                 │           │              │
-                 └───────────┴──── Tools ───┘   (Linter, Descriptions, DslTestRunner, gedsl)
+ .cantrip files ──► Syntax ──► Content ──► Runtime + Interpreter ──► CardRuntime ──► your game
+                      │           │              │
+                      └───────────┴──── Tools ───┘   (Linter, Descriptions, DslTestRunner, cantrip)
 ```
 
-Everything lives in `GameplayEffects.Core`, which references no engine. `GameplayEffects.Cli` is a thin command-line wrapper.
+Everything lives in `Cantrip.Core`, which references no engine. `Cantrip.Cli` is a thin command-line wrapper.
 
 | Namespace | Responsibility |
 |---|---|
-| `GameplayEffects` | `Num` (fixed-point), `Rng`, shared enums, `CardRuntime` |
-| `GameplayEffects.Syntax` | `Lexer`, `Parser`, AST nodes, `AstPrinter`, `AstWalker` |
-| `GameplayEffects.Content` | `ContentLibrary`, `EntityDefinition`, `VerbDefinition`, `ResourceRule` |
-| `GameplayEffects.Runtime` | `GameState`, `Entity`, `EventBus`, `ModifierPipeline`, clocks, `TraceLog`, snapshots, `Interpreter` |
-| `GameplayEffects.Linting` | `Linter` |
-| `GameplayEffects.Descriptions` | `DescriptionBuilder`, localization |
-| `GameplayEffects.Testing` | `DslTestRunner` |
-| `GameplayEffects.Diagnostics` | `SourceSpan`, `Diagnostic`, "did you mean" suggestions |
+| `Cantrip` | `Num` (fixed-point), `Rng`, shared enums, `CardRuntime` |
+| `Cantrip.Syntax` | `Lexer`, `Parser`, AST nodes, `AstPrinter`, `AstWalker` |
+| `Cantrip.Content` | `ContentLibrary`, `EntityDefinition`, `VerbDefinition`, `ResourceRule` |
+| `Cantrip.Runtime` | `GameState`, `Entity`, `EventBus`, `ModifierPipeline`, clocks, `TraceLog`, snapshots, `Interpreter` |
+| `Cantrip.Linting` | `Linter` |
+| `Cantrip.Descriptions` | `DescriptionBuilder`, localization |
+| `Cantrip.Testing` | `DslTestRunner` |
+| `Cantrip.Diagnostics` | `SourceSpan`, `Diagnostic`, "did you mean" suggestions |
 
 ## Syntax
 
@@ -38,7 +38,7 @@ No switch over node types in this codebase is exhaustive, so the compiler will n
 | Place | What goes wrong when it is missed |
 |---|---|
 | `AstWalker.VisitStatement` | the walk stops at the node, so the linter goes blind inside it |
-| `Linter.Facts.VisitStatement` | a name the node binds is not recorded, so every use of it warns GE302 |
+| `Linter.Facts.VisitStatement` | a name the node binds is not recorded, so every use of it warns CT302 |
 | `DescriptionBuilder.Statement` | the node contributes nothing to generated rules text |
 | `DescriptionBuilder.Canonical.Statement` | the effect hash stops noticing edits, so `text_checked` drift protection goes quiet |
 | `Content/BlockAddresses` | a scheduled block nested inside the node has no address, and `Capture` later throws somewhere unrelated |
@@ -55,8 +55,8 @@ The parser knows nothing about verbs, so a new one introduces no AST node and th
 | Place | What goes wrong when it is missed |
 |---|---|
 | `Interpreter.RegisterVerb` | nothing runs the verb |
-| `BuiltinEvents.VerbEvents` | `IsKnownVerb` is that table, so the linter calls the verb unknown (GE301). This one fails loudly: `BuiltinEventsTests.The_verb_catalogue_matches_the_registered_verbs` walks every registered verb and refuses any the table does not list |
-| `Linter.Facts.VisitStatement` | a clause that binds a name is not recorded there, so every use of the bound name warns GE302 |
+| `BuiltinEvents.VerbEvents` | `IsKnownVerb` is that table, so the linter calls the verb unknown (CT301). This one fails loudly: `BuiltinEventsTests.The_verb_catalogue_matches_the_registered_verbs` walks every registered verb and refuses any the table does not list |
+| `Linter.Facts.VisitStatement` | a clause that binds a name is not recorded there, so every use of the bound name warns CT302 |
 
 `attack` and `discover` were added this way. The `into` clause is what taught the third row its lesson: it shipped without being recorded, every use of the name it bound warned, and the corpus lint caught it only because that folder had been clean all along.
 

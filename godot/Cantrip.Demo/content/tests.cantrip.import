@@ -1,0 +1,16 @@
+[remap]
+
+importer="cantrip.content"
+importer_version=1
+type="Resource"
+uid="uid://cbd8p6mjsn1jt"
+path="res://.godot/imported/tests.cantrip-25fc8db6bfacb4556d9f512acf2c2935.res"
+
+[deps]
+
+source_file="res://content/tests.cantrip"
+dest_files=["res://.godot/imported/tests.cantrip-25fc8db6bfacb4556d9f512acf2c2935.res"]
+
+[params]
+
+diagnostics/report_problems=true

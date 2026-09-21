@@ -1,6 +1,6 @@
 # Language reference
 
-This describes the DSL as implemented in `src/GameplayEffects.Core`. Where it differs from the design notes, the [last section](#differences-from-the-design-notes) says how.
+This describes the DSL as implemented in `src/Cantrip.Core`. Where it differs from the design notes, the [last section](#differences-from-the-design-notes) says how.
 
 - [Files](#files)
 - [Declarations](#declarations)
@@ -29,9 +29,9 @@ This describes the DSL as implemented in `src/GameplayEffects.Core`. Where it di
 
 ## Files
 
-Content lives in `.ge` files. A folder loads every `.ge` file under it, in path order.
+Content lives in `.cantrip` files. A folder loads every `.cantrip` file under it, in path order.
 
-- **Indentation** delimits blocks. Use spaces; a tab counts as up to the next multiple of four. A line that does not line up with an enclosing block is error GE0001.
+- **Indentation** delimits blocks. Use spaces; a tab counts as up to the next multiple of four. A line that does not line up with an enclosing block is error CT0001.
 - **Comments** start with `#` and run to the end of the line. Blank and comment-only lines are ignored entirely.
 - **Names** of definitions are strings (`card "Fire Bolt"`) or bare words (`status Poison`). A name with spaces or hyphens can only be referred to as a string later, so single-word names are easier to use.
 - **Keywords** are case-insensitive. Names are matched case-insensitively.
@@ -51,7 +51,7 @@ Content lives in `.ge` files. A folder loads every `.ge` file under it, in path 
 | `resource "stat"` | Bounds and reset rules for a stat |
 | `verb name(params):` | A verb written in the DSL |
 | `ruleset` | Rules the content is written against |
-| `test "Name"` | A test run by `gedsl test` |
+| `test "Name"` | A test run by `cantrip test` |
 
 Inside a declaration:
 
@@ -635,7 +635,7 @@ ruleset
 | `max_steps` | 100000 | interpreter steps per top-level action before it is stopped |
 | `max_call_depth` | 64 | content verb nesting |
 
-If several rulesets are loaded, the last one loaded wins (GE0112).
+If several rulesets are loaded, the last one loaded wins (CT0112).
 
 ## How a battle runs
 
@@ -668,7 +668,7 @@ card "Firebolt"
 
 Placeholders are named after the values in the effect, in order: `{damage}`, `{damage2}`, `{block}`, `{heal}`, `{draw}`, `{Poison}` (the amount applied or gained), `{energy}` (an amount gained or lost), `{bonus}` (a modifier amount), `{cost}`, `{stacks}`, and any numeric property. Described against a live game, values go through the modifiers that would apply now, so a UI can show "~~7~~ 10".
 
-**Drift protection.** `gedsl lint` reports a placeholder that matches nothing (GE401). Add `text_checked "<hash>"` once a text has been reviewed; when the effect later changes, lint reports GE402 with the new hash to paste after re-reading the text. Presentation properties do not affect the hash.
+**Drift protection.** `cantrip lint` reports a placeholder that matches nothing (CT401). Add `text_checked "<hash>"` once a text has been reviewed; when the effect later changes, lint reports CT402 with the new hash to paste after re-reading the text. Presentation properties do not affect the hash.
 
 ## Tests
 
@@ -714,24 +714,24 @@ Numbers range to about ±9.2 trillion when written, and stay exact in multiplica
 
 | Codes | Source |
 |---|---|
-| GE0001-GE0028 | lexer and parser (indentation, unexpected tokens, invalid numbers, nesting deeper than 256) |
-| GE0101-GE0112 | loading content (duplicate definitions and verbs, unknown stacking modes or flags, pattern moves, several rulesets) |
-| GE0201-GE0202 | ruleset settings |
-| GE301 | unknown verb |
-| GE302 | unknown name; an error where a definition is required |
-| GE303 | a tag no definition declares |
-| GE304 | a listener on an event nothing raises |
-| GE305 | an emitted event nobody listens to (note) |
-| GE306 | listeners that can re-trigger each other (note) |
-| GE307 | `event` outside a listener |
-| GE308 | `cancel` in an after listener |
-| GE309 | a targeted card whose effect ignores its target |
-| GE310 | an unused content verb (note) |
-| GE311 | `stacks` outside a status |
-| GE312 | an enemy using a move it does not have |
-| GE401 | a description placeholder that matches nothing |
-| GE402 | `text_checked` no longer matches the effect |
-| GE403 | `text` shadowed by `text_override` (note) |
+| CT0001-CT0028 | lexer and parser (indentation, unexpected tokens, invalid numbers, nesting deeper than 256) |
+| CT0101-CT0112 | loading content (duplicate definitions and verbs, unknown stacking modes or flags, pattern moves, several rulesets) |
+| CT0201-CT0202 | ruleset settings |
+| CT301 | unknown verb |
+| CT302 | unknown name; an error where a definition is required |
+| CT303 | a tag no definition declares |
+| CT304 | a listener on an event nothing raises |
+| CT305 | an emitted event nobody listens to (note) |
+| CT306 | listeners that can re-trigger each other (note) |
+| CT307 | `event` outside a listener |
+| CT308 | `cancel` in an after listener |
+| CT309 | a targeted card whose effect ignores its target |
+| CT310 | an unused content verb (note) |
+| CT311 | `stacks` outside a status |
+| CT312 | an enemy using a move it does not have |
+| CT401 | a description placeholder that matches nothing |
+| CT402 | `text_checked` no longer matches the effect |
+| CT403 | `text` shadowed by `text_override` (note) |
 
 ## Differences from the design notes
 

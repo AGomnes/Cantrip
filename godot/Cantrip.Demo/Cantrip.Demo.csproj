@@ -1,0 +1,25 @@
+<Project Sdk="Godot.NET.Sdk/4.6.2">
+
+  <!--
+    Godot 4.6 .NET builds with net8.0: GodotSharp 4.6.1 ships lib/net8.0 only. The SDK declares
+    Debug, ExportDebug and ExportRelease; only Debug defines TOOLS and references GodotSharpEditor,
+    which is why every editor-only type in addons/ sits behind #if TOOLS.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <AssemblyName>Cantrip.Demo</AssemblyName>
+    <RootNamespace>Cantrip.GodotAdapter</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      In this repository the rules engine is the project next door. A game that installs the addon
+      replaces this with a PackageReference or a DLL. The configuration is pinned: MSBuild would
+      otherwise ask the library for the Godot SDK's ExportRelease configuration, which it does not
+      define.
+    -->
+    <ProjectReference Include="..\..\src\Cantrip.Core\Cantrip.Core.csproj" SetConfiguration="Configuration=Release" />
+  </ItemGroup>
+
+</Project>

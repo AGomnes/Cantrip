@@ -1,0 +1,16 @@
+[remap]
+
+importer="cantrip.content"
+importer_version=1
+type="Resource"
+uid="uid://cclk375kqck1a"
+path="res://.godot/imported/enemies.cantrip-331fa9ba5f3de7dffc105c841aefb2cb.res"
+
+[deps]
+
+source_file="res://content/enemies.cantrip"
+dest_files=["res://.godot/imported/enemies.cantrip-331fa9ba5f3de7dffc105c841aefb2cb.res"]
+
+[params]
+
+diagnostics/report_problems=true
