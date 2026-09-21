@@ -1,7 +1,9 @@
 # --- Enemies ---------------------------------------------------------------------------------
+# Tuned with src/Cantrip.Sim so the greedy bot wins about 60% of runs and the random bot about 10%,
+# with the damage taken rising floor by floor. Re-run it after changing any number here.
 
 enemy "Cinder Imp"
-  hp 20
+  hp 24
   move Claw:
     deal 6 to player
   move Ember:
@@ -14,7 +16,7 @@ enemy "Frost Wisp"
   hp 16
   immune Chill
   move Touch:
-    deal 5 to player
+    deal 6 to player
   move Mist:
     block 6
   pattern random_no_repeat
@@ -32,10 +34,10 @@ enemy "Tower Guard"
 # Stone does not burn, so a fire deck has to find another way through it.
 
 enemy "Stone Golem"
-  hp 65
+  hp 50
   immune Burn
   move Harden:
-    block 14
+    block 10
   move Slam:
     deal 14 to player
   pattern cycle Harden, Slam, Slam
@@ -43,7 +45,7 @@ enemy "Stone Golem"
 # --- Boss ------------------------------------------------------------------------------------
 
 enemy Archmage
-  hp 110
+  hp 90
   phase Calm when hp > max_hp / 2
   phase Unbound when hp <= max_hp / 2, retelegraph
   move Bolt phase Calm:
@@ -52,7 +54,7 @@ enemy Archmage
     block 12
     gain 1 Strength
   move Meteor phase Unbound:
-    deal 20 to player
+    deal 16 to player
   move Drain phase Unbound:
     deal 8 to player
     heal 8
