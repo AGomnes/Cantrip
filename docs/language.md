@@ -1,8 +1,9 @@
 # Language reference
 
-This describes the DSL as implemented in `src/Cantrip.Core`. The [last section](#implementation-notes) notes a few implementation choices worth knowing.
+This page sets out the declarations, statements and rules of the `.cantrip` language, as the rules engine in `src/Cantrip.Core` runs them. It is a reference: to learn the language by writing a first card, status, relic and enemy, start with [Writing content](writing-content.md), and see [the samples](../samples/README.md) for worked examples with tests. The [last section](#implementation-notes) notes a few implementation choices worth knowing.
 
 - [Files](#files)
+- [Terms](#terms)
 - [Declarations](#declarations)
 - [Cards](#cards)
 - [Statuses](#statuses)
@@ -33,9 +34,30 @@ Content lives in `.cantrip` files. A folder loads every `.cantrip` file under it
 
 - **Indentation** delimits blocks. Use spaces; a tab counts as up to the next multiple of four. A line that does not line up with an enclosing block is error CT0001.
 - **Comments** start with `#` and run to the end of the line. Blank and comment-only lines are ignored entirely.
-- **Names** of definitions are strings (`card "Fire Bolt"`) or bare words (`status Poison`). A name with spaces or hyphens can only be referred to as a string later, so single-word names are easier to use.
+- **Names** of definitions are strings (`card "Fire Bolt"`) or bare words (`status Poison`). A name with spaces, hyphens or other punctuation, such as `"Strike+"`, can only be referred to as a string later, and never after a qualifier such as `name:` (see [Qualifiers](#qualifiers)), so single-word names are easier to use.
 - **Keywords** are case-insensitive. Names are matched case-insensitively.
 - A block can be written on the same line after its colon: `if target.dead: draw 1`, `effect: deal 6 to target`.
+- **Editors.** Any text editor will do. There is no syntax-highlighting package for text editors yet; the Godot addon's editor dock shows the source highlighted.
+
+## Terms
+
+| Term | Meaning |
+|---|---|
+| definition | What one declaration describes, such as `card Strike`. It is loaded once. |
+| entity | One thing in play made from a definition: each Strike in the deck, each Poison on an enemy. |
+| actor | An entity that takes turns and has hp: the player, an enemy, or an `actor` such as a summoned minion. |
+| stat | A number on an entity: `hp`, `block`, `cost`, or any name content gives one. |
+| host, owner | The entity a status is attached to is its host; inside the status, `owner` is the host. A card or relic's owner is the actor holding it. |
+| controller | The actor at the top of the ownership chain: the player for their cards, relics and the statuses on them; an actor controls itself. |
+| source, target | Who is acting, and who it is aimed at. |
+| anchor | What a modifier written without `of` applies to: a status's host, a relic's holder, or the card itself. See [Modifiers](#modifiers). |
+| scope | Whose events a listener hears, as in `on owner.damaged`, or whose values a modifier changes, as in `of enemies`. See [Listeners](#listeners) and [Modifiers](#modifiers). |
+| channel | A value that modifiers can change: `damage`, `block`, `cost` and the others under [Modifiers](#modifiers), or any stat. |
+| layer | The stage a modifier works in: add, multiply, clamp or override. |
+| qualifier | A `word:value` test such as `tag:fire` or `source:self`. See [Qualifiers](#qualifiers). |
+| chooser | Whatever answers a choice: the player through the game's interface, or the `answer` queue in a test. |
+| causal chain | Everything one action sets off. Loop protection and `once per chain` count within it. |
+| timing | Whether a listener runs before, instead of, or after its event. Not the same as an enemy's **phase**, which is a stage of its behaviour, such as below half health. |
 
 ## Declarations
 
@@ -60,6 +82,21 @@ Inside a declaration:
 - **Listeners** are `on ...:` blocks. See [Listeners](#listeners).
 - **Modifiers** are `modify ...:` lines. See [Modifiers](#modifiers).
 - **Presentation** properties are `text`, `text_override`, `flavour` (or `flavor`) and `text_checked`. See [Descriptions](#descriptions).
+
+What each declaration reads, beyond the listeners, modifiers, `tags` and presentation properties that any of them can have:
+
+| Declaration | Properties it reads | Blocks it runs |
+|---|---|---|
+| `card` | `cost`, `target` | `effect:` |
+| `status`, `keyword` | `stacking`, `max_stacks`, `decay`, `flags`, `immune` | none |
+| `relic`, `item` | none | none |
+| `enemy`, `actor` | `hp`, `phase`, `pattern`, `immune` | `move "Name":` |
+| `ability` | `cooldown` | `effect:` |
+| `resource` | `min`, `max`, `reset_to`, `reset_on` | none |
+
+`rarity` and `weight` are read by [`discover`](#built-in-verbs) on any kind of definition.
+
+**Anything else is accepted silently.** A property the engine does not read is only a stat, or nothing at all: `duration 3` on a status does not make it last three turns (see [Statuses](#statuses)). And any other line ending in a colon is taken as a labelled block, and a labelled block in a declaration never runs. A listener written the wrong way round, such as `when card_played:` or `once per battle on card_played:`, is one of these: `validate` and `lint` report nothing, `describe` still prints rules text for it, and it never fires. A listener always starts with `on`; if one seems never to fire, check that first.
 
 ## Cards
 
@@ -103,7 +140,7 @@ Tags with built-in behaviour:
 | `unplayable` | `Play` refuses it. |
 | `attack` | Counted by the `attacks` history counter. |
 
-Other cards listen from hand, so a curse can hurt while it is held:
+Other cards listen from hand, so a curse can hurt while it is held (`on ...:` blocks are covered under [Listeners](#listeners)):
 
 ```
 card "Ache"
@@ -114,6 +151,31 @@ card "Ache"
 ```
 
 Playing a card checks energy and target, pays the cost, moves the card to the `play` zone, raises `card_played` around its effect, then moves it to its destination and resolves every queued trigger. A `before_card_played` listener that cancels refunds nothing because nothing was paid; an `instead_of_card_played` listener replaces the effect but the cost is still paid.
+
+**Upgrades.** There is no upgrade mechanism. `upgraded` is one of the words the parser accepts as a flag after a comma, but nothing in the engine reads it (see [Statements](#statements)). Write an upgraded card as a definition of its own, and have the game put it in the deck in place of the original between battles:
+
+```
+card "Strike+"
+  cost 1
+  target enemy
+  tags attack
+  effect:
+    deal 9 to target
+```
+
+A card can make the swap during a battle with `destroy` and `create`. The new card stays in the deck when the battle ends, like any other card, and the old one is gone:
+
+```
+card Hone
+  cost 1
+  effect:
+    choose 1 from hand where name:Strike as picked
+    if picked:
+      destroy picked
+      create "Strike+" into hand
+```
+
+A tag such as `upgraded` on the new card lets reward pools leave it out: see [Card upgrades](writing-content.md#card-upgrades), which has the recipe with its tests.
 
 ## Statuses
 
@@ -157,23 +219,84 @@ A status is removed when its counter reaches zero: `stacks` for intensity-like m
 
 Reading `host.Weak` gives that counter: stacks, or the remaining duration for duration and refresh statuses. Writing `host.Weak -1` changes the same counter, applying the status if it was absent.
 
-`apply X N for 3s` (or `for 2 turns`) also removes the status when the clock reaches that time.
+A status has no length of its own. The number comes from whoever applies it: `apply Weak 2` is a duration of 2. A `duration 2` line in the status's declaration is only a stat that nothing reads.
+
+### How long a duration status lasts
+
+A `duration` or `refresh` status loses 1 at the end of each of its **host's** turns, and goes when it reaches 0. The player's turn ends before the enemies act, so the same number buys a different number of enemy turns depending on who has the status. Applied during the player's first turn:
+
+| Moment | `apply Warded 2 to player` | `apply Weak 2 to target` (an enemy) |
+|---|---|---|
+| Just applied | 2 | 2 |
+| The player's turn ends | 1 | 2 |
+| The enemy's turn: it attacks | 1: the hit is halved | 2: the hit is weakened |
+| The enemy's turn ends | 1 | 1 |
+| The player's second turn ends | 0: removed | 1 |
+| The enemy's turn: it attacks | full damage | 1: the hit is weakened |
+| The enemy's turn ends | | 0: removed |
+
+Here `Warded` is a `stacking duration` status with `modify damage_taken: x0.5`, and `Weak` is the one above. In short:
+
+- **On an enemy**, N covers the enemy's next N turns. A status that changes what the enemy takes, such as a Vulnerable with `modify damage_taken: x1.5`, covers the rest of the player's current turn and the player's next N − 1 turns.
+- **On the player, applied by the player's own card**, N covers only N − 1 enemy turns, because the player's turn end ticks it first.
+- **On the player, applied by an enemy's move**, N covers the player's next N turns.
+
+To protect the player for the next N enemy turns, either apply N + 1, or declare the status with `decay 1 on turn_start`, so that it ticks at the start of the player's turn instead of the end:
+
+```
+status Guarded
+  tags buff
+  stacking duration
+  decay 1 on turn_start
+  modify damage_taken: x0.5
+```
+
+`apply Guarded 2 to player` then covers the next two enemy turns.
+
+**`for`** sets a deadline on the clock: `apply Chill 1 for 3s`, or `apply Shield for 2 turns`. The status is removed when the clock reaches it, whatever its counter says. The turn clock moves once per round, at the start of each player turn after the first, once that turn's `turn_start` event and `next turn:` blocks have run, so `for 2 turns` applied during the player's turn covers two enemy turns.
+
+`for` never lengthens a `duration` or `refresh` status: whichever runs out first removes it. `apply Weak for 2 turns` is a duration of 1, the default amount, with a two-turn deadline, so it covers one enemy turn; write `apply Weak 2`. Use `for` with `intensity`, `none` and `separate` statuses, which have no duration of their own. On a `stacking both` status the `for` length becomes the duration; `both` has no decay unless it declares one.
+
+The recipes [A debuff that lasts N enemy turns](writing-content.md#a-debuff-that-lasts-n-enemy-turns) and [A buff that lasts N enemy attacks](writing-content.md#a-buff-that-lasts-n-enemy-attacks) show these with tests.
 
 ## Relics, items and keywords
 
-Relics and items are active while in the `relics` zone (where `AddRelic` puts them). Their listeners and modifiers treat the holder as "you".
+Relics and items are active while the player holds them: the game gives them with `AddRelic`, and a test with `relic Name`. Their listeners and modifiers treat the holder as "you".
 
 ```
 relic "Tally"
   on card_played(tag:attack) once per turn:
     gain 1 gold
+
+# At the start of each battle. Block gained on battle_start would be reset by the
+# first turn start, so this grants it on the first turn instead.
+relic "Anchor"
+  on turn_start once per battle:
+    block 10
+
+# Every third card played draws a card. The count is a stat on the relic.
+relic "Metronome"
+  beats 0
+  on card_played:
+    beats += 1
+    if beats >= 3:
+      beats = 0
+      draw 1
+
+# Always on: every block the holder gains is 1 higher.
+relic "Bracer"
+  modify block: +1
 ```
+
+`once per battle` starts again with each new battle, and `once per turn` with each turn. A stat such as `beats` keeps its value between battles, for as long as the game keeps the relic.
 
 A `keyword` definition behaves like a status. Cards tagged `retain` or `exhaust` get those behaviours without any keyword definition; defining `keyword "Exhaust"` only adds a tooltip.
 
 ## Enemies
 
 ```
+# Uses the Strength status defined under Modifiers. Without it, Chant still runs but only
+# sets a stat that nothing reads; `cantrip lint` reports the missing status.
 enemy "Cultist"
   hp 48
   move "Chant":
@@ -197,24 +320,71 @@ enemy "Gremlin"
 | `pattern random` | A weighted random move each turn (`weight N` on the move, default 1). |
 | `pattern random_no_repeat` | Weighted random, never the same move twice in a row (unless it is the only move). |
 
-**Phases** gate which moves an enemy may choose from:
+The next move (the intent, readable as `enemy.intent`) is rolled when the battle starts, when an enemy spawns or is created mid-battle, and after each enemy turn. Inside a move, `self` is the enemy and `target` is the player. `use Chant` makes an enemy perform one of its moves.
+
+### Phases
+
+**Phases** gate which moves an enemy may choose from. This boss chomps until it drops to half health, then alternates splitting and chomping:
 
 ```
 enemy "Slime King"
   hp 60
-  phase Broken when hp <= max_hp / 2
+  phase Broken when hp <= max_hp / 2, retelegraph
   move "Chomp":
     deal 11 to player
   move "Split" phase Broken:
     deal 5 to player
-  pattern cycle Chomp, Split
+  pattern cycle Split, Chomp
 ```
 
-Add `retelegraph` to a phase — `phase Broken when hp <= max_hp / 2, retelegraph` — and entering it re-rolls the enemy's intent there and then, so the player is shown the move the phase has just unlocked. It is opt-in because it gives up a guarantee that is otherwise worth having: ordinarily the intent shown during your turn is exactly the move that follows, and a re-telegraphing boss can change its mind after you have committed. A phase crossed by a killing blow re-telegraphs nothing, and a hit absorbed entirely by block cannot cross a threshold at all.
+The rules that decide what the player sees:
 
-A move with no `phase` is available in every phase; a move with one only while that phase is active. Conditions are evaluated against the enemy each time its intent is rolled, and the **last** declared phase whose condition holds is the one that applies — so thresholds can be written in the order they are thought of (three quarters, then half, then a quarter) and the deepest one that is true wins. Entering a phase restarts the pattern, because the old position counted through a list of moves that is no longer the same one. The phase is readable as `enemy.phase`, and is part of the saved game.
+- **A move with no `phase` is available in every phase**; a move with one only while that phase is active. Before any phase applies, `enemy.phase` is `none`, which is compared without quotes: `enemy.phase == none`.
+- **A cycle skips the moves the current phase does not allow.** Before Broken, `cycle Split, Chomp` is Chomp every turn.
+- **Entering a phase restarts the pattern** from its first allowed move, because the old position counted through a list of moves that is no longer the same one. That is why Split is listed first: listed second, it would come a turn later.
+- **The phase changes as soon as a hit takes the enemy across the threshold**, and otherwise when its next intent is rolled. The **last** declared phase whose condition holds is the one that applies, so thresholds can be written in the order they are thought of (three quarters, then half, then a quarter) and the deepest one that is true wins.
+- **An enemy has one pattern**, written at the top level of the enemy, not inside a phase. Phases change which of its moves it can use.
 
-The next move (the intent, readable as `enemy.intent`) is rolled when the battle starts, when an enemy spawns or is created mid-battle, and after each enemy turn. Inside a move, `self` is the enemy and `target` is the player. `use Chant` makes an enemy perform one of its moves.
+**`retelegraph`** on a phase re-rolls the intent the moment the enemy enters that phase, so the player is shown the new phase's first move straight away. Without it, the intent already on show stays, and the new pattern starts on the enemy's next roll. For the Slime King, crossing half health during the player's turn gives:
+
+| Pattern | With `retelegraph` | Without |
+|---|---|---|
+| `cycle Split, Chomp` | Split, then Chomp | Chomp (already shown), then Split |
+| `cycle Chomp, Split` | Chomp, then Split | Chomp (already shown), Chomp, then Split |
+
+It is opt-in because it gives up a guarantee that is otherwise worth having: ordinarily the intent shown during your turn is exactly the move that follows, and a re-telegraphing boss can change its mind after you have committed. A phase crossed by a killing blow re-telegraphs nothing, and a hit absorbed entirely by block cannot cross a threshold at all.
+
+For a boss whose whole pattern changes, give it two phases that between them cover every hp value, and gate every move. With no `pattern` line, moves cycle in the order they are written, skipping those the phase does not allow:
+
+```
+enemy "Archmage"
+  hp 120
+  phase Calm when hp > max_hp / 2
+  phase Unbound when hp <= max_hp / 2, retelegraph
+  move "Bolt" phase Calm:
+    deal 11 to player
+  move "Barrier" phase Calm:
+    block 12
+  move "Meteor" phase Unbound:
+    deal 16 to player
+  move "Drain" phase Unbound:
+    deal 8 to player
+    heal 8
+```
+
+It alternates Bolt and Barrier, and from half health Meteor and Drain, starting with Meteor. Tests compare the intent and the phase with quoted strings, since they are names rather than definitions:
+
+```
+test "The Archmage opens its Unbound phase with Meteor"
+  enemy "Archmage"
+  expect enemy.phase == "Calm"
+  expect enemy.intent == "Bolt"
+  deal 60 to enemy
+  expect enemy.phase == "Unbound"
+  expect enemy.intent == "Meteor"
+```
+
+Written without quotes, `enemy.intent == Meteor` is a runtime error: `Unknown name`. The phase is part of the saved game. The sample roguelite's Archmage, in [samples/slice/enemies.cantrip](../samples/slice/enemies.cantrip), is this boss with Strength added.
 
 ## Abilities and real time
 
@@ -277,7 +447,20 @@ relic "Bloodlust"
     event.amount += 2
 ```
 
-**Phases.** `on damaged` listens after the fact. `on before_damaged` runs before, and may change `event.amount` or `cancel`. `on instead_of_died` runs in place of the action: if any instead listener fires, the default action is skipped. The phase prefix may come before the scope (`before_owner.damaged`) or after it (`owner.before_damaged`).
+The line always starts with `on`, and `once per ...` and `priority` come after the event and its filter. A line written another way, such as `once per battle on card_played:`, is not a listener at all but a label that never runs (see [Declarations](#declarations)).
+
+| To run... | Write |
+|---|---|
+| when the holder plays an attack | `on card_played(tag:attack):` |
+| the first time that happens in each battle | `on card_played(tag:attack) once per battle:` |
+| at the start of the holder's turn | `on turn_start:` |
+| once, on the first turn of each battle | `on turn_start once per battle:` |
+| when the holder is hit by an enemy | `on owner.damaged(source:enemies):` |
+| before the holder takes damage, to change or stop it | `on before_damaged(target:owner):`, then `event.amount -= 1` or `cancel` |
+| when an enemy dies | `on killed(target:enemies):` |
+| when a Weak status leaves anyone | `on status_removed(Weak):` |
+
+**Timing.** `on damaged` listens after the fact. `on before_damaged` runs before, and may change `event.amount` or `cancel`. `on instead_of_died` runs in place of the action: if any instead listener fires, the default action is skipped. The timing prefix may come before the scope (`before_owner.damaged`) or after it (`owner.before_damaged`). The grammar above calls it `phase_`; it has nothing to do with an enemy's [phases](#phases).
 
 **Scope.** `on owner.damaged` only hears `damaged` events whose target is the listener's owner. Scopes are `self`, `owner` (the host of a status, the holder of a relic), `controller`, `player`, `any`, or any name that resolves to an entity.
 
@@ -301,7 +484,9 @@ relic "Bloodlust"
 
 **Ordering.** Listeners for the same event run by priority (higher first), then play order (the order their entities became active), then the active side first, then registration order. The ruleset can reorder the first three.
 
-**Loop protection.** A listener never re-triggers from its own consequences within one causal chain, and chains stop at depth 50. `once per turn`, `once per battle`, `once per run` and `once per chain` limit how often a listener fires.
+**Joining mid-event.** A listener that becomes active while an event is being handled hears that event's after timing. A status applied by a card's effect hears the `card_played` of that same card, and a minion listening `on created(kind:actor)` hears its own creation. Where that is not wanted, leave the listener's own cause out with a filter: `on created(kind:actor, not target:self):`, or `not card:Reverb` for the card that applied the status. A `power` card is the exception, since it only becomes active after its `card_played` has finished.
+
+**Loop protection.** A listener never re-triggers from its own consequences within one causal chain, and chains stop at depth 50. `once per turn`, `once per battle`, `once per run` and `once per chain` limit how often a listener fires; `once per battle` starts again when the next battle starts.
 
 ## Built-in events
 
@@ -403,7 +588,17 @@ apply Slow 40% for 3s to enemies
 deal stacks to owner, ignore block
 ```
 
-Clause keywords are `to`, `from`, `for`, `with`, `at`, `by`, `into`, `over`, `as`, `of`, `against`, `using`, `onto`. Flags after a comma are `ignore block`, `pierce`, `true damage`, `unblockable`, `silent`, `hidden`, `forced`, `optional`, `upgraded`, or a bare word.
+Clause keywords are `to`, `from`, `for`, `with`, `at`, `by`, `into`, `over`, `as`, `of`, `against`, `using`, `onto`.
+
+In a command, a comma introduces a flag word rather than another argument, so arguments are separated by spaces: `log "hp is" enemy.hp`, not `log "hp is", enemy.hp` (error CT0023). The built-in verbs read these flags:
+
+| Flag | Read by |
+|---|---|
+| `ignore block`, `pierce`, `unblockable`, `true damage` | `deal` and `attack`: the damage skips block |
+| `top` | `move`: the cards go on top of the zone |
+| `weighted` | `discover`: candidates are drawn by their `weight` |
+
+Any other word after a comma, including `silent`, `hidden`, `forced`, `optional` and `upgraded`, is accepted and ignored by the built-in verbs. It is there for verbs a game registers in C#, which can read it with `call.Flag("name")`.
 
 **Assignments**:
 
@@ -451,7 +646,7 @@ else:
 
 `repeat` binds `index` (from 0). `for each` iterates over a snapshot of the group, skipping entities removed meanwhile. `chance` rolls against a percentage.
 
-Labelled blocks such as `setup:` just run their statements; the label is for readers and tools.
+Inside a body, labelled blocks such as `setup:` or `first:` just run their statements; the label is for readers and tools. A labelled block directly inside a declaration is different: only `effect:` and `move ...:` run, and any other label is kept but never runs (see [Declarations](#declarations)).
 
 ## Expressions
 
@@ -476,13 +671,13 @@ Labelled blocks such as `setup:` just run their statements; the label is for rea
 
 Percent values multiply as fractions: `10 * 50%` is 5. Division by zero gives 0.
 
-**Selectors.** `random N group` shuffles with the game's RNG and takes N. `lowest <stat> group` and `highest <stat> group` take the first by that stat, breaking ties by board position then id; with a single name (`lowest enemies`) the stat is `hp`. `other group` leaves out the target or the running entity's controller. A prefix word followed by nothing selectable (as in `pattern random`) is an ordinary name. `within` is passed to the host's `TryCall`; without a host that implements it, it is a runtime error.
+**Selectors.** `random N group` shuffles with the game's RNG and takes N. `lowest <stat> group` and `highest <stat> group` take the first by that stat, breaking ties by board position then id; with a single name (`lowest enemies`) the stat is `hp`. `other group` leaves out the running entity itself, and also the target when the target is in the group, or else the running entity's controller. In a modifier's `of` scope the running entity is the one the modifier is written on, so `modify attack of other allies where it.has(tag:goblin): +1` on a goblin leader buffs every other goblin but not the leader. A prefix word followed by nothing selectable (as in `pattern random`) is an ordinary name. `within` is passed to the host's `TryCall`; without a host that implements it, it is a runtime error.
 
 **Functions**: `min(a, b, ...)`, `max(...)`, `abs(n)`, `floor(n)`, `ceil(n)`, `round(n)`, `clamp(n, lo, hi)`, `count(group)`, `random(lo, hi)`, `adjacent(who)`, `has(who, predicate)`, `stacks(Status[, who])`. Methods: `who.has(predicate)`, `who.stacks(Status)`.
 
 `has` is true when the entity has the tag (directly or on an attached status), has a status of that name, or is that entity.
 
-**Members of an entity**: `dead`, `alive`, `removed`, `name`, `id`, `owner`, `source`, `controller`, `team`, `zone`, `position`, `intent`, `statuses`, `kind`, a status name (its counter), a history name (`damage_taken_this_turn`), or any stat. Stats that nothing has set read as 0.
+**Members of an entity**: `dead`, `alive`, `removed`, `name`, `id`, `owner`, `source`, `controller`, `team`, `zone`, `position`, `intent`, `phase`, `statuses`, `kind`, a status name (its counter), a history name (`damage_taken_this_turn`), or any stat. Stats that nothing has set read as 0. `position` counts board slots from 0, so the front two slots are `position <= 1`. `intent` and `phase` are text, or `none`; compare them with a quoted string, as in `enemy.intent == "Chomp"`, or with `none` unquoted. `enemy.phase == "none"` is never true.
 
 **Members of a group**: `count`, `size`, `length`, `first`, `last`, `empty`, `any`, or a stat, which sums it across the group (`enemies.hp`).
 
@@ -490,9 +685,11 @@ Percent values multiply as fractions: `10 * 50%` is 5. Division by zero gives 0.
 
 ### Qualifiers
 
-`tag:x`, `keyword:x`, `status:x`, `source:role`, `target:role`, `name:x`, `card:x`, `zone:x`, `team:x`, `kind:x`, `type:x`, `rarity:x`, `id:x`. They are written with no spaces around the colon.
+`tag:x`, `keyword:x`, `status:x`, `source:role`, `target:role`, `name:x`, `card:x`, `zone:x`, `team:x`, `kind:x`, `type:x`, `rarity:x`, `id:x`. They are written with no spaces around the colon, and the value is one word of letters, digits and `_`. A name such as `"Strike+"` or `"Fire Bolt"` cannot follow `name:` or `card:`; compare it instead, as in `hand where it.name == "Strike+"`.
 
 A qualifier tests whatever is in focus: the candidate inside `where`, the value being computed inside a modifier, or the event inside a listener filter. Roles for `source:` and `target:` are `self`, `owner`, `player`, `enemy`/`enemies`, `ally`/`allies`, `target`, `any`, or an entity name. Roles compare controllers, so `source:self` on a relic matches damage from its holder's cards. `enemy` and `ally` roles are relative to the side the effect runs for; inside a modifier, that is the modifier owner's side.
+
+`name:` and `card:` compare names, and there is no `card:self`: a card that needs a rule about itself names itself, as in `card:Pike`.
 
 ## Names
 
@@ -505,7 +702,7 @@ A bare name resolves in this order: local variables (`let` bindings, `for each` 
 | `source` | who is acting |
 | `target` | the target |
 | `card` | the card being played |
-| `player`, `controller` | the player; the running entity's controller |
+| `player`, `controller` | the game's player, whichever side is acting; the running entity's controller |
 | `enemy`, `enemies`, `allies`, `everyone` | relative to the side the effect runs for |
 | `hand`, `draw`, `discard`, `exhaust`, `powers`, `relics`, `deck`, `cards` | the controller's zones (`deck` is draw, hand and discard) |
 | `statuses` | statuses on the candidate or controller |
@@ -541,7 +738,7 @@ A bare name resolves in this order: local variables (`let` bindings, `for each` 
 | `cancel` | In a `before_` or `instead_of_` listener, cancels the event. |
 | `replay` | `replay card [on target]` resolves a card's effect again, for free. |
 | `use` | In an enemy, performs one of its moves. |
-| `log` | `log values...` writes to the runtime's `Logged` event. |
+| `log` | `log "hp is" target.hp`, with the values separated by spaces, writes them to the runtime's `Logged` event. `cantrip repl` prints it; `cantrip test` does not show it, so in a test use `expect`, whose failure shows the value. |
 
 **`into`** binds what a damage verb actually achieved, so an effect can act on it: `deal 4 to all enemies into dealt`, then `heal dealt`. The number is what landed, summed across the targets — after modifiers changed the amount, after block absorbed what it could, and counting only what a dying target could still take, which is rarely the number the line asked for. Available on `deal`, `damage` and `attack`.
 
@@ -569,6 +766,8 @@ What is bound is a definition, not an entity, and `create`, `apply`, `shuffle` a
 **Offering one candidate is a random pick with no decision in it**, so the chooser is never asked and no prompt appears: `discover 1` is how content rolls on a table, and `discover 3` is how it asks. With `, weighted`, each candidate's `weight` property decides its share (default 1, and a weight of 0 is never drawn) — the same property an enemy's moves are weighted by, so "rarely a virtue" is a 1 against three 5s. Without it every candidate is equally likely.
 
 Filters see a definition, so they test what is printed on it rather than anything about being in play: `tag:`, `kind:`, `name:`, `rarity:`, and properties through `it` (`it.cost <= 2`) or bare (`cost <= 2`). A qualifier that only makes sense for something in play, such as `zone:`, is an error rather than a quiet no-match — as is discovering from a filter nothing matches.
+
+The pool is every definition loaded, not only those in the card's own file. When several sets of content are loaded together, give a pool a tag of its own, as in `where tag:arcane`, so that it offers what was meant.
 
 Picks come from the game's own seeded RNG and cost one roll per candidate taken, never a shuffle of everything loaded, so the same seed discovers the same content on a replay and adding content to a pool does not disturb any other roll. Candidates are ordered by kind and name before anything is drawn, never by the order content happened to load in.
 
@@ -632,7 +831,7 @@ ruleset
 | `triggers` | `queued` | `immediate` runs after listeners inline |
 | `hand_size` | 5 | cards drawn each turn |
 | `max_hand_size` | 10 | cards drawn beyond this go to the discard pile |
-| `max_steps` | 100000 | interpreter steps per top-level action before it is stopped |
+| `max_steps` | 100000 | interpreter steps per top-level action before it is stopped with a runtime error (see [When content fails at runtime](csharp.md#when-content-fails-at-runtime)) |
 | `max_call_depth` | 64 | content verb nesting |
 
 If several rulesets are loaded, the last one loaded wins (CT0112).
@@ -668,7 +867,13 @@ card "Firebolt"
 
 Placeholders are named after the values in the effect, in order: `{damage}`, `{damage2}`, `{block}`, `{heal}`, `{draw}`, `{Poison}` (the amount applied or gained), `{energy}` (an amount gained or lost), `{bonus}` (a modifier amount), `{cost}`, `{stacks}`, and any numeric property. Described against a live game, values go through the modifiers that would apply now, so a UI can show "~~7~~ 10".
 
+A computed amount, such as `deal 2 * target.Poison to target`, has no number until there is a game to read. Described against a live game with a target, it shows the number; described on its own, as `cantrip describe` and a deck list do, both the automatic text and its placeholder show the expression as written ("Deal 2 * target.Poison damage."). Ranges and `random` never show a rolled number: `deal 3..6` reads "Deal 3–6 damage." For such cards, write text that needs no number, such as `text_override: "Deal damage equal to twice the target's Poison."`.
+
+Descriptions show what was parsed, not what will run: a mistyped listener line that never fires (see [Declarations](#declarations)) is still described. Check behaviour with a [test](#tests).
+
 **Drift protection.** `cantrip lint` reports a placeholder that matches nothing (CT401). Add `text_checked "<hash>"` once a text has been reviewed; when the effect later changes, lint reports CT402 with the new hash to paste after re-reading the text. Presentation properties do not affect the hash.
+
+**Other languages.** The automatic text is English. A game translates its text in C#, with an `IDescriptionLocalizer` that can replace each definition's name, its `text` or `text_override`, its flavour, and the phrases the automatic text is built from. A translated `text` uses the same `{placeholders}`, so its numbers stay live. See [Rules text with live values](csharp.md#rules-text-with-live-values).
 
 ## Tests
 
@@ -677,61 +882,146 @@ test "Poison ticks and decays"
   enemy hp 20
   apply Poison 3 to enemy
   end turn
-  expect enemy.hp == 17 and enemy.Poison == 2
+  expect enemy.hp == 17
+  expect enemy.Poison == 2
 ```
 
-Each test gets a fresh game with seed 1 and a player with 80 hp and 3 energy. Setup statements run first; the battle starts, without shuffling or drawing a hand, at the first other statement. Any DSL statement works in a test, plus:
+`dotnet cantrip test <folder>` runs every test in the content (from a clone of the repository, `dotnet run --project src/Cantrip.Cli -- test <folder>`). Each test gets a fresh game with seed 1 and a player with 80 hp and 3 energy. Setup statements run first; the battle starts, without shuffling or drawing a hand, at the first statement that is not setup. Any DSL statement works in a test, plus these verbs:
 
-| Verb | Meaning |
-|---|---|
-| `enemy [Name] [stat N]...` | Spawns an enemy: a defined one, or a plain 10 hp enemy (`enemy "Label" hp 20`). A status name applies that many stacks. The first is `enemy` and `enemy1`, then `enemy2`... |
-| `player stat N...` | Sets player stats or applies statuses |
-| `hand`, `deck`, `discard_pile` | Adds cards to that zone |
-| `relic Name` | Gives the player a relic |
-| `seed N` | Reseeds the game's RNG |
-| `answer "A, B"` | Queues an answer for the next choice |
-| `realtime N` | Uses a tick clock with N ticks per second for the whole test, wherever it is written |
-| `play Card [on who]` | Plays a card, adding it to the hand if needed; fails the test if it cannot be played |
-| `end turn` | Ends the turn |
-| `tick N` | Advances the tick clock |
-| `grant Ability`, `cast Ability [on who]` | Gives and uses abilities |
-| `expect condition` | Fails the test, showing the values involved, if the condition is false |
-| `setup:` | A block of setup statements |
+| Verb | Setup | Meaning |
+|---|---|---|
+| `enemy [Name] [stat N]...` | yes | Spawns an enemy: a defined one, or a plain 10 hp enemy (`enemy "Label" hp 20`). A status name applies that status, as `apply Name N` would. The first is `enemy` and `enemy1`, then `enemy2`... |
+| `player stat N...` | yes | Sets player stats or applies statuses: `player hp 40 Strength 2` |
+| `hand`, `deck`, `discard_pile` | yes | Adds cards to the hand, the draw pile or the discard pile, in that order: `deck Strike, Strike, Defend`. As a test verb, `deck` is the draw pile only; the name `deck` in an expression is draw, hand and discard together. |
+| `relic Name` | yes | Gives the player a relic or an item |
+| `grant Ability` | yes | Gives the player an ability |
+| `seed N` | yes | Reseeds the game's RNG |
+| `answer "A, B"` | yes | Queues the answer to the next choice, by name; `"A, B"` picks both |
+| `realtime N` | yes | Uses a tick clock with N ticks per second for the whole test, wherever it is written |
+| `setup:` | yes | A block of setup statements |
+| `play Card [on who]` | no | Plays a card, adding it to the hand if needed; fails the test if it cannot be played |
+| `end turn` | no | Ends the turn, runs the enemies' turn and starts the next one |
+| `tick N` | no | Advances the tick clock |
+| `cast Ability [on who]` | no | Uses an ability |
+| `expect condition` | no | Fails the test if the condition is false |
+
+**Setup runs before the battle starts, and the start of the first turn resets resources.** `player block 5` is wiped to 0, and `player energy 1` comes back as 3, the player's `max_energy`. A higher energy survives, because setting it also raises `max_energy`. To start a test with block or less energy, write a statement after setup: `block 5`, `player.energy = 1`. The same goes for any stat with a `reset_on turn_start` rule.
+
+**One comparison per `expect`.** A failing comparison shows the value it found: `expected enemy.Poison == 3, but enemy.Poison was 2`. Joined with `and`, it shows only the condition, and a test stops at its first failing `expect`, so the lines after it are not checked. To look further into a failure, `--filter <text>` runs only the tests whose names contain the text, and `--trace` prints what happened, step by step, in each failing test.
+
+**Setup does not check stat names.** In an `enemy` or `player` line, a word that is not a status becomes a stat, so `enemy hp 20 Weak 2` with no `Weak` defined sets a stat called `Weak` and the test carries on. `cantrip lint` says nothing about the setup line itself; it reports CT302 only where the test reads the name as a status, as in `expect enemy.Weak == 2`. An enemy's name is checked: `enemy Ghoul` with no Ghoul defined fails the test.
+
+**Choices** are answered from the `answer` queue. With nothing queued, the first option is taken, which is enough for `discard 1` when the candidates are identical or there is only one.
+
+**What a test cannot do:**
+
+- span two battles, so it cannot show that something resets between battles;
+- check that a play was refused, since `play` fails the test when a card cannot be played. For a targeting rule, show it the other way round: play the card with no target and check what it picked;
+- show `log` output.
+
+**When the last enemy dies, the battle is won at once**, and winning removes the player's statuses that are not `persistent` and returns every card to the draw pile. A test that checks a status or a drawn card after a killing blow needs a second enemy to keep the battle going.
+
+To try statements one at a time, `dotnet cantrip repl <folder>` loads the content and runs each line you type as the player, with a 100 hp enemy called Dummy as the target, and prints the state after each. It prints `log` output, but has none of the test verbs above. [Trying lines in the REPL](writing-content.md#6-trying-lines-in-the-repl) shows a session and its limits.
 
 ## Determinism
 
-The same content, seed and inputs produce the same game on every machine:
+Within one version of Cantrip, the same content, seed and inputs produce the same game:
 
 - All arithmetic uses a fixed-point number with six decimal places; no floating point.
 - Randomness comes from a seeded xoshiro256** generator, never `System.Random`.
 - Listener order, selector ties and resource resets use explicit orderings, never hash order.
-- `runtime.State.ComputeHash()` fingerprints the rules state, including scheduled work and history, for replay checks and lockstep multiplayer.
+- `runtime.State.ComputeHash()` fingerprints the rules state, including scheduled work and history. Comparing hashes checks that a replay, or a second machine playing the same inputs, has not drifted. Cantrip has no networking of its own.
 - Snapshots restore exactly, including listener limit windows and the RNG.
 
-Numbers range to about ±9.2 trillion when written, and stay exact in multiplication up to about ±1 million.
+Which platforms this has been checked on, and what C# code of the game's own must avoid to keep it, are in [stability.md](stability.md#determinism).
+
+**Numbers** can be written up to about ±9.2 trillion; a larger one is error CT0004. Arithmetic is correct while values stay within ±1 million. Past that nothing checks it, and a large enough result is wrong with no error, so a score that multiplies has to be kept in range by the content. [Numbers](stability.md#numbers) gives the limits.
 
 ## Diagnostics
 
-| Codes | Source |
-|---|---|
-| CT0001-CT0030 | lexer and parser (indentation, unexpected tokens, invalid numbers, nesting deeper than 256, names with spaces, lines indented under a line that opens no block) |
-| CT0101-CT0113 | loading content (duplicate definitions and verbs, unknown stacking modes or flags, pattern moves, several rulesets, the reserved `event` and `encounter` declarations) |
-| CT0201-CT0202 | ruleset settings |
-| CT301 | unknown verb |
-| CT302 | unknown name; an error where a definition is required |
-| CT303 | a tag no definition declares |
-| CT304 | a listener on an event nothing raises |
-| CT305 | an emitted event nobody listens to (note) |
-| CT306 | listeners that can re-trigger each other (note) |
-| CT307 | `event` outside a listener |
-| CT308 | `cancel` in an after listener |
-| CT309 | a targeted card whose effect ignores its target |
-| CT310 | an unused content verb (note) |
-| CT311 | `stacks` outside a status |
-| CT312 | an enemy using a move it does not have |
-| CT401 | a description placeholder that matches nothing |
-| CT402 | `text_checked` no longer matches the effect |
-| CT403 | `text` shadowed by `text_override` (note) |
+Every message starts with the file, line and column, then its level and code:
+
+```
+game.cantrip:26:11: error CT302: Nothing called `Posion` is defined. Did you mean `Poison`?
+```
+
+Codes with four digits come from reading and loading the files. An error among them stops `cantrip test`, `describe` and `repl` before they start. Codes with three digits come from the linter and the description checks, which `cantrip lint` runs; their errors do not stop a test, so a misspelt verb fails a test only when the test runs it. `cantrip validate` reports every error, and `cantrip lint` also reports warnings and notes, which it prints as `info`, but fails only on errors. `--suppress CT301,CT306` leaves the linter's codes out of either. A failure while content runs has no code: a test prints `runtime error:` and the message.
+
+**Reading the files**
+
+| Code | Level | Meaning | Typical fix |
+|---|---|---|---|
+| CT0001 | error | A line's indentation does not line up with any block it could belong to. | Indent it to the same depth as the lines of its block. Use spaces. |
+| CT0002 | error | A `!` on its own. | Write `!=`, or `not` to negate. |
+| CT0003 | error | A character the language does not use. | Remove it. A curly quote pasted from a document is a common cause. |
+| CT0004 | error | A number that is malformed or larger than about ±9.2 trillion. | Write a smaller number. |
+| CT0005 | error | A string with no closing quote. | Close it on the same line. |
+| CT0010 | error | Something other than what must come next, such as a missing `:` at the end of `if target.dead`. | The message says what was expected. |
+| CT0011 | error | A top-level line that does not start with a word. | Start it with a declaration, or indent it under one. |
+| CT0012 | error | A top-level word that is not a declaration. | Use one from [Declarations](#declarations); the message suggests the closest. |
+| CT0013 | error | A declaration with no name. | `card "Name"`. |
+| CT0014 | error | Something other than a name in a verb's parameter list. | `verb shatter(t):`. |
+| CT0015 | error | A line in a `ruleset` that is not a setting. | Use a setting from [Rulesets](#rulesets). |
+| CT0016 | error | A line in a declaration that does not start with a word. | Start it with a property, `on`, `modify` or a block name. |
+| CT0017 | error | `on` with no event after it. | `on damaged:`. |
+| CT0018 | error | `once` not followed by `per`. | `once per battle`. |
+| CT0019 | error | `priority` with no number. | `priority 10`. |
+| CT0020 | error | `once per` followed by something other than `turn`, `battle`, `run` or `chain`. | Use one of those four. |
+| CT0021 | error | `modify` with no channel. | `modify damage: +2`. See [Modifiers](#modifiers). |
+| CT0022 | error | `until` with no event. | `until turn_end:`. |
+| CT0023 | error | Something unexpected in a statement, often a comma between arguments. | Separate arguments with spaces; a comma starts a flag (see [Statements](#statements)). |
+| CT0024 | error | A value is missing, as after an operator. | Finish the expression. |
+| CT0025 | error | Something unexpected in the first line of a block, before its `:`. | Check the words before the `:`. |
+| CT0026 | error | Something unexpected in a property's values. | Check the line against the property's form. |
+| CT0027 | error | Something unexpected in a ruleset setting. | Check the line against [Rulesets](#rulesets). |
+| CT0028 | error | Blocks nested more than 256 deep. | Move some of the work into a [content verb](#content-defined-verbs). |
+| CT0029 | error | A name with spaces not in quotes, or a verb name with spaces. | `card "Fire Bolt"`; a verb name is one word, such as `fire_bolt`. |
+| CT0030 | error | A line indented further than the line above it, which does not open a block. | Line it up with the line above, or end that line with `:` if it should open a block. |
+
+**Loading content**
+
+| Code | Level | Meaning | Typical fix |
+|---|---|---|---|
+| CT0101 | warning | A declaration has the same block twice, such as two `effect:` blocks. The last one is used. | Merge them into one. |
+| CT0102 | error | A `move` with no name. | `move "Chomp":`. |
+| CT0103 | error | An unknown `stacking` mode. | `intensity`, `duration`, `refresh`, `both`, `none` or `separate`. |
+| CT0104 | error | `decay` not followed by a number. | `decay 1`, or `decay 1 on turn_start`. |
+| CT0105 | warning | An unknown status flag. The flag is ignored. | `buff`, `debuff`, `dispellable`, `persistent`, `hidden` or `unique`. |
+| CT0106 | error | A `pattern` names a move the enemy does not have. | Fix the name, or add the move. |
+| CT0107 | error | A `phase` without a name and a `when` condition. | `phase Broken when hp <= max_hp / 2`. |
+| CT0108 | error | A move names a phase the enemy does not declare. | Add the `phase` line, or fix the name. |
+| CT0109 | error | A `cost` with more than an amount and one resource. | `cost 2`, or `cost 2 bones`. |
+| CT0110 | error | Two definitions of the same kind with the same name, ignoring case, perhaps in different files. | Rename one, or delete the copy. |
+| CT0111 | error | Two content verbs with the same name. | Rename one. |
+| CT0112 | warning | More than one `ruleset` is loaded. The last one loaded is used. | Keep one. |
+| CT0113 | error | An `event` or `encounter` declaration. Both words are reserved and do nothing yet. | Remove it. Encounters are the game's code for now. |
+| CT0201 | warning | An unknown ruleset setting. It is ignored. | Use a setting from [Rulesets](#rulesets); the message suggests the closest. |
+| CT0202 | error | An unknown value in `ordering` or `modifier_layers`. | Use the values listed under [Rulesets](#rulesets). |
+
+**Linting**
+
+| Code | Level | Meaning | Typical fix |
+|---|---|---|---|
+| CT301 | error | An unknown verb, or a test verb such as `play` outside a test. | Fix the spelling. For a verb the game registers in C#, run with `--suppress CT301`. |
+| CT302 | error or warning | An unknown name. It is an error where a definition must be named (`apply Posion`, `card:Strke`) or a status is read (`target.Posion`), and a warning for other names, which the game may supply at runtime. | Fix the spelling, or define it. |
+| CT303 | warning | A `tag:` test for a tag no definition has, so it never matches. | Fix the spelling, or give the tag to what should match. |
+| CT304 | warning | A listener on an event that nothing raises: it is not [built in](#built-in-events) and no content emits it, or it is `<stat>_changed` for a stat nothing in the content has. | Fix the event or stat name. |
+| CT305 | note | An event is emitted but no content listens for it. | Nothing, if the game listens in its own code. Otherwise check the name. |
+| CT306 | note | Listeners that can set each other off. Loop protection stops each after one pass. | Check that this is what you want. |
+| CT307 | error | `event` used outside an `on ...:` listener. | Move the line into a listener. |
+| CT308 | error | `cancel` in a listener that runs after its event. | Listen to `before_<event>` instead. |
+| CT309 | warning | A card asks for a target but its effect never uses `target`. | Use `target` in the effect, or remove the `target` line. |
+| CT310 | note | A content verb that nothing calls. | Call it, or remove it. |
+| CT311 | warning | `stacks` outside a status, where it reads a stat that is probably never set. | Read the status by name, as in `target.Poison`. |
+| CT312 | error | `use` names a move the enemy does not have, or appears in something with no moves. | Fix the move's name. |
+
+**Descriptions**
+
+| Code | Level | Meaning | Typical fix |
+|---|---|---|---|
+| CT401 | warning | A `{placeholder}` in `text` that matches nothing in the effect. | Use a name from [Descriptions](#descriptions). |
+| CT402 | warning | The effect has changed since `text_checked` was recorded. | Re-read the text, then paste the new hash from the message. |
+| CT403 | note | `text` is never shown, because `text_override` is set. | Remove one of the two. |
 
 ## Implementation notes
 

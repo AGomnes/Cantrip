@@ -1,0 +1,21 @@
+# Recipe: damage that scales with a status on the target.
+# Explained in docs/writing-content.md, "Damage that scales with a status".
+# Poison is in tutorial/game.cantrip.
+
+card Rupture
+  cost 1
+  target enemy
+  tags attack
+  effect:
+    deal 2 * target.Poison to target
+  text_override: "Deal damage equal to twice the target's Poison."
+
+test "Rupture deals twice the target's Poison"
+  enemy hp 30 Poison 4
+  play Rupture on enemy
+  expect enemy.hp == 22
+
+test "Rupture does nothing to an enemy without Poison"
+  enemy hp 30
+  play Rupture on enemy
+  expect enemy.hp == 30

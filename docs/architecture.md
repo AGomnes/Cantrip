@@ -1,6 +1,24 @@
 # Architecture
 
-How the library is put together, what each part is responsible for, and where to extend it. The language itself is described in [language.md](language.md).
+How the library is put together, what each part is responsible for, and where to extend it. The language itself is described in [language.md](language.md), and [csharp.md](csharp.md) shows a game using the library.
+
+## Extending
+
+A game extends Cantrip through these seams, without changing the library:
+
+| To add | Do this |
+|---|---|
+| A verb in C# | `runtime.RegisterVerb(name, call => ...)`. Use `call.Argument`, `call.Number`, `call.Clause`, `call.Targets` and the interpreter's primitives, such as `ChangeStat`, so events and modifiers still apply. See [Verbs written in C#](csharp.md#verbs-written-in-c). |
+| A verb in content | `verb name(params):` (see [Content-defined verbs](language.md#content-defined-verbs)). |
+| Names or functions the rules cannot know | Implement `IEffectHost.TryResolveName` or `TryCall` (subclass `EffectHostBase`). See [The host](csharp.md#the-host). |
+| Presentation | `IEffectHost.OnEvent` sees every resolved event. See [Presenting events in a frame loop](csharp.md#presenting-events-in-a-frame-loop). |
+| A decision maker | Implement `IChoiceProvider`, and `IDefinitionChooser` for offers such as `discover`. A UI uses `DeferredChooser`; see [Player choices](csharp.md#player-choices). |
+| A clock | Implement `IGameClock`, advance it from the engine's fixed step, and pass it in `RuntimeOptions.Clock`. |
+| Translations | Implement `IDescriptionLocalizer` or subclass `EnglishDescriptions`, and pass it to `DescriptionBuilder`. |
+| Lint rules for your game | Pass `LintOptions` with host verbs, events and names, or suppress codes. |
+| Limits content cannot change | Pass a `Ruleset` in `RuntimeOptions.Rules`, which replaces the one content declares. See [When content fails at runtime](csharp.md#when-content-fails-at-runtime). |
+
+The rest of this page describes the library's insides, for anyone reading or changing it. [Adding a node](#adding-a-node) and [Adding a verb](#adding-a-verb) are checklists for contributors.
 
 ## Layers
 
@@ -80,7 +98,7 @@ The parser knows nothing about verbs, so a new one introduces no AST node and th
 
 **`TraceLog`** records steps with parent ids when enabled, and costs one branch per recording site when not.
 
-**Snapshots.** `GameState.Capture` produces plain data. Scheduled blocks are stored by content address (`card:Prepare/effect/0.body`), not object reference, so a save stays valid across processes. `Restore` rebuilds entities, zones and scheduled work, then re-registers listeners and modifiers in creation order and restores listener limit windows. Restoring into the same game reuses the entity instances whose ids match, so an `Entity` the game is holding stays the same object; anything the snapshot does not mention is marked removed.
+**Snapshots.** `GameState.Capture` produces plain data. Scheduled blocks are stored by content address (`card:Prepare/effect/0.body`), not object reference, so a save stays valid across processes. An address is a position within its definition, so an edit that moves the block breaks it, or points it at another block (see [Save and load](csharp.md#save-and-load)). `Restore` rebuilds entities, zones and scheduled work, then re-registers listeners and modifiers in creation order and restores listener limit windows. Restoring into the same game reuses the entity instances whose ids match, so an `Entity` the game is holding stays the same object; anything the snapshot does not mention is marked removed.
 
 **Hot reload.** `ContentLibrary` replaces exactly what a file contributed, and `CardRuntime.ApplyContentChanges` then points every live entity at the definition now loaded under its kind and name, re-registering its listeners and modifiers. A stat the game has changed keeps its value, because editing a card's cost must not heal an enemy mid-fight; a stat still at the definition's old number takes the new one.
 
@@ -111,10 +129,10 @@ Raise(event, action):
   resources with reset_on <event> reset
   after listeners are queued          (or run now, with triggers: immediate)
   decay and until-reverts for <event> are queued behind them
-  host.OnEvent(event)
+  host.OnEvent(event)                 (held until the action completes, under DeferredChooser)
 ```
 
-`CardRuntime` wraps every top-level operation (play, a turn phase, `Execute`) in `Run`, which starts a new causal chain, resets the step budget, drains the queue, and drops queued work if the operation fails.
+`CardRuntime` wraps every top-level operation (play, a turn phase, `Execute`) in `Run`, which starts a new causal chain, resets the step budget, drains the queue, and drops queued work if the operation fails. Nothing else is undone on a failure: what the operation changed before it stays changed, as [When content fails at runtime](csharp.md#when-content-fails-at-runtime) describes.
 
 ### Playing Fireball
 
@@ -130,7 +148,7 @@ Each queued trigger carries its `Chain`: an immutable list of the listeners that
 
 ## Determinism
 
-- `Num` is a 64-bit fixed-point value with six decimal places. Multiplication splits integer and fractional parts so no intermediate overflows for values up to about ±1 million.
+- `Num` is a 64-bit fixed-point value with six decimal places. Multiplication splits integer and fractional parts so no intermediate overflows for values up to about ±1 million. The arithmetic is unchecked, so a result beyond about ±9.2 trillion wraps round silently, with no error; [Numbers](stability.md#numbers) gives the limits.
 - `Rng` is xoshiro256** seeded through splitmix64, with rejection sampling for bounded values. Its full state is saved in snapshots.
 - Anything that could depend on hash order is sorted: listener candidates, resource resets, zone and history hashing.
 - `GameState.ComputeHash` covers entities, zones, RNG, clock, history, scheduled work and listener limits. Tests play a hundred random battles twice each, and play a battle side by side with a saved-and-restored copy of itself, comparing hashes after every step.
@@ -142,16 +160,3 @@ Each queued trigger carries its `Chain`: an immutable list of the listeners that
 **Descriptions.** One walk over a definition both writes the automatic text and names each value (`damage`, `damage2`, `Poison`...), which is what links a writer's placeholders to the effect. Live descriptions evaluate values without side effects (anything involving ranges or `random` is shown symbolically) and pass them through the same modifier queries the rules use.
 
 **DslTestRunner.** Creates a fresh `CardRuntime` per test and registers test-only verbs from a single table, which the linter also reads.
-
-## Extending
-
-| To add | Do this |
-|---|---|
-| A verb in C# | `runtime.RegisterVerb(name, call => ...)`. Use `call.Argument`, `call.Number`, `call.Clause`, `call.Targets` and the interpreter's primitives so events and modifiers still apply. |
-| A verb in content | `verb name(params):` |
-| Names or functions the rules cannot know | Implement `IEffectHost.TryResolveName` or `TryCall` (subclass `EffectHostBase`). |
-| Presentation | `IEffectHost.OnEvent` sees every resolved event. |
-| A decision maker | Implement `IChoiceProvider`. |
-| A clock | Implement `IGameClock`, advance it from the engine's fixed step, and pass it in `RuntimeOptions.Clock`. |
-| Translations | Implement `IDescriptionLocalizer` or subclass `EnglishDescriptions`. |
-| Lint rules for your game | Pass `LintOptions` with host verbs, events and names, or suppress codes. |

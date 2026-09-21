@@ -1,0 +1,41 @@
+card Strike
+  cost 1
+  target enemy
+  tags attack
+  effect:
+    deal 6 to target
+
+card Defend
+  cost 1
+  effect:
+    block 5
+
+status Poison
+  tags debuff
+  stacking intensity
+  on turn_end:
+    deal stacks to owner, ignore block
+    stacks -1
+
+card "Venom Dart"
+  cost 1
+  target enemy
+  tags attack
+  effect:
+    deal 3 to target
+    apply Poison 4 to target
+
+relic Whetstone
+  modify damage where tag:attack: +2
+
+enemy "Bog Troll"
+  hp 40
+  phase Enraged when hp <= max_hp / 2
+  move Club:
+    deal 8 to player
+  move Guard:
+    block 6
+  move Thrash phase Enraged:
+    repeat 2:
+      deal 5 to player
+  pattern cycle Thrash, Club, Guard

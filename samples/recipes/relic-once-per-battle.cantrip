@@ -1,0 +1,16 @@
+# Recipe: a relic that works once per battle.
+# Explained in docs/writing-content.md, "A relic that works once per battle".
+# Strike and Defend are in tutorial/game.cantrip.
+
+relic "War Horn"
+  on card_played(tag:attack) once per battle:
+    draw 2
+
+test "War Horn draws two after the first attack of the battle only"
+  enemy hp 50
+  relic "War Horn"
+  deck Defend, Defend, Defend, Defend
+  play Strike on enemy
+  expect count(hand) == 2
+  play Strike on enemy
+  expect count(hand) == 2

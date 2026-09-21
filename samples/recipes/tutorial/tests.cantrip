@@ -1,0 +1,53 @@
+test "Strike deals 6"
+  enemy hp 20
+  play Strike on enemy
+  expect enemy.hp == 14
+
+test "Defend gives 5 block"
+  enemy hp 20
+  play Defend
+  expect player.block == 5
+
+test "Venom Dart poisons, and Poison ticks at the end of the enemy's turn"
+  enemy hp 30
+  play "Venom Dart" on enemy
+  expect enemy.hp == 27
+  expect enemy.Poison == 4
+  end turn
+  expect enemy.hp == 23
+  expect enemy.Poison == 3
+
+test "Whetstone sharpens attacks, not Poison"
+  enemy hp 30
+  relic Whetstone
+  play Strike on enemy
+  expect enemy.hp == 22
+  play "Venom Dart" on enemy
+  expect enemy.hp == 17
+  end turn
+  expect enemy.hp == 13
+
+test "The Bog Troll clubs, then guards"
+  enemy "Bog Troll"
+  expect enemy.intent == "Club"
+  end turn
+  expect player.hp == 72
+  expect enemy.intent == "Guard"
+  end turn
+  expect enemy.block == 6
+
+test "Below half health the Bog Troll thrashes"
+  enemy "Bog Troll" hp 20
+  expect enemy.phase == "Enraged"
+  expect enemy.intent == "Thrash"
+  end turn
+  expect player.hp == 70
+
+test "Crossing half health changes the next move, not the one shown"
+  enemy "Bog Troll"
+  deal 25 to enemy
+  expect enemy.phase == "Enraged"
+  expect enemy.intent == "Club"
+  end turn
+  expect player.hp == 72
+  expect enemy.intent == "Thrash"

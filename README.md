@@ -3,9 +3,17 @@
 [![CI](https://github.com/AGomnes/Cantrip/actions/workflows/ci.yml/badge.svg)](https://github.com/AGomnes/Cantrip/actions/workflows/ci.yml)
 [![NuGet](https://img.shields.io/nuget/vpre/Cantrip.Core?label=Cantrip.Core)](https://www.nuget.org/packages/Cantrip.Core)
 
-**Write your cards, statuses, relics and enemies as short scripts instead of C# classes.**
+**Write your cards, statuses, relics and enemies as short scripts instead of code.**
 
-Cantrip is a rules language and rules engine for the battles in single-player, turn-based card games: deckbuilders and roguelites in the style of Slay the Spire, where one player fights AI enemies that show their next move. You write cards, statuses, relics, enemies and abilities as short `.cantrip` files, and the rules engine works out how they interact. Your game drives it from C#, or from GDScript through a Godot addon, and keeps the rendering, input, map and rewards between battles in its own code. Content carries its own tests, which the `cantrip` tool runs.
+[Quickstart](docs/quickstart.md) · [Writing content](docs/writing-content.md) · [Godot addon](docs/godot.md) · [Language reference](docs/language.md) · [C# guide](docs/csharp.md) · [Stability](docs/stability.md) · [Changelog](CHANGELOG.md)
+
+Cantrip is a rules language and rules engine for the battles in single-player, turn-based card games: deckbuilders and roguelites in the style of Slay the Spire, where one player fights AI enemies that show their next move. You write cards, statuses, relics, enemies and abilities as short `.cantrip` files, with their own tests, and the rules engine works out how they interact. Your game drives the battles and keeps the rendering, input, map and rewards between battles in its own code. That game can be any .NET project on .NET 5 or later, or a Godot 4.6 game on Godot's .NET edition, written in GDScript or C#.
+
+**Where to start**
+
+- **A C# game:** the [quickstart](docs/quickstart.md) goes from an empty folder to a playable battle in about fifteen minutes.
+- **A Godot game, in GDScript or C#:** [docs/godot.md](docs/godot.md) installs the addon. You need Godot's .NET edition and the .NET SDK, but no C# of your own.
+- **Writing cards rather than code:** [docs/writing-content.md](docs/writing-content.md) walks through a first card, status, relic and enemy with their tests, then gives recipes for common effects. It needs no C#.
 
 ## Why
 
@@ -50,7 +58,7 @@ test "Fireball kills a 6 hp enemy"
 
 None of these knows about the others. A Fireball on a frozen enemy deals its 6 damage, and the damage carries the card's `fire` tag, so the hit shatters Frozen for 10 more. Frozen is an `ice` status, so its removal sets off Kindling, which burns the enemy for 2 at the end of each of its turns, 1 less each time. That chain comes from events, not from code that anticipated it. A status's `on owner.` listener hears only what happens to its host, while a relic hears the whole battle, so Kindling would fire for ice coming off the player too.
 
-`{damage}` in the card's text is the first amount it deals, shown with whatever modifiers apply at the moment; leave `text:` out and Cantrip writes the rules text itself. The `test` block is content too, and `cantrip test` runs it.
+`{damage}` in the card's text is the first amount it deals, shown with whatever modifiers apply at the moment; leave `text:` out and Cantrip writes the rules text itself. The `test` block is content too, and `dotnet cantrip test` runs it.
 
 ## What you get
 
@@ -70,15 +78,17 @@ None of these knows about the others. A Fireball on a frozen enemy deals its 6 d
 
 ## Status
 
-**Preview: 0.1.0-preview.1.** The core has unit tests and content tests, and a small roguelite has been built with it and played headlessly by a bot, but no shipped game uses Cantrip yet. The API, the language and the save format may change between previews; [docs/stability.md](docs/stability.md) says how. Known gaps are in the [changelog](CHANGELOG.md): real time (a tick clock and abilities with cooldowns) is experimental, and the Godot addon has so far been installed only by its author and by an automated test.
+**Preview (0.x).** The current version is on the NuGet badge above and in the [changelog](CHANGELOG.md). The core has unit tests and content tests, and a small roguelite has been built with it and played headlessly by a bot, but no shipped game uses Cantrip yet. The API, the language and the save format may change between previews; [docs/stability.md](docs/stability.md) says how, and lists the tested platforms and the known limitations. Among them, real time (a tick clock and abilities with cooldowns) is experimental, and the Godot addon has so far been installed only by its author and by an automated test.
 
 Cantrip is written and maintained by one person. Feedback is the most useful thing right now, especially effects from your game that the language cannot express. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Get started
 
-You need the .NET 9 SDK or later. The library targets `netstandard2.1`, so it runs on .NET Core 3.0, .NET 5 and later, but not .NET Framework. It has been used from .NET 9 console apps and Godot 4.6 .NET; Unity and other game engines are untried.
+### In a .NET game
 
-In your game's project folder, add the library, and the `cantrip` tool for checking and testing content:
+The library targets `netstandard2.1`, so your game can target .NET 5 or later, such as `net8.0`, but not .NET Framework. MonoGame, FNA and other plain .NET engines call it just as the quickstart's console app does; none of them has been tried with it yet, and neither has Unity. Only the `cantrip` tool, which checks and tests content, needs the .NET 9 SDK or later.
+
+In your game's project folder, add the library and the tool:
 
 ```
 dotnet add package Cantrip.Core --prerelease
@@ -86,9 +96,9 @@ dotnet new tool-manifest
 dotnet tool install Cantrip.Cli --prerelease
 ```
 
-The tool manifest lets the folder run the tool as `dotnet cantrip`. With your `.cantrip` files in a `content` folder, `dotnet cantrip test content` runs their tests and `dotnet cantrip lint content` checks them. The [quickstart](docs/quickstart.md) goes from an empty folder to a battle you can play in the terminal in about fifteen minutes. For Godot, the addon is a zip on each [release](https://github.com/AGomnes/Cantrip/releases); [docs/godot.md](docs/godot.md) covers installing it.
+The tool manifest lets the folder run the tool as `dotnet cantrip`. With your `.cantrip` files in a `content` folder, `dotnet cantrip test content` runs their tests and `dotnet cantrip lint content` checks them. The [quickstart](docs/quickstart.md) takes the same steps to a battle you can play in the terminal.
 
-Playing a battle from C#, with Strike, Defend and a Jaw Worm defined in your content alongside the example above:
+Playing a battle from C#, with [samples/basic/content.cantrip](samples/basic/content.cantrip) in the `content` folder for its Strike, Defend, Fireball, Kindling and Jaw Worm:
 
 ```csharp
 using Cantrip;
@@ -110,33 +120,39 @@ PlayResult result = runtime.Play("Fireball", worm);   // Played, NotEnoughEnergy
 runtime.EndTurn();
 ```
 
-Your game learns what happened, to animate it, from events: damage, cards moving, statuses applied. [docs/csharp.md](docs/csharp.md) covers that and the rest: asking what can be played, player choices, saving, hot reload, rules text and tracing.
+Your game learns what happened, to animate it, from events: damage, cards moving, statuses applied. [docs/csharp.md](docs/csharp.md) covers that and the rest: pacing events in a frame loop, player choices, saving, shipping content, hot reload, rules text and tracing.
+
+### In a Godot game
+
+You need the .NET edition of Godot 4.6 and the .NET SDK 8 or later, even if your game is all GDScript. The addon is a zip on each [release](https://github.com/AGomnes/Cantrip/releases), also copied to [AGomnes/cantrip-godot](https://github.com/AGomnes/cantrip-godot) in the layout the Godot Asset Library expects. Add Cantrip.Core at the version in the addon's `plugin.cfg`, rather than with `--prerelease`, which may fetch a newer preview than your addon. [docs/godot.md](docs/godot.md) walks through installing it and playing a battle from GDScript.
 
 ## Documentation
 
-- [Quickstart](docs/quickstart.md): from nothing to a playable battle
+- [Quickstart](docs/quickstart.md): from nothing to a playable battle, in C#
+- [Writing content](docs/writing-content.md): a tutorial and recipes for content authors
 - [Language reference](docs/language.md): every declaration, event, verb and modifier
 - [Using Cantrip from C#](docs/csharp.md)
 - [The Godot addon](docs/godot.md)
 - [Architecture](docs/architecture.md): how the library fits together, and where to extend it
 - [Coverage](docs/coverage.md): which effects from existing games the language can express
-- [Stability](docs/stability.md): what may change between previews, and how to report a problem
+- [Slice friction](docs/slice-friction.md): what building a small roguelite on Cantrip needed
+- [Stability](docs/stability.md): what may change, platforms, performance and known limitations
 - [Changelog](CHANGELOG.md)
 
 ## Command line
 
 Installed as a local tool, the commands run as `dotnet cantrip ...`:
 
-```
-dotnet cantrip validate <path>... [--suppress codes]  load content and report its errors, including unknown verbs
-dotnet cantrip lint <path>... [--suppress codes]  report likely mistakes too (unknown names, events nothing raises)
-dotnet cantrip test <path>... [--filter text] [--trace]
-dotnet cantrip describe <path>... [--name name]   print generated rules text
-dotnet cantrip repl <path>...                     start a game from the content and try statements in it
-dotnet cantrip --version
-```
+| Command | What it does |
+|---|---|
+| `dotnet cantrip validate <path>... [--suppress codes]` | Reports errors, including unknown verbs |
+| `dotnet cantrip lint <path>... [--suppress codes]` | Also reports likely mistakes, such as events nothing raises |
+| `dotnet cantrip test <path>... [--filter text] [--trace]` | Runs the `test` blocks; `--trace` adds the causality trace to each failure |
+| `dotnet cantrip describe <path>... [--name name]` | Prints generated rules text |
+| `dotnet cantrip repl <path>...` | Runs each statement you type as the player, against a 100 hp Dummy; `:state`, `:trace`, `:quit` |
+| `dotnet cantrip --version` | Prints the version and the commit it was built from |
 
-Paths are files or folders; a folder loads every `.cantrip` file under it. The exit code is 0 for success, 1 for content errors or failing tests and 2 for bad usage. `lint` fails only on errors: its warnings are printed but still exit 0, so in CI cover an effect with a `test` if it must not silently stop working.
+Paths are files or folders; a folder loads every `.cantrip` file under it. The exit code is 0 for success, 1 for content errors or failing tests and 2 for bad usage. `lint` fails only on errors: its warnings are printed but still exit 0, so in CI cover an effect with a `test` if it must not silently stop working. [Trying lines in the REPL](docs/writing-content.md#6-trying-lines-in-the-repl) shows a REPL session and what it cannot do.
 
 ## Working on Cantrip
 
@@ -146,22 +162,11 @@ You need the .NET 9 SDK or later:
 dotnet build Cantrip.sln
 dotnet test tests/Cantrip.Core.Tests
 dotnet run --project src/Cantrip.Cli -- test samples/basic
+dotnet run --project src/Cantrip.Sim -c Release
 ```
 
-| Path | Contents |
-|---|---|
-| `src/Cantrip.Core` | The library: parser, content loading, rules engine, interpreter, linter, rules text, test runner |
-| `src/Cantrip.Cli` | The `cantrip` tool |
-| `src/Cantrip.Sim` | Plays whole runs of the sample roguelite with a bot and reports how they went |
-| `samples/basic` | Small examples of each feature, including Fireball, Frozen and Kindling above, and the Strike, Defend and Jaw Worm the C# example uses |
-| `samples/corpus` | Effects re-created from existing games |
-| `samples/slice` | The sample roguelite: a witch climbing a tower, fire against frost |
-| `godot/Cantrip.Demo` | The Godot addon, a demo and headless tests |
-| `tests` | Unit tests for the library and for the addon's engine-free layer |
-| `tools` | Packaging the addon, and checking the quickstart against freshly built packages |
-
-[CONTRIBUTING.md](CONTRIBUTING.md) has what a pull request needs, and how releases are made.
+The last line has the bot play the sample roguelite. [CONTRIBUTING.md](CONTRIBUTING.md) has a map of the repository, what a pull request needs, and how releases are made.
 
 ## License
 
-MIT. Copyright (c) 2026 Alexander Gomnæs. See [LICENSE](LICENSE).
+MIT, for the library, the tool and the Godot addon. Cantrip.Core has no third-party runtime dependencies. Copyright (c) 2026 Alexander Gomnæs. See [LICENSE](LICENSE).

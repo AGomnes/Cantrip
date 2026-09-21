@@ -1,0 +1,18 @@
+# Recipe: a card that draws and exhausts.
+# Explained in docs/writing-content.md, "A card that draws and exhausts".
+# Strike is in tutorial/game.cantrip.
+
+card Insight
+  cost 0
+  tags exhaust
+  effect:
+    draw 2
+
+test "Insight draws two and is exhausted"
+  enemy hp 20
+  deck Strike, Strike, Strike
+  play Insight
+  expect count(hand) == 2
+  expect count(draw) == 1
+  expect count(exhaust) == 1
+  expect count(discard) == 0

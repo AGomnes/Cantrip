@@ -1,0 +1,29 @@
+# Recipe: a debuff that lasts N of the enemy's turns.
+# Explained in docs/writing-content.md, "A debuff that lasts N enemy turns".
+
+status Weak
+  tags debuff
+  stacking duration
+  modify damage: x0.75
+
+card Sap
+  cost 1
+  target enemy
+  effect:
+    apply Weak 2 to target
+
+enemy Brute
+  hp 40
+  move Smash:
+    deal 10 to player
+
+test "Sap weakens the Brute's next two attacks"
+  enemy Brute
+  play Sap on enemy
+  end turn
+  expect player.hp == 73
+  end turn
+  expect player.hp == 66
+  expect not enemy.has(Weak)
+  end turn
+  expect player.hp == 56

@@ -1,13 +1,15 @@
 # Coverage corpus
 
-This page collects effects from existing games, re-created under our own names, to measure how much the language can express without new C#. This page tracks that corpus.
+To measure how much the language can express without new C#, the coverage corpus re-creates effects from existing games under our own names. The effects are in [`samples/corpus`](../samples/corpus), and each one the language can express has at least one test. Cantrip is not affiliated with these games or their publishers.
 
-Effects are reproduced under our own names in [`samples/corpus`](../samples/corpus), each expressible one with at least one DSL test. Run them with:
+From a clone of the repository, run the tests and the linter over the corpus with:
 
 ```
-cantrip test samples/corpus
-cantrip lint samples/corpus
+dotnet run --project src/Cantrip.Cli -- test samples/corpus
+dotnet run --project src/Cantrip.Cli -- lint samples/corpus
 ```
+
+The tables say what each effect needs. [What cannot be expressed yet](#open-gaps-most-useful-first) lists what is missing, and [Sharp edges](#sharp-edges-found-while-building-the-corpus) lists the rules that caught this corpus out, with links to where the language reference states them.
 
 **Status**
 
@@ -35,6 +37,8 @@ cantrip lint samples/corpus
 Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics. Inscryption models creatures the same way, with sigils as `keyword` definitions applied to them and bones as a declared `resource`. Dominion is treasure and victory cards as cards, with actions, buys and coins as declared resources that establish and refresh themselves each turn. Darkest Dungeon has heroes as actors, stress as a declared resource with bounds and no reset, and trinkets as `item` definitions.
 
 ## Slay the Spire
+
+Content: [slay_the_spire.cantrip](../samples/corpus/slay_the_spire.cantrip). Tests: [slay_the_spire.tests.cantrip](../samples/corpus/slay_the_spire.tests.cantrip).
 
 | # | Mechanic | Ours | Status | Notes |
 |---|---|---|---|---|
@@ -64,6 +68,8 @@ Units and minions in Monster Train and Hearthstone are modelled as `actor` defin
 
 ## Monster Train
 
+Content: [monster_train.cantrip](../samples/corpus/monster_train.cantrip). Tests: [monster_train.tests.cantrip](../samples/corpus/monster_train.tests.cantrip).
+
 | # | Mechanic | Ours | Status | Notes |
 |---|---|---|---|---|
 | 1 | Rage | Rage | Works | `modify attack: +2 * stacks` with `decay 1` |
@@ -78,6 +84,8 @@ Units and minions in Monster Train and Hearthstone are modelled as `actor` defin
 | 10 | Floors and capacity | | Not expressible | There is one board row per side. Multiple floors, per-floor capacity and moving units between floors need a richer board model |
 
 ## Hearthstone
+
+Content: [hearthstone.cantrip](../samples/corpus/hearthstone.cantrip). Tests: [hearthstone.tests.cantrip](../samples/corpus/hearthstone.tests.cantrip).
 
 | # | Mechanic | Ours | Status | Notes |
 |---|---|---|---|---|
@@ -97,6 +105,8 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 
 ## Balatro
 
+Content: [balatro.cantrip](../samples/corpus/balatro.cantrip). Tests: [balatro.tests.cantrip](../samples/corpus/balatro.tests.cantrip).
+
 | # | Mechanic | Ours | Status | Notes |
 |---|---|---|---|---|
 | 1 | Greedy Joker | Greedy Joker | Works | `on card_played(tag:diamond): gain 3 mult to player` |
@@ -107,7 +117,11 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 | 6 | Blueprint | | Not expressible | Copying another joker's ability needs effects as first-class values |
 | 7 | Poker hands | | Not expressible | Pairs, flushes and straights need grouping over the played cards (count by rank, by suit) |
 
+A score that multiplies grows fast. Arithmetic is correct while values stay within ±1 million, and past that a result can be wrong with no error, so a game scored like this has to keep its numbers in range: see [Numbers](stability.md#numbers).
+
 ## Dota 2
+
+Content: [dota2.cantrip](../samples/corpus/dota2.cantrip). Tests: [dota2.tests.cantrip](../samples/corpus/dota2.tests.cantrip).
 
 | # | Mechanic | Ours | Status | Notes |
 |---|---|---|---|---|
@@ -121,6 +135,8 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 | 8 | Mana regeneration | Mana Font | Works | `on every 1s: gain 1 mana to player` on a relic |
 
 ## Magic
+
+Content: [magic.cantrip](../samples/corpus/magic.cantrip). Tests: [magic.tests.cantrip](../samples/corpus/magic.tests.cantrip).
 
 | # | Mechanic | Ours | Status | Notes |
 |---|---|---|---|---|
@@ -137,6 +153,8 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 
 ## Inscryption
 
+Content: [inscryption.cantrip](../samples/corpus/inscryption.cantrip). Tests: [inscryption.tests.cantrip](../samples/corpus/inscryption.tests.cantrip).
+
 | # | Mechanic | Ours | Status | Notes |
 |---|---|---|---|---|
 | 1 | Bones from every death | Bone Collector | Works | `resource "bones"` with a floor, and `on killed(kind:actor): gain 1 bones to player` |
@@ -149,6 +167,8 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 | 8 | Candles and lives | | Not expressible | Run structure above a battle: nothing models a run of battles with lives carried between them |
 
 ## Dominion
+
+Content: [dominion.cantrip](../samples/corpus/dominion.cantrip). Tests: [dominion.tests.cantrip](../samples/corpus/dominion.tests.cantrip).
 
 | # | Mechanic | Ours | Status | Notes |
 |---|---|---|---|---|
@@ -163,6 +183,8 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 
 ## Darkest Dungeon
 
+Content: [darkest_dungeon.cantrip](../samples/corpus/darkest_dungeon.cantrip). Tests: [darkest_dungeon.tests.cantrip](../samples/corpus/darkest_dungeon.tests.cantrip).
+
 | # | Mechanic | Ours | Status | Notes |
 |---|---|---|---|---|
 | 1 | Stress | Dread | Works | `resource "stress"` with `min 0 max 200` and no reset, so it accumulates across turns instead of refreshing. Both bounds are tested |
@@ -174,47 +196,54 @@ A Deathrattle that draws a card needs to name who draws — `draw 1 to player` �
 | 7 | Camping between fights | | Not expressible | Camping happens between battles, and nothing models a run of battles with stress and health carried across them. The same shape as Inscryption's candles |
 | 8 | Virtue or affliction | Breaking Point | Works | `discover 1 statuses where tag:affliction or tag:virtue, weighted`. Offering one candidate is a pick with nothing to decide, so nobody is asked; "rarely a virtue" is a weight of 1 against three 5s |
 
-## Gaps, most useful first
+## Open gaps, most useful first
 
-1. **Delivered: time-based triggers.** `on every 1s:` fires on the clock, and both Poison Sting (#2) and Mana Font (#8) are written with it. Nothing is left in this area that the language cannot say.
-2. **Delivered: re-telegraphing when a phase changes.** `phase Broken when hp <= max_hp / 2, retelegraph` re-rolls the enemy's intent the moment a hit moves it into that phase, so a boss shows the move the phase has just unlocked (Slay the Spire #22). It is opt-in on purpose: ordinarily the intent shown during the player's turn is exactly the move that follows, and only a phase that asks gives that up. A killing blow re-telegraphs nothing, and a hit absorbed entirely by block cannot cross a threshold.
-3. **Delivered in part: target validity.** Content adds rules to target selection through the `targetable` channel, asked over a base of 1 before a card accepts a target. A taunt is a scope speaking for others — `modify targetable of allies where source:enemies, not it.has(Taunt): set 0` (Hearthstone #8) — and the same channel with no scope anchors to its own host, which is stealth (Hearthstone #11). The chooser is only offered candidates that pass, so a rule narrows what a player may pick rather than making the play fail, and a card left with nothing to point at is refused. It was a query channel rather than a cancellable event precisely because candidates must be filtered *before* the chooser is asked, and an event that can deal damage cannot honestly be used as a question. What is left: Magic's Flying (#8) needs a blocking step, which is a phase of combat rather than a targeting rule. Darkest Dungeon's ranks (#6) have left this gap as a workaround — a skill can limit its reach with `it.position`, but only by naming itself, because `card:` compares names and there is no `card:self`. A `card:self` qualifier, or an anchor-aware `card:` inside a card's own modifier, would make that one clean. Enemy moves and the `attack` verb do not go through card target selection at all, so a taunt does not constrain them either. Two things once filed here had already left: action blocking is expressible — a stunned unit loses its move by cancelling `move` in the before phase (Dota 2 #3) — and Multistrike (Monster Train #4) is a duplication problem rather than a targeting one.
-4. **Verbs that return values** (no corpus citation). The case that prompted this is gone: `into` binds what a damage verb landed, so Soul Reap no longer differences a counter (#11). What is still missing is a verb *returning* anything — `VerbHandler` is `delegate void`, a content verb's body is a statement block with no result channel, and `let x = shatter target` would need a command to be usable as an expression, which is a parser change reaching the walker, the canonical printer and the linter. Worth doing when something needs it; nothing in the corpus does yet.
-5. **Effects as values** (Balatro #6, Hearthstone #9). Copying and disabling another entity's effects.
-6. **Listeners registered during an event hear that event** (Slay the Spire #10, Hearthstone #6). The clean "not myself" filter already exists — `not target:self`, `not card:Reverb` — so what is left to decide is whether the default should change, since every listener of this shape has to remember to exclude itself. There is now evidence for the current default as well: the slice's Chill freezes its host at three stacks by listening for its own application, which on the first application only works because the new status hears the event that created it (samples/slice, and item 5 in [slice-friction.md](slice-friction.md)).
-7. **Delivered in part: definition pools.** `discover N <kind> [where ...] [, weighted] as name` offers content that nothing has been made from yet and binds what was chosen, ready for `create` or `apply` (Hearthstone #10, Darkest Dungeon #8). Offering a single candidate is a pick with nothing to decide, so the chooser is never asked and one verb serves both a player discovering a spell and a hero rolling on a table of afflictions; `weight` carries "rarely a virtue", reusing the property an enemy's moves are already weighted by. It is a verb rather than a `pool` declaration because a verb can read the kind as the word that was written instead of evaluating it, which needs no new AST node and so no trip down the checklist in [architecture.md](architecture.md) — and a declaration can still be added later as another source for the same verb. What is left: a pool is not a value, so it cannot be named, counted or iterated; and a pile cannot deplete, because definitions are immutable objects shared by every instance and nothing holds a per-definition count. So Dominion #7 stays open on a buy phase and multi-currency costs (gap 15) rather than on pools. Nor can a host UI answer a discovery yet — the editor's choice bridge validates answers against entity ids, so the core and the tests work while a Godot prompt would not.
-8. **Grouping over collections** (Balatro #7). Count by rank or suit, distinct values, runs.
-9. **Ordered modifier resolution** (Balatro #5). Resolve by source position instead of fixed layers, as an option.
-10. **Delivered: cancellable resets.** A reset marks the `<stat>_changed` event it raises, so `if event.reset: cancel` refuses a reset and nothing else — Bastion keeps block across turns while an effect that means to strip block still strips it (Slay the Spire #9). The other row filed here was never a gap: the battle sequence is documented, `battle_start` before the turn start that resets block, so Heavy Anchor granting on the first turn is the ordinary spelling rather than a trick (#15).
-11. **Delivered: cooldown as a modifier channel.** `modify cooldown: x0.5` on a relic or a status shortens every ability its holder has; written on an ability it shortens only that one — the division `cost` already makes between a card and its owner's cards (Dota 2 #5). Modifiers see the cooldown after it has been converted into clock units, so a multiplier means the same fraction whether the ability was authored in seconds or in turns, while an additive amount is in clock units — which is why a multiplier is the spelling that travels between clocks. Two things it deliberately does not do: the text a card prints still shows the cooldown as written, the way a printed cost does, and nothing reads the shortened value back out for a UI. Worth recording that cooldown timing had no test anywhere before this — nothing in the repository used an ability twice and checked that the second attempt was refused — so the plain case is pinned now alongside the modified one.
-12. **Space and richer boards** (Dota 2 #6, #7; Monster Train #10). Built-in geometry, or a documented host contract for it.
-13. **Not a gap: the modifier anchor.** A modifier with no `of` scope is anchored to the entity it is written on — a card to its own damage, a status to its host, a relic to its controller — and naming a scope reaches past that. Both rows once filed here (Slay the Spire #7, Hearthstone #4) were expressible that way all along, as Dota 2 #4 already was, and excluding yourself is covered by `of other allies`. The rule is set out under Modifiers in the language reference, both the default anchor and what `of` replaces it with; these corpus entries had simply not followed it.
-14. **Delivered: `draw` for someone else.** `draw N to who` names who draws, so a creature can draw for you (Inscryption #7) despite controlling itself. The Hearthstone Deathrattle note above is answered by the same clause.
-15. **Multi-currency and sacrifice costs** (Magic #7; Inscryption #6). A cost may now name the resource it is paid in — `cost 2 bones`, and `cost x bones` spends all of it — and such a card is refused exactly as an unaffordable energy card is. What is left is a cost in *several* currencies at once ("two red and one of any colour"), and a cost paid by destroying something you own, which is a payment step rather than a number.
-16. **Delivered: a declared resource establishes its own stat.** `resource "actions"` with `reset_to 1` now gives every actor whose turn begins one action, with nothing having to grant it first — the reset creates the stat as well as refreshing it. Dominion's entries needed a Turn Order relic to bring the stat into being before this, and that relic is gone. The one exception is a reset whose value names another stat: `reset_to max_energy` is still skipped for an entity without `max_energy`, which is what keeps an enemy from acquiring energy.
+What the language cannot say yet, ranked by how many rows of the tables above each one holds back. The numbers are the gaps' permanent names: comments in the corpus and elsewhere refer to them.
 
-17. **Run structure above a battle** (Inscryption #8; Darkest Dungeon #7). Nothing models a run of battles with hp, stress, lives or candles carried between them: a battle is the outermost unit here, `battle_end` is the last thing that happens, and `once per run` is the only acknowledgement that runs exist at all. Both rows were written as "not expressible" in their own files and cited nothing, because this had never been listed — found by counting corpus citations against this list rather than by reading either game.
+| Gap | What is missing | Rows | What works today |
+|---|---|---|---|
+| 12 | **Space and richer boards.** Actors have board slots, not positions in space, and each side has one row. | Dota 2 #6, #7; Monster Train #10 | Slots and `adjacent(target)`. `within` parses, and a game can give it a meaning through its host's `TryCall`. |
+| 15 | **Costs in several currencies, or paid by a sacrifice.** A cost is one amount in one resource. | Magic #7; Inscryption #6; Dominion #7 | A cost in a named resource, `cost 2 bones`. A sacrifice written into the effect, which cannot refuse the play. |
+| 5 | **Effects as values.** Nothing can copy another entity's effects, or switch them off. | Balatro #6; Hearthstone #9 | Nothing. |
+| 17 | **A run above the battle.** A battle is the outermost thing content can see: nothing carries lives, candles or stress from one battle to the next, and `once per run` is the only nod to runs. | Inscryption #8; Darkest Dungeon #7 | The game carries hp, deck and relics between battles in its own code, as [Winning, losing and several battles](csharp.md#winning-losing-and-several-battles) shows and `src/Cantrip.Sim` does. |
+| 3 | **Target rules beyond choosing a card's target.** There is no blocking step for a rule such as Flying, and no `card:self`. Enemy moves and the `attack` verb do not ask the `targetable` channel, so a taunt does not bind them. | Magic #8; Darkest Dungeon #6 | The `targetable` channel for cards. A card that limits its own reach names itself, as in `card:Pike`. |
+| 6 | **Whether a listener should hear the event that brought it into play.** Today it does, so each listener of that shape must leave its own cause out. The sample roguelite's Chill relies on the current behaviour, so changing it is a decision rather than a fix. | Slay the Spire #10; Hearthstone #6 | A filter: `not target:self`, `not card:Reverb`. |
+| 18 | **A priority window.** Nothing lets one side respond to a card while it is being played. | Magic #5 | A permanent that commits in advance to countering the next spell, which is still cast and paid for. |
+| 8 | **Grouping over collections.** Counting by rank or suit, distinct values, runs. | Balatro #7 | `where` filters and `.count`. |
+| 9 | **Modifiers in source order.** Layers apply in a fixed order, not by the position of their sources, as Balatro's jokers need. It would be a ruleset option. | Balatro #5 | The fixed layer order, which `modifier_layers` can rearrange. |
+| 7 | **Pools as values, and piles that run out.** A pool cannot be named, counted or iterated, and a definition holds no count, so a supply pile cannot deplete. Dominion also needs a buy phase. | Dominion #7 | `discover` offers content by filter and weight. |
+| 4 | **Verbs that return values.** A verb cannot hand a result to an expression, as `let x = shatter target` would need. | None | `into` binds what a damage verb landed. |
 
-## Found while building the corpus
+The other workarounds are explained in their rows: Heavy Blade (Slay the Spire #4), Multistrike (Monster Train #4), Abstract Joker (Balatro #2) and Cellar (Dominion #3). Militia (Dominion #8) needs a second player with a hand, which Cantrip does not have by design.
 
-- **A defect, fixed:** inside modifiers, roles such as `source:enemies` and group names such as `allies` were read from the attacker's side instead of the modifier owner's. War Banner depends on the fix.
-- Names with hyphens or spaces (`Anti-Magic`) cannot be written as bare words in expressions or test setup; use single-word names or strings.
-- Winning a battle clears the player's non-persistent statuses, so a test that checks a status applied by the last enemy on death needs a second enemy.
-- Until Inscryption was added, nothing in the repository declared a `resource` or a `keyword` — not the samples, not the corpus. Both behave as the language reference says, but neither had been exercised anywhere outside it.
-- Knife Juggler's `if event.target != self` guard is expressible as a filter clause, `on created(kind:actor, not target:self)`.
-- The other four held up, and each fails by a measurable amount when the trick is taken out. Kobold Geomancer's Arcane Shot lands 2 instead of 3 without its `of` scope; a Shiv lands 4 instead of 8 without one; Titan Blade deals 26 instead of 23 if the doubled Strength is written as tripled, because the modifier applies its own multiple on top; and Abstract Joker scores 33 instead of 231 if it listens on the after phase rather than the before. Heavy Anchor needed no probe at all: the corpus already ships a `Naive Anchor` relic and a test asserting that block granted on `battle_start` is wiped to 0. A deliberate counter-example beside the entry is the best evidence in this table, and more of these notes could carry one.
-- Dominion settled four things nothing had tested. `discard N` and `exhaust N` resolve through the chooser inside a DSL test with no `answer` needed, as long as the candidates are identical or there is only one. A card in hand is active, so it can react from there without ever being played. `choose N from group as name` binds something `replay` accepts. And a trap: a stat set in setup is wiped by its own `reset_on turn_start`, because setup runs before the battle starts — grant it with a statement instead.
-- The summary table is bookkeeping over the sections below it, and nothing checks the two against each other. One figure went stale unnoticed: a row moved from workaround to works, the README was updated to match, and the total was not, so the table and the README disagreed for a commit. Every summary row and the total have since been counted against the section rows, and all nine games agree. The section rows are the authority — count them rather than adjusting the total by hand. This note deliberately carries no figure of its own: quoting one here would be the same mistake a level up, and it would go stale the next time a row moved. Counting the status cells mechanically is the quickest way to check, and it has two traps. The pattern that matches a status cell also matches the status key above and this page's own summary header, so a raw count reads two high in every column. And spelling that pattern out in prose here adds another: this note used to quote it, which made one column read a further one high and sent me hunting for a miscounted section that did not exist. So describe the pattern rather than reproducing it, subtract those two rows, and count the sections you think you already know — trusting the summary for two of them is how this went wrong the first time.
-- `item` works as a declaration and behaves like a relic, but there is no `item` setup verb in the test language: a test grants one with `relic`. Darkest Dungeon is the first content anywhere to declare an `item` at all.
-- Listening on a custom stat's change event works, and needs nothing declared for it: `on any.stress_changed` fires for a `resource` the content declared, and the linter does not complain that nothing raises it, because its stat inventory counts resource declarations. I expected a warning there and was wrong, which is worth recording in the direction it fell.
-- The checklist in architecture.md earned its keep on the first new binding form since it was written. `into` binds a name, the linter did not know that, and every use of the bound name warned CT302 — exactly the failure the list predicts for a form the linter has not been taught. The corpus lint caught it, because that folder has been clean all along and two warnings stood out. Lint tests now pin both halves: a name bound by a verb that honours the clause is known, and one written on a verb that ignores it is still a real mistake.
-- Twice now a row has looked like a workaround only because a documented ordering rule was not being followed — the modifier anchor, and the battle sequence that puts `battle_start` before the turn start which resets block. Both times the instinct to reason by analogy with another row pointed the wrong way, and both times the language reference settled it in a sentence. Check the reference before filing a gap.
-- Re-telegraphing turned out to be a conflict between two guarantees rather than a missing hook. "The telegraph never lies" and "a boss re-telegraphs when it transforms" cannot both hold unconditionally, and an existing test pins the first across twelve turns — the intent shown is asserted to be the move used. That is what made the feature opt-in per phase instead of a change to how intents work. Replacing Slime King's `on self.damaged` listener with a phase-gated move also took four CT306 self-retrigger notes out of the corpus, which is a fair sign the listener was doing more than it looked like.
-- Declaring a resource used to establish the stat on nobody, so its reset was silently inert and Dominion carried a relic whose only job was to bring `actions` into being. A reset now creates the stat it resets, that relic is deleted, and the four action counts it had been inflating came back to what the tests always asserted.
-- Eight of these workarounds have been examined rather than trusted, and four were self-inflicted: the Goblin Chief's separate tag, the Juggler's body guard, Honed Edge's extra status, and Stun — which really can stop a unit from acting, by cancelling `move` in the before phase. What is real is narrower, and it is the anchoring rule: drop the `of` scope and Kobold Geomancer's Arcane Shot lands 2 instead of 3, and a Shiv lands 4 instead of 8. Naming a scope is the ordinary way to write an outward modifier, though, not a trick — so the lesson is not "the notes were wrong" but that the anchor catches people out even though the language reference states it plainly under Modifiers. Every note in this table is worth testing before believing.
-- `other` excludes the entity a modifier is written on, not merely the target: a modifier's scope is evaluated with the owner as `self`, and `other` drops `self` as well as the target or controller. So "other goblins" is `of other allies where tag:goblin`, with no need to tag the lord separately. The language reference describes `other` in terms of the target and the running entity's controller, which does not make this obvious, and the Magic entry carried a needless workaround until it was checked.
-- Winning a battle returns the player's hand, discard, exhaust, play and powers piles to the draw pile (`EndBattle`), and `Execute` checks whether the battle is over when it finishes. So a test that draws a card by killing the last enemy finds that card back in the draw pile afterwards, which looks precisely like the draw never happening. It is worth ruling this out before suspecting the effect. Relatedly, `player` in content is always the game's player, never relative to whichever side is acting.
-- A DSL test cannot assert that a play was *refused*: `DslTestRunner.Play` throws when the result is anything but `Played`, so `play X on Y` either succeeds or fails the test outright. A rule that forbids something therefore has to be shown the other way round — play the card with no target and assert it picked the only thing it was allowed to pick, which has the merit of exercising candidate filtering rather than the final validity check. Where the refusal itself is the point, assert `PlayResult.InvalidTarget` from a core test instead.
-- Three targeting details, each of which would have shipped as a plausible bug if it had been reasoned about instead of read. Inside a modifier's `of ... where ...`, `it` is the candidate but a bare qualifier such as `tag:` tests the value being computed, so a candidate's own tags must be written `it.` — `magic.cantrip`'s bare `tag:goblin` works only because a stat query carries no card to test instead. `card:` compares names and there is no `card:self`, so a card wanting a rule about itself must name itself, which is the whole wart in Darkest Dungeon #6. And positions count from zero, so ranks one and two are `position > 1`; that one is asserted outright in a core test rather than left to inference, because it was inferred from a default value rather than from the line that assigns it.
-- `event` and `encounter` are declaration keywords the parser accepts and nothing consumes. No `.cantrip` file in the repository declares either, and there is no code anywhere that reads one, but they are not inert: an unmapped kind falls through `EntityDefinition.ParseKind` to `EntityKind.Global`, which is always active, whose modifiers apply on every channel to everything, which `create` instantiates into the hand, and which lands in the by-name index where it can shadow a real definition in a lookup that does not name a kind. Since 0.1.0-preview.1 loading either is error CT0113, "reserved but not supported yet". The keywords stay in the parser, and in the Godot editor's highlighter, which keeps its own copy of the keyword list (already out of step, missing `for`), so that a stray declaration gets that clear error rather than a confusing parse error. Giving them a meaning is the encounters work in gap 17.
-- A pool is drawn from every definition the library has loaded, not from the file the card is written in — obvious once said, and not obvious while writing a corpus test. This folder loads all nine games together, so `discover 3 cards where tag:spell` offers Magic's and Inscryption's spells beside Hearthstone's: eight of them across four files, which is why a test asserting *which* card was discovered failed while the count was right. A corpus discovery needs a pool tag of its own to be deterministic, and that is the more faithful model anyway, since the real card offers spells of your class rather than every spell ever printed.
+## Closed gaps
+
+- **1. Time-based triggers.** `on every 1s:` fires on the clock (Dota 2 #2, #8).
+- **2. Re-telegraphing when a phase changes.** `retelegraph` on a phase re-rolls the intent as the threshold is crossed (Slay the Spire #22). It is opt-in: see [Phases](language.md#phases).
+- **3, in part. Target validity.** The `targetable` channel is asked before a card accepts a target, which is how a taunt and stealth are written (Hearthstone #8, #11). The rest is open above.
+- **7, in part. Definition pools.** `discover` offers content that nothing has been made from yet (Hearthstone #10, Darkest Dungeon #8). Since 0.1.0-preview.2 the player can answer the offer in a game, as with any other choice. The rest is open above.
+- **10. Cancellable resets.** `event.reset` marks a reset, so `if event.reset: cancel` keeps block across turns (Slay the Spire #9).
+- **11. Cooldown as a modifier channel.** `modify cooldown: x0.5` (Dota 2 #5).
+- **13. Not a gap: the modifier anchor.** A modifier without `of` applies to what it is written on, and naming a scope reaches past that (Slay the Spire #7, Hearthstone #4).
+- **14. `draw` for someone else.** `draw 1 to player` lets a creature draw for the player (Inscryption #7).
+- **15, in part. A cost in another resource.** `cost 2 bones` is refused when the bones are not there, as an energy cost is (Inscryption #2). The rest is open above.
+- **16. A declared resource creates its own stat.** `resource "actions"` with `reset_to 1` gives every actor one action a turn with nothing else to grant it (Dominion #1).
+
+## Sharp edges found while building the corpus
+
+Rules that are stated in the language reference but still caught this corpus out. Each links to where the reference states it.
+
+- **A listener hears the event that brought it into play.** A status applied by a card hears that card's `card_played`, and a minion hears its own creation. See Joining mid-event under [Listeners](language.md#listeners).
+- **Block granted on `battle_start` is gone by the first turn,** because the first turn start resets block. Grant it `on turn_start once per battle`. See [Relics](language.md#relics-items-and-keywords).
+- **A modifier without `of` applies to what it is written on:** on a card, to that card's own damage. See [Modifiers](language.md#modifiers).
+- **In the `where` of a modifier's `of` group, a bare qualifier tests the value being computed.** Write `it.has(tag:goblin)` to test the candidate. See [Modifiers](language.md#modifiers).
+- **`other` leaves out the entity the modifier is written on,** so `of other allies` on a goblin leader buffs every goblin but the leader. See [Expressions](language.md#expressions).
+- **There is no `card:self`.** A card that needs a rule about itself names itself. See [Qualifiers](language.md#qualifiers).
+- **Board positions count from 0,** so the front two slots are `position <= 1`. See [Expressions](language.md#expressions).
+- **`draw` draws for the controller, and a creature controls itself,** so a creature draws for the player with `draw 1 to player`. See [Built-in verbs](language.md#built-in-verbs).
+- **`discover` offers from everything loaded,** not only from the card's own file. Give a pool a tag of its own. See [Built-in verbs](language.md#built-in-verbs).
+- **`player` is always the game's player,** whichever side is acting. See [Names](language.md#names).
+- **In a test, block set in setup, and energy set below the maximum, are reset when the first turn starts;** winning the battle removes the player's statuses and returns every card to the draw pile; `play` cannot check that a card is refused; and an `item` is given with `relic`. See [Tests](language.md#tests).
+- **A name with spaces, hyphens or other punctuation** can only be written as a string later, and not after `name:` or `card:`. See [Files](language.md#files) and [Qualifiers](language.md#qualifiers).
+
+The summary counts the rows of the per-game tables. If the two ever disagree, the rows are right.

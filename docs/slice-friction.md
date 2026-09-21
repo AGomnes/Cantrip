@@ -14,4 +14,4 @@ The slice in `samples/slice` tests whether the library holds up inside a real ro
 
 - Every DSL test for the slice passed on the first run, and lint was clean apart from one intended loop note on Frozen.
 - The runtime already supported several battles in a row with one runtime: `StartBattle` counts battles, cards return to the draw pile, and non-persistent statuses clear.
-- Snapshots are cheap enough to drive a lookahead bot: 500 whole runs with a one-card lookahead take about ten seconds, and every run replays exactly from its seed.
+- Snapshots are cheap enough to drive a lookahead bot: 500 whole runs with a one-card lookahead take about ten seconds, and every run replays exactly from its seed. [Performance](stability.md#performance) has the command and a current measurement.

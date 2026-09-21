@@ -1,0 +1,39 @@
+# Recipe: a boss that switches to a different set of moves at half health.
+# Explained in docs/writing-content.md, "A boss that switches moves at half health".
+
+enemy "Storm Warden"
+  hp 60
+  phase Calm when hp > max_hp / 2
+  phase Tempest when hp <= max_hp / 2, retelegraph
+  move Gust phase Calm:
+    deal 6 to player
+  move Shelter phase Calm:
+    block 8
+  move Lightning phase Tempest:
+    deal 14 to player
+  move Squall phase Tempest:
+    repeat 3:
+      deal 3 to player
+  pattern cycle Gust, Shelter, Lightning, Squall
+
+test "While calm, the Warden gusts and shelters"
+  enemy "Storm Warden"
+  expect enemy.phase == "Calm"
+  expect enemy.intent == "Gust"
+  end turn
+  expect player.hp == 74
+  expect enemy.intent == "Shelter"
+  end turn
+  expect enemy.intent == "Gust"
+
+test "At half health the Warden switches at once"
+  enemy "Storm Warden"
+  deal 30 to enemy
+  expect enemy.phase == "Tempest"
+  expect enemy.intent == "Lightning"
+  end turn
+  expect player.hp == 66
+  expect enemy.intent == "Squall"
+  end turn
+  expect player.hp == 57
+  expect enemy.intent == "Lightning"

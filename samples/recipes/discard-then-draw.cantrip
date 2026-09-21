@@ -1,0 +1,18 @@
+# Recipe: a choice. The player discards a card of their choosing, then draws.
+# Explained in docs/writing-content.md, "Discard, then draw".
+# Strike and Defend are in tutorial/game.cantrip.
+
+card Sift
+  cost 0
+  effect:
+    discard 1
+    draw 2
+
+test "Sift discards the chosen card, then draws two"
+  enemy hp 20
+  hand Strike, Defend
+  deck Strike, Strike
+  answer "Defend"
+  play Sift
+  expect count(hand) == 3
+  expect count(discard where name:Defend) == 1

@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 # Installs the Godot addon the way docs/godot.md tells a stranger to, into a blank Godot C# project
-# outside this repository, and plays a battle from GDScript. The demo project inside the repository
-# inherits the repository's build settings, so it cannot show what a user's own project sees; this
-# can. It fails on any build warning, on a plugin that does not load, and on any failed check.
+# outside this repository, then runs the guide's first battle exactly as written, and a few checks
+# of its own from GDScript. The demo project inside the repository inherits the repository's build
+# settings, so it cannot show what a user's own project sees; this can. It fails on any build
+# warning, on a plugin that does not load, on a first battle that reports an error or prints
+# something other than the guide shows, and on any failed check.
+#
+# docs/godot.md marks what to take with HTML comments, which Markdown does not render:
+#   <!-- smoke: file <path> -->      the next code block is written to <path> in the project
+#   <!-- smoke: prints <script> -->  the next code block is how that script's output begins
 #
 #   tools/godot-install-smoke.sh <godot binary> <addon zip> <folder with the Cantrip.Core .nupkg>
 set -euo pipefail
@@ -84,12 +90,32 @@ pin="dotnet add package Cantrip.Core --version $version"
 grep -q -F "$pin" "$root/docs/godot.md" || { echo "docs/godot.md does not say: $pin" >&2; exit 1; }
 (cd "$project" && $pin > "$work/add.log" 2>&1) || { cat "$work/add.log" >&2; echo "'$pin' failed in the blank project." >&2; exit 1; }
 
-# Content: the quickstart's game, plus a card that discovers, so an offer goes through the node.
-mkdir -p "$project/content"
-awk '/<!-- smoke: file content\/game.cantrip -->/ { f = 1; next } f && /^```/ { if (inb) exit; inb = 1; next } f && inb' \
-  "$root/docs/quickstart.md" > "$project/content/game.cantrip"
-cat >> "$project/content/game.cantrip" <<'EOF'
+# The code block after a marker line in a document, without carriage returns.
+block() {
+  awk -v want="$2" '{ sub(/\r$/, "") } $0 == want { f = 1; next } f && /^```/ { if (inb) exit; inb = 1; next } f && inb' "$1"
+}
 
+echo "== The first battle in docs/godot.md: its content and its script, as written"
+mkdir -p "$project/content"
+for file in content/game.cantrip content/sift.cantrip first_battle.gd; do
+  block "$root/docs/godot.md" "<!-- smoke: file $file -->" > "$project/$file"
+  [ -s "$project/$file" ] || { echo "docs/godot.md has no code block marked <!-- smoke: file $file -->." >&2; exit 1; }
+done
+block "$root/docs/godot.md" "<!-- smoke: prints first_battle.gd -->" > "$work/first_battle.expected"
+[ -s "$work/first_battle.expected" ] || { echo "docs/godot.md has no code block marked <!-- smoke: prints first_battle.gd -->." >&2; exit 1; }
+printf '[gd_scene format=3]\n\n[ext_resource type="Script" path="res://first_battle.gd" id="1"]\n\n[node name="FirstBattle" type="Node"]\nscript = ExtResource("1")\n' > "$project/first_battle.tscn"
+
+# The guide says its content is the quickstart's, so keep that true.
+block "$root/docs/quickstart.md" "<!-- smoke: file content/game.cantrip -->" > "$work/quickstart.cantrip"
+if ! cmp -s "$work/quickstart.cantrip" "$project/content/game.cantrip"; then
+  diff "$work/quickstart.cantrip" "$project/content/game.cantrip" >&2 || true
+  echo "The content/game.cantrip in docs/godot.md is no longer the one in docs/quickstart.md." >&2
+  exit 1
+fi
+
+# For the checks of its own below: cards that discover, so an offer goes through the node. The first
+# battle loads them too, and never uses them.
+cat > "$project/content/offers.cantrip" <<'EOF'
 card Spark
   cost 0
   tags spell
@@ -168,8 +194,32 @@ timeout 300 "$godot" --headless --path "$project" --import > "$work/import.log" 
 grep "Cantrip:" "$work/import.log" || true
 grep -q "Cantrip: dock ready" "$work/import.log" || { cat "$work/import.log" >&2; echo "The plugin did not load." >&2; exit 1; }
 
-echo "== Step 5: a battle from GDScript"
-# Everything Godot says is kept, so a script error or a C# exception shows in the log when it fails.
+echo "== Your first battle, as docs/godot.md gives it"
+# Like a game, the script never quits by itself, so Godot stops after a few frames; the whole battle
+# is played in the first. Everything Godot says is kept, so a script error or a C# exception shows
+# in the log when it fails, and anything it reports as an error fails the run.
+status=0
+timeout 300 "$godot" --headless --path "$project" res://first_battle.tscn --quit-after 30 > "$work/first_battle.log" 2>&1 || status=$?
+tr -d '\r' < "$work/first_battle.log" > "$work/first_battle.out"
+# What it printed, from the line the guide's output starts with: Godot's own banner comes first.
+awk -v first="$(head -n 1 "$work/first_battle.expected")" -v lines="$(wc -l < "$work/first_battle.expected")" \
+  'seen || $0 == first { seen = 1; if (printed++ < lines) print }' "$work/first_battle.out" > "$work/first_battle.start"
+problem=""
+if [ "$status" -ne 0 ]; then problem="Godot exited with $status."
+elif grep -q "ERROR" "$work/first_battle.out"; then problem="It reported an error."
+elif ! cmp -s "$work/first_battle.expected" "$work/first_battle.start"; then problem="It does not begin as the guide shows."
+elif ! grep -q -x "The Ghoul falls." "$work/first_battle.out" || ! grep -q "^Turn 3\. " "$work/first_battle.out" || grep -q "^Turn 4\. " "$work/first_battle.out"; then
+  problem="The guide says the Ghoul loses on turn 3."
+fi
+if [ -n "$problem" ]; then
+  cat "$work/first_battle.log" >&2
+  diff "$work/first_battle.expected" "$work/first_battle.start" >&2 || true
+  echo "The first battle in docs/godot.md failed. $problem" >&2
+  exit 1
+fi
+cat "$work/first_battle.out"
+
+echo "== Checks of its own: a battle and a discover offer from GDScript"
 status=0
 timeout 300 "$godot" --headless --path "$project" res://main.tscn > "$work/run.log" 2>&1 || status=$?
 grep "INSTALL:" "$work/run.log" || true

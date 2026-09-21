@@ -1,0 +1,37 @@
+# Recipe: an upgraded card as a definition of its own, kept out of reward pools by a tag.
+# Explained in docs/writing-content.md, "Card upgrades".
+
+card Cleave
+  cost 1
+  tags attack, reward
+  effect:
+    deal 8 to all enemies
+
+card "Cleave+"
+  cost 1
+  tags attack, reward, upgraded
+  effect:
+    deal 11 to all enemies
+
+card Spoils
+  cost 0
+  tags exhaust
+  effect:
+    discover 3 cards where tag:reward and not tag:upgraded as prize
+    create prize into hand
+  text_override: "Choose 1 of 3 reward cards and add it to your hand. Exhaust."
+
+test "Cleave+ hits harder than Cleave"
+  enemy hp 30
+  enemy hp 30
+  play Cleave
+  play "Cleave+"
+  expect enemy.hp == 11
+  expect enemy2.hp == 11
+
+test "Spoils never offers an upgraded card"
+  enemy hp 20
+  answer "Cleave+"
+  play Spoils
+  expect count(hand) == 1
+  expect count(hand where tag:upgraded) == 0

@@ -1,6 +1,6 @@
 # Cantrip.Core
 
-Write cards, statuses, relics, enemies and abilities as short text files instead of code, and run them turn-based from any .NET game. The rules engine has no engine dependencies; a [Godot 4.6 addon](https://github.com/AGomnes/Cantrip/blob/main/docs/godot.md) is available separately.
+Write cards, statuses, relics, enemies and abilities as short text files instead of code, and run them turn-based from any .NET game on .NET 5 or later, `net8.0` included. The rules engine has no engine dependencies and no third-party packages; a [Godot 4.6 addon](https://github.com/AGomnes/Cantrip/blob/main/docs/godot.md) is available separately.
 
 ```
 status Hex
@@ -21,7 +21,13 @@ enemy Ghoul
     deal 7 to player
 ```
 
+With that in `content/game.cantrip`:
+
 ```csharp
+using Cantrip;
+using Cantrip.Content;
+using Cantrip.Runtime;
+
 var content = new ContentLibrary();
 content.LoadFolder("content");
 content.Diagnostics.ThrowIfErrors();

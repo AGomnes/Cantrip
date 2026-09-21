@@ -1,0 +1,41 @@
+# Recipe: a buff that protects the player for N enemy attacks, however many turns they take.
+# Explained in docs/writing-content.md, "A buff that lasts N enemy attacks".
+# The Bog Troll is in tutorial/game.cantrip.
+
+status Parry
+  tags buff
+  stacking intensity
+  on owner.before_damaged(source:enemies):
+    event.amount = event.amount / 2
+    stacks -1
+  text_override: "Each hit from an enemy deals half damage and uses up 1 Parry."
+
+card Brace
+  cost 1
+  effect:
+    apply Parry 2 to player
+
+enemy Raider
+  hp 30
+  move Flurry:
+    repeat 2:
+      deal 6 to player
+
+test "Parry halves the next two attacks, however many turns they take"
+  enemy "Bog Troll"
+  play Brace
+  end turn
+  expect player.hp == 76
+  expect player.Parry == 1
+  end turn
+  expect player.Parry == 1
+  end turn
+  expect player.hp == 72
+  expect not player.has(Parry)
+
+test "Each hit of a multi-hit move uses one Parry"
+  enemy Raider
+  play Brace
+  end turn
+  expect player.hp == 74
+  expect not player.has(Parry)

@@ -1,0 +1,35 @@
+# Recipe: a status that goes off when its own stacks reach a threshold.
+# Explained in docs/writing-content.md, "A status that goes off at a threshold".
+
+status Static
+  tags debuff
+  stacking intensity
+  on owner.status_applied(Static):
+    if stacks >= 5:
+      deal 15 to owner
+      remove Static from owner
+  text_override: "At 5 or more, take 15 damage and lose all Static."
+
+card Jolt
+  cost 1
+  target enemy
+  tags attack
+  effect:
+    deal 3 to target
+    apply Static 2 to target
+
+test "Static goes off when it reaches 5"
+  enemy hp 50
+  play Jolt on enemy
+  play Jolt on enemy
+  expect enemy.hp == 44
+  expect enemy.Static == 4
+  play Jolt on enemy
+  expect enemy.hp == 26
+  expect not enemy.has(Static)
+
+test "Five Static applied at once go off straight away"
+  enemy hp 50
+  apply Static 5 to enemy
+  expect enemy.hp == 35
+  expect not enemy.has(Static)

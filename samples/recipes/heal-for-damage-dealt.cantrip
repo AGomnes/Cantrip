@@ -1,0 +1,25 @@
+# Recipe: an effect that heals for the damage it dealt.
+# Explained in docs/writing-content.md, "Healing for the damage dealt".
+
+card Leech
+  cost 1
+  target enemy
+  tags attack
+  effect:
+    deal 8 to target into dealt
+    heal dealt
+  text: "Deal {damage} damage. Heal as much hp as it took."
+
+test "Leech heals for what got through block"
+  player hp 50
+  enemy hp 30 block 3
+  play Leech on enemy
+  expect enemy.hp == 25
+  expect player.hp == 55
+
+test "Leech heals no more than the target had left"
+  player hp 50
+  enemy hp 4
+  play Leech on enemy
+  expect enemy.dead
+  expect player.hp == 54

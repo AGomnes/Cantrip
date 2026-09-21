@@ -1,0 +1,35 @@
+# Recipe: a discover card. The player picks one of three cards from a pool and gets a copy.
+# Explained in docs/writing-content.md, "Discover a card".
+
+card Study
+  cost 1
+  effect:
+    discover 3 cards where tag:tome as found
+    create found into hand
+  text_override: "Choose 1 of 3 tomes and add it to your hand."
+
+card Flare
+  cost 1
+  target enemy
+  tags tome, attack
+  effect:
+    deal 9 to target
+
+card Rime
+  cost 1
+  tags tome
+  effect:
+    block 9
+
+card Surge
+  cost 0
+  tags tome, exhaust
+  effect:
+    gain 2 energy
+
+test "Study adds the tome the player picks"
+  enemy hp 20
+  answer "Rime"
+  play Study
+  expect count(hand) == 1
+  expect count(hand where name:Rime) == 1

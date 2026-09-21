@@ -1,0 +1,15 @@
+# Recipe: a relic that works at the start of each of the player's turns.
+# Explained in docs/writing-content.md, "A relic that works at the start of each turn".
+# The Bog Troll is in tutorial/game.cantrip.
+
+relic Kettle
+  on turn_start:
+    block 3
+
+test "Kettle gives 3 block at the start of every turn"
+  enemy "Bog Troll"
+  relic Kettle
+  expect player.block == 3
+  end turn
+  expect player.hp == 75
+  expect player.block == 3

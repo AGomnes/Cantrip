@@ -2,6 +2,8 @@
 
 In about fifteen minutes this gets you from nothing to a small card battle you can play in a terminal: three cards, a status and an enemy written in Cantrip, checked by tests, and driven from C#. It assumes you know C# and the .NET command line, and nothing about Cantrip.
 
+Writing cards rather than code? [writing-content.md](writing-content.md) starts from the content side. Using Godot? [godot.md](godot.md) installs the addon and plays this same content from GDScript.
+
 ## 1. Make a project
 
 You need the [.NET 9 SDK](https://dotnet.microsoft.com/download) or later. Create a console project, add the library, and install the `cantrip` command-line tool into the project:
@@ -131,7 +133,8 @@ while (runtime.Won == null)
 {
     Console.WriteLine();
     Console.WriteLine($"You: {player.GetInt("hp")} hp, {player.GetInt("block")} block, {player.GetInt("energy")} energy");
-    Console.WriteLine($"Ghoul: {ghoul.GetInt("hp")} hp, {ghoul.CounterOf("Hex")} Hex, next move {ghoul.Intent}");
+    Console.WriteLine($"Ghoul: {ghoul.GetInt("hp")} hp, {ghoul.CounterOf("Hex")} Hex");
+    Console.WriteLine($"  Next move, {ghoul.Intent}: {text.DescribeIntent(ghoul, runtime).ToPlainText()}");
 
     var hand = runtime.State.ZoneOf(player, Zones.Hand).ToList();
     for (int i = 0; i < hand.Count; i++)
@@ -158,15 +161,16 @@ while (runtime.Won == null)
 Console.WriteLine(runtime.Won == true ? "The Ghoul falls." : "You fall.");
 ```
 
-Run it with `dotnet run`. Each line shows a card's cost and its rules text with live numbers, and an `x` marks a card you cannot play right now. `Play` answers with what happened: `Played`, `NotEnoughEnergy`, `InvalidTarget` and so on.
+Run it with `dotnet run`. Each line shows a card's cost and its rules text with live numbers, and an `x` marks a card you cannot play right now. Above the hand, the Ghoul shows its intent: the move it will make when you end your turn, described the same way, with live numbers. `Play` answers with what happened: `Played`, `NotEnoughEnergy`, `InvalidTarget` and so on.
 
 The whole rules engine is behind those few calls. Nothing in `Program.cs` knows what Hex does or how the Ghoul chooses its move; change `content/game.cantrip`, run again, and the game changes with it.
 
 ## 5. Where next
 
+- [writing-content.md](writing-content.md) is for whoever writes the cards, statuses, relics and enemies: a tutorial that goes further than steps 2 and 3, the edit and test loop, and recipes for common mechanics.
 - [language.md](language.md) is the full language reference: every declaration, event, verb and modifier.
 - [godot.md](godot.md) runs the same content in Godot 4.6 through an addon, with an editor dock for problems, tests and card text.
-- [csharp.md](csharp.md) covers the rest of the C# side: saving and loading, hot reload, player choices a UI answers, and tracing why something happened.
+- [csharp.md](csharp.md) covers the rest of the C# side: showing events in a game's frame loop, player choices a UI answers, several battles in one run, saving and loading, hot reload, shipping content, and tracing why something happened.
 - `samples/slice` is a bigger example, a five-floor roguelite, and `src/Cantrip.Sim` plays it with a bot, 500 runs by default, and reports win rates by card, relic and encounter.
 
 ## Working from source
