@@ -5,7 +5,7 @@ using static Cantrip.Tests.Runtime.RuntimeTestKit;
 
 namespace Cantrip.Tests.Runtime
 {
-    /// <summary>Stacking modes, caps, decay, removal and immunity (section 3.9).</summary>
+    /// <summary>Stacking modes, caps, decay, removal and immunity.</summary>
     public sealed class StatusTests
     {
         private const string Statuses = """

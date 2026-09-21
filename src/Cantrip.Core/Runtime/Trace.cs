@@ -7,7 +7,7 @@ using Cantrip.Diagnostics;
 namespace Cantrip.Runtime
 {
     /// <summary>
-    /// One recorded step. Every action records what caused it (section 5), which is the foundation
+    /// One recorded step. Every action records what caused it, which is the foundation
     /// for the causality tree, modifier breakdowns and replays.
     /// </summary>
     public sealed class TraceEntry
@@ -87,7 +87,7 @@ namespace Cantrip.Runtime
 
         /// <summary>
         /// When set, only the most recent entries are kept. Real-time games use this as the
-        /// "last few seconds" ring buffer from section 5.
+        /// "last few seconds" ring buffer.
         /// </summary>
         public int? Capacity { get; set; }
 

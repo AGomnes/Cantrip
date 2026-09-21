@@ -586,7 +586,7 @@ namespace Cantrip.Syntax
         public BlockNode Body { get; }
     }
 
-    /// <summary>The <c>ruleset</c> block: rules that content is written against, per section 4.4.</summary>
+    /// <summary>The <c>ruleset</c> block: rules that content is written against.</summary>
     public sealed class RulesetDeclNode : DeclarationNode
     {
         public RulesetDeclNode(IReadOnlyList<PropertyNode> settings, SourceSpan span)

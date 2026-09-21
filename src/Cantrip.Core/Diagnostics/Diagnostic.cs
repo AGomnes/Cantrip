@@ -120,7 +120,7 @@ namespace Cantrip.Diagnostics
 
     /// <summary>
     /// Finds the closest known spelling for an unrecognised name, which turns a bare
-    /// "unknown verb" error into the "did you mean `deal`?" hint from the design notes.
+    /// "unknown verb" error into the "did you mean `deal`?" hint.
     /// </summary>
     public static class Suggest
     {

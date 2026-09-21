@@ -226,7 +226,7 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
             return 0;
         }
 
-        /// <summary>The REPL from section 5: run DSL lines against a live game.</summary>
+        /// <summary>The REPL: run DSL lines against a live game.</summary>
         private static int Repl(ContentLibrary content)
         {
             if (!Report(content)) return 1;

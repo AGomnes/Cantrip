@@ -152,7 +152,7 @@ namespace Cantrip.Runtime
             "change", "apply", "add", "gain", "lose",
         };
 
-        /// <summary>Every built-in event, grouped as in section 3.3: combat, cards, statuses, lifecycle.</summary>
+        /// <summary>Every built-in event, grouped: combat, cards, statuses, lifecycle.</summary>
         public static IReadOnlyList<BuiltinEvent> All => Events;
 
         /// <summary>Built-in event names, in the same order as <see cref="All"/>.</summary>

@@ -1,7 +1,7 @@
 namespace Cantrip
 {
     /// <summary>
-    /// The three phases every verb emits, per section 3.3 of the design notes.
+    /// The three phases every verb emits: before, instead and after.
     /// </summary>
     public enum EventPhase
     {
@@ -28,7 +28,7 @@ namespace Cantrip
         Override,
     }
 
-    /// <summary>How repeated applications of the same status combine, per section 3.9.</summary>
+    /// <summary>How repeated applications of the same status combine.</summary>
     public enum StackingMode
     {
         /// <summary>Stacks add up; there is no timer. Poison, Strength.</summary>
@@ -71,7 +71,7 @@ namespace Cantrip
         Global,
     }
 
-    /// <summary>Pacing of the action queue, per the table in section 4.4.</summary>
+    /// <summary>Pacing of the action queue.</summary>
     public enum ExecutionMode
     {
         /// <summary>Drain the queue as fast as possible. Used by simulations and tests.</summary>

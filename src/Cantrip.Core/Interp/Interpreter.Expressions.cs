@@ -245,7 +245,7 @@ namespace Cantrip.Runtime
         }
 
         /// <summary>
-        /// History queries (section 3.6): <c>damage_taken_this_turn</c>, <c>cards_played_this_battle</c>.
+        /// History queries: <c>damage_taken_this_turn</c>, <c>cards_played_this_battle</c>.
         /// </summary>
         private bool TryHistory(string key, Entity? who, out Value value)
         {

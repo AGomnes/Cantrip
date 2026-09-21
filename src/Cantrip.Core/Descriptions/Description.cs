@@ -6,7 +6,7 @@ using Cantrip.Content;
 
 namespace Cantrip.Descriptions
 {
-    /// <summary>Which of the three description levels from section 3.12 produced the text.</summary>
+    /// <summary>Which of the three description levels (automatic, custom, override) produced the text.</summary>
     public enum DescriptionLevel
     {
         /// <summary>Generated from the effect tree, listeners and modifiers. Nothing to write.</summary>
@@ -150,7 +150,7 @@ namespace Cantrip.Descriptions
     }
 
     /// <summary>
-    /// The rules text of one entity (section 3.12): segments of plain text and linked values, the
+    /// The rules text of one entity: segments of plain text and linked values, the
     /// flavour line kept apart, and tooltips for every keyword the text relies on.
     /// </summary>
     public sealed class Description

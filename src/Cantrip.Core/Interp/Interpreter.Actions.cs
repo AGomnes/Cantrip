@@ -189,7 +189,7 @@ namespace Cantrip.Runtime
         // Statuses --------------------------------------------------------------------------
 
         /// <summary>
-        /// Applies a status following its stacking mode (section 3.9). <paramref name="durationUnits"/>
+        /// Applies a status following its stacking mode. <paramref name="durationUnits"/>
         /// comes from <c>for 3s</c> / <c>for 2 turns</c> and sets an expiry time.
         /// </summary>
         public Entity? ApplyStatus(EntityDefinition definition, Entity host, Num stacks, long? durationUnits, EvalContext context, SourceSpan span = default)

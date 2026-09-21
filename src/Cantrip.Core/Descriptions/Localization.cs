@@ -5,7 +5,7 @@ using Cantrip.Content;
 namespace Cantrip.Descriptions
 {
     /// <summary>
-    /// Supplies descriptions in another language (section 3.12). The library owns the templates
+    /// Supplies descriptions in another language. The library owns the templates
     /// and placeholders; a game owns the translations. Return null from any member to fall back
     /// to the content's own text or the built-in English phrase.
     /// </summary>

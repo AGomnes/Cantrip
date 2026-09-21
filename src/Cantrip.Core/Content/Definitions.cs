@@ -6,7 +6,7 @@ using Cantrip.Syntax;
 
 namespace Cantrip.Content
 {
-    /// <summary>Status flags from section 3.9.</summary>
+    /// <summary>Status flags: what a status is (buff, debuff) and how it behaves (persistent, unique).</summary>
     [Flags]
     public enum StatusFlags
     {
@@ -518,8 +518,8 @@ namespace Cantrip.Content
     }
 
     /// <summary>
-    /// Bounds and reset behaviour for a stat treated as a resource, per "resources as data" in
-    /// section 3.10. Declared with <c>resource "energy"</c>; common ones are built in.
+    /// Bounds and reset behaviour for a stat treated as a resource. Resources are data, declared
+    /// with <c>resource "energy"</c>; common ones are built in.
     /// </summary>
     public sealed class ResourceRule
     {

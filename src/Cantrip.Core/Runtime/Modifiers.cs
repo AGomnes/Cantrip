@@ -112,7 +112,7 @@ namespace Cantrip.Runtime
     }
 
     /// <summary>
-    /// The modifier pipeline from section 3.7. Values pass through fixed layers in ruleset order
+    /// The modifier pipeline. Values pass through fixed layers in ruleset order
     /// (add, multiply, clamp, override by default). Stat reads are cached and the cache is dropped
     /// whenever <see cref="GameState.Version"/> moves, which covers every mutation that could
     /// change a modifier's scope, filter or amount.

@@ -3,7 +3,7 @@ using System;
 namespace Cantrip.Runtime
 {
     /// <summary>
-    /// Abstract game time (section 4.2). The core only ever sees whole units: a
+    /// Abstract game time. The core only ever sees whole units: a
     /// <see cref="TurnClock"/> advances one unit per turn and a <see cref="TickClock"/> one unit per
     /// fixed-timestep tick, so durations, cooldowns and <c>every</c> triggers share one code path.
     /// </summary>

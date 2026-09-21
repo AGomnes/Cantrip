@@ -44,7 +44,7 @@ namespace Cantrip
     }
 
     /// <summary>
-    /// The entry point for games (section 4.7): load content, set up actors and decks, then drive
+    /// The entry point for games: load content, set up actors and decks, then drive
     /// battles through <see cref="StartBattle"/>, <see cref="Play"/> and <see cref="EndTurn"/>, or
     /// real-time play through <see cref="Tick"/> and <see cref="UseAbility"/>.
     /// </summary>
@@ -894,7 +894,7 @@ namespace Cantrip
 
         /// <summary>
         /// Rebinds every live entity to the definition now loaded under its kind and name, so edits
-        /// to content take effect in a running game (section 4.1). Call it after reloading files
+        /// to content take effect in a running game. Call it after reloading files
         /// into <see cref="Content"/>.
         /// </summary>
         /// <remarks>

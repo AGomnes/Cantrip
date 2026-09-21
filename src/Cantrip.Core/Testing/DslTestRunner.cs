@@ -32,7 +32,7 @@ namespace Cantrip.Testing
     }
 
     /// <summary>
-    /// Runs <c>test</c> blocks (section 5, item 9). Each test gets a fresh runtime with a player
+    /// Runs <c>test</c> blocks. Each test gets a fresh runtime with a player
     /// (80 hp, 3 energy) and seed 1. Setup statements run first; the battle starts, without
     /// shuffling or drawing, at the first statement that is not setup.
     /// </summary>

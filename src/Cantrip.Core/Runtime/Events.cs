@@ -185,8 +185,7 @@ namespace Cantrip.Runtime
             _byOwner.TryGetValue(owner.Id, out List<Listener>? owned) ? owned : (IReadOnlyList<Listener>)Array.Empty<Listener>();
 
         /// <summary>
-        /// Cheap pre-check so verbs can skip building events nobody listens to, per the
-        /// "skip events with no listeners" row of the section 4.4 table.
+        /// Cheap pre-check so verbs can skip building events nobody listens to.
         /// </summary>
         public bool HasListeners(string eventName, EventPhase phase)
         {

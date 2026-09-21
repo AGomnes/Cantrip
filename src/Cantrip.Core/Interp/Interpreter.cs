@@ -73,7 +73,7 @@ namespace Cantrip.Runtime
     }
 
     /// <summary>
-    /// The tree-walking interpreter (section 4.5). It evaluates expressions, executes statements,
+    /// The tree-walking interpreter. It evaluates expressions, executes statements,
     /// dispatches events and resolves the trigger queue. All randomness goes through
     /// <see cref="GameState.Rng"/> and all arithmetic through <see cref="Num"/>, so a run is fully
     /// determined by its seed and its inputs.
@@ -101,7 +101,7 @@ namespace Cantrip.Runtime
 
         public IChoiceProvider Chooser { get; set; } = new FirstOptionChooser();
 
-        /// <summary>Adds or replaces a verb implemented in C#, per <c>runtime.RegisterVerb</c> in section 4.7.</summary>
+        /// <summary>Adds or replaces a verb implemented in C#, as games do through <c>runtime.RegisterVerb</c>.</summary>
         public void RegisterVerb(string name, VerbHandler handler)
         {
             if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Verb name is required.", nameof(name));

@@ -11,7 +11,7 @@ using Cantrip.Syntax;
 namespace Cantrip.Descriptions
 {
     /// <summary>
-    /// Builds descriptions for every kind of entity (section 3.12). One walk over a definition's
+    /// Builds descriptions for every kind of entity. One walk over a definition's
     /// effects both generates the automatic text and names every value in it (<c>damage</c>,
     /// <c>damage2</c>, <c>block</c>, <c>Poison</c>...), which is what links a writer's
     /// <c>{placeholders}</c> to the real effect.

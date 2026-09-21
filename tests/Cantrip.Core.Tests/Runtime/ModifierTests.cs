@@ -5,7 +5,7 @@ using static Cantrip.Tests.Runtime.RuntimeTestKit;
 
 namespace Cantrip.Tests.Runtime
 {
-    /// <summary>The modifier pipeline (section 3.7): layers, scopes, filters, caching and breakdowns.</summary>
+    /// <summary>The modifier pipeline: layers, scopes, filters, caching and breakdowns.</summary>
     public sealed class ModifierTests
     {
         private const string Layers = """

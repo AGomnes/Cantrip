@@ -6,7 +6,7 @@ using Xunit;
 namespace Cantrip.Tests.Runtime
 {
     /// <summary>
-    /// Hot reload (section 4.1): editing content while a game runs. Entities keep playing; only
+    /// Hot reload: editing content while a game runs. Entities keep playing; only
     /// what the designer changed changes.
     /// </summary>
     public sealed class HotReloadTests

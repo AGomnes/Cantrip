@@ -6,7 +6,7 @@ namespace Cantrip.Runtime
 {
     /// <summary>
     /// Everything in the game is an entity: actors, cards, relics, statuses and keywords all
-    /// share tags, stats and listeners (section 3.1). A status on an actor is itself an entity,
+    /// share tags, stats and listeners. A status on an actor is itself an entity,
     /// attached to that actor, whose <c>stacks</c> is an ordinary stat. That is what lets
     /// <c>stacks -1</c> and <c>remove tag:dot</c> work without special cases.
     /// </summary>

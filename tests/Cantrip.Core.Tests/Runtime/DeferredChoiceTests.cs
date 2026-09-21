@@ -7,7 +7,7 @@ using Xunit;
 namespace Cantrip.Tests.Runtime
 {
     /// <summary>
-    /// Choices a UI answers (section 4.3). An action that asks for a decision nobody has made rolls
+    /// Choices a UI answers. An action that asks for a decision nobody has made rolls
     /// back, reports it, and replays exactly once it is answered.
     /// </summary>
     public sealed class DeferredChoiceTests

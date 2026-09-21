@@ -56,7 +56,7 @@ namespace Cantrip.Runtime
 
     /// <summary>
     /// A chooser for games whose decisions come from a player, where an answer cannot be produced
-    /// on the spot (section 4.3). Instead of guessing, it stops the action; the runtime rolls the
+    /// on the spot. Instead of guessing, it stops the action; the runtime rolls the
     /// game back, the UI asks, and the action is replayed with the answer. Because the rollback is
     /// an exact snapshot, the replay is deterministic.
     /// </summary>

@@ -27,7 +27,7 @@ namespace Cantrip.Linting
     }
 
     /// <summary>
-    /// Static checks over loaded content (section 5, item 4): mistakes that would otherwise only
+    /// Static checks over loaded content: mistakes that would otherwise only
     /// show up when the effect runs, if ever. The linter never executes content, so it is safe to
     /// run in editors and CI on anything, including content that does not load cleanly.
     /// </summary>

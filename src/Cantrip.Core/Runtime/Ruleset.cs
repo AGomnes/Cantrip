@@ -36,7 +36,7 @@ namespace Cantrip.Runtime
     }
 
     /// <summary>
-    /// Rules that content is written against (section 4.4). These change results, so they live in
+    /// Rules that content is written against. These change results, so they live in
     /// content where mod authors can see them, unlike execution speed which lives in code.
     /// </summary>
     public sealed class Ruleset

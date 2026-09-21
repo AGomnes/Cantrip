@@ -147,7 +147,7 @@ namespace Cantrip.Runtime
     }
 
     /// <summary>
-    /// The game's side of the integration (section 4.7). Everything is optional: a host only
+    /// The game's side of the integration. Everything is optional: a host only
     /// implements the parts the library cannot know, such as spatial queries or presentation.
     /// </summary>
     public interface IEffectHost
@@ -210,7 +210,7 @@ namespace Cantrip.Runtime
     }
 
     /// <summary>
-    /// Pluggable decision maker (section 4.4): UI, AI, random or scripted. Answers must be a
+    /// Pluggable decision maker: UI, AI, random or scripted. Answers must be a
     /// subset of <see cref="ChoiceRequest.Options"/>; anything else is ignored.
     /// </summary>
     public interface IChoiceProvider
