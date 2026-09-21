@@ -31,7 +31,7 @@ test "Fireball kills a 6 HP enemy"
   expect enemy.dead
 ```
 
-The design notes are in [gameplay-effects-dsl.md](gameplay-effects-dsl.md). This README describes what exists today.
+This README describes what exists today.
 
 ## Status
 
@@ -194,7 +194,6 @@ IReadOnlyList<DslTestResult> results = new DslTestRunner(content).RunAll();
 - [docs/architecture.md](docs/architecture.md): how the library is put together, and where to extend it
 - [docs/coverage.md](docs/coverage.md): which reference effects the language can express today
 - [docs/godot.md](docs/godot.md): the Godot addon, and the two rules GDScript imposes on it
-- [gameplay-effects-dsl.md](gameplay-effects-dsl.md): the design notes this project follows
 
 ## Project layout
 
