@@ -236,9 +236,12 @@ namespace Cantrip.Testing
                 }
                 else
                 {
-                    // `enemy Ghoul` with no Ghoul defined. Stats come in pairs, so a bare word with
-                    // nothing to pair it with can only have meant an enemy's name.
-                    if (nodes.Count % 2 == 1 && nodes[0] is NameExpr missing)
+                    // `enemy Ghoul` with no Ghoul defined. Stats come in pairs, so an odd count means
+                    // one word is unpaired; it is a name only when it comes first with no value of its
+                    // own after it and is not a status. `enemy hp 20 block` is a missing value instead.
+                    if (nodes.Count % 2 == 1 && nodes[0] is NameExpr missing
+                        && (nodes.Count == 1 || nodes[1] is NameExpr)
+                        && _runtime.Content.FindAny(missing.Name, "status", "keyword") == null)
                     {
                         string? close = Suggest.Closest(missing.Name, _runtime.Content.Pool("enemy").Select(d => d.Name));
                         throw Fail(

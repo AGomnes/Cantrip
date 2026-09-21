@@ -17,7 +17,13 @@ version="$(basename "$package" .nupkg)"
 version="${version#Cantrip.Core.}"
 
 # The project must be built with the Godot .NET SDK that matches the engine running it.
-sdk="$("$godot" --headless --version | head -1 | cut -d. -f1-3)"
+# Godot prints 4.6.2.stable.mono..., but 4.6.stable... for a .0 release and 4.7.beta1... for a
+# preview; the SDK is published as 4.6.2, 4.6.0 and 4.7.0-beta.1.
+sdk="$("$godot" --headless --version | head -1 | awk -F. '{
+  if ($3 ~ /^[0-9]+$/) { patch = $3; status = $4 } else { patch = 0; status = $3 }
+  v = $1 "." $2 "." patch
+  if (status != "stable") { kind = status; n = status; sub(/[0-9]+$/, "", kind); sub(/^[a-z]+/, "", n); v = v "-" kind "." n }
+  print v }')"
 echo "== Godot $sdk, Cantrip.Core $version"
 
 feed_path="$feed"
@@ -76,7 +82,7 @@ unzip -q "$zip" -d "$project"
 echo "== Step 2: the command docs/godot.md gives"
 pin="dotnet add package Cantrip.Core --version $version"
 grep -q -F "$pin" "$root/docs/godot.md" || { echo "docs/godot.md does not say: $pin" >&2; exit 1; }
-(cd "$project" && $pin > /dev/null)
+(cd "$project" && $pin > "$work/add.log" 2>&1) || { cat "$work/add.log" >&2; echo "'$pin' failed in the blank project." >&2; exit 1; }
 
 # Content: the quickstart's game, plus a card that discovers, so an offer goes through the node.
 mkdir -p "$project/content"
@@ -163,8 +169,15 @@ grep "Cantrip:" "$work/import.log" || true
 grep -q "Cantrip: dock ready" "$work/import.log" || { cat "$work/import.log" >&2; echo "The plugin did not load." >&2; exit 1; }
 
 echo "== Step 5: a battle from GDScript"
-timeout 300 "$godot" --headless --path "$project" res://main.tscn 2>&1 | tee "$work/run.log" | grep "INSTALL:"
-[ "${PIPESTATUS[0]}" -eq 0 ] || { echo "The GDScript battle failed." >&2; exit 1; }
-! grep -q "INSTALL: FAIL" "$work/run.log"
+# Everything Godot says is kept, so a script error or a C# exception shows in the log when it fails.
+status=0
+timeout 300 "$godot" --headless --path "$project" res://main.tscn > "$work/run.log" 2>&1 || status=$?
+grep "INSTALL:" "$work/run.log" || true
+if [ "$status" -ne 0 ] || grep -q "INSTALL: FAIL" "$work/run.log" || ! grep -q "INSTALL: ok   and creates the card picked" "$work/run.log"; then
+  cat "$work/run.log" >&2
+  [ "$status" -eq 124 ] && echo "Godot timed out: a script error probably stopped the scene before it quit." >&2
+  echo "The GDScript battle failed (exit $status)." >&2
+  exit 1
+fi
 
 echo "== The addon installs into a blank project and works as docs/godot.md says."

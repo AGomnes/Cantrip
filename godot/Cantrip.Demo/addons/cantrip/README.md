@@ -12,7 +12,7 @@ scripts by file path inside your project's own assembly.
 2. Add the rules engine from NuGet, in the folder with your `.csproj`. The version must match this
    addon's, which is also in `plugin.cfg`:
    ```
-   dotnet add package Cantrip.Core --version 0.1.0-preview.1
+   dotnet add package Cantrip.Core --version 0.1.0-preview.2
    ```
    Offline, reference the DLL instead. The Cantrip.Core `.nupkg` attached to the GitHub release is
    a zip file: copy `lib/netstandard2.1/Cantrip.Core.dll` (and `Cantrip.Core.xml`, for editor help)

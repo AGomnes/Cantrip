@@ -18,7 +18,7 @@ namespace Cantrip.Cli
         private const string Usage = @"cantrip - tools for the Cantrip DSL
 
 usage:
-  cantrip validate <path>...          load content and report its errors, including unknown verbs and names
+  cantrip validate <path>... [options] load content and report its errors, including unknown verbs and names
   cantrip lint <path>... [options]    load content and run static checks
   cantrip test <path>... [options]    run the `test` blocks in content
   cantrip describe <path>... [--name <name>]
@@ -28,8 +28,9 @@ usage:
 
 paths may be files or folders (folders load every *.cantrip file, recursively).
 
-lint options:
-  --suppress <codes>  comma-separated diagnostic codes to leave out, e.g. CT306,CT310
+validate and lint options:
+  --suppress <codes>  comma-separated diagnostic codes to leave out, e.g. CT306,CT310, or CT301
+                      for verbs your game registers in C#
 
 test options:
   --filter <text>    only run tests whose name contains <text>
@@ -90,7 +91,7 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
 
             switch (command)
             {
-                case "validate": return Validate(content);
+                case "validate": return Validate(content, suppressed);
                 case "lint": return Lint(content, suppressed);
                 case "test": return Test(content, filter, trace);
                 case "describe": return Describe(content, filter);
@@ -143,10 +144,7 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
         {
             bool loaded = Report(content);
 
-            var options = new LintOptions();
-            foreach (string code in suppressed) options.Suppressed.Add(code);
-
-            IReadOnlyList<Diagnostic> findings = Linter.Lint(content, options);
+            IReadOnlyList<Diagnostic> findings = Linter.Lint(content, Options(suppressed));
             Print(findings);
 
             int errors = findings.Count(d => d.Severity == DiagnosticSeverity.Error) + content.Diagnostics.Errors.Count();
@@ -157,14 +155,21 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
             return loaded && errors == 0 ? 0 : 1;
         }
 
-        private static int Validate(ContentLibrary content)
+        private static LintOptions Options(IEnumerable<string> suppressed)
+        {
+            var options = new LintOptions();
+            foreach (string code in suppressed) options.Suppressed.Add(code);
+            return options;
+        }
+
+        private static int Validate(ContentLibrary content, IEnumerable<string> suppressed)
         {
             bool ok = Report(content);
 
             // Loading catches what cannot be parsed; a misspelled verb such as `aply` parses fine and
             // only fails when a card runs it. Those are the linter's errors, so validate reports them
             // too, and leaves the linter's warnings and notes to `lint`.
-            List<Diagnostic> broken = Linter.Lint(content).Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
+            List<Diagnostic> broken = Linter.Lint(content, Options(suppressed)).Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
             Print(broken);
 
             int definitions = content.Definitions.Count();

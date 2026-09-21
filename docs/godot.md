@@ -12,7 +12,7 @@ inside the project's own assembly — only the engine library itself can be a DL
 2. Add the rules engine to your project from NuGet, in the folder with your `.csproj`, at the same
    version as the addon (the addon's is in its `plugin.cfg`):
    ```
-   dotnet add package Cantrip.Core --version 0.1.0-preview.1
+   dotnet add package Cantrip.Core --version 0.1.0-preview.2
    ```
    `--prerelease` alone would install the newest preview, which may not match the addon you have.
    This repository's own demo uses a project reference to the source instead.
@@ -250,8 +250,8 @@ CI runs it on every push and before every release:
 
 ```
 dotnet pack src/Cantrip.Core -c Release -o /tmp/feed
-tools/package-addon.sh /tmp/addon
-tools/godot-install-smoke.sh "$GODOT" /tmp/addon/cantrip-godot-*.zip /tmp/feed
+bash tools/package-addon.sh /tmp/addon
+bash tools/godot-install-smoke.sh godot /tmp/addon/cantrip-godot-*.zip /tmp/feed
 ```
 
 ## Not done yet

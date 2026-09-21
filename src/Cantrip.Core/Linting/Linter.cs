@@ -367,6 +367,7 @@ namespace Cantrip.Linting
         {
             foreach (CommandNode command in body.Facts.Commands)
             {
+                if (command.Verb.Length == 0) continue; // a statement with no verb: the parser has reported it (CT0010)
                 if (_verbs.Contains(command.Verb)) continue;
                 if (body.Kind == BodyKind.Test && DslTestRunner.TestVerbs.Contains(command.Verb, StringComparer.OrdinalIgnoreCase)) continue;
 

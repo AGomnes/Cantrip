@@ -68,7 +68,7 @@ options.HostVerbs.Add("corrupt");
 IReadOnlyList<Diagnostic> problems = Linter.Lint(content, options);
 ```
 
-The `cantrip` tool cannot run a verb that lives in your game, so content tests that use one belong in your game's own test suite, through `DslTestRunner` with the verb registered.
+The `cantrip` tool cannot run a verb that lives in your game, so content tests that use one belong in your game's own test suite, through `DslTestRunner` with the verb registered. For its checks, pass `--suppress CT301` to `cantrip validate` and `cantrip lint`.
 
 ## The host
 

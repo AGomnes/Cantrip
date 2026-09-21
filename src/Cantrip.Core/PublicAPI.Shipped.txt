@@ -1362,3 +1362,11 @@ virtual Cantrip.Runtime.VerbHandler.Invoke(Cantrip.Runtime.VerbCall! call) -> vo
 virtual Cantrip.Syntax.AstWalker.VisitBlock(Cantrip.Syntax.BlockNode! block) -> void
 virtual Cantrip.Syntax.AstWalker.VisitExpression(Cantrip.Syntax.ExprNode! expression) -> void
 virtual Cantrip.Syntax.AstWalker.VisitStatement(Cantrip.Syntax.StatementNode! statement) -> void
+Cantrip.CardRuntime.Answer(Cantrip.Content.EntityDefinition! chosen) -> Cantrip.PlayResult
+Cantrip.Runtime.DeferredChooser.ChooseDefinition(Cantrip.Runtime.DefinitionChoice! request, Cantrip.Runtime.GameState! state) -> Cantrip.Content.EntityDefinition?
+Cantrip.Runtime.OfferPendingException
+Cantrip.Runtime.OfferPendingException.Offer.get -> Cantrip.Runtime.DefinitionChoice!
+Cantrip.Runtime.OfferPendingException.OfferPendingException(Cantrip.Runtime.DefinitionChoice! offer) -> void
+Cantrip.Runtime.PendingChoice.Definitions.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Content.EntityDefinition!>!
+Cantrip.Runtime.PendingChoice.IsOffer.get -> bool
+Cantrip.Runtime.RandomChooser.ChooseDefinition(Cantrip.Runtime.DefinitionChoice! request, Cantrip.Runtime.GameState! state) -> Cantrip.Content.EntityDefinition?

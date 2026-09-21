@@ -73,6 +73,91 @@ namespace Cantrip.Tests.Review
         }
 
         [Fact]
+        [Trait("Regression", "first-hour-stray-indent")]
+        public void A_stray_indent_in_a_test_body_is_one_error_and_the_test_goes_on()
+        {
+            ContentLibrary content = ContentLibrary.FromText(
+                "card Zap\n  cost 1\n  effect:\n    draw 1\n\ntest \"zap\"\n  player energy 3\n    hand Zap\n  play Zap\n  expect player.energy == 2\n");
+
+            Diagnostic error = Assert.Single(content.Diagnostics.Errors);
+            Assert.Equal("CT0030", error.Code);
+            // All four lines survive, the stray one read as if it were not indented.
+            Assert.Equal(4, Assert.Single(content.Tests).Syntax.Body.Statements.Count);
+        }
+
+        [Fact]
+        [Trait("Regression", "first-hour-stray-indent")]
+        public void A_property_indented_under_another_is_one_error_and_the_card_keeps_the_rest()
+        {
+            ContentLibrary content = ContentLibrary.FromText(
+                "card Zap\n  cost 1\n    target enemy\n  effect:\n    deal 6 to target\n");
+
+            Diagnostic error = Assert.Single(content.Diagnostics.Errors);
+            Assert.Equal("CT0030", error.Code);
+            EntityDefinition zap = content.Find("Zap", "card")!;
+            Assert.Equal("enemy", zap.Word("target"));
+            Assert.NotNull(zap.Effect);
+        }
+
+        [Fact]
+        public void A_dedent_that_lines_up_with_no_block_is_reported_once_by_the_lexer()
+        {
+            ContentLibrary content = ContentLibrary.FromText(
+                "card Zap\n  cost 1\n  target enemy\n  effect:\n    if target.hp > 0:\n      deal 1 to target\n     deal 2 to target\n");
+
+            Diagnostic error = Assert.Single(content.Diagnostics.Errors);
+            Assert.Equal("CT0001", error.Code);
+        }
+
+        [Fact]
+        public void A_verb_name_with_spaces_is_told_to_use_one_word_not_quotes()
+        {
+            ContentLibrary content = ContentLibrary.FromText("verb my verb(t):\n  deal 1 to t\n");
+
+            Diagnostic error = Assert.Single(content.Diagnostics.Errors);
+            Assert.Equal("CT0029", error.Code);
+            Assert.Contains("verb my_verb", error.Message);
+            Assert.NotNull(content.FindVerb("my_verb"));
+        }
+
+        [Fact]
+        public void A_statement_with_no_verb_is_reported_by_the_parser_alone()
+        {
+            ContentLibrary content = ContentLibrary.FromText("card Zap\n  cost 1\n  target enemy\n  effect:\n    6 damage to target\n");
+
+            Assert.Contains(content.Diagnostics.Errors, d => d.Code == "CT0010");
+            Assert.DoesNotContain(Cantrip.Linting.Linter.Lint(content), d => d.Code == "CT301");
+        }
+
+        [Theory]
+        [InlineData("enemy hp 20 block", "`block` needs a value.")]
+        [InlineData("enemy hp 20 Weak", "`Weak` needs a value.")]
+        [InlineData("enemy Weak", "`Weak` needs a value.")]
+        public void A_missing_stat_value_in_a_test_is_not_mistaken_for_an_undefined_enemy(string line, string message)
+        {
+            ContentLibrary content = ContentLibrary.FromText(
+                "status Weak\n  stacking intensity\n\ncard Zap\n  cost 1\n  target enemy\n  effect:\n    deal 6 to target\n\n" +
+                "test \"zap\"\n  " + line + "\n  play Zap on enemy\n");
+
+            DslTestResult result = Assert.Single(new DslTestRunner(content).RunAll());
+
+            Assert.False(result.Passed);
+            Assert.Contains(message, result.Failure);
+        }
+
+        [Fact]
+        public void Validate_lets_a_game_suppress_the_verbs_it_registers_in_csharp()
+        {
+            const string dsl = "card Zap\n  cost 1\n  target enemy\n  effect:\n    corrupt 2 to target\n";
+
+            (int plain, string _) = ReviewCli.Run("validate", dsl);
+            (int suppressed, string output) = ReviewCli.Run("validate", dsl, "--suppress", "CT301");
+
+            Assert.Equal(1, plain);
+            Assert.True(suppressed == 0, output);
+        }
+
+        [Fact]
         [Trait("Regression", "first-hour-validate-misses-typo")]
         public void Validate_reports_a_misspelled_verb()
         {

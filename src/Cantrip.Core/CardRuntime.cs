@@ -792,25 +792,39 @@ namespace Cantrip
             if (Pending == null) throw new InvalidOperationException("No choice is pending.");
             if (!Pending.IsOffer) throw new InvalidOperationException("This choice is between entities: answer it with their ids.");
 
+            // The offered instance, or one a reload put in its place: kind and name identify it.
             int index = -1;
             for (int i = 0; i < Pending.Definitions.Count; i++)
             {
                 if (ReferenceEquals(Pending.Definitions[i], chosen)) { index = i; break; }
             }
+            for (int i = 0; index < 0 && i < Pending.Definitions.Count; i++)
+            {
+                if (DeferredChooser.SameDefinition(Pending.Definitions[i], chosen)) index = i;
+            }
             if (index < 0) throw new ArgumentException($"{chosen} was not one of the offers for \"{Pending.Prompt}\".", nameof(chosen));
 
-            return Replay(new[] { index });
+            return Replay(new[] { index }, Pending.Definitions[index]);
         }
 
-        private PlayResult Replay(IEnumerable<int> answer)
+        private PlayResult Replay(IEnumerable<int> answer, EntityDefinition? pick = null)
         {
             if (!(Chooser is DeferredChooser deferred)) throw new InvalidOperationException("Answering a choice needs a DeferredChooser.");
 
             Func<PlayResult> replay = _replay ?? throw new InvalidOperationException("There is no action to replay.");
-            deferred.Add(answer);
+            deferred.Add(answer, pick);
             Pending = null;
             _replay = null;
-            return replay();
+            try
+            {
+                return replay();
+            }
+            finally
+            {
+                // Answers belong to the action they were given for. Unless it stopped to ask again,
+                // that action is over, whether it finished, threw, or found its card gone.
+                if (Pending == null) deferred.Clear();
+            }
         }
 
         /// <summary>
@@ -849,6 +863,11 @@ namespace Cantrip
                     "Deferred choices need a game that can be snapshotted. " + error.Message, error);
             }
 
+            // A new action abandons a choice left unanswered, and the answers collected for it, so they
+            // cannot be read as answers to this action's questions. A replay never gets here with one
+            // pending: Answer clears Pending before replaying.
+            if (Pending != null) CancelPending();
+
             int traceMark = State.Trace.Entries.Count;
             _deferring = true;
             deferred.Rewind();
@@ -875,7 +894,7 @@ namespace Cantrip
                 int[] optionIds = pending.Request.Options.Select(o => o.Id).ToArray();
                 int chooserId = pending.Request.Chooser?.Id ?? 0;
 
-                Restore(before);
+                RestoreState(before);
                 State.Trace.TruncateTo(traceMark);
 
                 Pending = new PendingChoice(
@@ -896,7 +915,7 @@ namespace Cantrip
                 // Definitions are immutable content, so they survive the rollback as they are.
                 int chooserId = pending.Offer.Chooser?.Id ?? 0;
 
-                Restore(before);
+                RestoreState(before);
                 State.Trace.TruncateTo(traceMark);
 
                 Pending = new PendingChoice(pending.Offer.Prompt, pending.Offer.Options, Live(chooserId), pending.Offer.Span);
@@ -906,6 +925,7 @@ namespace Cantrip
             catch
             {
                 Interpreter.DiscardHostBuffer();
+                deferred.Clear();
                 throw;
             }
             finally
@@ -1013,8 +1033,16 @@ namespace Cantrip
         /// <summary>
         /// Replaces the current state with a snapshot. The runtime must have the same content
         /// loaded; the next inputs then play out exactly as they would have in the original game.
+        /// A choice left pending is abandoned: it belonged to the game being replaced.
         /// </summary>
         public void Restore(GameSnapshot snapshot)
+        {
+            RestoreState(snapshot);
+            CancelPending();
+        }
+
+        /// <summary>The state alone, for rolling back an action whose pending choice must survive.</summary>
+        private void RestoreState(GameSnapshot snapshot)
         {
             if (Interpreter.HasPendingWork) throw new InvalidOperationException("Cannot restore while effects are still resolving.");
 

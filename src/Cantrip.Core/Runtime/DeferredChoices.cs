@@ -110,6 +110,9 @@ namespace Cantrip.Runtime
     public sealed class DeferredChooser : IChoiceProvider, IDefinitionChooser
     {
         private readonly List<int[]> _answers = new List<int[]>();
+
+        // Beside each answer to an offer, the definition that was picked; null for entity answers.
+        private readonly List<Cantrip.Content.EntityDefinition?> _picks = new List<Cantrip.Content.EntityDefinition?>();
         private int _next;
 
         /// <summary>True while an action that can be rolled back is running.</summary>
@@ -123,10 +126,15 @@ namespace Cantrip.Runtime
         internal void Clear()
         {
             _answers.Clear();
+            _picks.Clear();
             _next = 0;
         }
 
-        internal void Add(IEnumerable<int> entityIds) => _answers.Add((entityIds ?? Enumerable.Empty<int>()).ToArray());
+        internal void Add(IEnumerable<int> entityIds, Cantrip.Content.EntityDefinition? pick = null)
+        {
+            _answers.Add((entityIds ?? Enumerable.Empty<int>()).ToArray());
+            _picks.Add(pick);
+        }
 
         public IReadOnlyList<Entity> Choose(ChoiceRequest request, GameState state)
         {
@@ -147,15 +155,35 @@ namespace Cantrip.Runtime
         }
 
         /// <summary>
-        /// An offer of content is answered the same way, in the same sequence: the answer holds the
-        /// index of the chosen candidate. Candidates are ordered deterministically, so the replay
-        /// offers the same ones in the same order and the index means the same card.
+        /// An offer of content is answered in the same sequence as any other choice, but by what was
+        /// picked rather than where it stood: the replay draws its candidates again from content, and
+        /// a reload in between can change them. The pick is matched by identity, or by kind and name
+        /// once a reload has replaced the definition. When the replay no longer offers it at all, the
+        /// player is asked again, with this answer and any after it dropped, since they answered a
+        /// question that no longer exists.
         /// </summary>
         public Cantrip.Content.EntityDefinition? ChooseDefinition(DefinitionChoice request, GameState state)
         {
             if (_next < _answers.Count)
             {
-                int[] answer = _answers[_next++];
+                int slot = _next++;
+                Cantrip.Content.EntityDefinition? pick = _picks[slot];
+                if (pick != null)
+                {
+                    Cantrip.Content.EntityDefinition? match =
+                        request.Options.FirstOrDefault(o => ReferenceEquals(o, pick)) ??
+                        request.Options.FirstOrDefault(o => SameDefinition(o, pick));
+                    if (match != null) return match;
+                    if (!Armed) return null;
+
+                    _answers.RemoveRange(slot, _answers.Count - slot);
+                    _picks.RemoveRange(slot, _picks.Count - slot);
+                    _next = slot;
+                    throw new OfferPendingException(request);
+                }
+
+                // An answer given as a position alone.
+                int[] answer = _answers[slot];
                 int index = answer.Length > 0 ? answer[0] : -1;
                 return index >= 0 && index < request.Options.Count ? request.Options[index] : null;
             }
@@ -163,5 +191,10 @@ namespace Cantrip.Runtime
             if (!Armed) return request.Options.Count == 0 ? null : request.Options[0];
             throw new OfferPendingException(request);
         }
+
+        internal static bool SameDefinition(Cantrip.Content.EntityDefinition a, Cantrip.Content.EntityDefinition b) =>
+            ReferenceEquals(a, b) ||
+            (string.Equals(a.KindName, b.KindName, StringComparison.OrdinalIgnoreCase) &&
+             string.Equals(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
     }
 }

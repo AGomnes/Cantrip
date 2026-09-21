@@ -259,10 +259,13 @@ namespace Cantrip.Syntax
 
             if (Match(TokenKind.Indent))
             {
-                while (!Check(TokenKind.Dedent) && !Check(TokenKind.EndOfFile))
+                int stray = 0;
+                while (!Check(TokenKind.EndOfFile))
                 {
                     SkipNewlines();
-                    if (Check(TokenKind.Dedent) || Check(TokenKind.EndOfFile)) break;
+                    if (Check(TokenKind.EndOfFile)) break;
+                    if (SkipStrayIndent(ref stray)) continue;
+                    if (Check(TokenKind.Dedent)) break;
 
                     int before = _index;
                     MemberNode? member = ParseMember();
@@ -292,6 +295,15 @@ namespace Cantrip.Syntax
                 {
                     last = Advance();
                     words.Add(last.Text);
+                }
+
+                // A verb is called by one word, so a quoted name with a space could never be called:
+                // suggest one word instead, and carry on under that name so calls written that way work.
+                if (string.Equals(keyword, "verb", StringComparison.OrdinalIgnoreCase))
+                {
+                    string verb = string.Join("_", words);
+                    _diagnostics.Error("CT0029", $"A verb name cannot contain spaces, because a verb is called by one word: verb {verb}.", first.Span.To(last.Span));
+                    return verb;
                 }
 
                 string name = string.Join(" ", words);
@@ -388,20 +400,7 @@ namespace Cantrip.Syntax
             Expect(TokenKind.Newline, "end of line");
 
             var statements = new List<StatementNode>();
-            if (Match(TokenKind.Indent))
-            {
-                while (!Check(TokenKind.Dedent) && !Check(TokenKind.EndOfFile))
-                {
-                    SkipNewlines();
-                    if (Check(TokenKind.Dedent) || Check(TokenKind.EndOfFile)) break;
-
-                    int before = _index;
-                    StatementNode? statement = ParseStatement();
-                    if (statement != null) statements.Add(statement);
-                    if (_index == before) _index++;
-                }
-                Match(TokenKind.Dedent);
-            }
+            if (Match(TokenKind.Indent)) ParseIndentedStatements(statements);
 
             return new TestDeclNode(name, new BlockNode(statements, keyword.Span), keyword.Span);
         }
@@ -743,34 +742,23 @@ namespace Cantrip.Syntax
             if (!Match(TokenKind.Indent)) return BlockNode.Empty(span);
 
             var statements = new List<StatementNode>();
+            ParseIndentedStatements(statements);
+            return new BlockNode(statements, span);
+        }
 
-            // Lines indented under a line that opens no block. Each is reported once and parsed as
-            // if it were not indented, and its matching dedent is consumed here, so the block does
-            // not end early and scatter errors over the lines that follow.
+        /// <summary>
+        /// Statements up to the dedent that closes the block the caller has just indented into. A
+        /// test body and an effect both go through here, so a stray indent reads the same in either.
+        /// </summary>
+        private void ParseIndentedStatements(List<StatementNode> statements)
+        {
             int stray = 0;
             while (!Check(TokenKind.EndOfFile))
             {
                 SkipNewlines();
                 if (Check(TokenKind.EndOfFile)) break;
-
-                if (Check(TokenKind.Dedent))
-                {
-                    if (stray == 0) break;
-                    stray--;
-                    _index++;
-                    continue;
-                }
-
-                if (Check(TokenKind.Indent))
-                {
-                    _diagnostics.Error(
-                        "CT0030",
-                        "This line is indented further than the line above it, which does not open a block. Only a line ending in `:`, such as `effect:` or `if target.dead:`, can have lines indented under it.",
-                        Current.Span);
-                    stray++;
-                    _index++;
-                    continue;
-                }
+                if (SkipStrayIndent(ref stray)) continue;
+                if (Check(TokenKind.Dedent)) break;
 
                 int before = _index;
                 StatementNode? statement = ParseStatement();
@@ -778,8 +766,39 @@ namespace Cantrip.Syntax
                 if (_index == before) _index++;
             }
             Match(TokenKind.Dedent);
+        }
 
-            return new BlockNode(statements, span);
+        /// <summary>
+        /// A line indented under a line that opens no block. It is reported once and read as if it
+        /// were not indented, and its matching dedent is consumed here, so the enclosing block does
+        /// not end early and scatter errors over the lines that follow. Returns true when it consumed
+        /// a token, either the stray indent or the dedent that closes one.
+        /// </summary>
+        private bool SkipStrayIndent(ref int stray)
+        {
+            if (Check(TokenKind.Dedent) && stray > 0)
+            {
+                stray--;
+                _index++;
+                return true;
+            }
+
+            if (!Check(TokenKind.Indent)) return false;
+
+            // An indent straight after a dedent is the lexer's recovery from a dedent that lines up
+            // with no block. The lexer has reported that line already (CT0001), and it is less
+            // indented than the one above it, not more.
+            if (_index == 0 || _tokens[_index - 1].Kind != TokenKind.Dedent)
+            {
+                _diagnostics.Error(
+                    "CT0030",
+                    "This line is indented further than the line above it, which does not open a block. Only a line ending in `:`, such as `effect:` or `if target.dead:`, can have lines indented under it.",
+                    Current.Span);
+            }
+
+            stray++;
+            _index++;
+            return true;
         }
 
         private StatementNode? ParseStatement()

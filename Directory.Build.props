@@ -18,7 +18,7 @@
       and a test holds the Godot addon's plugin.cfg to the same version.
     -->
     <VersionPrefix>0.1.0</VersionPrefix>
-    <VersionSuffix>preview.1</VersionSuffix>
+    <VersionSuffix>preview.2</VersionSuffix>
   </PropertyGroup>
 
   <PropertyGroup Label="Package metadata">

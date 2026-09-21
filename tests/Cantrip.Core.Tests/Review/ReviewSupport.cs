@@ -59,7 +59,7 @@ namespace Cantrip.Tests.Review
     /// </summary>
     internal static class ReviewCli
     {
-        public static (int ExitCode, string Output) Run(string command, string dsl)
+        public static (int ExitCode, string Output) Run(string command, string dsl, params string[] options)
         {
             string cli = FindCli();
             string folder = Path.Combine(Path.GetTempPath(), "ge-review-" + Guid.NewGuid().ToString("N"));
@@ -77,6 +77,7 @@ namespace Cantrip.Tests.Review
                 start.ArgumentList.Add(cli);
                 start.ArgumentList.Add(command);
                 start.ArgumentList.Add(folder);
+                foreach (string option in options) start.ArgumentList.Add(option);
 
                 using Process process = Process.Start(start) ?? throw new InvalidOperationException("Could not start cantrip.");
                 Task<string> stdout = process.StandardOutput.ReadToEndAsync();

@@ -4,15 +4,20 @@ Versions follow [semantic versioning](https://semver.org). While the major versi
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.1.0-preview.2] - 2026-09-21
+
 ### Added
 
-- `discover` can be answered by the player. Under `DeferredChooser`, which the Godot node uses, it pauses like any other choice: `PendingChoice.IsOffer` is true, `Definitions` lists the candidates, and `CardRuntime.Answer(EntityDefinition)` replays the action with the pick. In GDScript the pending choice has `"kind": "offer"`, each option carries the candidate's name, kind, tags and rules text, and the answer is its position. `RandomChooser` now picks among offers at random instead of taking the first.
+- `discover` can be answered by the player. Under `DeferredChooser`, which the Godot node uses, it pauses like any other choice: `PendingChoice.IsOffer` is true, `Definitions` lists the candidates, and `CardRuntime.Answer(EntityDefinition)` replays the action with the pick. In GDScript the pending choice has `"kind": "offer"`, each option carries the candidate's name, kind, tags and rules text, and the answer is its position. The pick is remembered by identity, so reloading content while an offer is open never swaps it for another card: if the reload takes it out of the offer, the player is asked again. `RandomChooser` now picks among offers at random instead of taking the first.
 - `tools/godot-install-smoke.sh`, run by CI on every push and before every release, installs the addon from its zip into a blank Godot project outside the repository, following docs/godot.md, and plays a battle from GDScript.
 
 ### Changed
 
-- `cantrip validate` also reports the linter's errors, such as an unknown verb, so a typo like `aply` no longer passes as "0 errors". Warnings stay with `lint`.
-- Clearer messages for mistakes made in the first hour: a declaration name with spaces is one error saying to quote it (CT0029), a line indented under a line that opens no block is one error saying which lines can (CT0030), and a test naming an enemy nothing defines says so and how to fix it.
+- `cantrip validate` also reports the linter's errors, such as an unknown verb, so a typo like `aply` no longer passes as "0 errors". Warnings stay with `lint`. Like `lint`, it takes `--suppress`, e.g. `--suppress CT301` for content that calls verbs a game registers in C#.
+- Clearer messages for mistakes made in the first hour: a declaration name with spaces is one error saying to quote it (CT0029), a line indented under a line that opens no block is one error saying which lines can (CT0030), in an effect, a test or a declaration's properties alike, and a test naming an enemy nothing defines says so and how to fix it.
+- `CardRuntime.Restore` abandons a pending choice, which belonged to the game being replaced. A new action does the same with a choice left half answered, so its answers can never be read as answers to the new one.
 
 ## [0.1.0-preview.1] - 2026-09-21
 
@@ -31,7 +36,7 @@ The first public preview.
 - `event` and `encounter` declarations are now error CT0113, "reserved but not supported yet". They used to load as inert definitions that nothing ran.
 - `CardRuntime.CanPlay`, `LegalTargets` and `TargetMode` answer "what can I play, and at what?" exactly as `Play` decides it. The Godot node's `CanPlay` and `GetLegalTargets` use them, which fixes legal targets that ignored taunt and stealth, and `CanPlay` checking energy for a card priced in another resource.
 - The enums a save stores as numbers (`EntityKind`, `ValueKind`, `ScheduleTiming`) have explicit values, so reordering them can no longer corrupt a save.
-- Reloading a file spelled with the other slash, such as `content/cards.cantrip` after `LoadFolder` recorded `contentrds.cantrip` on Windows, now replaces it. It used to report every definition as a duplicate and leave the running game on the old rules.
+- Reloading a file spelled with the other slash, such as `content/cards.cantrip` after `LoadFolder` recorded `content\cards.cantrip` on Windows, now replaces it. It used to report every definition as a duplicate and leave the running game on the old rules.
 
 ### Known limitations
 
