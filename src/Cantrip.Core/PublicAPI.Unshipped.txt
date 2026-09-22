@@ -1,18 +1,1 @@
 #nullable enable
-Cantrip.Runtime.ScheduledSnapshot.BlockHash.get -> string?
-Cantrip.Runtime.ScheduledSnapshot.BlockHash.set -> void
-Cantrip.Runtime.ScheduledSnapshot.Statements.get -> string?
-Cantrip.Runtime.ScheduledSnapshot.Statements.set -> void
-Cantrip.Runtime.ListenerDueSnapshot.ListenerHash.get -> string?
-Cantrip.Runtime.ListenerDueSnapshot.ListenerHash.set -> void
-Cantrip.Runtime.ListenerLimitSnapshot.ListenerHash.get -> string?
-Cantrip.Runtime.ListenerLimitSnapshot.ListenerHash.set -> void
-Cantrip.Linting.LintOptions.HostBlocks.get -> System.Collections.Generic.ISet<string!>!
-const Cantrip.Linting.Linter.ForOnDurationStatus = "CT314" -> string!
-const Cantrip.Linting.Linter.IgnoredDuration = "CT315" -> string!
-const Cantrip.Linting.Linter.UnknownBlock = "CT313" -> string!
-const Cantrip.Linting.Linter.TagWrittenAsProperty = "CT316" -> string!
-Cantrip.Testing.DslTestRunner.ConfigureRuntime.get -> System.Action<Cantrip.CardRuntime!>?
-Cantrip.Testing.DslTestRunner.ConfigureRuntime.set -> void
-Cantrip.Testing.DslTestRunner.CreateHost.get -> System.Func<Cantrip.Runtime.IEffectHost!>?
-Cantrip.Testing.DslTestRunner.CreateHost.set -> void

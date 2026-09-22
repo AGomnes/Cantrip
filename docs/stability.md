@@ -41,13 +41,13 @@ Same-seed results are not on that list. A 1.x release may change what the same c
 
 ## Performance
 
-On a Windows laptop, the simulator plays its default 500 runs of the sample roguelite in about 12 seconds, or 23 ms per run. From the repository root:
+On a Windows laptop (an Intel Core Ultra 5 125U, plugged in), the simulator plays its default 500 runs of the sample roguelite in about 8.5 seconds, or 17 ms per run. From the repository root:
 
 ```
 dotnet run --project src/Cantrip.Sim -c Release
 ```
 
-The first line of its report gives the time. Each run is up to five floors of battles, and before each card it plays, the bot tries every legal play, ends the turn to score the result, and restores a snapshot of the game. A build instrumented to count them shows that the 500 runs make about 205,000 plays, 214,000 turn ends and 206,000 restores, most of them trial moves that are rolled back. So a play or a turn end, with its share of the snapshots, averages about 30 microseconds. Nothing yet measures memory, allocations or how long content takes to load.
+The first line of its report gives the time. Each run is up to five floors of battles, and before each card it plays, the bot tries every legal play, ends the turn to score the result, and restores a snapshot of the game. A build instrumented to count them shows that the 500 runs make about 205,000 plays, 214,000 turn ends and 206,000 restores, most of them trial moves that are rolled back. So a play or a turn end, with its share of the snapshots, averages about 20 microseconds. Nothing yet measures memory, allocations or how long content takes to load.
 
 ## Determinism
 
@@ -82,16 +82,20 @@ A save holds each entity's stats and the names of the definitions behind them, n
 
 ## Known limitations
 
-This list is kept current with each release.
+This list is kept current with each release. It was last checked for 0.1.0-preview.3.
 
 - **Real time is experimental.** The tick clock and abilities work and are tested, but no real-time game has been built with them, and spatial queries such as `within` need your game to supply space.
 - **A run of battles is your game's code.** The language has no run structure yet: the map, encounters and rewards live in the game, and `event` and `encounter` declarations are an error (CT0113). One runtime can play several battles in a row, as [Winning, losing and several battles](csharp.md#winning-losing-and-several-battles) in the C# guide describes.
-- **The Godot addon has had little use.** It has been installed only by its author and by an automated test. The dock's interactive use is checked by hand, and so are the debugger's two tabs for a running game: a causality trace with pause and step, and a view of the entities in play. The running game also accepts breakpoints, a reload and statements to run, which headless tests cover, but the editor has no controls for them yet.
+- **The Godot addon has had little use.** It has been installed only by its author and by an automated test. The dock's interactive use is checked by hand, and so are the debugger's two tabs for a running game: a causality trace with pause and step, and a view of the entities in play.
+- **The editor's debugger has no breakpoints, reload or console.** The running game accepts breakpoints on an event or a line of content, a reload of changed files, and statements to run, and headless tests cover them, but the editor has no controls for any of them yet. Saving a `.cantrip` file does not reach a running game: call `ReloadContent([])` from a debug key, as [Hot reload](godot.md#hot-reload) in the Godot guide shows.
+- **In Godot, starting the next battle too soon can lose a `BattleEnded`.** If an `EffectEvent` handler starts the next battle, for example on the `battle_end` event, `BattleEnded` is never emitted for the battle that just ended. If the `BattleEnded` handler starts it, and the first action after that handler returns ends the new battle, `BattleEnded` is not emitted for the new battle. Start the next battle after the handler has returned, from your reward screen or with `call_deferred`.
+- **A hot reload can hold up saving.** After a reload that changes a waiting `next turn:` or `in N turns:` block, `CanCapture` is false, and in Godot so is `CanSave()`, until that block has run.
 - **A mistyped block line only warns.** Inside a declaration, a line ending in `:` that is not a block Cantrip runs, such as `when card_played:` for `on card_played:`, still loads as a label and does nothing. `lint` warns about it (CT313) but exits 0 unless given `--warnings-as-errors`, and `validate` does not report it, so cover anything that must happen with a `test`.
 - **A save is trusted input.** It sets every stat, and it holds the text of work that `Execute` scheduled, which the game runs when that work comes due, so an edited save can make a game do anything its content and C# verbs can. The hashes in a save recognise content; they do not show that the save is unaltered. A game that loads saves it did not write itself, such as shared, downloaded or cloud saves, should sign them or verify them another way.
 - **An error in content leaves its action half done.** A runtime error while an action resolves, including going past the step limit, reaches your game as a `RuntimeError` exception. What the action changed before the error stays changed, and the work it had queued is dropped. To recover, restore a snapshot taken before the action, as [When content fails at runtime](csharp.md#when-content-fails-at-runtime) shows.
 - **Numbers past ±1 million are unchecked**, as described under [Numbers](#numbers).
-- **Content tests cover one battle.** A `test` cannot start a second battle, so it cannot show that something resets between battles, and it cannot check that a play was refused.
+- **Content tests cover one battle, without your game.** A `test` cannot start a second battle, so it cannot show that something resets between battles, and it cannot check that a play was refused. The `cantrip` tool and the Godot dock's Tests tab run tests without the verbs, names and functions your game supplies, so a test of content that uses one fails there. A C# game can run such tests from its own test suite, as [Verbs written in C#](csharp.md#verbs-written-in-c) shows; a game that supplies them only from GDScript has nowhere to run such `test` blocks yet.
+- **No editor support outside Godot.** There is no syntax highlighting or language server for text editors yet. The Godot dock shows the source highlighted, and `dotnet cantrip lint` does the checking from the command line.
 - **Some mechanics cannot be expressed yet**, among them a Magic-style priority window and grouping played cards into poker hands. [coverage.md](coverage.md) keeps the list.
 
 ## Reporting a problem

@@ -50,7 +50,7 @@ What a GDScript project takes on by using it:
 2. **Add the rules engine** from NuGet, in the folder with your `.csproj`, at the same version as
    the addon (the addon's is in its `plugin.cfg`):
    ```
-   dotnet add package Cantrip.Core --version 0.1.0-preview.2
+   dotnet add package Cantrip.Core --version 0.1.0-preview.3
    ```
    `--prerelease` alone would install the newest preview, which may not match the addon you have.
 
@@ -522,7 +522,9 @@ The rules resolve an action completely and at once; presentation watches afterwa
   such as answering a choice or playing the next card, because by then nothing is resolving. An
   action taken in an `EffectEvent` handler resolves at once as well, and its events are emitted
   after the rest of those already on their way, still before the outer call returns; `BattleEnded`
-  comes after all of them. What is refused, with an error, is acting from a
+  comes after all of them. Start the next battle only once the handler has returned, though:
+  one started from a handler can lose a `BattleEnded`, as
+  [Known limitations](stability.md#known-limitations) explains. What is refused, with an error, is acting from a
   [callback](#callbacks-from-content): those run in the middle of an effect.
 - **They arrive in completion order, innermost first.** An event that wraps others completes after
   them: playing a card reports `damaged`, then `status_applied`, then `card_played`.
