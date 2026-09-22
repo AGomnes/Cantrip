@@ -15,11 +15,13 @@ Cantrip is in preview (0.x). It works, it is tested, and it has been used to bui
 
 The public API, which includes the Godot node's methods, signals and dictionary keys; the language; and the ability to load a save made with any earlier 1.x release.
 
+Same-seed results are not on that list. A 1.x release may change what the same content, seed and inputs produce, to fix a rule, and its changelog says so under **Same-seed results**.
+
 ## How it is checked
 
 - On every push to `main` and every pull request, on Linux and Windows x64: the unit tests, the content tests in `samples/`, `lint` on each sample folder with `--warnings-as-errors`, so that a new warning fails the build, and 100 runs of the sample roguelite played by a bot, which fail on any run that throws.
 - Among the unit tests, 100 seeded random battles are each played twice and compared step by step, and a saved and restored game is played beside the original, comparing state hashes after every step.
-- Every change to Cantrip.Core's public C# API must be recorded in `src/Cantrip.Core/PublicAPI.Unshipped.txt`, or the build warns.
+- Every change to Cantrip.Core's public C# API must be recorded in `src/Cantrip.Core/PublicAPI.Unshipped.txt`, or the build fails.
 - On the same pushes and before every release, the [quickstart](quickstart.md) is followed word for word against freshly packed packages, and the Godot addon is installed from its zip into a blank Godot project and plays a battle from GDScript.
 - A release publishes nothing until all of that has passed at the tagged commit.
 
@@ -29,7 +31,7 @@ The public API, which includes the Godot node's methods, signals and dictionary 
 |---|---|
 | Linux x64 and Windows x64, .NET 9 | Tested in CI |
 | Godot 4.6.1 .NET on Linux x64 | Tested in CI: headless tests, a GDScript smoke test, the demo playing itself, the editor dock's self-test, and installing the addon into a blank project, which targets `net8.0` |
-| Godot 4.6.2 .NET on Windows x64 | Checked by hand, including what no automated test can drive: the dock in use and live debugging |
+| Godot 4.6.2 .NET on Windows x64 | Checked by hand, including what no automated test can drive: the dock in use, and the debugger's two tabs (a causality trace with pause and step, and a view of the entities in play) |
 | Godot export to Linux x64 | Tested on demand (`.github/workflows/export.yml`): the exported demo plays itself |
 | macOS, and ARM on any system | Untested |
 | Godot exports to Windows, macOS, the web, Android and iOS | Untested. Godot's own limits on where a .NET game can be exported apply as well |
@@ -76,7 +78,7 @@ A save holds each entity's stats and the names of the definitions behind them, n
 - **runs work that was waiting as it was written.** A `next turn:` or `in N turns:` block waiting in the save is found by its statements, so the patch may reformat it or move it within its definition. If the patch changed its statements or removed it, `Restore` refuses the save, naming the definition. Work that `Execute` scheduled is saved with its statements, so a patch never turns it away. Saves made by 0.1.0-preview.2 or earlier find a block by its place alone, so after a patch that moves it they fail to load or run another block.
 - **keeps each listener's limit with that listener.** Which turn or battle a `once per` listener last fired in, and when an `on every` listener is next due, are found by the listener's place and a hash of it, so the patch may add, remove, reorder or reformat `on` blocks, and change what a listener does while it keeps its place. A listener whose `on` line changed, or whose body changed as it moved, starts afresh, as a new listener would: a `once per battle` one changed like that can fire once more in the battle that was saved. Saves made by 0.1.0-preview.2 or earlier record the place alone, so after a patch that adds, removes or reorders `on` blocks they can give a limit to another listener.
 
-`ContentLibrary.Fingerprint` changes when a definition, verb or resource is added, renamed or removed, but not when numbers or effects change: store it with each save and compare it before restoring. The Godot node does this itself and refuses any save whose fingerprint differs, so there a patch that only adds a card also turns older saves away. To keep saves working across patches, do not rename or remove a shipped definition, and to change what a `once per` listener does without letting it fire again where it has already fired, change only its body, in a patch that leaves the `on` blocks above it as they are. [Save and load](csharp.md#save-and-load) in the C# guide has the details.
+`ContentLibrary.Fingerprint` changes when a definition, verb or resource is added, renamed or removed, but not when numbers or effects change: store it with each save and compare it before restoring. The Godot node compares it too, but a different fingerprint alone does not make it refuse a save: `LoadSave` goes on to restore it, and refuses it as `content_changed`, with `Restore`'s message, only when `Restore` does, so a patch that only adds a card keeps older saves loading. To keep saves working across patches, do not rename or remove a shipped definition, and to change what a `once per` listener does without letting it fire again where it has already fired, change only its body, in a patch that leaves the `on` blocks above it as they are. [Save and load](csharp.md#save-and-load) in the C# guide has the details.
 
 ## Known limitations
 
@@ -84,7 +86,7 @@ This list is kept current with each release.
 
 - **Real time is experimental.** The tick clock and abilities work and are tested, but no real-time game has been built with them, and spatial queries such as `within` need your game to supply space.
 - **A run of battles is your game's code.** The language has no run structure yet: the map, encounters and rewards live in the game, and `event` and `encounter` declarations are an error (CT0113). One runtime can play several battles in a row, as [Winning, losing and several battles](csharp.md#winning-losing-and-several-battles) in the C# guide describes.
-- **The Godot addon has had little use.** It has been installed only by its author and by an automated test. Its live debugging, the round trip between a running game and the editor, and the dock's interactive use are checked by hand.
+- **The Godot addon has had little use.** It has been installed only by its author and by an automated test. The dock's interactive use is checked by hand, and so are the debugger's two tabs for a running game: a causality trace with pause and step, and a view of the entities in play. The running game also accepts breakpoints, a reload and statements to run, which headless tests cover, but the editor has no controls for them yet.
 - **A mistyped block line only warns.** Inside a declaration, a line ending in `:` that is not a block Cantrip runs, such as `when card_played:` for `on card_played:`, still loads as a label and does nothing. `lint` warns about it (CT313) but exits 0 unless given `--warnings-as-errors`, and `validate` does not report it, so cover anything that must happen with a `test`.
 - **A save is trusted input.** It sets every stat, and it holds the text of work that `Execute` scheduled, which the game runs when that work comes due, so an edited save can make a game do anything its content and C# verbs can. The hashes in a save recognise content; they do not show that the save is unaltered. A game that loads saves it did not write itself, such as shared, downloaded or cloud saves, should sign them or verify them another way.
 - **An error in content leaves its action half done.** A runtime error while an action resolves, including going past the step limit, reaches your game as a `RuntimeError` exception. What the action changed before the error stays changed, and the work it had queued is dropped. To recover, restore a snapshot taken before the action, as [When content fails at runtime](csharp.md#when-content-fails-at-runtime) shows.

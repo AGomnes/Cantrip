@@ -1,13 +1,17 @@
 # Packages the Godot addon as a zip whose root is addons/cantrip, which is the shape the
 # Asset Library and every "unzip into your project" instruction expect.
 #
-#   pwsh tools/package-addon.ps1 [-OutputDirectory <path>]
+#   pwsh tools/package-addon.ps1 [-OutputDirectory <path>] [-Ref <tag>]
 #
 # The version comes from plugin.cfg, so the zip and the plugin can never disagree about it.
+# Given a ref, a tag such as v0.1.0-preview.3, the addon README's links into the main branch of
+# github.com/AGomnes/Cantrip point at that ref instead, so a user reads the docs of the version they
+# installed. Without one, the README goes in as it is.
 
 [CmdletBinding()]
 param(
-    [string] $OutputDirectory
+    [string] $OutputDirectory,
+    [string] $Ref
 )
 
 $ErrorActionPreference = 'Stop'
@@ -15,6 +19,8 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $addon = Join-Path $root 'godot/Cantrip.Demo/addons/cantrip'
 if (-not (Test-Path $addon)) { throw "The addon is not where it should be: $addon" }
+
+if ($Ref -and $Ref -notmatch '^[A-Za-z0-9][A-Za-z0-9._/-]*$') { throw "'$Ref' is not a tag or branch name this script accepts." }
 
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $root 'artifacts' }
 
@@ -28,10 +34,20 @@ try {
     Copy-Item -Recurse -Force (Join-Path $addon '*') $target
     Copy-Item -Force (Join-Path $root 'LICENSE') (Join-Path $target 'LICENSE')
 
+    if ($Ref) {
+        # Read and written as UTF-8 without a byte order mark, as the file is in the repository.
+        $readme = Join-Path $target 'README.md'
+        $utf8 = New-Object System.Text.UTF8Encoding $false
+        $text = [System.IO.File]::ReadAllText($readme, $utf8)
+        $text = $text -replace '(https://github\.com/AGomnes/Cantrip/(blob|tree))/main/', ('$1/' + $Ref + '/')
+        [System.IO.File]::WriteAllText($readme, $text, $utf8)
+        if ($text -match 'AGomnes/Cantrip/(blob|tree)/main/') { throw "The addon README still links the main branch after pointing its links at $Ref." }
+    }
+
     # .uid files are Godot's stable script ids: keeping them means a project that updates the addon
     # does not lose the references its scenes already hold.
     New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
-    $zip = Join-Path $OutputDirectory "cantrip-godot-$version.zip"
+    $zip = Join-Path (Resolve-Path $OutputDirectory).Path "cantrip-godot-$version.zip"
     if (Test-Path $zip) { Remove-Item $zip }
 
     # Entries are written by hand rather than with Compress-Archive, which records Windows

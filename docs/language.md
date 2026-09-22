@@ -1,5 +1,7 @@
 # Language reference
 
+> These docs describe the `main` branch, which can be ahead of the latest release. The changelog's [Unreleased](../CHANGELOG.md#unreleased) section lists what that release lacks, and each release's own docs are in [its tag](https://github.com/AGomnes/Cantrip/tags).
+
 This page sets out the declarations, statements and rules of the `.cantrip` language, as the rules engine in `src/Cantrip.Core` runs them. It is a reference: to learn the language by writing a first card, status, relic and enemy, start with [Writing content](writing-content.md), and see [the samples](../samples/README.md) for worked examples with tests. The [last section](#implementation-notes) notes a few implementation choices worth knowing.
 
 - [Files](#files)
@@ -96,7 +98,7 @@ What each declaration reads, beyond the listeners, modifiers, `tags` and present
 
 `rarity` and `weight` are read by [`discover`](#built-in-verbs) on any kind of definition.
 
-**Anything else is only a stat, or a label.** A property the engine does not read is accepted silently and becomes a stat, or nothing at all: `max_stack 3`, with the `s` missing, leaves a status with no cap. `duration 3` on a status does not make it last three turns either (see [Statuses](#statuses)). Any other line ending in a colon is taken as a labelled block, and a labelled block in a declaration never runs. A listener written the wrong way round, such as `when card_played:` or `once per battle on card_played:`, is one of these: it loads, `describe` still prints rules text for it, and it never fires. `lint` warns about every such block (CT313) and suggests the listener it looks like. A listener always starts with `on`. A game that runs a block of its own from C#, reading it through `EntityDefinition.Blocks`, names it in `LintOptions.HostBlocks` so the linter knows it runs.
+**Anything else is only a stat, or a label.** A property the engine does not read is accepted silently and becomes a stat, or nothing at all: `max_stack 3`, with the `s` missing, leaves a status with no cap. `duration 3` on a status does not make it last three turns either (see [Statuses](#statuses)), and `exhaust` on a line of its own does not exhaust a card: a tag works only on the `tags` line, and `lint` warns about a tag written this way (CT316). Any other line ending in a colon is taken as a labelled block, and a labelled block in a declaration never runs. A listener written the wrong way round, such as `when card_played:` or `once per battle on card_played:`, is one of these: it loads, `describe` still prints rules text for it, and it never fires. `lint` warns about every such block (CT313) and suggests the listener it looks like. A listener always starts with `on`. A game that runs a block of its own from C#, reading it through `EntityDefinition.Blocks`, names it in `LintOptions.HostBlocks` so the linter knows it runs.
 
 ## Cards
 
@@ -139,6 +141,8 @@ Tags with built-in behaviour:
 | `ethereal` | Exhausted if still in hand at the end of the turn. |
 | `unplayable` | `Play` refuses it. |
 | `attack` | Counted by the `attacks` history counter. |
+
+These work only on the `tags` line. Written on a line of its own, as in `exhaust`, the word is a property that nothing reads, so the card is discarded as usual; `lint` warns about it (CT316).
 
 Other cards listen from hand, so a curse can hurt while it is held (`on ...:` blocks are covered under [Listeners](#listeners)):
 
@@ -217,7 +221,7 @@ A status is an entity attached to its host. Inside it, `owner` is the host and `
 
 A status is removed when its counter reaches zero: `stacks` for intensity-like modes, `duration` for duration-like ones.
 
-Reading `host.Weak` gives that counter: stacks, or the remaining duration for duration and refresh statuses. Writing `host.Weak -1` changes the same counter, applying the status if it was absent.
+A status is read by its name on the entity that has it: `owner.Weak` inside a status or relic, `target.Weak` in a card aimed at an enemy. That gives its counter: stacks, or the remaining duration for duration and refresh statuses, and 0 when the entity does not have it. Writing `target.Weak -1` changes the same counter, and `target.Weak +2` applies the status if it was absent. There is no name `host`: inside a status, its host is `owner`.
 
 A status has no length of its own. The number comes from whoever applies it: `apply Weak 2` is a duration of 2. A `duration 2` line in the status's declaration does not change that. On a `duration`, `refresh` or `both` status the duration always comes from the application, so the line does nothing and `lint` warns about it (CT315); on any other status it is only a stat.
 
@@ -466,6 +470,8 @@ The line always starts with `on`, and `once per ...` and `priority` come after t
 
 **Scope.** `on owner.damaged` only hears `damaged` events whose target is the listener's owner. Scopes are `self`, `owner` (the host of a status, the holder of a relic), `controller`, `player`, `any`, or any name that resolves to an entity.
 
+The scope is matched against the event's target, whatever the event. So `on owner.card_played` hears cards played *at* the holder, such as a `target self` card, and not the cards the holder plays. For those, write `on card_played(source:owner)`. In a game where only the player plays cards, plain `on card_played` on the player's relic hears the same ones.
+
 **Your turn.** An unscoped `on turn_start` or `on turn_end` on a status, card or relic only hears its own controller's turn. Use `on any.turn_end` to hear everyone's.
 
 **Filters.** Clauses in parentheses are joined with `and` (a comma also means `and`); `or` and `not` work too. Each clause is tested on its own:
@@ -489,6 +495,8 @@ The line always starts with `on`, and `once per ...` and `priority` come after t
 **Joining mid-event.** A listener that becomes active while an event is being handled hears that event's after timing. A status applied by a card's effect hears the `card_played` of that same card, and a minion listening `on created(kind:actor)` hears its own creation. Where that is not wanted, leave the listener's own cause out with a filter: `on created(kind:actor, not target:self):`, or `not card:Reverb` for the card that applied the status. A `power` card is the exception, since it only becomes active after its `card_played` has finished.
 
 **Loop protection.** A listener never re-triggers from its own consequences within one causal chain, and chains stop at depth 50. `once per turn`, `once per battle`, `once per run` and `once per chain` limit how often a listener fires; `once per battle` starts again when the next battle starts.
+
+**A limit is spent when the listener fires,** whatever its body then does. An `if` in the body that does nothing still uses it up, so a relic that heals "the first time you fall to half health" with the condition in an `if` spends its one use on the first hit. Put the condition in the filter, which is checked before the limit: `on owner.damaged(owner.hp <= owner.max_hp / 2) once per battle:`.
 
 ## Built-in events
 
@@ -612,7 +620,7 @@ target.Poison -1
 event.amount = event.amount * 2
 ```
 
-`name -N` and `name +N` are shorthand for `-=` and `+=` when nothing else follows on the line. A bare stat name refers to the nearest entity up the ownership chain that has the stat, else the controller: `stacks -1` in a status changes the status, `energy += 1` in a card changes the player, `block +6` in an enemy move changes the enemy. `host.Status` adjusts that status's counter. Only `event.amount` can be assigned on an event.
+`name -N` and `name +N` are shorthand for `-=` and `+=` when nothing else follows on the line. A bare stat name refers to the nearest entity up the ownership chain that has the stat, else the controller: `stacks -1` in a status changes the status, `energy += 1` in a card changes the player, `block +6` in an enemy move changes the enemy. A status written after an entity, as in `target.Weak -1` or `owner.Poison += 2`, adjusts that status's counter (see [Statuses](#statuses)). Only `event.amount` can be assigned on an event.
 
 **Locals** bind a value for the rest of the body with `let`:
 
@@ -911,7 +919,9 @@ test "Poison ticks and decays"
 
 **One comparison per `expect`.** A failing comparison shows the value it found: `expected enemy.Poison == 3, but enemy.Poison was 2`. Joined with `and`, it shows only the condition, and a test stops at its first failing `expect`, so the lines after it are not checked. To look further into a failure, `--filter <text>` runs only the tests whose names contain the text, and `--trace` prints what happened, step by step, in each failing test, with what any `log` statement wrote.
 
-**Setup does not check stat names.** In an `enemy` or `player` line, a word that is not a status becomes a stat, so `enemy hp 20 Weak 2` with no `Weak` defined sets a stat called `Weak` and the test carries on. `cantrip lint` says nothing about the setup line itself; it reports CT302 only where the test reads the name as a status, as in `expect enemy.Weak == 2`. An enemy's name is checked: `enemy Ghoul` with no Ghoul defined fails the test.
+**Setup does not check stat names.** In an `enemy` or `player` line, a word that is not a status becomes a stat, so `enemy hp 20 Weak 2` with no `Weak` defined sets a stat called `Weak` and the test carries on. `cantrip lint` says nothing about the setup line itself; it reports CT302 only where the test reads the name as a status, as in `expect enemy.Weak == 2`.
+
+**Names of definitions are checked.** A line that names a card, relic, item, ability or enemy that is not defined, such as `hand Strik`, `relic Anchr`, `grant Zapp`, `play Strik on enemy` or `enemy Ghol hp 12`, fails the test with a message that names the nearest definition, and `cantrip lint` reports it as error CT302.
 
 **Choices** are answered from the `answer` queue. With nothing queued, the first option is taken, which is enough for `discard 1` when the candidates are identical or there is only one.
 
@@ -919,7 +929,8 @@ test "Poison ticks and decays"
 
 - span two battles, so it cannot show that something resets between battles;
 - check that a play was refused, since `play` fails the test when a card cannot be played. For a targeting rule, show it the other way round: play the card with no target and check what it picked;
-- show `log` output when it passes. Only `--trace` shows it, and only for a failing test.
+- show `log` output when it passes. Only `--trace` shows it, and only for a failing test;
+- in the `cantrip` tool, use a verb, name or function that your game supplies in C#. Run such a test from the game's own test suite, where `DslTestRunner` can register them: see [Verbs written in C#](csharp.md#verbs-written-in-c).
 
 **When the last enemy dies, the battle is won at once**, and winning removes the player's statuses that are not `persistent` and returns every card to the draw pile. A test that checks a status or a drawn card after a killing blow needs a second enemy to keep the battle going.
 
@@ -1005,9 +1016,9 @@ Codes with four digits come from reading and loading the files. An error among t
 | Code | Level | Meaning | Typical fix |
 |---|---|---|---|
 | CT301 | error | An unknown verb, or a test verb such as `play` outside a test. | Fix the spelling. For a verb the game registers in C#, run with `--suppress CT301`. |
-| CT302 | error or warning | An unknown name. It is an error where a definition must be named (`apply Posion`, `card:Strke`) or a status is read (`target.Posion`), and a warning for other names, which the game may supply at runtime. | Fix the spelling, or define it. |
+| CT302 | error or warning | An unknown name. It is an error where a definition must be named (`apply Posion`, `card:Strke`, or a test line such as `hand Strik`) or a status is read (`target.Posion`), and a warning for other names, which the game may supply at runtime. | Fix the spelling, or define it. |
 | CT303 | warning | A `tag:` test for a tag no definition has, so it never matches. | Fix the spelling, or give the tag to what should match. |
-| CT304 | warning | A listener on an event that nothing raises: it is not [built in](#built-in-events) and no content emits it, or it is `<stat>_changed` for a stat nothing in the content has. | Fix the event or stat name. |
+| CT304 | warning | A listener on an event that nothing raises: it is not [built in](#built-in-events) and no content emits it, or it is `<stat>_changed` for a stat nothing in the content has. | Fix the event or stat name. The message suggests the nearest event, such as `turn_start` for `start_of_turn`. |
 | CT305 | note | An event is emitted but no content listens for it. | Nothing, if the game listens in its own code. Otherwise check the name. |
 | CT306 | note | Listeners that can set each other off. Loop protection stops each after one pass. | Check that this is what you want. |
 | CT307 | error | `event` used outside an `on ...:` listener. | Move the line into a listener. |
@@ -1016,9 +1027,10 @@ Codes with four digits come from reading and loading the files. An error among t
 | CT310 | note | A content verb that nothing calls. | Call it, or remove it. |
 | CT311 | warning | `stacks` outside a status, where it reads a stat that is probably never set. | Read the status by name, as in `target.Poison`. |
 | CT312 | error | `use` names a move the enemy does not have, or appears in something with no moves. | Fix the move's name. |
-| CT313 | warning | A line in a declaration that ends in `:` but is not `effect:`, `move ...:` or a listener, such as `when card_played:` or `once per battle on card_played:`. It is only a label, so it never runs. | Start a listener with `on`, with `once per ...` after the event: `on card_played once per battle:`. The message suggests the form the line looks like. For a block the game runs from C#, add its name to `LintOptions.HostBlocks`, or run with `--suppress CT313`. |
+| CT313 | warning | A line in a declaration that ends in `:` but is not `effect:`, `move ...:` or a listener, such as `when card_played:` or `once per battle on card_played:`. It is only a label, so it never runs. | Start a listener with `on`, with `once per ...` after the event: `on card_played once per battle:`. The message suggests the form the line looks like, keeping a timing such as `before_` and a filter. For a block the game runs from C#, add its name to `LintOptions.HostBlocks`, or run with `--suppress CT313`. |
 | CT314 | warning | `for N turns` on a `duration` or `refresh` status that ticks down on its host's turns, with N more than the amount applied. The status lasts as many turns as the amount, and `for` can only end it sooner. | Give the turns as the amount: `apply Weak 2`, not `apply Weak for 2 turns`. |
 | CT315 | warning | A `duration` line on a `duration`, `refresh` or `both` status. The status takes its duration from whoever applies it, so the line does nothing. | Remove the line, and give the length where the status is applied: `apply Weak 2`. |
+| CT316 | warning | A tag with behaviour of its own written on a line of its own: `exhaust`, `retain`, `ethereal`, `unplayable`, `power` or `attack` under a card, or `buff` or `debuff` under a status. The line is a property that nothing reads, so the behaviour never happens. | Put the word on the `tags` line: `tags exhaust`. The message suggests the whole line. |
 
 **Descriptions**
 

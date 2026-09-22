@@ -1,0 +1,45 @@
+# Recipe: a debuff that makes its host take more damage.
+# Explained in docs/writing-content.md, "A debuff that makes its host take more damage".
+# Strike is in tutorial/game.cantrip.
+
+status Vulnerable
+  tags debuff
+  stacking duration
+  modify damage_taken: x1.5
+
+card Expose
+  cost 1
+  target enemy
+  effect:
+    apply Vulnerable 2 to target
+
+enemy Hexer
+  hp 30
+  move Hex:
+    apply Vulnerable 2 to player
+  move Jab:
+    deal 10 to player
+  pattern cycle Hex, Jab, Jab
+
+test "Vulnerable 2 on an enemy lasts the rest of this turn and the next"
+  enemy hp 40
+  play Expose on enemy
+  play Strike on enemy
+  expect enemy.hp == 31
+  end turn
+  play Strike on enemy
+  expect enemy.hp == 22
+  end turn
+  expect not enemy.has(Vulnerable)
+  play Strike on enemy
+  expect enemy.hp == 16
+
+test "Vulnerable 2 from an enemy's move covers only the enemy's next turn"
+  enemy Hexer
+  end turn
+  expect player.Vulnerable == 2
+  end turn
+  expect player.hp == 65
+  end turn
+  expect player.hp == 55
+  expect not player.has(Vulnerable)

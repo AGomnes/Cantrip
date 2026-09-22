@@ -323,6 +323,10 @@ namespace Cantrip.Runtime
             }
             if (snapshot.Rng == null || snapshot.Rng.Length != 4)
                 throw new InvalidOperationException("The snapshot's random number generator state is not four numbers.");
+            // All zeros is the one state the generator never leaves, and one Capture never writes:
+            // it is what an empty or truncated save deserialises to.
+            if (snapshot.Rng.All(part => part == 0))
+                throw new InvalidOperationException("The snapshot is damaged: its random number generator state is all zeros.");
 
             var bodies = new BlockNode?[snapshot.Scheduled.Count];
             for (int i = 0; i < bodies.Length; i++) bodies[i] = resolveBlock(snapshot.Scheduled[i]);

@@ -53,6 +53,7 @@ namespace Cantrip.GodotAdapter
 
         private long _cursor;
         private long _dropped;
+        private long _session;
         private bool _connected;
 
         /// <summary>Raised when someone picks a step, so the dock can open the line behind it.</summary>
@@ -149,6 +150,7 @@ namespace Cantrip.GodotAdapter
             _connected = true;
             _cursor = 0;
             _dropped = 0;
+            _session = 0;
             ClearRows();
             Request(CantripProtocol.Hello, new Godot.Collections.Array());
             _poll?.Start();
@@ -218,6 +220,20 @@ namespace Cantrip.GodotAdapter
 
         private void OnWelcome(Godot.Collections.Dictionary payload)
         {
+            // A game that starts a new run greets again as a new session, with a trace numbered
+            // from 1: the steps shown, and the cursor into them, belong to the run before.
+            long session = payload.ContainsKey("session") ? payload["session"].AsInt64() : 0;
+            if (session != _session)
+            {
+                if (_session != 0)
+                {
+                    _cursor = 0;
+                    _dropped = 0;
+                    ClearRows();
+                }
+                _session = session;
+            }
+
             bool tracing = payload.ContainsKey("tracing") && payload["tracing"].AsBool();
             if (_tracing != null) _tracing.SetPressedNoSignal(tracing);
 
@@ -294,6 +310,9 @@ namespace Cantrip.GodotAdapter
 
             if (_follow != null && _follow.ButtonPressed) _tree.ScrollToItem(row, true);
         }
+
+        /// <summary>What the view holds, for the dock's self-test: its rows and the step it has read up to.</summary>
+        internal (int Rows, long Cursor) Shown => (_rows.Count, _cursor);
 
         private void ClearRows()
         {

@@ -16,6 +16,7 @@ A game extends Cantrip through these seams, without changing the library:
 | A clock | Implement `IGameClock`, advance it from the engine's fixed step, and pass it in `RuntimeOptions.Clock`. |
 | Translations | Implement `IDescriptionLocalizer` or subclass `EnglishDescriptions`, and pass it to `DescriptionBuilder`. |
 | Lint rules for your game | Pass `LintOptions` with host verbs, events and names, or suppress codes. |
+| Content tests that use your verbs or host | Set `DslTestRunner.ConfigureRuntime` to register them on each test's runtime, and `DslTestRunner.CreateHost` to give each test a host. See [Verbs written in C#](csharp.md#verbs-written-in-c). |
 | Limits content cannot change | Pass a `Ruleset` in `RuntimeOptions.Rules`, which replaces the one content declares. See [When content fails at runtime](csharp.md#when-content-fails-at-runtime). |
 
 The rest of this page describes the library's insides, for anyone reading or changing it. [Adding a node](#adding-a-node) and [Adding a verb](#adding-a-verb) are checklists for contributors.
@@ -162,4 +163,4 @@ Each queued trigger carries its `Chain`: an immutable list of the listeners that
 
 **Descriptions.** One walk over a definition both writes the automatic text and names each value (`damage`, `damage2`, `Poison`...), which is what links a writer's placeholders to the effect. Live descriptions evaluate values without side effects (anything involving ranges or `random` is shown symbolically) and pass them through the same modifier queries the rules use.
 
-**DslTestRunner.** Creates a fresh `CardRuntime` per test and registers test-only verbs from a single table, which the linter also reads.
+**DslTestRunner.** Creates a fresh `CardRuntime` per test, with the game's host and verbs when it sets `CreateHost` and `ConfigureRuntime`, and registers test-only verbs from a single table, which the linter also reads.

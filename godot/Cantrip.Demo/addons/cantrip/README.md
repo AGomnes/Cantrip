@@ -35,8 +35,8 @@ https://github.com/AGomnes/Cantrip/blob/main/docs/godot.md. In short:
   previews with live values, and a source viewer with syntax highlighting.
 - An importer so `.cantrip` files reach an exported build, and an export check that fails a build where
   they would not.
-- Two tabs in the debugger: a running game's causality trace, with pause, step and breakpoints, and
-  the entities in play. Saving a file reloads it into the running game.
+- Two tabs in the debugger: a running game's causality trace, with pause and step, and the entities
+  in play.
 
 ## Documentation
 

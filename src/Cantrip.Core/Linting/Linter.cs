@@ -54,12 +54,19 @@ namespace Cantrip.Linting
         public const string UnknownBlock = "CT313";
         public const string ForOnDurationStatus = "CT314";
         public const string IgnoredDuration = "CT315";
+        public const string TagWrittenAsProperty = "CT316";
 
         /// <summary>Tags the engine itself gives meaning to, so using one never needs a declaration.</summary>
         private static readonly string[] EngineTags =
         {
             "attack", "skill", "power", "curse", "exhaust", "retain", "ethereal", "unplayable", "buff", "debuff",
         };
+
+        /// <summary>The tags whose behaviour a card gets only from its <c>tags</c> line (see CT316).</summary>
+        private static readonly string[] CardBehaviourTags = { "exhaust", "retain", "ethereal", "unplayable", "power", "attack" };
+
+        /// <summary>The tags that set a status's flags (see CT316).</summary>
+        private static readonly string[] StatusBehaviourTags = { "buff", "debuff" };
 
         /// <summary>Event data the runtime also exposes as bare names inside listeners.</summary>
         private static readonly string[] EventDataNames =
@@ -87,6 +94,30 @@ namespace Cantrip.Linting
         {
             "when", "whenever", "upon", "at", "after", "before", "instead", "once", "on",
         };
+
+        /// <summary>Listener words that are also the timing of an event, as in <c>before_damaged</c>.</summary>
+        private static readonly HashSet<string> TimingWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "before", "instead",
+        };
+
+        /// <summary>Words an event's name can do without: <c>start_of_turn</c> is <c>turn_start</c>.</summary>
+        private static readonly HashSet<string> FillerWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "a", "an", "the", "of", "on", "at", "is", "my", "your",
+        };
+
+        /// <summary>Other words for the words built-in events use.</summary>
+        private static readonly Dictionary<string, string> EventSynonyms = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["begin"] = "start", ["begins"] = "start", ["began"] = "start", ["beginning"] = "start",
+            ["finish"] = "end", ["finishes"] = "end", ["finished"] = "end",
+            ["death"] = "die", ["dead"] = "die", ["dies"] = "die", ["died"] = "die",
+            ["drew"] = "draw",
+        };
+
+        /// <summary>Endings taken off a word to compare it with another form of itself.</summary>
+        private static readonly string[] WordEndings = { "ing", "ed", "es", "s", "d", "n" };
 
         /// <summary>Names that only ever mean actors, never a card.</summary>
         private static readonly HashSet<string> ActorWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -238,6 +269,7 @@ namespace Cantrip.Linting
 
             CheckBlocks();
             CheckIgnoredDurations();
+            CheckTagProperties();
             CheckListenedEvents();
             CheckEmittedEvents();
             CheckEventCycles();
@@ -374,12 +406,14 @@ namespace Cantrip.Linting
 
                         case "player":
                         case "enemy":
-                            // Test setup writes stats by name: `player rage 5`.
+                            // Test setup writes stats by name: `player rage 5`. The name in
+                            // `enemy Ghoul hp 12` is not one, defined or not.
                             if (body.Kind == BodyKind.Test)
                             {
+                                NameExpr? enemyName = verb == "enemy" ? TestEnemyName(command) : null;
                                 foreach (ExprNode argument in command.Arguments)
                                 {
-                                    if (argument is NameExpr stat && _content.Find(stat.Name) == null) _stats.Add(stat.Name);
+                                    if (argument is NameExpr stat && stat != enemyName && _content.Find(stat.Name) == null) _stats.Add(stat.Name);
                                 }
                             }
                             break;
@@ -446,6 +480,8 @@ namespace Cantrip.Linting
                 }
             }
 
+            if (body.Kind == BodyKind.Test) CheckTestNames(body);
+
             foreach (CallExpr call in body.Facts.Calls)
             {
                 if (!string.Equals(call.Name, "has", StringComparison.OrdinalIgnoreCase)) continue;
@@ -504,8 +540,98 @@ namespace Cantrip.Linting
                 string message = StartsUpper(name.Name)
                     ? $"`{name.Name}` is not defined anywhere in the loaded content."
                     : $"`{name.Name}` is not a stat, name or local the rules know; at runtime this is an error.";
-                Warn(UnknownName, message, name.Span, Suggest.Closest(name.Name, NameCandidates(body)));
+
+                // "Host" is what the docs call the entity a status is on; content calls it `owner`.
+                string? suggestion = string.Equals(name.Name, "host", StringComparison.OrdinalIgnoreCase)
+                    ? "owner"
+                    : Suggest.Closest(name.Name, NameCandidates(body));
+                Warn(UnknownName, message, name.Span, suggestion);
             }
+        }
+
+        /// <summary>
+        /// The test lines that name a definition, which the runner looks up and fails the test
+        /// without: <c>hand</c>, <c>deck</c> and <c>discard_pile</c> name cards, <c>relic</c> a relic
+        /// or item, <c>grant</c> and <c>cast</c> an ability, <c>play</c> a card, and <c>enemy</c>
+        /// an enemy when its first word stands alone as a name (<c>enemy Ghoul hp 12</c>).
+        /// </summary>
+        private void CheckTestNames(Body body)
+        {
+            foreach (CommandNode command in body.Facts.Commands)
+            {
+                switch (command.Verb.ToLowerInvariant())
+                {
+                    case "hand":
+                    case "deck":
+                    case "discard_pile":
+                        RequireDefinitions(body, TestNames(command), "card");
+                        break;
+                    case "relic":
+                        RequireDefinitions(body, TestNames(command), "relic", "item");
+                        break;
+                    case "grant":
+                        RequireDefinitions(body, TestNames(command), "ability");
+                        break;
+                    case "play":
+                        RequireDefinition(body, Aimed(command.Arguments.FirstOrDefault()), "card");
+                        break;
+                    case "cast":
+                        RequireDefinition(body, Aimed(command.Arguments.FirstOrDefault()), "ability");
+                        break;
+                    case "enemy":
+                        RequireDefinition(body, TestEnemyName(command), "enemy");
+                        break;
+                }
+            }
+        }
+
+        /// <summary>Checks each name a line lists once, so <c>deck Strik, Strik</c> is one error.</summary>
+        private void RequireDefinitions(Body body, IEnumerable<ExprNode> nodes, params string[] kinds)
+        {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (ExprNode node in nodes)
+            {
+                string name = node is StringExpr text ? text.Value : ((NameExpr)node).Name;
+                if (seen.Add(name)) RequireDefinition(body, node, kinds);
+                else _reported.Add(node);
+            }
+        }
+
+        /// <summary><c>Strike</c> in <c>play Strike on enemy</c>.</summary>
+        private static ExprNode? Aimed(ExprNode? argument) =>
+            argument is BinaryExpr { Operator: BinaryOperator.On } on ? on.Left : argument;
+
+        /// <summary>
+        /// The names a test verb lists, the way the runner reads them: <c>deck Strike Defend</c>,
+        /// <c>deck Strike, Defend</c>, <c>deck "Twin Strike", Defend</c>. A name after a comma is a
+        /// flag to the parser, which keeps it in lower case.
+        /// </summary>
+        private static IEnumerable<ExprNode> TestNames(CommandNode command)
+        {
+            foreach (ExprNode argument in command.Arguments)
+            {
+                if (argument is NameExpr || argument is StringExpr) yield return argument;
+            }
+            foreach (ClauseNode clause in command.Clauses)
+            {
+                if (clause.Value == null) yield return new NameExpr(clause.Keyword, clause.Span);
+                else if (clause.Value is NameExpr || clause.Value is StringExpr) yield return clause.Value;
+            }
+        }
+
+        /// <summary>
+        /// The first word of a test's <c>enemy</c> line when the runner takes it for an enemy's name:
+        /// a bare word, not a status, with no value of its own after it, as in <c>enemy Ghoul</c> and
+        /// <c>enemy Ghoul hp 12</c>, but not <c>enemy hp 12</c>. A quoted first word that names no
+        /// enemy is a label for a plain one, so it is never checked.
+        /// </summary>
+        private NameExpr? TestEnemyName(CommandNode command)
+        {
+            IReadOnlyList<ExprNode> nodes = command.Arguments;
+            if (nodes.Count % 2 == 0 || !(nodes[0] is NameExpr name)) return null;
+            if (nodes.Count > 1 && !(nodes[1] is NameExpr)) return null;
+            if (_content.FindAny(name.Name, "status", "keyword") != null) return null;
+            return name;
         }
 
         private void RequireDefinition(Body body, ExprNode? node, params string[] kinds)
@@ -525,7 +651,7 @@ namespace Cantrip.Linting
             EntityDefinition? other = _content.Find(written);
             if (other != null)
             {
-                Error(UnknownName, $"`{written}` is a {other.KindName}, but a {string.Join(" or ", kinds.Take(2))} is needed here.", node.Span);
+                Error(UnknownName, $"`{written}` is {A(other.KindName)}, but {A(string.Join(" or ", kinds.Take(2)))} is needed here.", node.Span);
                 return;
             }
 
@@ -710,7 +836,8 @@ namespace Cantrip.Linting
 
             // The event: a word that names one, or names one once `on_` or `when_` is taken off it, or
             // two or three words that do once joined (`at turn start`), or else what follows `on`, or
-            // `when` and the like, as long as it can stand for an event (see TakeUnknownEvent).
+            // `when` and the like, as long as it can stand for an event (see TakeUnknownEvent). A
+            // timing written into the word, as in `before_damaged`, stays with it.
             int at = words.FindIndex(w => IsKnownListenerEvent(w.Word));
             if (at < 0) at = words.FindIndex(w => IsKnownListenerEvent(StripListenerPrefix(w.Word)));
             if (at < 0) JoinSplitEvent(words, ref at);
@@ -735,10 +862,7 @@ namespace Cantrip.Linting
                 }
 
                 if (Parser.NormalizeEventName(eventName).Phase == EventPhase.After && !eventName.StartsWith("after_", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (string.Equals(block.Name, "before", StringComparison.OrdinalIgnoreCase)) eventName = "before_" + eventName;
-                    else if (string.Equals(block.Name, "instead", StringComparison.OrdinalIgnoreCase)) eventName = "instead_of_" + eventName;
-                }
+                    eventName = TimingWrittenBefore(words, at, block.Name) + eventName;
 
                 string filter = words[at].Filter is IReadOnlyList<ExprNode> clauses ? "(" + string.Join(", ", clauses.Select(AstPrinter.Print)) + ")" : string.Empty;
 
@@ -760,17 +884,19 @@ namespace Cantrip.Linting
 
             // Not `every`, which needs an interval that a label with none cannot supply.
             IEnumerable<string> events = ListenableEvents().Where(e => !string.Equals(e, BuiltinEvents.Every, StringComparison.OrdinalIgnoreCase));
-            string? closeEvent = Suggest.Closest(StripListenerPrefix(block.Name), events);
-            return closeEvent == null ? null : $"on {closeEvent}:";
+            (string named, EventPhase timing) = Parser.NormalizeEventName(StripListenerPrefix(block.Name));
+            string? closeEvent = SuggestEvent(named, events, partial: false);
+            return closeEvent == null ? null : $"on {TimingPrefix(timing)}{closeEvent}:";
         }
 
         /// <summary>
         /// Whether the words from <paramref name="at"/> to the colon, or to a <c>once per</c> or
         /// <c>priority</c>, can stand for the event when the linter knows none of them. An event
-        /// close to them joined takes their place: <c>turn starts</c> is <c>turn_start</c> and
-        /// <c>card_plyed</c> is <c>card_played</c>. Failing that, one word is kept, as an event the
-        /// game may raise from C#, while several are prose that suggests no listener, as in
-        /// <c>whenever player takes damage:</c>.
+        /// close to them joined takes their place, keeping any timing and scope written with them:
+        /// <c>turn starts</c> and <c>start of turn</c> are <c>turn_start</c>, and
+        /// <c>before_damagd</c> is <c>before_damaged</c>. Failing that, one word is kept, as an
+        /// event the game may raise from C#, while several are prose that suggests no listener, as
+        /// in <c>whenever player takes damage:</c>.
         /// </summary>
         private bool TakeUnknownEvent(List<(string Word, IReadOnlyList<ExprNode>? Filter)> words, int at)
         {
@@ -779,14 +905,48 @@ namespace Cantrip.Linting
                 .ToList();
             if (rest.Count == 0) return false;
 
-            string? close = Suggest.Closest(StripListenerPrefix(string.Join("_", rest.Select(w => w.Word))), ListenableEvents());
+            (string named, EventPhase timing) = Parser.NormalizeEventName(StripListenerPrefix(string.Join("_", rest.Select(w => w.Word))));
+            int dot = named.LastIndexOf('.');
+            string? close = SuggestEvent(named.Substring(dot + 1), ListenableEvents(), partial: false);
             if (close != null)
             {
-                words[at] = (close, rest[rest.Count - 1].Filter);
+                words[at] = (TimingPrefix(timing) + named.Substring(0, dot + 1) + close, rest[rest.Count - 1].Filter);
                 return true;
             }
             return rest.Count == 1;
         }
+
+        /// <summary>
+        /// A timing written as a word of its own just before the event, as in <c>before damaged</c>,
+        /// <c>once per battle instead of died</c> and <c>when before owner.damaged</c>, or else as the
+        /// block's first word, as its prefix: <c>before_</c>, <c>instead_of_</c> or none.
+        /// </summary>
+        private static string TimingWrittenBefore(List<(string Word, IReadOnlyList<ExprNode>? Filter)> words, int at, string first)
+        {
+            string previous = at > 0 ? words[at - 1].Word : string.Empty;
+            if (string.Equals(previous, "of", StringComparison.OrdinalIgnoreCase) && at > 1) previous = words[at - 2].Word + "_of";
+
+            foreach (string word in new[] { previous, first })
+            {
+                switch (word.ToLowerInvariant())
+                {
+                    case "before":
+                        return "before_";
+                    case "instead":
+                    case "instead_of":
+                        return "instead_of_";
+                }
+            }
+            return string.Empty;
+        }
+
+        /// <summary>The prefix that writes a timing into an event's name: <c>before_</c>, <c>instead_of_</c> or none.</summary>
+        private static string TimingPrefix(EventPhase timing) => timing switch
+        {
+            EventPhase.Before => "before_",
+            EventPhase.Instead => "instead_of_",
+            _ => string.Empty,
+        };
 
         /// <summary>The events a listener can hear: the built-in ones, those content emits and the game's own.</summary>
         private IEnumerable<string> ListenableEvents() => BuiltinEvents.Names.Concat(_emitted.Keys).Concat(_options.HostEvents);
@@ -846,15 +1006,96 @@ namespace Cantrip.Linting
             return IsKnownEvent(EventPart(name));
         }
 
-        /// <summary><c>on_turn_start</c> and <c>when_damaged</c>: the event with the listener word taken off.</summary>
+        /// <summary>
+        /// <c>on_turn_start</c> and <c>when_damaged</c>: the event with the listener word taken off.
+        /// <c>before_</c> and <c>instead_of_</c> stay, because they are the timing of the event the
+        /// listener hears, and <c>on damaged</c> in place of <c>on before_damaged</c> is a different
+        /// listener, one that can no longer <c>cancel</c>.
+        /// </summary>
         private static string StripListenerPrefix(string word)
         {
             foreach (string prefix in ListenerWords)
             {
+                if (TimingWords.Contains(prefix)) continue;
                 if (word.Length > prefix.Length + 1 && word.StartsWith(prefix + "_", StringComparison.OrdinalIgnoreCase))
                     return word.Substring(prefix.Length + 1);
             }
             return word;
+        }
+
+        /// <summary>
+        /// The event among <paramref name="candidates"/> that <paramref name="written"/> most
+        /// likely meant. First the same words in another order or form, as <c>start_of_turn</c> is
+        /// <c>turn_start</c> and <c>play_card</c> is <c>card_played</c>; then a misspelling, as
+        /// <c>turn_strat</c> is <c>turn_start</c>; then, when <paramref name="partial"/>, the event
+        /// with the most words that <paramref name="written"/> has among others, as
+        /// <c>card_drawn</c> has <c>drawn</c>.
+        /// </summary>
+        private static string? SuggestEvent(string written, IEnumerable<string> candidates, bool partial)
+        {
+            List<string> events = candidates.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            List<string> words = EventWords(written);
+
+            string? same = events.FirstOrDefault(e => SameWords(EventWords(e), words));
+            if (same != null) return same;
+
+            string? close = Suggest.Closest(written, events);
+            if (close != null || !partial) return close;
+
+            string? best = null;
+            int bestCount = 0;
+            foreach (string candidate in events)
+            {
+                List<string> needed = EventWords(candidate);
+                if (needed.Count <= bestCount || needed.Count >= words.Count) continue;
+                if (needed.All(n => words.Any(w => SameWord(n, w))))
+                {
+                    best = candidate;
+                    bestCount = needed.Count;
+                }
+            }
+            return best;
+        }
+
+        /// <summary>The words of an event's name that carry meaning: <c>start_of_turn</c> is start, turn.</summary>
+        private static List<string> EventWords(string name) =>
+            name.Split(new[] { '_', '.' }, StringSplitOptions.RemoveEmptyEntries)
+                .Where(w => !FillerWords.Contains(w))
+                .ToList();
+
+        /// <summary>The same words in any order, each in any of its forms.</summary>
+        private static bool SameWords(List<string> a, List<string> b)
+        {
+            if (a.Count == 0 || a.Count != b.Count) return false;
+            var unmatched = new List<string>(b);
+            foreach (string word in a)
+            {
+                int at = unmatched.FindIndex(w => SameWord(word, w));
+                if (at < 0) return false;
+                unmatched.RemoveAt(at);
+            }
+            return true;
+        }
+
+        /// <summary><c>played</c> and <c>play</c>, <c>drawn</c> and <c>draw</c>, <c>begin</c> and <c>start</c>.</summary>
+        private static bool SameWord(string a, string b) => WordForms(a).Intersect(WordForms(b)).Any();
+
+        private static IEnumerable<string> WordForms(string word)
+        {
+            string lower = word.ToLowerInvariant();
+            if (EventSynonyms.TryGetValue(lower, out string? same))
+            {
+                yield return same;
+                yield break;
+            }
+
+            yield return lower;
+            if (lower.Length > 4 && lower.EndsWith("ied", StringComparison.Ordinal)) yield return lower.Substring(0, lower.Length - 3) + "y";
+            foreach (string ending in WordEndings)
+            {
+                if (lower.Length - ending.Length >= 3 && lower.EndsWith(ending, StringComparison.Ordinal))
+                    yield return lower.Substring(0, lower.Length - ending.Length);
+            }
         }
 
         /// <summary>
@@ -892,6 +1133,44 @@ namespace Cantrip.Linting
             }
         }
 
+        /// <summary>
+        /// CT316: a line of its own on a card, such as <c>exhaust</c>, that names a tag with built-in
+        /// behaviour. It loads as a property with no value, which is not even a stat, so the card is
+        /// discarded as usual. The same goes for <c>buff</c> and <c>debuff</c> on a status. Only a
+        /// bare line, or one set to <c>true</c> or <c>yes</c>, is reported: <c>power 3</c> and
+        /// <c>attack 2</c> are stats content may read, the second by the <c>attack</c> verb.
+        /// </summary>
+        private void CheckTagProperties()
+        {
+            foreach (EntityDefinition definition in _content.Definitions.OrderBy(d => d.Syntax.Span.File, StringComparer.Ordinal).ThenBy(d => d.Syntax.Span.Line))
+            {
+                string[] tags = definition.Kind switch
+                {
+                    EntityKind.Card => CardBehaviourTags,
+                    EntityKind.Status or EntityKind.Keyword => StatusBehaviourTags,
+                    _ => Array.Empty<string>(),
+                };
+                if (tags.Length == 0) continue;
+
+                foreach (MemberNode member in definition.Syntax.Members)
+                {
+                    if (!(member is PropertyNode property) || !tags.Contains(property.Name, StringComparer.OrdinalIgnoreCase)) continue;
+                    if (definition.HasTag(property.Name)) continue;
+
+                    bool flagLike = property.Values.Count == 0
+                        || (property.Values.Count == 1 && property.Values[0] is NameExpr { Name: var value }
+                            && (string.Equals(value, "true", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "yes", StringComparison.OrdinalIgnoreCase)));
+                    if (!flagLike) continue;
+
+                    string tag = property.Name.ToLowerInvariant();
+                    Warn(TagWrittenAsProperty,
+                        $"`{property.Name}` on a line of its own does nothing to {definition}: `{tag}` works only as a tag.",
+                        property.Span,
+                        "tags " + string.Join(", ", definition.Tags.Concat(new[] { tag })));
+                }
+            }
+        }
+
         private void CheckListenedEvents()
         {
             foreach (Body body in _bodies)
@@ -907,8 +1186,11 @@ namespace Cantrip.Linting
                     continue;
                 }
 
+                // The nearest event, whether misspelt (`turn_strat`), worded another way
+                // (`start_of_turn`, `play_card`) or with words to spare (`card_drawn`).
+                IEnumerable<string> events = ListenableEvents().Concat(_stats.OrderBy(s => s, StringComparer.Ordinal).Select(BuiltinEvents.StatChanged));
                 Warn(UnknownEvent, $"Nothing raises an event called `{name}`: it is not built in and no content emits it.", body.Listener.Span,
-                    Suggest.Closest(name, BuiltinEvents.Names.Concat(_emitted.Keys)));
+                    SuggestEvent(name, events, partial: true));
             }
         }
 
@@ -1098,6 +1380,9 @@ namespace Cantrip.Linting
         }
 
         private static bool StartsUpper(string name) => name.Length > 0 && char.IsUpper(name[0]);
+
+        /// <summary>"a card", "an ability".</summary>
+        private static string A(string noun) => ("aeiou".IndexOf(char.ToLowerInvariant(noun[0])) >= 0 ? "an " : "a ") + noun;
 
         /// <summary>A whole number of one or more, as a count of turns is.</summary>
         private static bool IsWholeCount(Num value) => value >= Num.One && value == value.Floor();

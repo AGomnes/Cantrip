@@ -226,6 +226,58 @@ namespace Cantrip.GodotAdapter
             return owner == null ? VariantMap.NoEntity : core.GrantAbility(name, owner).Id;
         }
 
+        /// <summary>
+        /// Takes a card out of the game for good, as <c>destroy</c> does in content and as
+        /// <c>Execute("destroy target", 0, cardId)</c> would: the way to remove a card from the deck
+        /// between battles, or to swap one for its upgraded definition. Content hears it as
+        /// <c>destroyed</c>. Returns whether the card is gone; false, having changed nothing, when
+        /// the id is not a card still in the game.
+        /// </summary>
+        public bool RemoveCard(int cardId)
+        {
+            CardRuntime core = EnsureRuntime();
+            Guard();
+
+            Entity? card = core.State.Find(cardId);
+            if (card == null || card.Kind != EntityKind.Card || card.IsRemoved) return false;
+
+            return Act(() =>
+            {
+                core.Execute("destroy target", null, card);
+                return card.IsRemoved;
+            });
+        }
+
+        /// <summary>
+        /// Starts a new run on this node: the rules begin again from the loaded content, with no
+        /// player, cards or enemies. <see cref="Seed"/> and the other exports are read again, so set
+        /// a new seed first.
+        /// </summary>
+        /// <remarks>
+        /// What belonged to the old run goes with it: a choice waiting for an answer, events not yet
+        /// delivered, including the rest of a batch being delivered when this is called from an
+        /// <c>EffectEvent</c> handler, and whatever the <see cref="Presenter"/> has queued. No
+        /// signal says the old battle ended. The content stays as it is, reloads included, so a
+        /// ruleset a reload changed takes effect now. The callables registered with
+        /// <see cref="RegisterName"/> and <see cref="RegisterFunction"/> stay registered.
+        /// <see cref="Core"/> is a new object afterwards.
+        /// </remarks>
+        public void NewRun()
+        {
+            Guard();
+
+            _debug?.Uninstall();
+            _debug = null;
+            _core = null;
+
+            _choices.Close();
+            _announcedChoice = 0;
+            Buffer.Reset();
+            if (Presenter != null && IsInstanceValid(Presenter)) Presenter.SkipAll();
+
+            EnsureRuntime();
+        }
+
         // Battle flow ----------------------------------------------------------------------------
 
         public void StartBattle(bool shuffle = true, bool drawOpeningHand = true)
@@ -401,6 +453,40 @@ namespace Cantrip.GodotAdapter
             return VariantMap.Description(DescriptionView.Of(Describer().DescribeIntent(enemy, core), forOpponent: true));
         }
 
+        /// <summary>
+        /// The rules text of a definition that need not be in play, such as a reward, a shop's stock
+        /// or a page of a card library, with its printed values: the same dictionary as
+        /// <see cref="Describe"/>. An empty <paramref name="kind"/> takes the first definition of
+        /// that name. Empty when nothing of that name is loaded. Name and kind are matched without
+        /// regard to case, as <see cref="GetDefinitions"/> matches the kind.
+        /// </summary>
+        /// <remarks>It reads the content alone, so it does not bring the rules into being.</remarks>
+        public Godot.Collections.Dictionary DescribeDefinition(string name, string kind = "")
+        {
+            // Kinds are stored as the keyword that declares them, which is lower case.
+            EntityDefinition? definition = Content.Find(name ?? string.Empty, string.IsNullOrEmpty(kind) ? null : kind.ToLowerInvariant());
+            return definition == null
+                ? new Godot.Collections.Dictionary()
+                : VariantMap.Description(DescriptionView.Of(Describer().Describe(definition)));
+        }
+
+        /// <summary>
+        /// The names of every loaded definition of one kind, such as "card" or "relic", with
+        /// <paramref name="tag"/> among its tags unless that is empty: the pool a reward screen or a
+        /// shop picks from. Sorted by name, which a reload does not disturb, so a pick made from it
+        /// with the game's own seeded random numbers replays.
+        /// </summary>
+        /// <remarks>It reads the content alone, so it does not bring the rules into being.</remarks>
+        public Godot.Collections.Array GetDefinitions(string kind, string tag = "")
+        {
+            var names = new Godot.Collections.Array();
+            foreach (EntityDefinition definition in Content.Pool(kind ?? string.Empty))
+            {
+                if (string.IsNullOrEmpty(tag) || definition.HasTag(tag)) names.Add(definition.Name);
+            }
+            return names;
+        }
+
         public bool IsInBattle() => EnsureRuntime().State.InBattle;
 
         public int GetTurn() => EnsureRuntime().State.Turn;
@@ -484,10 +570,10 @@ namespace Cantrip.GodotAdapter
         public bool CanSave() => !_busy && EnsureRuntime().CanCapture;
 
         /// <summary>
-        /// The whole game as a string, with the fingerprint of the content it was taken against so a
-        /// save from before a patch can be refused with a message rather than a crash. When no save
-        /// can be made it throws an <see cref="InvalidOperationException"/> that says why: effects
-        /// still resolving, or, in the rules' own words, a waiting block a reload has changed.
+        /// The whole game as a string, with the fingerprint of the content it was taken against.
+        /// When no save can be made it throws an <see cref="InvalidOperationException"/> that says
+        /// why: effects still resolving, or, in the rules' own words, a waiting block a reload has
+        /// changed.
         /// </summary>
         public string Save()
         {
@@ -512,10 +598,13 @@ namespace Cantrip.GodotAdapter
         /// a refused save leaves the game, and any choice it is waiting on, exactly as they were.
         /// </summary>
         /// <remarks>
-        /// The fingerprint catches a definition that has gone. What it cannot see, a waiting
-        /// <c>next turn:</c> or <c>in N turns:</c> block whose statements a patch has changed, the
-        /// rules find as they restore, and they refuse before changing anything. That refusal, like
-        /// any other snapshot the rules turn down, comes back as "content_changed" with their message.
+        /// A fingerprint that differs says only that a definition has been added, renamed or removed
+        /// since the save was made, and a patch that only adds a card leaves every older save
+        /// loadable. So it is not a refusal by itself: the rules look up everything the save needs
+        /// as they restore, a definition it names and a waiting <c>next turn:</c> or
+        /// <c>in N turns:</c> block included, and refuse before changing anything. That refusal,
+        /// like any other snapshot the rules turn down, comes back as "content_changed" with their
+        /// message.
         /// </remarks>
         public Godot.Collections.Dictionary LoadSave(string json)
         {
@@ -536,7 +625,7 @@ namespace Cantrip.GodotAdapter
 
             var envelope = new SaveEnvelope(file.Format, file.Fingerprint, file.Snapshot);
             SaveCheck check = envelope.Check(Content.Fingerprint);
-            if (!check.Accepted) return Refused(check.ReasonName, check.Message);
+            if (!check.Accepted && check.Reason != SaveRejection.ContentChanged) return Refused(check.ReasonName, check.Message);
 
             GameSnapshot? snapshot;
             try
@@ -734,19 +823,35 @@ namespace Cantrip.GodotAdapter
         private void AfterAction()
         {
             // A handler that acts again arrives here a second time while the first drain is still
-            // walking the buffer. Let the outer one finish rather than deliver the same events twice.
-            if (!_drainingEvents)
+            // walking the buffer. The outer one tells this action's events once its own batch is
+            // done, and then whether the battle ended, so the game hears them in the order they
+            // happened. The handler may be waiting on a choice its call left, so that is told now.
+            if (_drainingEvents)
             {
-                _drainingEvents = true;
-                try
+                SyncChoice();
+                return;
+            }
+
+            _drainingEvents = true;
+            try
+            {
+                // Until nothing is left: a batch holds only what was recorded before it began, and
+                // a handler that acts adds more. One that starts a new run ends this one: the rest
+                // of the batch is not told, since its ids would now name the new run's entities,
+                // while anything the handler then does in the new run is.
+                while (Buffer.Count > 0)
                 {
+                    CardRuntime? run = _core;
                     if (Presenter != null && IsInstanceValid(Presenter)) Presenter.Drain(Buffer);
-                    else Buffer.Drain(record => EmitSignal(SignalName.EffectEvent, VariantMap.Event(record)));
+                    else Buffer.Drain(record =>
+                    {
+                        if (_core == run) EmitSignal(SignalName.EffectEvent, VariantMap.Event(record));
+                    });
                 }
-                finally
-                {
-                    _drainingEvents = false;
-                }
+            }
+            finally
+            {
+                _drainingEvents = false;
             }
 
             SyncChoice();

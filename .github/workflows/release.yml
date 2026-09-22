@@ -90,10 +90,21 @@ jobs:
       - name: Quickstart from these packages
         run: bash tools/quickstart-smoke.sh "$RUNNER_TEMP/release/packages"
 
+      # Both READMEs that reach users link docs/godot.md. Someone who installs this release should
+      # read the guide as it is at this tag, not on main, which may already have moved on, so their
+      # links into this repository's main branch are pointed at the tag, as the release notes are.
       - name: Package the Godot addon
         run: |
-          bash tools/package-addon.sh "$RUNNER_TEMP/release/addon"
+          bash tools/package-addon.sh "$RUNNER_TEMP/release/addon" "$GITHUB_REF_NAME"
           cp -r tools/addon-repo "$RUNNER_TEMP/release/addon-repo"
+          sed -i -E "s#(https://github\.com/AGomnes/Cantrip/(blob|tree))/main/#\1/${GITHUB_REF_NAME}/#g" "$RUNNER_TEMP/release/addon-repo/README.md"
+          unzip -p "$RUNNER_TEMP"/release/addon/*.zip addons/cantrip/README.md > "$RUNNER_TEMP/zipped-readme.md"
+          for readme in "$RUNNER_TEMP/release/addon-repo/README.md" "$RUNNER_TEMP/zipped-readme.md"; do
+            if grep -q -E "AGomnes/Cantrip/(blob|tree)/main/" "$readme" || ! grep -q -F "blob/${GITHUB_REF_NAME}/docs/godot.md" "$readme"; then
+              echo "::error::A README that ships with the addon does not link docs/godot.md at ${GITHUB_REF_NAME}."
+              exit 1
+            fi
+          done
 
       # The changelog's links are relative, which works in the repository but not in a release body,
       # so each one is pointed at the file as it is at this tag.

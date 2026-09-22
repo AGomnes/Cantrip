@@ -56,6 +56,22 @@ enemy ""Slime""
             Assert.False(hello.Tracing);
         }
 
+        /// <summary>
+        /// A new run on the node is a new runtime, and so a new service, whose trace is numbered
+        /// from 1 again: the session it gives is how the editor knows to start its view afresh.
+        /// </summary>
+        [Fact]
+        public void Each_game_greets_as_a_session_of_its_own()
+        {
+            CantripDebugService first = Started(out Entity _);
+            CantripDebugService second = Started(out Entity _);
+
+            Assert.NotEqual(0L, first.Session);
+            Assert.NotEqual(first.Session, second.Session);
+            Assert.Equal(first.Session, first.Hello().Session);
+            Assert.Equal(second.Session, second.Hello().Session);
+        }
+
         [Fact]
         public void Tracing_is_off_until_the_editor_asks_for_it()
         {

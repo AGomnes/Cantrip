@@ -22,6 +22,10 @@ When a release changes any of the following, its section says so under that name
 - A qualifier can name something that is not one word by quoting it: `card:"Fire Bolt"`, `hand where name:"Strike+"`.
 - `cantrip test --trace` shows what `log` statements wrote, as `[log]` lines in a failing test's trace.
 - An enemy's generated rules text names the phase a move is limited to: "Split (Broken phase only): Deal 5 damage to the player." Translations can supply the new `move.enemy.phase` phrase.
+- `lint` warns (CT316) about a tag with behaviour of its own written on a line of its own, such as `exhaust` or `attack` under a card, which does nothing, and suggests the whole `tags` line.
+- CT304 suggests the nearest event for one written in other words, such as `turn_start` for `start_of_turn`, and CT302 suggests `owner` for `host`.
+- `DslTestRunner.ConfigureRuntime` and `DslTestRunner.CreateHost`, so a game's own test suite can run content tests that use the verbs, names and functions it registers in C#.
+- Godot: `RemoveCard`, `GetDefinitions`, `DescribeDefinition` and `NewRun`, for removing and upgrading cards between battles, reward and shop screens, and a new run on the same node.
 - Godot: with `AutoLoad` on, the node reports each content error and warning in the Output panel, one line each. Before, only the editor dock showed them.
 - `tools/godot-install-smoke.sh` runs the first battle in docs/godot.md exactly as written and checks its output against the page.
 
@@ -38,10 +42,14 @@ When a release changes any of the following, its section says so under that name
 - `Restore` refuses work from `Execute` saved without its block hash, or naming a block that is not a `next turn:` or `in N turns:` body. `Capture` never writes either.
 - `GameState.ComputeHash` counts a waiting block by what it does rather than where it was written, so a save restored after a patch that moved the block hashes like the original, and two games waiting on different statements no longer hash alike.
 - Godot: `AnswerChoice`'s `reason` words are snake_case, like every other word the node gives: `nothing_pending`, `stale_request`, `unknown_option`, `duplicate_option`, `too_few` and `too_many`. They come from a fixed table, so renaming an enum can no longer change them.
+- A test line that names a card, relic, item, ability or enemy that is not defined, such as `hand Strik`, is lint error CT302, no longer a warning. The test fails saying so, with the nearest name, instead of with a .NET message ending `(Parameter 'name')`.
+- Godot: `LoadSave` no longer refuses a save only because the content's fingerprint differs. It restores it when the content still has everything it needs, so a patch that only adds a card keeps older saves loading, and refuses it as `content_changed`, with the rules' message, only when `Restore` does.
 - Godot: `GetWon()` returns null, not false, while a battle runs and before the first battle ends, as its documentation always said.
 - Godot: `CreatePlayer`, `AddCard`, `AddDeck`, `SpawnEnemy`, `GrantAbility`, `LoadSave` and `CancelChoice` fail with an error when called from a host callback, as `Play` and the other actions already did, including from a callback that a query such as `CanPlay` or `Describe` ran.
 - Godot: the editor dock's Reload button re-reads the `cantrip/*` project settings, so a changed setting no longer needs the plugin switched off and on.
 - Godot: `CantripRuntime.Execute` is documented for its supported uses, such as a rest between battles, and its limits.
+- Releases: the addon README in the release zip and in AGomnes/cantrip-godot links the Godot guide as it is at that release's tag, not on `main`. `tools/package-addon.sh` and `package-addon.ps1` take the tag as an optional argument.
+- Contributors: building Cantrip.Core fails, rather than warns, when its public API changes without a line in `PublicAPI.Unshipped.txt` (RS0016, RS0017).
 
 ### Fixed
 
@@ -52,6 +60,9 @@ When a release changes any of the following, its section says so under that name
 - Under `DeferredChooser`, an action that asks for a choice no longer throws ("The snapshot needs ..., which is not loaded") after a hot reload has removed a definition still in play.
 - A save taken after a hot reload names a waiting block in the definition that scheduled it, where that definition still has the same statements, so a later patch to an unrelated definition no longer refuses it.
 - Generated rules text puts a space before a unit that is a word: "for 2 turns", not "for 2turns".
+- CT313's suggestion keeps the listener's timing and filter: for `once per battle on before_damaged(target:owner):` it suggests `on before_damaged(target:owner) once per battle:`, not `on damaged(...)`, which cannot `cancel`.
+- Godot: an action a script takes in an `EffectEvent` handler has its events emitted before the outer call returns, after the events already on their way, rather than held until the game's next call. `BattleEnded` for a battle such an action ends comes after all of them.
+- `tools/package-addon.sh` works with a relative output folder.
 - Godot: loading or reloading content, from the node or the dock's Reload button, no longer crashes at random. The addon now reads each imported content file past Godot's resource cache, where a copy the garbage collector had already let go of could be found.
 - Godot: `LoadSave` no longer throws for a save whose waiting `next turn:` or `in N turns:` block a patch has changed. It refuses it as `"content_changed"` with the rules' message, leaving the game and any open choice untouched. A save whose game cannot be read, or is in a snapshot format this Cantrip.Core does not read, is refused as `"wrong_format"`.
 - Godot: `Save()` fails with "Cannot save while effects are still resolving." when a host callback calls it part way through an effect, as `CanSave()` and the guide already said; it used to save half an action. When a hot reload has changed a waiting block, it passes on the rules' own error, which says so, instead of blaming resolving effects.
@@ -63,10 +74,11 @@ When a release changes any of the following, its section says so under that name
   - Godot: the `AnswerChoice` `reason` words were `nothingpending`, `stalerequest`, `unknownoption`, `duplicateoption`, `toofew` and `toomany`. A script that compares against them needs the snake_case words above.
   - Godot: a script that stores `GetWon()` in a `bool` variable, or compares it with `false`, must allow for null.
   - Saving from a host callback part way through an effect now fails, in C# (`Capture`) and in Godot (`Save()`), instead of saving half an action.
+  - Lint: a test line naming a definition that does not exist is error CT302, so `lint` and `validate` fail on content they passed before.
   - Godot: a host callback that changed the game with a setup call now fails. The guide already said not to.
   - Godot, C# only: `CantripRuntime` and `GodotEffectHost` `RegisterName` and `RegisterFunction` take a `Variant` and dispose it when done. Pass a `Callable`, not a Variant you keep using or register twice.
   - `CanCapture` can be false in one new case: while a waiting block is one that a hot reload has changed since it was scheduled, until that block has run.
-- **Save format.** Saves made with 0.1.0-preview.2 still load; the format number stays 1, and their waiting blocks and listener records are matched by place, as before. Saves gain optional fields: `ScheduledSnapshot.Statements` and `BlockHash`, and `ListenerLimitSnapshot.ListenerHash` and `ListenerDueSnapshot.ListenerHash`. A save holding work scheduled by `Execute` does not load in 0.1.0-preview.2. A save that used to load after a patch that changed its waiting block, and then ran the wrong block, is now refused.
+- **Save format.** Saves made with 0.1.0-preview.2 still load; the format number stays 1, and their waiting blocks and listener records are matched by place, as before. Saves gain optional fields: `ScheduledSnapshot.Statements` and `BlockHash`, and `ListenerLimitSnapshot.ListenerHash` and `ListenerDueSnapshot.ListenerHash`. A save holding work scheduled by `Execute` does not load in 0.1.0-preview.2. A save that used to load after a patch that changed its waiting block, and then ran the wrong block, is now refused, as is a damaged one. In Godot, a save refused before only because a definition had since been added now loads.
 - **Same-seed results.** Unchanged: the simulator plays the same seeds identically. `ComputeHash` values of games with work waiting differ from 0.1.0-preview.2, but play does not.
 
 ## [0.1.0-preview.2] - 2026-09-21

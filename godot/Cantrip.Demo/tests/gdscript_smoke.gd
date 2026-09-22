@@ -3,8 +3,8 @@ extends Node
 # Proves the GDScript path, which C# tests cannot reach: that the node is instantiable by its
 # global class name, that its members answer under their C# (PascalCase) names, that dictionaries
 # and arrays marshal both ways, that signals arrive, that a lambda or a bound method registered
-# as a callback reaches the rules whole, and that an answer turned away says why in the word
-# docs/godot.md gives.
+# as a callback reaches the rules whole, that an answer turned away says why in the word
+# docs/godot.md gives, and that the calls a run makes between battles answer as it says.
 #
 # Two rules this file exists to pin down, both of which fail loudly rather than subtly:
 #   - members keep their C# names; there is no snake_case alias
@@ -61,8 +61,30 @@ func _run() -> void:
 
 	_check_callbacks(rules, slime)
 	_check_answers(rules)
+	_check_between_battles(rules)
 
 	_finish()
+
+# What a run needs between battles, through the GDScript call path: names come back as an array of
+# strings, a definition's text as the dictionary Describe gives, a removed card as a bool, and a new
+# run leaves the node ready to set up again. Last, because the new run ends the game above.
+func _check_between_battles(rules: CantripRuntime) -> void:
+	var cards: Array = rules.GetDefinitions("card", "")
+	_check("definitions are listed by name", cards == ["Ember", "Guard", "Sort"], str(cards))
+	_check("and narrowed by a tag", rules.GetDefinitions("card", "skill") == ["Guard", "Sort"], str(rules.GetDefinitions("card", "skill")))
+
+	var guard: Dictionary = rules.DescribeDefinition("Guard", "card")
+	_check("a definition out of play describes itself", guard.get("plain", "") == "Gain 6 Block.", str(guard.get("plain")))
+	_check("and a name nothing defines is empty", rules.DescribeDefinition("Nothing", "").is_empty())
+
+	var spare: int = rules.AddCard("Guard", "draw")
+	_check("a card is removed from the deck", rules.RemoveCard(spare) and not rules.GetZone(0, "draw").has(spare))
+	_check("once", not rules.RemoveCard(spare))
+
+	rules.Seed = 3
+	rules.NewRun()
+	_check("a new run has no player and no battle", rules.PlayerId() == 0 and not rules.IsInBattle() and rules.GetWon() == null)
+	_check("and sets up again", rules.CreatePlayer("Player", 80, 3) != 0 and rules.SpawnEnemy("Slime", 0) != 0)
 
 # An answer that is turned away says why in a snake_case word, like every other word the node gives.
 func _check_answers(rules: CantripRuntime) -> void:

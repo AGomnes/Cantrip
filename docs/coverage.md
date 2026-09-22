@@ -9,7 +9,7 @@ dotnet run --project src/Cantrip.Cli -- test samples/corpus
 dotnet run --project src/Cantrip.Cli -- lint samples/corpus
 ```
 
-The tables say what each effect needs. [What cannot be expressed yet](#open-gaps-most-useful-first) lists what is missing, and [Sharp edges](#sharp-edges-found-while-building-the-corpus) lists the rules that caught this corpus out, with links to where the language reference states them.
+The tables say what each effect needs. [What cannot be expressed yet](#open-gaps-most-useful-first) lists what is missing, and [Sharp edges](#sharp-edges) lists the rules that most often catch authors out, with links to where the language reference states them. Missing an effect from your game? [Report it with the effect form](https://github.com/AGomnes/Cantrip/issues/new?template=effect.yml).
 
 **Status**
 
@@ -198,7 +198,7 @@ Content: [darkest_dungeon.cantrip](../samples/corpus/darkest_dungeon.cantrip). T
 
 ## Open gaps, most useful first
 
-What the language cannot say yet, ranked by how many rows of the tables above each one holds back. The numbers are the gaps' permanent names: comments in the corpus and elsewhere refer to them.
+What the language cannot say yet, ranked by how many rows of the tables above each one holds back. The numbers are the gaps' permanent names: comments in the corpus and elsewhere refer to them. An effect from your game that is not here, or that the language cannot write, is worth [reporting with the effect form](https://github.com/AGomnes/Cantrip/issues/new?template=effect.yml): it is how this list grows.
 
 | Gap | What is missing | Rows | What works today |
 |---|---|---|---|
@@ -229,9 +229,9 @@ The other workarounds are explained in their rows: Heavy Blade (Slay the Spire #
 - **15, in part. A cost in another resource.** `cost 2 bones` is refused when the bones are not there, as an energy cost is (Inscryption #2). The rest is open above.
 - **16. A declared resource creates its own stat.** `resource "actions"` with `reset_to 1` gives every actor one action a turn with nothing else to grant it (Dominion #1).
 
-## Sharp edges found while building the corpus
+## Sharp edges
 
-Rules that are stated in the language reference but still caught this corpus out. Each links to where the reference states it.
+Rules that are stated in the language reference but still catch authors out, most of them found while building this corpus. Each links to where the reference states it.
 
 - **A listener hears the event that brought it into play.** A status applied by a card hears that card's `card_played`, and a minion hears its own creation. See Joining mid-event under [Listeners](language.md#listeners).
 - **Block granted on `battle_start` is gone by the first turn,** because the first turn start resets block. Grant it `on turn_start once per battle`. See [Relics](language.md#relics-items-and-keywords).
@@ -245,5 +245,10 @@ Rules that are stated in the language reference but still caught this corpus out
 - **`player` is always the game's player,** whichever side is acting. See [Names](language.md#names).
 - **In a test, block set in setup, and energy set below the maximum, are reset when the first turn starts;** winning the battle removes the player's statuses and returns every card to the draw pile; `play` cannot check that a card is refused; and an `item` is given with `relic`. See [Tests](language.md#tests).
 - **A name with spaces, hyphens or other punctuation is written in quotes wherever it is used,** after `name:` or `card:` too, as in `card:"Fire Bolt"`. See [Files](language.md#files) and [Qualifiers](language.md#qualifiers).
+- **A `once per` limit is spent when the listener fires,** even if an `if` in its body then does nothing. Put the condition in the filter: `on owner.damaged(owner.hp <= owner.max_hp / 2) once per battle:`. See [Listeners](language.md#listeners).
+- **A listener's scope is matched against the event's target,** so `on owner.card_played` hears cards played at the holder, not by it. For the cards it plays, write `on card_played(source:owner)`. See [Listeners](language.md#listeners).
+- **A tag works only on the `tags` line.** Under a card, `exhaust` on a line of its own is a property that nothing reads, and the card is discarded as usual; `lint` warns about it (CT316). See [Cards](language.md#cards).
+- **`damage` is what an entity deals and `damage_taken` what it receives,** so a Vulnerable is `modify damage_taken: x1.5`; written with `damage`, it makes its host hit harder. See [Modifiers](language.md#modifiers).
+- **A status is read through the entity that has it,** as in `owner.Weak` or `target.Weak`. There is no name `host`. See [Statuses](language.md#statuses).
 
 The summary counts the rows of the per-game tables. If the two ever disagree, the rows are right.

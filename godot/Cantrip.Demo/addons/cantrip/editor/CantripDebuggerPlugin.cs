@@ -118,6 +118,19 @@ namespace Cantrip.GodotAdapter
 
                 report.Add($"debugger: 2 session tab(s) driven, {raised.Count} request(s) raised back");
                 report.Add(inspector.SelfTest());
+
+                // A new run on the node is a new game behind the same session, whose trace is
+                // numbered from 1 again. The trace tab must start afresh rather than wait for the
+                // new steps to pass its old cursor and then hang them under the old run's rows.
+                runtime.Execute("block 1");
+                Relay(agent, trace, inspector, CantripProtocol.TraceFetch, new Godot.Collections.Array { 0, 50 });
+                (int Rows, long Cursor) before = trace.Shown;
+                var next = new CardRuntime(content, new RuntimeOptions { Seed = 1 });
+                Relay(new CantripDebugAgent(new CantripDebugService(next)), trace, inspector, CantripProtocol.Hello, new Godot.Collections.Array());
+                (int Rows, long Cursor) after = trace.Shown;
+                report.Add(before.Rows > 0 && after.Rows == 0 && after.Cursor == 0
+                    ? $"debugger: a new run starts the trace tab afresh, clearing {before.Rows} step(s) of the run before"
+                    : $"debugger: {CantripPlugin.SelfTestFailed}, a new run left the trace tab at step {after.Cursor} with {after.Rows} row(s), from {before.Rows}");
             }
             finally
             {

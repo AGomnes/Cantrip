@@ -41,11 +41,20 @@ namespace Cantrip.GodotAdapter.Demo
                 ContentLoadsAgainAfterACollection();
                 ABattlePlaysOut();
                 EventsArriveAfterTheAction();
+                AnActionFromAnEventHandlerIsToldBeforeTheCallReturns();
                 ViewsAndDescriptionsTellTheTruth();
                 ADeferredChoiceRollsBackAndReplays();
                 AnAnswerTurnedAwaySaysWhyInOneWord();
                 SavingAndLoadingReturnsTheSameGame();
+                ASaveFromBeforeAPatchThatAddsACardLoads();
+                ASaveNeedingACardAPatchRemovedIsRefusedUntouched();
                 APatchedWaitingBlockIsExplainedNotThrown();
+                ACardIsRemovedOrUpgradedBetweenBattles();
+                DefinitionsAreListedAndDescribedOutOfPlay();
+                ANewRunStartsAfresh();
+                ANewRunTakesUpAReloadedRuleset();
+                ANewRunCutsTheOldRunsEventsShort();
+                ANewRunDropsWhatThePresenterStillHadToShow();
                 HotReloadChangesARunningGame();
                 AChoiceIsAnsweredFromTheSignalThatAsks();
                 AHostCallbackCannotCallBackIn();
@@ -162,6 +171,43 @@ namespace Cantrip.GodotAdapter.Demo
                 _events.IndexOf("damaged") < _events.IndexOf("card_played"), string.Join(", ", _events));
 
             rules.EffectEvent -= OnEffectEvent;
+            rules.QueueFree();
+        }
+
+        /// <summary>
+        /// A handler may act again, and what that action raises is told as well, after the events
+        /// that prompted it and before the first call returns, not held back for the player's next
+        /// move. Whether the battle ended comes after all of them.
+        /// </summary>
+        private void AnActionFromAnEventHandlerIsToldBeforeTheCallReturns()
+        {
+            CantripRuntime rules = Loaded();
+            rules.CreatePlayer();
+            int slime = rules.SpawnEnemy("Slime");
+            rules.StartBattle(false, false);
+
+            var told = new List<string>();
+            Action<Godot.Collections.Dictionary> onEvent = effectEvent =>
+            {
+                told.Add(effectEvent["name"].AsString() + " " + effectEvent["amount"].AsInt32());
+                if (told.Count == 1) rules.Execute("deal 99 to target", 0, slime);   // the finishing blow, from the handler
+            };
+            Action<bool> onEnded = won => told.Add("BattleEnded " + won);
+            rules.EffectEvent += onEvent.Invoke;
+            rules.BattleEnded += onEnded.Invoke;
+
+            rules.Execute("deal 3 to target", 0, slime);
+
+            rules.EffectEvent -= onEvent.Invoke;
+            rules.BattleEnded -= onEnded.Invoke;
+
+            Check("an action taken in an event handler is told before the first call returns",
+                told.Count > 2 && told[0] == "damaged 3" && told[1] == "damaged 27", string.Join(", ", told));
+            Check("and the battle it won ends once, after everything that happened",
+                told[told.Count - 1] == "BattleEnded True" && told.Exists(entry => entry.StartsWith("battle_end", StringComparison.Ordinal))
+                && told.FindAll(entry => entry.StartsWith("BattleEnded", StringComparison.Ordinal)).Count == 1, string.Join(", ", told));
+            Check("so nothing is left for a later call to tell", rules.Buffer.Count == 0, rules.Buffer.Count.ToString());
+
             rules.QueueFree();
         }
 
@@ -282,10 +328,6 @@ namespace Cantrip.GodotAdapter.Demo
             Check("the save was accepted", loaded["accepted"].AsBool(), loaded["message"].AsString());
             Check("and the game is back where it was", rules.StateHash() == before, rules.StateHash() + " vs " + before);
 
-            Godot.Collections.Dictionary refused = rules.LoadSave("{\"format\":1,\"fingerprint\":\"not-this-content\",\"snapshot\":\"{}\"}");
-            Check("a save from other content is refused, not crashed into", !refused["accepted"].AsBool());
-            Check("with a reason worth showing", refused["reason"].AsString() == "content_changed", refused["reason"].AsString());
-
             // The right content, but no game inside: a file damaged or edited by hand.
             string untouched = rules.StateHash();
             Godot.Collections.Dictionary unreadable = LoadOrThrown(rules,
@@ -302,6 +344,76 @@ namespace Cantrip.GodotAdapter.Demo
             Check("and changes nothing either", rules.StateHash() == untouched);
 
             rules.QueueFree();
+        }
+
+        /// <summary>
+        /// A patch that only adds a card changes the content's fingerprint, but a save made before
+        /// it still has everything it needs, so it loads: the fingerprint alone refuses nothing.
+        /// </summary>
+        private void ASaveFromBeforeAPatchThatAddsACardLoads()
+        {
+            CantripRuntime before = Loaded();
+            before.CreatePlayer();
+            before.SpawnEnemy("Slime");
+            before.StartBattle(false, false);
+            int ember = before.AddCard("Ember", "hand");
+            string save = before.Save();
+            string saved = before.StateHash();
+
+            CantripRuntime patched = Loaded();
+            DiagnosticBag added = patched.Content.LoadText(
+                "card \"Newcomer\"\n  cost 1\n  effect:\n    block 3\n", "res://tests/newcomer.cantrip");
+            Check("the patch adds a card and so changes the fingerprint",
+                !added.HasErrors && patched.Content.Fingerprint != before.Content.Fingerprint, added.ToString());
+
+            Godot.Collections.Dictionary loaded = LoadOrThrown(patched, save);
+            Check("a save from before a patch that only adds a card loads",
+                loaded["accepted"].AsBool() && loaded["reason"].AsString() == "none", loaded["reason"] + ": " + loaded["message"]);
+            Check("as the game it was", patched.StateHash() == saved, patched.StateHash() + " vs " + saved);
+            Godot.Collections.Array enemies = patched.GetEnemies();
+            Check("and plays on", enemies.Count == 1 && patched.Play(ember, enemies[0].AsInt32()) == "played");
+            Check("with the new card there to be had", patched.PlayerId() != 0 && patched.AddCard("Newcomer", "hand") != 0);
+
+            before.QueueFree();
+            patched.QueueFree();
+        }
+
+        /// <summary>
+        /// A save that names a card the patch has removed cannot be restored. The rules find that
+        /// before they change anything, so the game in progress, and the choice it waits on, stay.
+        /// </summary>
+        private void ASaveNeedingACardAPatchRemovedIsRefusedUntouched()
+        {
+            CantripRuntime before = NewRuntime();
+            before.LoadContent(ContentFolder);
+            before.Content.LoadText("card \"Keepsake\"\n  cost 0\n  effect:\n    draw 1\n", "res://tests/keepsake.cantrip");
+            before.CreatePlayer();
+            before.SpawnEnemy("Slime");
+            before.StartBattle(false, false);
+            before.AddCard("Keepsake", "hand");
+            string save = before.Save();
+
+            CantripRuntime patched = Loaded();
+            patched.CreatePlayer();
+            patched.SpawnEnemy("Slime");
+            patched.StartBattle(false, false);
+            int spare = patched.AddCard("Ember", "hand");
+            patched.Play(patched.AddCard("Sort", "hand"));
+            int request = patched.GetPendingChoice()["id"].AsInt32();
+            string untouched = patched.StateHash();
+
+            Godot.Collections.Dictionary refused = LoadOrThrown(patched, save);
+            Check("a save needing a card the patch removed is refused as content_changed",
+                !refused["accepted"].AsBool() && refused["reason"].AsString() == "content_changed", refused["reason"] + ": " + refused["message"]);
+            Check("with the rules' message, naming the card", refused["message"].AsString().Contains("\"Keepsake\""), refused["message"].AsString());
+            Check("and the game is untouched", patched.StateHash() == untouched, patched.StateHash() + " vs " + untouched);
+            Check("its open choice still open", patched.HasPendingChoice() && patched.GetPendingChoice()["id"].AsInt32() == request);
+
+            Godot.Collections.Dictionary answered = patched.AnswerChoice(request, new Godot.Collections.Array { spare });
+            Check("and answered as before", answered["accepted"].AsBool() && answered["result"].AsString() == "played", answered["message"].AsString());
+
+            before.QueueFree();
+            patched.QueueFree();
         }
 
         /// <summary>
@@ -360,6 +472,262 @@ namespace Cantrip.GodotAdapter.Demo
                 DirAccess.RemoveAbsolute(folder);
                 rules.QueueFree();
             }
+        }
+
+        /// <summary>
+        /// A deckbuilder between battles: the deck is the draw pile, a card leaves it for good, and
+        /// an upgrade is the card's upgraded definition put in its place.
+        /// </summary>
+        private void ACardIsRemovedOrUpgradedBetweenBattles()
+        {
+            CantripRuntime rules = Loaded();
+            DiagnosticBag upgrades = rules.Content.LoadText(
+                "card \"Guard+\"\n  cost 1\n  tags skill, upgraded\n  effect:\n    block 9\n", "res://tests/upgrades.cantrip");
+            Check("an upgraded definition loads", !upgrades.HasErrors, upgrades.ToString());
+
+            _events.Clear();
+            rules.EffectEvent += OnEffectEvent;
+
+            int player = rules.CreatePlayer();
+            Godot.Collections.Array deck = rules.AddDeck(new Godot.Collections.Array { "Ember", "Guard", "Sort" });
+            int slime = rules.SpawnEnemy("Slime");
+            rules.StartBattle(false, true);
+            rules.Execute("deal 99 to target", 0, slime);
+            Check("the battle is won, and every card is back in the draw pile",
+                rules.GetWon().AsBool() && rules.GetZone(0, "draw").Count == 3, Names(rules, rules.GetZone(0, "draw")));
+
+            int sort = deck[2].AsInt32();
+            _events.Clear();
+            Check("RemoveCard takes a card out of the deck", rules.RemoveCard(sort) && !rules.GetZone(0, "draw").Contains(sort));
+            Check("content hears it as destroyed", _events.Contains("destroyed"), string.Join(", ", _events));
+            Check("and it is gone for good", rules.GetEntity(sort)["removed"].AsBool());
+            Check("a card already gone is not removed again", !rules.RemoveCard(sort));
+            Check("nor is anything that is not a card",
+                !rules.RemoveCard(slime) && !rules.RemoveCard(player) && !rules.RemoveCard(0) && !rules.RemoveCard(999999));
+            Check("so the player is still there", rules.PlayerId() == player && rules.GetStat(player, "hp") > 0);
+
+            int guard = deck[1].AsInt32();
+            string upgraded = rules.GetEntity(guard)["name"].AsString() + "+";
+            Check("a card's upgraded definition is found by its name", rules.DescribeDefinition(upgraded, "card").Count > 0, upgraded);
+            rules.RemoveCard(guard);
+            int better = rules.AddCard(upgraded, "draw");
+            Check("an upgrade is the upgraded definition put in its place",
+                Names(rules, rules.GetZone(0, "draw")) == "Ember, Guard+", Names(rules, rules.GetZone(0, "draw")));
+            Check("and a card with no upgraded definition has none to find", rules.DescribeDefinition("Ember+", "card").Count == 0);
+
+            int ember = deck[0].AsInt32();
+
+            rules.SpawnEnemy("Slime");
+            rules.StartBattle(false, true);
+            Check("and the next battle is dealt from the deck as it now is",
+                rules.GetHand().Count == 2 && rules.GetHand().Contains(better) && rules.GetHand().Contains(ember), Names(rules, rules.GetHand()));
+
+            rules.EffectEvent -= OnEffectEvent;
+            rules.QueueFree();
+        }
+
+        /// <summary>
+        /// A reward screen or a shop shows cards that are not in play yet: listed by kind and tag,
+        /// and described with their printed values, without the rules having to exist.
+        /// </summary>
+        private void DefinitionsAreListedAndDescribedOutOfPlay()
+        {
+            CantripRuntime rules = NewRuntime();
+            rules.LoadContent(ContentFolder);
+
+            Check("every card is listed by name, sorted", Joined(rules.GetDefinitions("card", "")) == "Ember, Guard, Sort",
+                Joined(rules.GetDefinitions("card", "")));
+            Check("a tag narrows the list", Joined(rules.GetDefinitions("card", "skill")) == "Guard, Sort", Joined(rules.GetDefinitions("card", "skill")));
+            Check("any kind can be listed", Joined(rules.GetDefinitions("enemy", "")) == "Slime" && Joined(rules.GetDefinitions("status", "fire")) == "Burn");
+            Check("a kind or a tag nothing has lists nothing",
+                rules.GetDefinitions("card", "nothing").Count == 0 && rules.GetDefinitions("potion", "").Count == 0);
+
+            Godot.Collections.Dictionary guard = rules.DescribeDefinition("Guard", "card");
+            Check("a definition describes itself out of play", guard["plain"].AsString() == "Gain 6 Block.", guard["plain"].AsString());
+            Check("with its cost", guard.ContainsKey("cost") && guard["cost"].AsGodotDictionary()["current"].AsInt32() == 1);
+            Check("an empty kind finds it by name alone", rules.DescribeDefinition("Guard", "")["plain"].AsString() == "Gain 6 Block.");
+            Godot.Collections.Dictionary anyCase = rules.DescribeDefinition("guard", "Card");
+            Check("and a kind is matched without regard to case, in both",
+                anyCase.ContainsKey("plain") && anyCase["plain"].AsString() == "Gain 6 Block." && Joined(rules.GetDefinitions("Card", "")) == "Ember, Guard, Sort",
+                anyCase.Count + " key(s); " + Joined(rules.GetDefinitions("Card", "")));
+            Check("and a name nothing has, or not of that kind, is empty",
+                rules.DescribeDefinition("Nothing", "").Count == 0 && rules.DescribeDefinition("Guard", "enemy").Count == 0);
+
+            Check("neither brings the rules into being, so content can still be loaded",
+                !Throws<InvalidOperationException>(() => rules.LoadContent(ContentFolder)));
+
+            rules.CreatePlayer();
+            rules.SpawnEnemy("Slime");
+            rules.StartBattle(false, false);
+            int ember = rules.AddCard("Ember", "hand");
+            Godot.Collections.Dictionary printed = rules.DescribeDefinition("Ember", "card");
+            Godot.Collections.Dictionary live = rules.Describe(ember, 0);
+            Check("with nothing changing a card, its text is the one Describe gives in play",
+                printed["plain"].AsString() == live["plain"].AsString() && printed["bbcode"].AsString() == live["bbcode"].AsString(),
+                printed["plain"] + " vs " + live["plain"]);
+            Check("in the same shape", new HashSet<string>(Keys(printed)).SetEquals(Keys(live)), string.Join(", ", Keys(printed)));
+
+            rules.QueueFree();
+        }
+
+        /// <summary>
+        /// A new run on the same node: the rules begin again from the loaded content, reading the
+        /// seed afresh, and nothing of the old run is left to answer or to hear.
+        /// </summary>
+        private void ANewRunStartsAfresh()
+        {
+            CantripRuntime rules = Loaded();
+            rules.RegisterName("three", Callable.From((Godot.Collections.Dictionary _) => 3));
+            _lastChoice = new Godot.Collections.Dictionary();
+            rules.ChoiceRequested += OnChoiceRequested;
+
+            rules.CreatePlayer();
+            rules.AddDeck(new Godot.Collections.Array { "Ember", "Guard" });
+            rules.SpawnEnemy("Slime");
+            rules.StartBattle(false, false);
+            int keep = rules.AddCard("Guard", "hand");
+            rules.Play(rules.AddCard("Sort", "hand"));
+            int request = _lastChoice.Count > 0 ? _lastChoice["id"].AsInt32() : 0;
+            Check("the old run was waiting on a choice", request > 0 && rules.HasPendingChoice());
+            CardRuntime old = rules.Core;
+
+            rules.Seed = 9;
+            rules.NewRun();
+            rules.ChoiceRequested -= OnChoiceRequested;
+
+            Check("a new run has no player, no battle and no enemies",
+                rules.PlayerId() == 0 && !rules.IsInBattle() && rules.GetEnemies().Count == 0 && rules.GetWon().VariantType == Variant.Type.Nil);
+            Check("nothing is waiting to be answered", !rules.HasPendingChoice()
+                && rules.AnswerChoice(request, new Godot.Collections.Array { keep })["reason"].AsString() == "nothing_pending");
+            Check("its Core is a new object", !ReferenceEquals(old, rules.Core));
+            Check("content is not loaded again over it", Throws<InvalidOperationException>(() => rules.LoadContent(ContentFolder)));
+
+            var fresh = new CantripRuntime { AutoLoad = false, ContentFolder = ContentFolder, Seed = 9 };
+            AddChild(fresh);
+            fresh.LoadContent(ContentFolder);
+            CantripRuntime seven = Loaded();
+
+            foreach (CantripRuntime run in new[] { rules, fresh, seven })
+            {
+                Check("and it plays from the start", run.CreatePlayer() != 0);
+                run.AddDeck(new Godot.Collections.Array { "Ember", "Guard", "Sort", "Guard", "Ember", "Sort" });
+                run.SpawnEnemy("Slime");
+                run.StartBattle(true, true);
+            }
+            Check("exactly as a fresh node with the new seed does", rules.StateHash() == fresh.StateHash(), rules.StateHash() + " vs " + fresh.StateHash());
+            Check("which is not how the old seed plays", rules.StateHash() != seven.StateHash());
+
+            int slime = rules.GetEnemies()[0].AsInt32();
+            rules.Execute("deal three to target", 0, slime);
+            Check("the callables registered stay registered", rules.GetStat(slime, "hp") == 27, rules.GetStat(slime, "hp").ToString());
+
+            fresh.QueueFree();
+            seven.QueueFree();
+            rules.QueueFree();
+        }
+
+        /// <summary>
+        /// A running game keeps the ruleset it started with, whatever a reload says; a new run is
+        /// the point at which a changed one takes effect.
+        /// </summary>
+        private void ANewRunTakesUpAReloadedRuleset()
+        {
+            const string folder = "user://headless";
+            const string path = folder + "/ruleset.cantrip";
+            var deck = new Godot.Collections.Array { "Ember", "Guard", "Sort", "Ember", "Guard", "Sort" };
+
+            CantripRuntime rules = Loaded();
+            try
+            {
+                DirAccess.MakeDirRecursiveAbsolute(folder);
+                rules.CreatePlayer();
+                rules.AddDeck(deck);
+                rules.SpawnEnemy("Slime");
+                rules.StartBattle(false, true);
+                Check("the default ruleset deals five cards", rules.GetHand().Count == 5, rules.GetHand().Count.ToString());
+
+                using (FileAccess file = FileAccess.Open(path, FileAccess.ModeFlags.Write)) file.StoreString("ruleset\n  hand_size 2\n");
+                Godot.Collections.Dictionary report = rules.ReloadContent(new Godot.Collections.Array { path });
+                Check("a reload that changes the ruleset says so", report["ruleset_changed"].AsBool());
+
+                rules.NewRun();
+                rules.CreatePlayer();
+                rules.AddDeck(deck);
+                rules.SpawnEnemy("Slime");
+                rules.StartBattle(false, true);
+                Check("and a new run plays by it", rules.GetHand().Count == 2, rules.GetHand().Count.ToString());
+            }
+            finally
+            {
+                DirAccess.RemoveAbsolute(path);
+                DirAccess.RemoveAbsolute(folder);
+                rules.QueueFree();
+            }
+        }
+
+        /// <summary>
+        /// A handler may start a new run while the old run's events are still being told. The rest
+        /// of them name entities that are gone, and ids the new run will reuse, so they stop there.
+        /// </summary>
+        private void ANewRunCutsTheOldRunsEventsShort()
+        {
+            CantripRuntime rules = Loaded();
+            rules.CreatePlayer();
+            int slime = rules.SpawnEnemy("Slime");
+            rules.StartBattle(false, false);
+
+            var heard = new List<string>();
+            bool ended = false;
+            Action<Godot.Collections.Dictionary> onEvent = effectEvent =>
+            {
+                heard.Add(effectEvent["name"].AsString());
+                if (heard.Count == 1) rules.NewRun();
+            };
+            Action<bool> onEnded = won => ended = true;
+            rules.EffectEvent += onEvent.Invoke;
+            rules.BattleEnded += onEnded.Invoke;
+
+            rules.Execute("deal 99 to target", 0, slime);
+
+            rules.EffectEvent -= onEvent.Invoke;
+            rules.BattleEnded -= onEnded.Invoke;
+
+            Check("a new run started from an event handler hears nothing more of the old one", heard.Count == 1, string.Join(", ", heard));
+            Check("not even that its battle ended", !ended);
+            Check("and is ready to play", rules.PlayerId() == 0 && rules.CreatePlayer() != 0);
+
+            rules.QueueFree();
+        }
+
+        /// <summary>What a presenter still had to show belongs to the old run, so a new run drops it.</summary>
+        private void ANewRunDropsWhatThePresenterStillHadToShow()
+        {
+            var presenter = new BattlePresenter();
+            AddChild(presenter);
+            var rules = new CantripRuntime { AutoLoad = false, ContentFolder = ContentFolder, Seed = 7, Presenter = presenter };
+            AddChild(rules);
+            rules.LoadContent(ContentFolder);
+
+            int presented = 0;
+            bool settled = false;
+            Action<Godot.Collections.Dictionary> onPresent = _ => presented++;   // and never Done: an animation still playing
+            Action onSettled = () => settled = true;
+            presenter.Present += onPresent.Invoke;
+            presenter.Settled += onSettled.Invoke;
+
+            rules.CreatePlayer();
+            int slime = rules.SpawnEnemy("Slime");
+            rules.StartBattle(false, false);
+            rules.Play(rules.AddCard("Ember", "hand"), slime);
+            Check("the presenter is part way through the old run's events", presenter.IsBusy() && presenter.PendingCount() > 0 && presented == 1);
+
+            rules.NewRun();
+            Check("a new run drops the rest", presenter.IsSettled() && settled && presented == 1);
+
+            presenter.Present -= onPresent.Invoke;
+            presenter.Settled -= onSettled.Invoke;
+            rules.QueueFree();
+            presenter.QueueFree();
         }
 
         private void HotReloadChangesARunningGame()
@@ -522,17 +890,19 @@ namespace Cantrip.GodotAdapter.Demo
                 Attempt("GrantAbility", () => rules.GrantAbility("Anything", player));
                 Attempt("LoadSave", () => rules.LoadSave(save));
                 Attempt("CancelChoice", () => rules.CancelChoice());
+                Attempt("RemoveCard", () => rules.RemoveCard(card));
+                Attempt("NewRun", () => rules.NewRun());
                 return 0;
             }));
 
             rules.Execute("log meddle", 0, 0);
             Check("every setup call is refused from a callback an effect made",
-                allowed.Count == 0 && new HashSet<string>(refused).Count == 7, "allowed: " + string.Join(", ", allowed));
+                allowed.Count == 0 && new HashSet<string>(refused).Count == 9, "allowed: " + string.Join(", ", allowed));
 
             refused.Clear();
             int cost = rules.CostOf(card);
             Check("and from one a query made",
-                allowed.Count == 0 && new HashSet<string>(refused).Count == 7 && cost == 1, $"cost {cost}, allowed: " + string.Join(", ", allowed));
+                allowed.Count == 0 && new HashSet<string>(refused).Count == 9 && cost == 1, $"cost {cost}, allowed: " + string.Join(", ", allowed));
 
             Check("so the game was not set up behind the rules' back",
                 rules.GetHand().Count == 1 && rules.GetZone(0, "draw").Count == 0 && rules.GetEnemies().Count == 1);
@@ -815,6 +1185,30 @@ namespace Cantrip.GodotAdapter.Demo
                 lines.Add($"{diagnostic["file"]}:{diagnostic["line"]} {diagnostic["code"]} {diagnostic["message"]}");
             }
             return string.Join(" | ", lines);
+        }
+
+        /// <summary>The names of these entities, sorted, as one line.</summary>
+        private static string Names(CantripRuntime rules, Godot.Collections.Array ids)
+        {
+            var names = new List<string>();
+            foreach (Variant id in ids) names.Add(rules.GetEntity(id.AsInt32())["name"].AsString());
+            names.Sort(StringComparer.Ordinal);
+            return string.Join(", ", names);
+        }
+
+        /// <summary>An array of strings as one line, in its own order.</summary>
+        private static string Joined(Godot.Collections.Array values)
+        {
+            var parts = new List<string>();
+            foreach (Variant value in values) parts.Add(value.AsString());
+            return string.Join(", ", parts);
+        }
+
+        private static List<string> Keys(Godot.Collections.Dictionary dictionary)
+        {
+            var keys = new List<string>();
+            foreach (Variant key in dictionary.Keys) keys.Add(key.AsString());
+            return keys;
         }
 
         private static int Status(Godot.Collections.Dictionary entity, string name)

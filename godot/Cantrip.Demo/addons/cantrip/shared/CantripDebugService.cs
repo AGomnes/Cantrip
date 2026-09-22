@@ -10,9 +10,10 @@ namespace Cantrip.GodotAdapter
     /// <summary>What a game says about itself when the editor first reaches it.</summary>
     public sealed class CantripHello
     {
-        internal CantripHello(int protocol, int generation, string fingerprint, int definitions, bool inBattle, int turn, bool tracing)
+        internal CantripHello(int protocol, long session, int generation, string fingerprint, int definitions, bool inBattle, int turn, bool tracing)
         {
             Protocol = protocol;
+            Session = session;
             Generation = generation;
             Fingerprint = fingerprint;
             Definitions = definitions;
@@ -23,6 +24,13 @@ namespace Cantrip.GodotAdapter
 
         /// <summary>The protocol the game speaks, so an editor of another age can say so plainly.</summary>
         public int Protocol { get; }
+
+        /// <summary>
+        /// Which game behind the channel this is. A new run on the same node is a new game, whose
+        /// trace is numbered from 1 again, so an editor holding steps from another session starts
+        /// its view afresh.
+        /// </summary>
+        public long Session { get; }
 
         public int Generation { get; }
 
@@ -152,12 +160,18 @@ namespace Cantrip.GodotAdapter
         private static readonly IReadOnlyList<Diagnostic> NoDiagnostics = new Diagnostic[0];
         private static readonly IReadOnlyList<string> NoMissing = new string[0];
 
+        private static long _sessions;
+
         public CantripDebugService(CardRuntime runtime)
         {
             Runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
+            Session = System.Threading.Interlocked.Increment(ref _sessions);
         }
 
         public CardRuntime Runtime { get; }
+
+        /// <summary>This service's own number, never shared with another in the same process. See <see cref="CantripHello.Session"/>.</summary>
+        public long Session { get; }
 
         public ContentLibrary Content => Runtime.Content;
 
@@ -171,6 +185,7 @@ namespace Cantrip.GodotAdapter
 
             return new CantripHello(
                 CantripProtocol.Version,
+                Session,
                 Content.Generation,
                 Content.Fingerprint,
                 definitions,

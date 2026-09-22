@@ -41,7 +41,7 @@ runtime.Play(runtime.State.ZoneOf(player, Zones.Hand)[0], ghoul);
 runtime.EndTurn();
 ```
 
-This is a **preview**. The API and the save format may change between previews; see [stability](https://github.com/AGomnes/Cantrip/blob/main/docs/stability.md).
+This is a **preview**. The API and the save format may change between previews; see [stability](https://github.com/AGomnes/Cantrip/blob/main/docs/stability.md). The linked docs describe the `main` branch, which can be ahead of this version; each release's own docs are in [its tag](https://github.com/AGomnes/Cantrip/tags).
 
 - [Quickstart](https://github.com/AGomnes/Cantrip/blob/main/docs/quickstart.md): from nothing to a playable battle in about fifteen minutes
 - [Language reference](https://github.com/AGomnes/Cantrip/blob/main/docs/language.md)

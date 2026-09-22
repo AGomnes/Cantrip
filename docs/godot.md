@@ -1,5 +1,9 @@
 # The Godot addon
 
+> Read on the `main` branch, this guide can be ahead of the latest release. The changelog's
+> [Unreleased](../CHANGELOG.md#unreleased) section lists what that release lacks, and each
+> release's own guide is in its [tag](https://github.com/AGomnes/Cantrip/tags).
+
 The Cantrip addon puts the rules engine inside a Godot game. Content loads from `res://`, one node
 runs battles and hands everything to your scripts as ids and dictionaries, `.cantrip` files reach
 exported builds, and the editor gets a dock for problems, tests and card text.
@@ -14,8 +18,12 @@ What a GDScript project takes on by using it:
 - **The .NET edition of Godot**, for everyone who opens the project, since the standard edition
   cannot run the addon's C#. Your GDScript works in it unchanged.
 - **The .NET SDK**, which builds the C# part. You never edit that part.
-- **Godot's limits on exporting a .NET game.** Only a Linux x64 export has been tried with
-  Cantrip; [Platforms](stability.md#platforms) lists what has and has not.
+- **Godot's limits on exporting a .NET game.** A .NET project cannot export to every platform
+  Godot supports: not to the web at all, and to Android and iOS only experimentally, as
+  [C# platform support](https://docs.godotengine.org/en/4.6/tutorials/scripting/c_sharp/index.html#c-platform-support)
+  in Godot's documentation explains. With Cantrip, only a Linux x64 export has been tried; a
+  Windows export has not been tried yet. [Platforms](stability.md#platforms) lists what has and
+  has not.
 
 ## Installing
 
@@ -30,8 +38,8 @@ What a GDScript project takes on by using it:
      right, or `dotnet build` in the project folder.
 1. **Put the addon in the project**, so that `res://addons/cantrip/plugin.cfg` exists. It comes
    from any of these:
-   - the Godot Asset Library: search for Cantrip in the editor's AssetLib tab once the listing,
-     which is awaiting review, is approved;
+   - the Godot Asset Library: search for Cantrip in the editor's AssetLib tab, and if it is not
+     listed yet, use one of the other two;
    - `cantrip-godot-<version>.zip` on a [GitHub release](https://github.com/AGomnes/Cantrip/releases),
      whose root is `addons/cantrip`: unzip it into the project folder;
    - the [AGomnes/cantrip-godot](https://github.com/AGomnes/cantrip-godot) repository, which each
@@ -259,9 +267,10 @@ The same seed plays the same battle, so yours reads the same. What the script re
 - **`AnswerChoice` returns a dictionary**, not a word: `accepted`, a `reason` and a `message`
   saying why when it is false, and the `result` word when it is true. See
   [Choices the player makes](#choices-the-player-makes).
-- **Events come after the action.** The card is announced before `Play` is called because its
-  events arrive during the call, once the play has resolved. `amount` on `damaged` is the hp
-  actually lost, so a hit that the block absorbs is `damaged` with 0.
+- **Events come after the action.** `EffectEvent` is emitted for each of the card's events before
+  `Play` returns, but only after the whole play has resolved, which is why the script announces
+  the card before calling `Play`. `amount` on `damaged` is the hp actually lost, so a hit that the
+  block absorbs is `damaged` with 0.
 
 A fuller version, with a hand of buttons, enemy panels with intents, a log and paced animation, is
 the demo's [battle.gd](https://github.com/AGomnes/Cantrip/blob/main/godot/Cantrip.Demo/demo/battle.gd).
@@ -291,15 +300,15 @@ none. Everything else crosses as strings, numbers, arrays and dictionaries with 
 | `Presenter` | none | A `BattlePresenter` that paces events; see [Pacing events](#pacing-events-with-a-battlepresenter) |
 | `Driver` | none | A `TickDriver` for a real-time game |
 
-`Seed`, `Trace`, `RealTime`, `TicksPerSecond` and `TrackedStats` are read once, when the first
-call that sets up, plays or reads the game brings the rules into being, so set them before that.
-`Driver` is read when the node enters the tree.
+`Seed`, `Trace`, `RealTime`, `TicksPerSecond` and `TrackedStats` are read when the first call
+that sets up, plays or reads the game brings the rules into being, so set them before that, and
+again by `NewRun`. `Driver` is read when the node enters the tree.
 
 ### Signals
 
 | Signal | When |
 |---|---|
-| `EffectEvent(effect_event: Dictionary)` | Once for each event, after the action that raised it has finished. Not emitted while a `Presenter` is set. |
+| `EffectEvent(effect_event: Dictionary)` | Once for each event, after the action that raised it has resolved and before the call that started it returns; for an action taken in a handler, see [Events](#events). Not emitted while a `Presenter` is set. |
 | `ChoiceRequested(request: Dictionary)` | The rules are waiting for the player to choose. Emitted after the action's events. |
 | `BattleStarted()` | `StartBattle` has started a battle |
 | `BattleEnded(won: bool)` | The action that won or lost the battle has finished |
@@ -316,18 +325,21 @@ that is the value to pass if you have no other in mind.
 |---|---|
 | `LoadContent(folder: String) -> Array` | Loads every `.cantrip` file under `folder` (`""` means `ContentFolder`) and returns the problems found. Only before any other call. |
 | `ReloadContent(paths: Array) -> Dictionary` | Reloads the given `res://` files into a running game, or for `[]` every file under `ContentFolder`, even if `LoadContent` was given another folder. See [Hot reload](#hot-reload). |
+| `GetDefinitions(kind: String, tag: String) -> Array` | The names of every loaded definition of one kind, such as `"card"`, `"relic"` or `"enemy"`, that has `tag` among its tags, or of every one for `""`. Sorted by name, for a reward screen or a shop. Default tag: `""`. |
 
 **Setting a game up**
 
 | Method | |
 |---|---|
-| `CreatePlayer(name: String, hp: int, maxEnergy: int) -> int` | Creates the player, once per node. `maxEnergy` is the energy each turn starts with. Defaults: `"Player", 80, 3`. |
+| `CreatePlayer(name: String, hp: int, maxEnergy: int) -> int` | Creates the player, once per run. `maxEnergy` is the energy each turn starts with. Defaults: `"Player", 80, 3`. |
 | `AddCard(name: String, zone: String) -> int` | Adds a card to one of the player's zones. Default zone: `"draw"`. |
 | `AddDeck(names: Array) -> Array` | Adds cards to the draw pile, returning their ids |
 | `AddRelic(name: String) -> int` | Gives the player a relic |
 | `SpawnEnemy(name: String, hp: int) -> int` | Adds an enemy. An `hp` of 0 uses the content's. Default: `0`. |
 | `ApplyStatus(status: String, targetId: int, stacks: int) -> int` | Applies a status, as the player. Returns the status's id, or 0. Default stacks: `1`. |
 | `GrantAbility(name: String, ownerId: int) -> int` | Attaches an ability to an actor. Returns its id, or 0 when `ownerId` is unknown. |
+| `RemoveCard(cardId: int) -> bool` | Takes a card out of the game for good, as `destroy` does in content, which hears it as `destroyed`. False, having changed nothing, when the id is not a card still in the game. |
+| `NewRun() -> void` | Starts a new run: the rules begin again from the loaded content, with no player, cards or enemies, and read `Seed` and the other exports again. See [Between battles](#between-battles). |
 
 **Playing**
 
@@ -369,6 +381,7 @@ that is the value to pass if you have no other in mind.
 |---|---|
 | `Describe(entityId: int, targetId: int) -> Dictionary` | Rules text with live values, for a card frame or a tooltip. `targetId` counts that target's statuses, or 0 for none. |
 | `DescribeIntent(enemyId: int) -> Dictionary` | What an enemy will do next, with live values. Until the battle has started, its `empty` is true and its text is `""`. |
+| `DescribeDefinition(name: String, kind: String) -> Dictionary` | A definition's rules text with its printed values, for something not in play, such as a reward. `kind` `""` takes the first definition of that name. Empty when none is loaded. Default kind: `""`. |
 
 **Choices**
 
@@ -395,7 +408,8 @@ that is the value to pass if you have no other in mind.
 | `RegisterFunction(name: String, callable: Callable) -> void` | Answers a function content calls that only your game knows |
 
 See [Callbacks from content](#callbacks-from-content). A C# game has two more members: `Core`,
-the `CardRuntime` underneath, and `Content`, the loaded `ContentLibrary`.
+the `CardRuntime` underneath, which is a new object after `NewRun`, and `Content`, the loaded
+`ContentLibrary`.
 
 ### Zones
 
@@ -437,7 +451,7 @@ Each status in `statuses` has `id`, `name`, `stacks`, `duration` (turns left, or
 duration status, the stacks for any other. `hidden` is true for `flags hidden`, which a status bar
 leaves out.
 
-**Rules text**, from `Describe` and `DescribeIntent`:
+**Rules text**, from `Describe`, `DescribeIntent` and `DescribeDefinition`:
 
 | Key | |
 |---|---|
@@ -502,9 +516,13 @@ way the save cannot survive; see [Saving](#saving)).
 
 The rules resolve an action completely and at once; presentation watches afterwards.
 
-- **Events are delivered after the action finishes, never during it.** Acting again from a handler
-  is fine, such as answering a choice or playing the next card, because by then nothing is
-  resolving. What is refused, with an error, is acting from a
+- **Events are emitted before the call that caused them returns, but only after the whole action
+  has resolved**, never part way through it; with a [`Presenter`](#pacing-events-with-a-battlepresenter),
+  they go to it then, and it hands them on one at a time. So acting again from a handler is fine,
+  such as answering a choice or playing the next card, because by then nothing is resolving. An
+  action taken in an `EffectEvent` handler resolves at once as well, and its events are emitted
+  after the rest of those already on their way, still before the outer call returns; `BattleEnded`
+  comes after all of them. What is refused, with an error, is acting from a
   [callback](#callbacks-from-content): those run in the middle of an effect.
 - **They arrive in completion order, innermost first.** An event that wraps others completes after
   them: playing a card reports `damaged`, then `status_applied`, then `card_played`.
@@ -532,7 +550,7 @@ A Strike on the Ghoul, the first card played in a battle set up as in
 | `values` | The event's data, such as `blocked` on `damaged` or `status_name` on `status_applied`. Numbers arrive as floats and entities as ids. |
 | `after` | For each entity that took part, keyed by its id as an `int`, the tracked stats as they were |
 | `tags` | The event's tags: the damage type, the card's tags |
-| `seq` | Its position in the run of events, rising by one each time |
+| `seq` | Its position in the run of events, rising by one each time. It starts again from 1 after `LoadSave` and `NewRun`. |
 | `time` | The game clock when it happened: the tick in a real-time game. In a turn game it counts turns from 0 and does not start again with each battle, so it is not the turn number; `GetTurn()` gives that. |
 | `replaced` | True when an `instead` listener ran in place of the usual action |
 | `phase` | Always `"after"` |
@@ -636,11 +654,18 @@ func _on_offer(request: Dictionary, picked_position: int) -> void:
 
 ## Between battles
 
-One node plays a whole run. The player keeps its hp, its deck and its relics from one battle to
-the next; the enemies that died are cleared away when the next battle starts, and the player's
-statuses end with the battle unless content flags them `persistent`.
-[Winning, losing and several battles](csharp.md#winning-losing-and-several-battles) in the C#
-guide lists what carries over and what starts afresh; it is the same here.
+One node plays a whole run. When a battle ends, every card the player owns goes back to the draw
+pile, so between battles the draw pile, `rules.GetZone(0, "draw")`, is the deck.
+
+| Carries over | Starts afresh |
+|---|---|
+| The player, with its hp, max hp and any other stats | Enemies: the dead are removed when the next battle starts |
+| Every card still in the game, back in the draw pile, exhausted cards and cards made during the battle included | The player's statuses, unless flagged `persistent` |
+| Relics, and `once per run` limits | `until` effects, which are undone, and scheduled work, which is dropped |
+| | `once per battle` limits, the battle's history counters and the turn number |
+
+A card made during a battle, such as a Wound, stays in the deck like any other; take it out with
+`RemoveCard` to make it last only for the battle.
 
 The map, the rewards and the encounters are your game's code. Between battles, hand out rewards,
 heal, spawn the next encounter and start again:
@@ -664,6 +689,110 @@ or `null` while a battle is running and before the first one has ended.
 when it runs, so anything longer, or anything a card, relic or status should own, belongs in
 content, where the linter and your tests see it.
 
+### Removing, upgrading, rewards and a new run
+
+The example below removes a card from the deck, upgrades one, offers three reward cards with their
+text, and starts a new run. Beside the first battle's content it uses these cards, saved as
+`content/rewards.cantrip`. An upgraded card is a definition of its own, named here after the card
+with a `+`, and tags mark the reward pool, as [Card upgrades](writing-content.md#card-upgrades)
+explains:
+
+<!-- smoke: file content/rewards.cantrip -->
+```
+card "Strike+"
+  cost 1
+  target enemy
+  tags attack, upgraded
+  effect:
+    deal 9 to target
+
+card Cleave
+  cost 1
+  tags attack, reward
+  effect:
+    deal 8 to all enemies
+
+card "Cleave+"
+  cost 1
+  tags attack, reward, upgraded
+  effect:
+    deal 11 to all enemies
+
+card Brace
+  cost 1
+  tags skill, reward
+  effect:
+    block 8
+
+card Flurry
+  cost 1
+  target enemy
+  tags attack, reward
+  effect:
+    deal 4 to target
+    deal 4 to target
+```
+
+These functions go in the script that holds `rules`:
+
+<!-- smoke: file between_battles.gd -->
+```gdscript
+# Between battles the deck is the draw pile.
+func deck() -> Array:
+	return rules.GetZone(0, "draw")
+
+# At a shop, or to lift a curse: the card leaves the game for good.
+func remove_card(card: int) -> void:
+	rules.RemoveCard(card)
+
+# An upgrade is the upgraded definition, put in the deck in place of the card.
+func upgrade_card(card: int) -> bool:
+	var upgraded: String = rules.GetEntity(card)["name"] + "+"
+	if rules.DescribeDefinition(upgraded, "card").is_empty():
+		return false  # this card has no upgrade
+	rules.RemoveCard(card)
+	rules.AddCard(upgraded, "draw")
+	return true
+
+# Three reward cards, with their text, picked by a RandomNumberGenerator your game seeds with the run.
+func offer_rewards(rng: RandomNumberGenerator) -> Array:
+	var upgraded: Array = rules.GetDefinitions("card", "upgraded")
+	var pool: Array = rules.GetDefinitions("card", "reward").filter(func(card_name): return not upgraded.has(card_name))
+	var offer: Array = []
+	while offer.size() < 3 and not pool.is_empty():
+		offer.append(pool.pop_at(rng.randi_range(0, pool.size() - 1)))
+	for card_name in offer:
+		print("%s: %s" % [card_name, rules.DescribeDefinition(card_name, "card")["plain"]])
+	return offer  # the one the player picks goes in with rules.AddCard(card_name, "draw")
+
+# After a loss, or from the title screen: a new player and deck on the same node.
+func new_run(run_seed: int) -> void:
+	rules.Seed = run_seed
+	rules.NewRun()
+	rules.CreatePlayer("Player", 40, 3)
+	rules.AddDeck(["Strike", "Strike", "Strike", "Defend", "Defend", "Curse", "Curse", "Sift"])
+```
+
+With that content, `offer_rewards` offers Brace, Cleave and Flurry in an order the generator
+decides, and prints lines such as `Cleave: Deal 8 damage to ALL enemies.` and
+`Flurry: Deal 4 damage. Deal 4 damage.`
+
+- **`RemoveCard`** takes the card out of the game for good, as `destroy` does in content, so a relic
+  that listens for `destroyed` hears it. It returns false, and changes nothing, for an id that is
+  not a card still in the game.
+- **`GetDefinitions`** lists the names of the definitions of one kind, and with one tag unless that
+  is `""`. To leave a tag out, list that tag as well and filter, as `offer_rewards` does with
+  `upgraded`. The list is sorted by name, so picks made from it with a generator seeded for the run
+  replay. **`DescribeDefinition`** gives the same dictionary as `Describe`, with the printed
+  numbers. Both read the content alone, so a card library can use them before any run has started.
+- **`NewRun`** starts again on the same node. The rules begin anew from the loaded content, with no
+  player, cards or enemies, and read `Seed` and the other exports again, so set the new seed first.
+  What belonged to the old run goes with it: a choice waiting for an answer (answering it now gives
+  `nothing_pending`), events not yet emitted, and whatever the `Presenter` still had to show. No
+  `BattleEnded` is emitted for a battle it cuts short. The content stays as it is, reloads
+  included, and a ruleset a reload has changed takes effect. The callables registered with
+  `RegisterName` and `RegisterFunction` stay registered, and signal connections stay connected.
+
 ## Saving
 
 ```gdscript
@@ -674,7 +803,7 @@ func save_game() -> void:
 func load_game() -> void:
 	var result: Dictionary = rules.LoadSave(FileAccess.get_file_as_string("user://slot1.json"))
 	if not result["accepted"]:
-		print(result["message"])  # reason "content_changed": the save predates a content edit
+		print(result["message"])  # reason "content_changed": the save needs content a patch removed
 ```
 
 `CanSave()` is false while effects are resolving, which only a callback sees. It is also false
@@ -686,15 +815,24 @@ which of the two stopped it.
 A save holds the whole game, the player, the piles and the enemies included, so it loads into a
 node that has only loaded its content: there is no need to create a player first.
 
-The save carries a fingerprint of the content it was taken against. Adding, renaming or deleting a
-definition changes the fingerprint, so a save from before such a patch is refused with a message
-before anything is restored, with the `reason` `"content_changed"`. Editing a card's numbers or
-effects does not change the fingerprint, and such a save loads, with one exception: if a
-`next turn:` or `in N turns:` block was waiting when the game was saved and a patch has since
-changed that block's statements, the save is refused as `"content_changed"` too, with a message
-naming the definition the block belongs to. A save made by 0.1.0-preview.2 or earlier finds such a
-block by its place alone instead: it runs whatever block is in that place now, and is refused only
-if there is none. A refused save leaves the game as it was, a choice it is waiting on included. See
+A save from before a content patch loads as long as the content still has everything the save
+needs. A patch that only adds a card, or only changes numbers or effects, keeps that true, except
+for a waiting block whose statements it changes, below. The save carries a fingerprint of the
+content it was taken against, which adding, renaming or removing a definition changes, but a
+different fingerprint does not turn a save away by itself: the rules look up what the save needs
+as they restore it, before they change anything.
+
+A save is refused, with the `reason` `"content_changed"`, when:
+
+- a definition it names has since been renamed or removed. The message names it, as in
+  `The snapshot needs card "Sift", which is not loaded.`
+- a `next turn:` or `in N turns:` block was waiting when the game was saved, and a patch has since
+  changed that block's statements. The message names the definition the block belongs to. A save
+  made by 0.1.0-preview.2 or earlier finds such a block by its place alone instead: it runs whatever
+  block is in that place now, and is refused only if there is none.
+
+A refused save leaves the game as it was, a choice it is waiting on included. What a patch does to
+the stats and listeners of a save that loads is under
 [Saves after a content update](stability.md#saves-after-a-content-update).
 
 A save is trusted input: the node restores whatever the file holds, including statements the game
@@ -714,9 +852,10 @@ func reload_content() -> void:  # call it from a debug key, for example
 
 Stats the game has changed keep their values, while a card still at its printed cost takes the new
 one. A `once per` listener that has fired stays used, and an `on every` listener stays on its
-interval, unless the reload changed its `on` line. The report says how many entities rebound, which definitions have gone, and whether the
-ruleset changed: a running game keeps the rules it started with. Wire it to a debug key, and a
-designer can change a number, save, press the key and play on.
+interval, unless the reload changed its `on` line. The report says how many entities rebound,
+which definitions have gone, and whether the ruleset changed: a running game keeps the rules it
+started with until `NewRun`. Wire it to a debug key, and a designer can change a number, save,
+press the key and play on.
 
 ## Callbacks from content
 
@@ -766,14 +905,31 @@ the node's queries and from values fixed for the run, in whole numbers.
 [Determinism](stability.md#determinism) lists what to avoid, `randi()` among it.
 
 The linter reports a name it does not know (CT302). To keep it quiet about the names your game
-answers, list them in the dock's settings (see [The editor dock](#the-editor-dock)).
+answers, list them in the dock's settings (see [The editor dock](#the-editor-dock)). That quiets
+the linter only: the dock's Tests tab runs without your callbacks, so a test of content that uses
+one fails there.
 
 ## When a call fails
 
 A call the rules cannot carry out, such as `SpawnEnemy` with a name no content defines, a second
-`CreatePlayer`, or content that fails while it runs, prints the error to the Output panel with the
-C# exception's message and returns null, even where the method is declared to return an `int`.
+`CreatePlayer` in one run, or content that fails while it runs, prints the error to the Output
+panel with the C# exception's message and returns null, even where the method is declared to
+return an `int`.
 Your script carries on, so watch the Output panel.
+
+A typed variable does not catch that null. Stored in one, as in
+`var result: String = rules.Play(card, target)`, it raises no second error, and `result == null`
+is false there, so that check misses the failure. To check a call that can fail, keep its result
+in an untyped variable and compare that with `null`:
+
+<!-- smoke: file spawn.gd -->
+```gdscript
+func spawn(enemy_name: String) -> int:
+	var spawned = rules.SpawnEnemy(enemy_name, 0)  # untyped, so a failure can be seen
+	if spawned == null:
+		return 0  # no enemy: the Output panel says why
+	return spawned
+```
 
 An action whose content failed is not rolled back: what it did before the failure stays done, and
 the events it had collected are dropped. Content errors name the file and line; the linter and the
@@ -811,9 +967,12 @@ Two things to know before exporting a .NET game, both of which cost an afternoon
 With the plugin enabled, the *Cantrip* dock sits at the bottom of the editor:
 
 - **Problems**: parse errors and lint findings in one list, in source order. Double-click one to
-  open the line.
+  open the line. [Diagnostics](language.md#diagnostics) in the language reference explains each
+  code, such as CT302, and how to fix it.
 - **Tests**: the `test` blocks in your content, run by the same runner as `dotnet cantrip test`,
-  with a trace of what happened when one fails.
+  with a trace of what happened when one fails. It runs them without your game, so without the
+  names and functions your scripts answer with `RegisterName` and `RegisterFunction`: a test of
+  content that uses one fails there, with an error such as ``Unknown name `front_row`.``
 - **Preview**: any definition's rules text with live values, its flavour, its keyword tooltips,
   and the hash to paste into `text_checked`.
 - **Source**: a viewer, because Godot cannot open a non-script file at a line. Its highlighting
@@ -835,15 +994,22 @@ the plugin starts and again each time you press **Reload**, so after changing on
 
 ## Live debugging
 
-Run a game from the editor and the debugger gets two *Cantrip* tabs. The first is the trace: turn
-recording on, pull the causality tree, and click a step to open the line of content that caused
-it. It also holds the game: pause, and queued triggers wait; step, and exactly one of them
-resolves; or set a breakpoint on an event or a line of content, and the game stops itself the next
-time that trigger comes up. The second is *Entities*: everything in play, and for whichever one you
-pick, its zone and side, each stat's base value beside what the modifiers make of it, its
-statuses, and every listener and modifier it has registered, each row opening the line of content
-behind it. Saving a file reloads it into the running game, and statements can be run against it as
-a console.
+Run a game from the editor and the debugger gets two tabs:
+
+- **Cantrip**, the trace. Tick *Record* to turn recording on in the running game, then press
+  *Fetch*, or leave *Follow* ticked, to pull the causality tree; double-click a step to open the
+  line of content that caused it. *Pause* holds the game's queued triggers, *Step* then resolves
+  exactly one of them, and *Resume* lets the rest resolve. A new run started with `NewRun` clears
+  the tab, because its steps are numbered from 1 again.
+- **Entities**: everything in play. For whichever one you pick, it shows its kind and side, its
+  zone, each stat's base value beside what the modifiers make of it, its statuses, and every
+  listener and modifier it has registered; double-click one to open the line of content behind it.
+  *Refresh* asks the game again.
+
+The editor offers nothing more. The running game also accepts breakpoints on an event or a line of
+content, a reload of changed files, and statements to run as a console would, but the editor has
+no controls for them yet: saving a file does not reach a running game. To pick up a saved file
+while playing, call `ReloadContent([])` from a debug key, as [Hot reload](#hot-reload) shows.
 
 This is built but only half proven. Both ends compile, the addon loads with them, and the
 conversation between them is exercised headlessly by driving the game's side directly; a live
@@ -873,6 +1039,13 @@ This section is for contributors to Cantrip, working in a clone of its repositor
 It takes the version from `plugin.cfg`, so the two cannot disagree. Each release attaches the zip
 and copies the addon to AGomnes/cantrip-godot, whose README is `tools/addon-repo/README.md`.
 
+Both READMEs link this guide on `main`. Given a tag or branch as well, such as
+`bash tools/package-addon.sh artifacts v0.1.0-preview.3` or
+`pwsh tools/package-addon.ps1 -Ref v0.1.0-preview.3`, the script points the addon README's links
+into this repository at that tag instead, and the release workflow does the same to the
+cantrip-godot README, so a user reads the guide for the version they installed. Without one, the
+links are left as they are.
+
 The repository's own demo uses a project reference to the source instead of the package.
 
 ### Verifying
@@ -899,8 +1072,11 @@ sees. `tools/godot-install-smoke.sh` can: it unzips the addon into a blank Godot
 the repository, adds Cantrip.Core with the command in [Installing](#installing), and fails on any
 build warning or a plugin that does not load. It then runs [Your first battle](#your-first-battle)
 from the blocks marked `<!-- smoke: ... -->` in this page, exactly as written, and compares what it
-prints with the first turn shown there. It also checks that the content is the quickstart's, word
-for word, answers content from a GDScript lambda, and plays a `discover` offer through the node.
+prints with the first turn shown there. It runs the functions under
+[Between battles](#removing-upgrading-rewards-and-a-new-run) and
+[When a call fails](#when-a-call-fails) the same way, through a run of its own. It also checks
+that the content is the quickstart's, word for word, answers content from a GDScript lambda, and
+plays a `discover` offer through the node.
 CI runs it on every push to `main`, on pull requests and before every release:
 
 ```

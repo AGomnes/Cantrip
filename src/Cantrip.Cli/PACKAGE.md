@@ -30,4 +30,6 @@ A path is a file or a folder; a folder loads every `.cantrip` file under it. `--
 
 Exit codes: 0 success, 1 content errors or failing tests, 2 bad usage. `lint` fails only on errors, and prints its warnings but still exits 0, unless it is given `--warnings-as-errors`: then a warning fails it too, which is what a build server wants. Notes never fail it.
 
-This is a **preview**; see [stability](https://github.com/AGomnes/Cantrip/blob/main/docs/stability.md). Start with the [quickstart](https://github.com/AGomnes/Cantrip/blob/main/docs/quickstart.md).
+Each message starts with the file, line and column, then its level and a code such as `CT302`. [Diagnostics](https://github.com/AGomnes/Cantrip/blob/main/docs/language.md#diagnostics) in the language reference lists every code, with what it means and the usual fix.
+
+This is a **preview**; see [stability](https://github.com/AGomnes/Cantrip/blob/main/docs/stability.md). Start with the [quickstart](https://github.com/AGomnes/Cantrip/blob/main/docs/quickstart.md). Writing content rather than code? Start with [Writing content](https://github.com/AGomnes/Cantrip/blob/main/docs/writing-content.md), which needs no C#.

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Installs the Godot addon the way docs/godot.md tells a stranger to, into a blank Godot C# project
-# outside this repository, then runs the guide's first battle exactly as written, and a few checks
-# of its own from GDScript. The demo project inside the repository inherits the repository's build
-# settings, so it cannot show what a user's own project sees; this can. It fails on any build
-# warning, on a plugin that does not load, on a first battle that reports an error or prints
-# something other than the guide shows, and on any failed check.
+# outside this repository, then runs the guide's first battle exactly as written, its functions for
+# between battles and for a call that fails, and a few checks of its own from GDScript. The demo
+# project inside the repository inherits the repository's build settings, so it cannot show what a
+# user's own project sees; this can. It fails on any build warning, on a plugin that does not load,
+# on a first battle that reports an error or prints something other than the guide shows, and on
+# any failed check.
 #
 # docs/godot.md marks what to take with HTML comments, which Markdown does not render:
 #   <!-- smoke: file <path> -->      the next code block is written to <path> in the project
@@ -113,6 +114,97 @@ if ! cmp -s "$work/quickstart.cantrip" "$project/content/game.cantrip"; then
   exit 1
 fi
 
+echo "== Between battles and When a call fails in docs/godot.md: their content and functions, as written"
+# The guide gives functions for a script that holds `rules`, so they go into one with a run of its
+# own below them. The first battle loads the content too, and never uses it.
+block "$root/docs/godot.md" "<!-- smoke: file content/rewards.cantrip -->" > "$project/content/rewards.cantrip"
+block "$root/docs/godot.md" "<!-- smoke: file between_battles.gd -->" > "$work/between_battles.part"
+block "$root/docs/godot.md" "<!-- smoke: file spawn.gd -->" > "$work/spawn.part"
+for part in "$project/content/rewards.cantrip" "$work/between_battles.part" "$work/spawn.part"; do
+  [ -s "$part" ] || { echo "docs/godot.md has no code block marked for $(basename "$part" .part)." >&2; exit 1; }
+done
+{
+  printf 'extends Node\n\nvar rules: CantripRuntime\n\n'
+  cat "$work/between_battles.part"
+  printf '\n'
+  cat "$work/spawn.part"
+  cat <<'EOF'
+
+# The run the guide's functions are checked by.
+var _failures := 0
+
+func _ready() -> void:
+	call_deferred("_run")
+
+func _check(what: String, ok: bool, detail: String = "") -> void:
+	print(("BETWEEN: ok   " if ok else "BETWEEN: FAIL ") + what + ("" if ok or detail == "" else " (" + detail + ")"))
+	if not ok:
+		_failures += 1
+
+func _names(ids: Array) -> Array:
+	var names: Array = []
+	for id in ids:
+		names.append(rules.GetEntity(id)["name"])
+	names.sort()
+	return names
+
+func _first_in_deck(card_name: String) -> int:
+	for id in deck():
+		if rules.GetEntity(id)["name"] == card_name:
+			return id
+	return 0
+
+func _run() -> void:
+	rules = CantripRuntime.new()
+	rules.AutoLoad = false
+	add_child(rules)
+	var problems: Array = rules.LoadContent("res://content")
+	_check("content loads", problems.is_empty(), str(problems))
+
+	new_run(5)
+	_check("a run starts with its deck", deck().size() == 8, str(_names(deck())))
+	var ghoul: int = spawn("Ghoul")
+	rules.StartBattle(true, true)
+	rules.Execute("deal 99 to target", 0, ghoul)
+	_check("the battle is won, and the whole deck is back in the draw pile",
+		rules.GetWon() == true and deck().size() == 8, str(_names(deck())))
+
+	print("BETWEEN: spawning an enemy no content defines; the error it reports next is expected.")
+	_check("a failed call is seen in an untyped variable", spawn("Nobody") == 0)
+
+	_check("a Strike upgrades", upgrade_card(_first_in_deck("Strike")))
+	_check("a Defend has no upgrade, so it stays", not upgrade_card(_first_in_deck("Defend")))
+	remove_card(_first_in_deck("Curse"))
+	_check("the deck is as the player left it",
+		_names(deck()) == ["Curse", "Defend", "Defend", "Sift", "Strike", "Strike", "Strike+"], str(_names(deck())))
+
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	var offer: Array = offer_rewards(rng)
+	var offered: Array = offer.duplicate()
+	offered.sort()
+	_check("three reward cards are offered, and no upgraded one", offered == ["Brace", "Cleave", "Flurry"], str(offer))
+	rules.AddCard(offer[0], "draw")
+
+	var next_ghoul: int = spawn("Ghoul")
+	rules.StartBattle(true, true)
+	_check("the next battle is dealt from the deck as it now is",
+		rules.GetHand().size() + deck().size() == 8, str(_names(rules.GetHand())))
+
+	print("BETWEEN: playing a card whose content fails; the error it reports next is expected.")
+	var result: String = rules.Play(rules.AddCard("Broken", "hand"), next_ghoul)
+	_check("a failed call's null in a typed variable raises no second error, and == null does not see it",
+		result != "played" and not (result == null))
+
+	new_run(6)
+	_check("a new run starts over",
+		rules.GetWon() == null and not rules.IsInBattle() and deck().size() == 8 and not _names(deck()).has("Strike+"), str(_names(deck())))
+
+	get_tree().quit(1 if _failures > 0 else 0)
+EOF
+} > "$project/between_battles.gd"
+printf '[gd_scene format=3]\n\n[ext_resource type="Script" path="res://between_battles.gd" id="1"]\n\n[node name="BetweenBattles" type="Node"]\nscript = ExtResource("1")\n' > "$project/between_battles.tscn"
+
 # For the checks of its own below: cards that discover, so an offer goes through the node. The first
 # battle loads them too, and never uses them.
 cat > "$project/content/offers.cantrip" <<'EOF'
@@ -133,6 +225,16 @@ card Scholar
   effect:
     discover 3 cards where tag:spell as found
     create found into hand
+EOF
+
+# And a card whose content fails when it is played, for what When a call fails says about a typed
+# variable.
+cat > "$project/content/broken.cantrip" <<'EOF'
+card Broken
+  cost 0
+  target enemy
+  effect:
+    deal nonsense to target
 EOF
 
 cat > "$project/main.gd" <<'EOF'
@@ -228,6 +330,20 @@ if [ -n "$problem" ]; then
   exit 1
 fi
 cat "$work/first_battle.out"
+
+echo "== Between battles and When a call fails, as docs/godot.md gives them"
+# The run quits by itself; --quit-after only stops one that a script error cut short, which the
+# missing last check then shows.
+status=0
+timeout 300 "$godot" --headless --path "$project" res://between_battles.tscn --quit-after 60 > "$work/between.log" 2>&1 || status=$?
+tr -d '\r' < "$work/between.log" > "$work/between.out"
+grep -E "^(BETWEEN|Brace|Cleave|Flurry)" "$work/between.out" || true
+if [ "$status" -ne 0 ] || grep -q -E "BETWEEN: FAIL|SCRIPT ERROR" "$work/between.out" || ! grep -q "BETWEEN: ok   a new run starts over" "$work/between.out" \
+  || ! grep -q -x "Cleave: Deal 8 damage to ALL enemies." "$work/between.out" || ! grep -q -x "Flurry: Deal 4 damage. Deal 4 damage." "$work/between.out"; then
+  cat "$work/between.log" >&2
+  echo "The functions under Between battles or When a call fails in docs/godot.md failed (exit $status)." >&2
+  exit 1
+fi
 
 echo "== Checks of its own: a battle, a lambda callback and a discover offer from GDScript"
 status=0

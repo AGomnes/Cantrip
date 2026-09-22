@@ -91,6 +91,59 @@ namespace Cantrip.Tests.Linting
             Assert.Equal(suggestion, label.Suggestion);
         }
 
+        /// <summary>
+        /// The suggestion for <c>once per battle on before_damaged(target:owner):</c> used to drop
+        /// <c>before_</c>, and the listener it suggested, <c>on damaged(...)</c>, then failed CT308
+        /// because it can no longer <c>cancel</c>. A timing written into the event word, and a filter,
+        /// stay in the suggestion, which then loads and lints cleanly.
+        /// </summary>
+        [Theory]
+        [Trait("Regression", "ct313-drops-timing")]
+        [InlineData("once per battle on before_damaged(target:owner):", "on before_damaged(target:owner) once per battle:")]
+        [InlineData("once per turn on instead_of_damaged(target:owner):", "on instead_of_damaged(target:owner) once per turn:")]
+        [InlineData("once per battle on owner.before_damaged:", "on owner.before_damaged once per battle:")]
+        [InlineData("once per battle on before_owner.damaged:", "on before_owner.damaged once per battle:")]
+        [InlineData("when before_damaged(source:enemies):", "on before_damaged(source:enemies):")]
+        [InlineData("whenever instead_of_damaged:", "on instead_of_damaged:")]
+        [InlineData("on_before_damaged:", "on before_damaged:")]
+        [InlineData("before_damaged:", "on before_damaged:")]
+        [InlineData("when before_damagd(target:owner):", "on before_damaged(target:owner):")]
+        [InlineData("before damaged(target:owner) once per battle:", "on before_damaged(target:owner) once per battle:")]
+        [InlineData("once per battle before damaged(target:owner):", "on before_damaged(target:owner) once per battle:")]
+        [InlineData("once per battle instead of died(target:owner):", "on instead_of_died(target:owner) once per battle:")]
+        [InlineData("instead_of died(target:owner) once per battle:", "on instead_of_died(target:owner) once per battle:")]
+        [InlineData("when before owner.damaged:", "on before_owner.damaged:")]
+        public void A_suggestion_keeps_the_timing_and_filter_written_with_the_event(string header, string suggestion)
+        {
+            Diagnostic label = Assert.Single(Labels($$"""
+                relic Amulet
+                  {{header}}
+                    cancel
+                """));
+
+            Assert.Equal(suggestion, label.Suggestion);
+
+            // Taking the suggestion gives a listener that may cancel, and nothing to report.
+            ContentLibrary fixedContent = ContentLibrary.FromText("relic Amulet\n  " + suggestion + "\n    cancel\n", "labels.cantrip");
+            Assert.False(fixedContent.Diagnostics.HasErrors, fixedContent.Diagnostics.ToString());
+            Assert.Empty(Linter.Lint(fixedContent));
+        }
+
+        [Theory]
+        [InlineData("when start of turn:", "on turn_start:")]
+        [InlineData("at end_of_turn:", "on turn_end:")]
+        [InlineData("when card_play once per turn:", "on card_played once per turn:")]
+        public void A_suggestion_finds_an_event_written_in_other_words(string header, string suggestion)
+        {
+            Diagnostic label = Assert.Single(Labels($$"""
+                relic Anchor
+                  {{header}}
+                    draw 1
+                """));
+
+            Assert.Equal(suggestion, label.Suggestion);
+        }
+
         [Fact]
         public void A_misspelt_block_suggests_the_block()
         {

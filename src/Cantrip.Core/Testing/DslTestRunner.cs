@@ -64,6 +64,24 @@ namespace Cantrip.Testing
         /// </summary>
         public bool Trace { get; set; }
 
+        /// <summary>
+        /// Makes the host for each test's runtime, for content that uses names or functions the game
+        /// answers in C#: <c>runner.CreateHost = () => new GameHost();</c>. It is called once per
+        /// test, so each test starts with a host of its own. Null, the default, gives each test a
+        /// host that adds nothing.
+        /// </summary>
+        public Func<IEffectHost>? CreateHost { get; set; }
+
+        /// <summary>
+        /// Runs on each test's new runtime before the test's first line, for the verbs the game
+        /// registers in C#:
+        /// <c>runner.ConfigureRuntime = runtime => runtime.RegisterVerb("corrupt", Corrupt);</c>.
+        /// The runtime has no player yet. If this creates one, the test uses it; otherwise the test
+        /// creates one with 80 hp and 3 energy. The test verbs, such as <c>play</c>, are registered
+        /// afterwards, so they win over a verb of the same name. An exception from it fails that test.
+        /// </summary>
+        public Action<CardRuntime>? ConfigureRuntime { get; set; }
+
         public IReadOnlyList<DslTestResult> RunAll(string? nameFilter = null) =>
             _content.Tests
                 .Where(t => nameFilter == null || t.Name.IndexOf(nameFilter, StringComparison.OrdinalIgnoreCase) >= 0)
@@ -85,11 +103,21 @@ namespace Cantrip.Testing
             CardRuntime runtime;
             try
             {
+                options.Host = CreateHost?.Invoke();
                 runtime = new CardRuntime(_content, options);
             }
             catch (Exception e)
             {
-                return new DslTestResult(test, false, "could not create runtime: " + e.Message, test.Syntax.Span, null);
+                return new DslTestResult(test, false, "could not create runtime: " + Plain(e), test.Syntax.Span, null);
+            }
+
+            try
+            {
+                ConfigureRuntime?.Invoke(runtime);
+            }
+            catch (Exception e) when (!(e is OutOfMemoryException))
+            {
+                return new DslTestResult(test, false, "could not configure the runtime: " + Plain(e), test.Syntax.Span, null);
             }
 
             // `log` writes to an event nothing in a test listens to. Traced, its message goes into the
@@ -124,14 +152,29 @@ namespace Cantrip.Testing
             }
             catch (Exception error) when (error is ArgumentException || error is InvalidOperationException)
             {
-                // The runtime API's own complaints ("No card named Strke. Did you mean Strike?")
-                // fail this test only, instead of aborting the whole run.
-                return new DslTestResult(test, false, error.Message, at, Trace ? runtime.State.Trace.FormatTree() : null);
+                // The runtime API's own complaints, and a game verb's, fail this test only, instead
+                // of aborting the whole run.
+                return new DslTestResult(test, false, Plain(error), at, Trace ? runtime.State.Trace.FormatTree() : null);
             }
             catch (Exception error) when (!(error is OutOfMemoryException))
             {
-                return new DslTestResult(test, false, $"internal error ({error.GetType().Name}): {error.Message}", at, Trace ? runtime.State.Trace.FormatTree() : null);
+                return new DslTestResult(test, false, $"internal error ({error.GetType().Name}): {Plain(error)}", at, Trace ? runtime.State.Trace.FormatTree() : null);
             }
+        }
+
+        /// <summary>
+        /// An exception's message without the <c>(Parameter 'name')</c> that .NET adds to an
+        /// <see cref="ArgumentException"/>, which means nothing to someone writing content.
+        /// </summary>
+        private static string Plain(Exception error)
+        {
+            string message = error.Message;
+            if (error is ArgumentException { ParamName: string parameter })
+            {
+                string suffix = $" (Parameter '{parameter}')";
+                if (message.EndsWith(suffix, StringComparison.Ordinal)) message = message.Substring(0, message.Length - suffix.Length);
+            }
+            return message;
         }
 
         private static bool IsSetup(StatementNode statement) => statement switch
@@ -175,7 +218,8 @@ namespace Cantrip.Testing
                 _runtime = runtime;
                 _chooser = chooser;
 
-                Entity player = runtime.CreatePlayer();
+                // The runner's ConfigureRuntime may have made the player already.
+                Entity player = runtime.Player ?? runtime.CreatePlayer();
                 _context = new EvalContext(player) { Source = player };
                 RegisterVerbs();
             }
@@ -211,7 +255,7 @@ namespace Cantrip.Testing
                 ("hand", s => call => s.AddCards(call, Zones.Hand)),
                 ("deck", s => call => s.AddCards(call, Zones.Draw)),
                 ("discard_pile", s => call => s.AddCards(call, Zones.Discard)),
-                ("relic", s => call => { foreach (string name in Names(call)) s._runtime.AddRelic(name); }),
+                ("relic", s => call => { foreach (string name in Names(call)) s._runtime.AddRelic(s.Defined(name, call, "relic or item", "relic", "item")); }),
                 ("seed", s => call => s.State.Rng.Reseed((ulong)call.Number(0, Num.One).ToInt())),
                 ("answer", s => call => { foreach (string name in Names(call)) s._chooser.Enqueue(name); }),
                 ("realtime", s => _ => { }),
@@ -220,7 +264,7 @@ namespace Cantrip.Testing
                 ("end_turn", s => s.EndTurn),
                 ("expect", s => s.Expect),
                 ("tick", s => call => s._runtime.Tick(call.Number(0, Num.One).ToInt())),
-                ("grant", s => call => { foreach (string name in Names(call)) s._runtime.GrantAbility(name, s.State.Player!); }),
+                ("grant", s => call => { foreach (string name in Names(call)) s._runtime.GrantAbility(s.Defined(name, call, "ability", "ability"), s.State.Player!); }),
                 ("cast", s => s.Cast),
             };
 
@@ -251,6 +295,14 @@ namespace Cantrip.Testing
                         && (nodes.Count == 1 || nodes[1] is NameExpr)
                         && _runtime.Content.FindAny(missing.Name, "status", "keyword") == null)
                     {
+                        EntityDefinition? other = _runtime.Content.Find(missing.Name);
+                        if (other != null)
+                        {
+                            throw Fail(
+                                $"`{missing.Name}` is {A(other.KindName)}, not an enemy. Write `enemy \"{missing.Name}\" hp 20` for a plain enemy with that label.",
+                                call.Span);
+                        }
+
                         string? close = Suggest.Closest(missing.Name, _runtime.Content.Pool("enemy").Select(d => d.Name));
                         throw Fail(
                             $"No enemy named `{missing.Name}` is defined." + (close == null ? string.Empty : $" Did you mean `{close}`?") +
@@ -301,8 +353,27 @@ namespace Cantrip.Testing
 
             private void AddCards(VerbCall call, string zone)
             {
-                foreach (string name in Names(call)) _runtime.AddCard(name, zone);
+                foreach (string name in Names(call)) _runtime.AddCard(Defined(name, call, "card", "card"), zone);
             }
+
+            /// <summary>
+            /// Fails the test, naming the nearest definition, when <paramref name="name"/> names
+            /// nothing of the <paramref name="kinds"/> a line needs, as in <c>hand Strik</c>.
+            /// </summary>
+            private string Defined(string name, VerbCall call, string what, params string[] kinds)
+            {
+                ContentLibrary content = _runtime.Content;
+                if (content.FindAny(name, kinds) != null) return name;
+
+                EntityDefinition? other = content.Find(name);
+                if (other != null) throw Fail($"`{name}` is {A(other.KindName)}, not {A(what)}.", call.Span);
+
+                string? close = Suggest.Closest(name, kinds.SelectMany(kind => content.Pool(kind)).Select(d => d.Name));
+                throw Fail($"No {what} named `{name}` is defined." + (close == null ? string.Empty : $" Did you mean `{close}`?"), call.Span);
+            }
+
+            /// <summary>"a card", "an ability".</summary>
+            private static string A(string noun) => ("aeiou".IndexOf(char.ToLowerInvariant(noun[0])) >= 0 ? "an " : "a ") + noun;
 
             /// <summary>Names written as <c>A B</c>, <c>A, B</c> or <c>"Twin Strike", Defend</c>.</summary>
             private static IEnumerable<string> Names(VerbCall call)
@@ -337,7 +408,7 @@ namespace Cantrip.Testing
                 {
                     string name = node is NameExpr n ? n.Name : ((StringExpr)node).Value;
                     card = State.ZoneOf(State.Player, Zones.Hand).FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase))
-                        ?? _runtime.AddCard(name, Zones.Hand);
+                        ?? _runtime.AddCard(Defined(name, call, "card", "card"), Zones.Hand);
                 }
                 else
                 {
@@ -366,7 +437,8 @@ namespace Cantrip.Testing
                 }
 
                 string name = node is NameExpr n ? n.Name : node is StringExpr s ? s.Value : throw Fail("expected an ability name.", call.Span);
-                Entity ability = State.Player!.FindAttached(name) ?? throw Fail($"the player has no ability `{name}`; use `grant` first.", call.Span);
+                Entity ability = State.Player!.FindAttached(name)
+                    ?? throw Fail($"the player has no ability `{Defined(name, call, "ability", "ability")}`; use `grant` first.", call.Span);
                 if (!_runtime.UseAbility(ability, target)) throw Fail($"{name} is not ready.", call.Span);
             }
 

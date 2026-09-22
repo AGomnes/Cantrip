@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Cantrip.Content;
@@ -78,6 +79,8 @@ namespace Cantrip.Tests.Snapshots
             { "a zone without contents", save => save["Zones"]![0]!["Entities"] = null },
             { "no history", save => save["TurnHistory"] = null },
             { "no listener limits", save => save["ListenerLimits"] = null },
+            { "an all-zero random state", save => save["Rng"] = new JsonArray(0, 0, 0, 0) },
+            { "nothing at all", save => { foreach (string key in save.Select(p => p.Key).ToList()) save.Remove(key); } },
         };
 
         [Theory]

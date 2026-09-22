@@ -11,11 +11,12 @@
     <!-- Ship the XML docs so editors show them; members without docs stay quiet (CS1591). -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!--
-      PublicAPI.Shipped.txt lists the public surface each release shipped; the build warns (RS0016,
+      PublicAPI.Shipped.txt lists the public surface each release shipped; the build fails (RS0016,
       RS0017) when that surface changes without the change being written into PublicAPI.Unshipped.txt,
       so an API change is always a visible diff. RS0026 flags overloads that both have optional
       parameters; the ones it names shipped in 0.1.0-preview.1 and are kept for compatibility.
     -->
+    <WarningsAsErrors>$(WarningsAsErrors);RS0016;RS0017</WarningsAsErrors>
     <NoWarn>$(NoWarn);RS0026</NoWarn>
   </PropertyGroup>
 

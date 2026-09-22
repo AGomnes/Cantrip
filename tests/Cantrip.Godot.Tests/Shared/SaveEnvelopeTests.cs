@@ -30,7 +30,7 @@ namespace Cantrip.GodotAdapter.Tests.Shared
         }
 
         [Fact]
-        public void A_save_from_before_a_definition_was_added_is_refused()
+        public void A_save_from_before_a_definition_was_added_is_reported_as_other_content()
         {
             ContentLibrary before = ViewTestKit.Library();
             SaveEnvelope envelope = SaveEnvelope.Wrap(before.Fingerprint, "{}");
@@ -45,6 +45,40 @@ namespace Cantrip.GodotAdapter.Tests.Shared
             Assert.Equal("content_changed", check.ReasonName);
             Assert.Contains(before.Fingerprint, check.Message);
             Assert.Contains(after.Fingerprint, check.Message);
+        }
+
+        /// <summary>
+        /// Why the node lets a mismatched fingerprint through to the restore: the restore itself
+        /// takes a save from before a card was added, and refuses one needing a card since removed
+        /// before it changes anything, naming the card.
+        /// </summary>
+        [Fact]
+        public void A_mismatch_is_for_the_restore_to_judge_by_what_the_save_needs()
+        {
+            CardRuntime before = ViewTestKit.Runtime(out _);
+            before.AddCard("Footnote", Zones.Hand);
+            before.StartBattle(shuffle: false, drawOpeningHand: false);
+            SaveEnvelope envelope = SaveEnvelope.Wrap(before.Content.Fingerprint, JsonSerializer.Serialize(before.Capture()));
+            ulong saved = before.State.ComputeHash();
+
+            var added = new ContentLibrary();
+            added.LoadText(ViewTestKit.Content + "\ncard \"Newcomer\"\n  cost 1\n  effect:\n    draw 1\n", "res://content/test.cantrip");
+            var patched = new CardRuntime(added);
+            Assert.Equal(SaveRejection.ContentChanged, envelope.Check(added.Fingerprint).Reason);
+
+            patched.Restore(JsonSerializer.Deserialize<GameSnapshot>(envelope.Payload)!);
+            Assert.Equal(saved, patched.State.ComputeHash());
+
+            var removed = new ContentLibrary();
+            removed.LoadText(ViewTestKit.Content.Replace("card \"Footnote\"", "card \"Endnote\""), "res://content/test.cantrip");
+            var other = new CardRuntime(removed);
+            other.CreatePlayer();
+            ulong untouched = other.State.ComputeHash();
+
+            InvalidOperationException refused = Assert.Throws<InvalidOperationException>(
+                () => other.Restore(JsonSerializer.Deserialize<GameSnapshot>(envelope.Payload)!));
+            Assert.Contains("\"Footnote\"", refused.Message);
+            Assert.Equal(untouched, other.State.ComputeHash());
         }
 
         [Fact]

@@ -1,6 +1,6 @@
 # Samples
 
-Worked `.cantrip` content, each folder with its tests. On each change, CI runs `test` over every folder, and `lint` with `--warnings-as-errors`, so a folder must stay free of warnings as well as errors.
+Worked `.cantrip` content, each folder with its tests. On each change, CI runs `test` over each of the four folders in `samples`, and `lint` with `--warnings-as-errors`, so a folder must stay free of warnings as well as errors.
 
 | Folder | What it shows |
 |---|---|
@@ -8,6 +8,7 @@ Worked `.cantrip` content, each folder with its tests. On each change, CI runs `
 | [`recipes`](recipes) | The content from [Writing content](../docs/writing-content.md). [`recipes/tutorial`](recipes/tutorial) holds the tutorial's finished files, and every other file is one recipe with its tests, such as [a boss that switches moves at half health](recipes/boss-switches-at-half-health.cantrip) or [a debuff that lasts N enemy turns](recipes/debuff-for-enemy-turns.cantrip). Some recipes use the tutorial's Strike, Defend, Poison or Bog Troll, so load the whole folder. |
 | [`slice`](slice) | A small roguelite: a witch climbing a five-floor tower, fire against frost, with 17 cards, 4 relics and 5 enemies, among them a boss, the Archmage, that changes its moves at half health. The simulator below plays it. |
 | [`corpus`](corpus) | Effects from nine existing games, re-created under our own names, one content file and one test file per game. [Coverage](../docs/coverage.md) says which the language writes directly, which need a workaround and which it cannot express yet. |
+| [`godot/Cantrip.Demo`](../godot/Cantrip.Demo) | A Godot project, kept beside the addon rather than here, that plays a battle from GDScript. [`demo/battle.gd`](../godot/Cantrip.Demo/demo/battle.gd) builds a hand of card buttons and enemy panels that show their intents, tells what happened in a log at a steady pace, and answers a card's choice with its first option where a game would open a picker. It plays the content in its `content` folder, which has tests of its own. To run it, build it once with `dotnet build godot/Cantrip.Demo/Cantrip.Demo.csproj`, open the folder in the .NET edition of Godot 4.6 and press Play. CI builds it and has it play a battle by itself. [godot.md](../docs/godot.md) explains the addon it uses. |
 
 For a first read, start with `basic` or the recipes. For a phased enemy and the tests that pin its intents, see the recipe above or the Archmage in [`slice/enemies.cantrip`](slice/enemies.cantrip) and [`slice/tests.cantrip`](slice/tests.cantrip).
 

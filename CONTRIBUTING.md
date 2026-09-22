@@ -38,7 +38,7 @@ Please open an issue first for anything beyond a small fix, so we can agree on t
   ```
 - A behaviour change comes with a test, and a language change with its entry in [docs/language.md](docs/language.md).
 - Anything that changes results keeps determinism: no floating point, `System.Random` or hash-order dependence in the rules.
-- A change to the public C# API of Cantrip.Core is written into `src/Cantrip.Core/PublicAPI.Unshipped.txt`. The build warns until it is (RS0016 for an addition, RS0017 for a removal), so no API change slips through unnoticed.
+- A change to the public C# API of Cantrip.Core is written into `src/Cantrip.Core/PublicAPI.Unshipped.txt`. The build fails until it is (error RS0016 for an addition, RS0017 for a removal), so no API change slips through unnoticed.
 - Add a line to the unreleased section of [CHANGELOG.md](CHANGELOG.md) for anything a user would notice, under **Breaking changes**, **Save format** or **Same-seed results** if it changes one of those. A change to the Godot node's methods, signals or dictionary keys counts as breaking, like one to the C# API.
 
 [docs/architecture.md](docs/architecture.md) explains how the library fits together and has a checklist for adding a new kind of syntax.

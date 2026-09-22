@@ -184,6 +184,7 @@ namespace Cantrip.GodotAdapter
             return new Godot.Collections.Dictionary
             {
                 ["protocol"] = hello.Protocol,
+                ["session"] = hello.Session,
                 ["generation"] = hello.Generation,
                 ["fingerprint"] = hello.Fingerprint,
                 ["definitions"] = hello.Definitions,

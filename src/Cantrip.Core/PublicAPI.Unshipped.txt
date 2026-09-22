@@ -11,3 +11,8 @@ Cantrip.Linting.LintOptions.HostBlocks.get -> System.Collections.Generic.ISet<st
 const Cantrip.Linting.Linter.ForOnDurationStatus = "CT314" -> string!
 const Cantrip.Linting.Linter.IgnoredDuration = "CT315" -> string!
 const Cantrip.Linting.Linter.UnknownBlock = "CT313" -> string!
+const Cantrip.Linting.Linter.TagWrittenAsProperty = "CT316" -> string!
+Cantrip.Testing.DslTestRunner.ConfigureRuntime.get -> System.Action<Cantrip.CardRuntime!>?
+Cantrip.Testing.DslTestRunner.ConfigureRuntime.set -> void
+Cantrip.Testing.DslTestRunner.CreateHost.get -> System.Func<Cantrip.Runtime.IEffectHost!>?
+Cantrip.Testing.DslTestRunner.CreateHost.set -> void

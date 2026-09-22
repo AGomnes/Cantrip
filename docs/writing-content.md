@@ -1,5 +1,7 @@
 # Writing content
 
+> These docs describe the `main` branch, which can be ahead of the latest release. The changelog's [Unreleased](../CHANGELOG.md#unreleased) section lists what that release lacks, and each release's own docs are in [its tag](https://github.com/AGomnes/Cantrip/tags).
+
 This guide is for whoever writes a game's cards, statuses, relics and enemies. It needs no C#. It builds a card, a status, a relic and an enemy whose moves change at half health, each with a test, and explains each idea the first time it appears. Then come the commands you will use all day, a sandbox for trying single lines, and [recipes](#recipes) for common card-game mechanics.
 
 - [Before you start](#before-you-start)
@@ -25,6 +27,8 @@ dotnet tool install Cantrip.Cli --prerelease
 Run the commands below from that folder, or any folder inside it. Any text editor will do for the files; there is no syntax-highlighting package for text editors yet. In a Godot project, the addon's editor dock can do the checking instead of the command line: see [7. In Godot](#7-in-godot).
 
 Make a folder called `tutorial` with two empty files in it, `game.cantrip` and `tests.cantrip`. If you have done the quickstart, keep this folder apart from its `content` folder: a folder loads as one game, and both define a Strike.
+
+In Godot a separate folder is not enough, because the editor dock reads every `.cantrip` file in the project. Work through the tutorial in a Godot project of its own, or point the dock at the tutorial alone: under Project Settings, with Advanced Settings switched on, add the setting `cantrip/content/folder` with the value `res://tutorial`, then press the dock's Reload button. The setting changes only what the dock reads, not what the game loads; remove it when you are done, and press Reload again.
 
 The finished files are in [samples/recipes/tutorial](../samples/recipes/tutorial).
 
@@ -237,7 +241,7 @@ tutorial/game.cantrip:26:11: error CT302: Nothing called `Posion` is defined. Di
 1 error(s), 0 warning(s), 0 note(s)
 ```
 
-Each message starts with the file, line and column. `lint` counts only errors as failure, so read its warnings too. To have a warning fail it as well, as on a build server, add `--warnings-as-errors`; notes never fail it, and `--suppress` with a warning's code, such as `--suppress CT303`, leaves that warning out.
+Each message starts with the file, line and column, and [Diagnostics](language.md#diagnostics) lists every code with what it means and the usual fix. `lint` counts only errors as failure, so read its warnings too. To have a warning fail it as well, as on a build server, add `--warnings-as-errors`; notes never fail it, and `--suppress` with a warning's code, such as `--suppress CT303`, leaves that warning out.
 
 A failing `expect` shows the value it found. Change the Strike test to expect 15, and run it alone with `--filter`, adding `--trace` to see what happened before the `expect`:
 
@@ -274,12 +278,13 @@ The full list of test verbs is under [Tests](language.md#tests).
 `lint` also warns about lines that load but do nothing:
 
 - **A line ending in a colon that is not a block the declaration runs** (CT313). `when card_played:` inside a relic is taken as a label and never runs, because a listener always starts with `on`. The warning suggests the listener the line looks like. [Declarations](language.md#declarations) lists what each kind of declaration reads.
+- **A tag on a line of its own** (CT316). Under a card, `exhaust` alone is a property that nothing reads, so the card is discarded as usual; write `tags exhaust`. See [A card that draws and exhausts](#a-card-that-draws-and-exhausts).
 - **A length the status never uses** (CT314, CT315). `apply Weak for 2 turns` on a `stacking duration` status lasts one turn, and a `duration 2` line in the status's declaration does nothing; see [A debuff that lasts N enemy turns](#a-debuff-that-lasts-n-enemy-turns).
 
 Some mistakes neither command reports:
 
 - **A property the engine does not read.** It is only a stat: `max_stack 3`, with the `s` missing, leaves the status with no cap, and `duration 2` on a status that stacks by intensity does not make it last two turns.
-- **A misspelt status in a test's `enemy` or `player` line.** In `enemy hp 20 Posion 3`, a word that is not a status becomes a plain stat, so the enemy gets a stat called Posion and no status. Neither command reports the line itself; `lint` reports CT302 only where the test goes on to read `enemy.Posion`. Check what the status does, such as the hp the enemy has lost after `end turn`, and the test fails instead.
+- **A misspelt status in a test's `enemy` or `player` line.** In `enemy hp 20 Posion 3`, a word that is not a status becomes a plain stat, so the enemy gets a stat called Posion and no status. Neither command reports the line itself; `lint` reports CT302 only where the test goes on to read `enemy.Posion`. Check what the status does, such as the hp the enemy has lost after `end turn`, and the test fails instead. A misspelt card, relic, ability or enemy on a test line is different: `hand Strik` is an error in `lint`, and the test fails naming the nearest definition.
 
 Nor is `describe` a check: it prints rules text for what was written, whether or not it will ever run. Only a test shows that it does.
 
@@ -358,6 +363,7 @@ Short answers to common questions, each with a test that passes. Every recipe is
 | I want | Recipe |
 |---|---|
 | a debuff that lasts N of the enemy's turns | [A debuff that lasts N enemy turns](#a-debuff-that-lasts-n-enemy-turns) |
+| a debuff that makes its host take more damage, such as Vulnerable | [A debuff that makes its host take more damage](#a-debuff-that-makes-its-host-take-more-damage) |
 | a buff that protects the player from the next N attacks | [A buff that lasts N enemy attacks](#a-buff-that-lasts-n-enemy-attacks) |
 | damage worked out from a status, such as twice the target's Poison | [Damage that scales with a status](#damage-that-scales-with-a-status) |
 | a card that draws and then leaves play | [A card that draws and exhausts](#a-card-that-draws-and-exhausts) |
@@ -405,6 +411,60 @@ test "Sap weakens the Brute's next two attacks"
 
 The number goes after the status's name: `apply Weak 2`. `apply Weak for 2 turns` is a different thing, a deadline added to a duration of 1, and covers only one enemy turn; `lint` warns about it (CT314). A `duration 2` line in the status's declaration does nothing either (CT315). The same number means something else on the player, because the player's turn ends before the enemies act: see [How long a duration status lasts](language.md#how-long-a-duration-status-lasts), which also shows how to protect the player for the next N enemy turns. File: [debuff-for-enemy-turns.cantrip](../samples/recipes/debuff-for-enemy-turns.cantrip).
 
+### A debuff that makes its host take more damage
+
+`modify damage_taken` changes the damage a status's host receives. This uses Strike from the tutorial.
+
+```
+status Vulnerable
+  tags debuff
+  stacking duration
+  modify damage_taken: x1.5
+
+card Expose
+  cost 1
+  target enemy
+  effect:
+    apply Vulnerable 2 to target
+
+enemy Hexer
+  hp 30
+  move Hex:
+    apply Vulnerable 2 to player
+  move Jab:
+    deal 10 to player
+  pattern cycle Hex, Jab, Jab
+
+test "Vulnerable 2 on an enemy lasts the rest of this turn and the next"
+  enemy hp 40
+  play Expose on enemy
+  play Strike on enemy
+  expect enemy.hp == 31
+  end turn
+  play Strike on enemy
+  expect enemy.hp == 22
+  end turn
+  expect not enemy.has(Vulnerable)
+  play Strike on enemy
+  expect enemy.hp == 16
+
+test "Vulnerable 2 from an enemy's move covers only the enemy's next turn"
+  enemy Hexer
+  end turn
+  expect player.Vulnerable == 2
+  end turn
+  expect player.hp == 65
+  end turn
+  expect player.hp == 55
+  expect not player.has(Vulnerable)
+```
+
+- `damage` is what the status's host deals and `damage_taken` what it receives. Weak uses `modify damage: x0.75`. Written with `damage` instead, Vulnerable would make the enemy's own hits bigger by half.
+- The status loses 1 at the end of each of its host's turns. On an enemy, it is the player's attacks that it changes, so `apply Vulnerable 2` covers the rest of the player's turn and the whole of the next one.
+- On the player it is the enemies' hits that count, and the player's own turn end ticks it first, so 2 from an enemy's move covers only the next enemy turn. [How long a duration status lasts](language.md#how-long-a-duration-status-lasts) sets out both cases.
+
+File: [debuff-more-damage-taken.cantrip](../samples/recipes/debuff-more-damage-taken.cantrip).
+
 ### A buff that lasts N enemy attacks
 
 To count attacks rather than turns, give the status stacks and spend one on each hit. This uses the Bog Troll from the tutorial.
@@ -449,7 +509,7 @@ test "Each hit of a multi-hit move uses one Parry"
   expect not player.has(Parry)
 ```
 
-- `before_damaged` runs before the damage lands, and can change `event.amount`. `owner.` in front of the event limits it to hits on the status's host, and `(source:enemies)` to hits from enemies.
+- `before_damaged` runs before the damage lands, and can change `event.amount`. `owner.` in front of the event limits it to hits on the status's host, and `(source:enemies)` to hits from enemies. A scope in front of an event is always matched against the event's target, so on a relic `on owner.card_played` would hear cards played at the player, not by them; for the cards the player plays, write `on card_played`.
 - The Troll's Guard turn does not use a stack, because nothing hits. Each hit of a multi-hit move uses one.
 - Damage rounds down, so a hit of 7 becomes 3.
 - Write `cancel` instead of the `event.amount` line to stop the hits entirely.
@@ -504,7 +564,9 @@ test "Insight draws two and is exhausted"
   expect count(discard) == 0
 ```
 
-`hand`, `draw`, `discard` and `exhaust` name the player's piles, and `count` counts what is in one. When the draw pile runs out, `draw` shuffles the discard pile into it. File: [draw-and-exhaust.cantrip](../samples/recipes/draw-and-exhaust.cantrip).
+`hand`, `draw`, `discard` and `exhaust` name the player's piles, and `count` counts what is in one. When the draw pile runs out, `draw` shuffles the discard pile into it.
+
+Write `tags exhaust`. On a line of its own, `exhaust` is a property that nothing reads, so the card goes to the discard pile as usual; `lint` warns about it (CT316). The same goes for the other tags with behaviour of their own: `retain`, `ethereal`, `unplayable`, `power` and `attack`. File: [draw-and-exhaust.cantrip](../samples/recipes/draw-and-exhaust.cantrip).
 
 ### A relic that works at the start of each turn
 
@@ -546,6 +608,7 @@ test "War Horn draws two after the first attack of the battle only"
 ```
 
 - `once per battle` goes after the event and its filter, just before the colon. Written first, as in `once per battle on card_played:`, the line is taken as a label and never runs, and `lint` warns about it (CT313).
+- The limit is spent when the listener fires, whatever its body then does. A condition in an `if` inside the body still uses it up, so put the condition in the filter instead: `on owner.damaged(owner.hp <= owner.max_hp / 2) once per battle:` waits for the first hit that leaves the holder at half health or below.
 - The limit resets when the next battle starts. A test is a single battle, so it cannot show that.
 - `once per turn`, `once per run` and `once per chain` work the same way; see [Listeners](language.md#listeners).
 
@@ -822,5 +885,7 @@ The [language reference](language.md) has the full rules for each idea used here
 | the order of a turn | [How a battle runs](language.md#how-a-battle-runs) |
 
 For more worked content with tests, [samples/basic](../samples/basic) has small examples of many features, and [samples/slice](../samples/slice) is the content of a small five-floor roguelite, including the Archmage, a boss with two phases.
+
+Looking for an effect you know from another game? [coverage.md](coverage.md) maps effects from nine games to working content in [samples/corpus](../samples/corpus), including power cards, and its [Sharp edges](coverage.md#sharp-edges) list the rules that most often catch authors out.
 
 For the programmer on the team, [csharp.md](csharp.md) covers running battles, choices, saves and hot reload from C#, and [godot.md](godot.md) does the same for a Godot game.
