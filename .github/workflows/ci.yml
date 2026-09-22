@@ -41,11 +41,12 @@ jobs:
         run: dotnet test tests/Cantrip.Godot.Tests -c Release --no-build
 
       # Each sample folder is its own game with its own definitions, so they are linted separately.
+      # Every folder is free of warnings, so a new warning fails the build rather than scrolling by.
       - name: Lint samples/basic
-        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- lint samples/basic
+        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- lint samples/basic --warnings-as-errors
 
       - name: Lint samples/corpus
-        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- lint samples/corpus
+        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- lint samples/corpus --warnings-as-errors
 
       - name: DSL tests (samples/basic)
         run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- test samples/basic
@@ -55,14 +56,14 @@ jobs:
         run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- test samples/corpus
 
       - name: Lint samples/slice
-        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- lint samples/slice
+        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- lint samples/slice --warnings-as-errors
 
       - name: DSL tests (samples/slice)
         run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- test samples/slice
 
       # The recipes in docs/writing-content.md, so a recipe that stops working fails the build.
       - name: Lint samples/recipes
-        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- lint samples/recipes
+        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- lint samples/recipes --warnings-as-errors
 
       - name: DSL tests (samples/recipes)
         run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- test samples/recipes

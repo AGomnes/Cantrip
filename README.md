@@ -66,7 +66,7 @@ None of these knows about the others. A Fireball on a frozen enemy deals its 6 d
 - **A rules engine that runs it.** Turns, card play, draw and enemy intents. It is deterministic by design, with fixed-point maths and a seeded random generator, so the same seed and inputs replay the same game; CI runs the tests on Linux and Windows x64. Battle state can be saved between actions and loaded again against the same content. Content can be reloaded into a running game. And an effect can stop to ask the player something, such as which card to discard, and carry on once your UI answers.
 - **Tools for the people writing content.** Tests written in content, a linter for unknown names, events nothing raises and similar mistakes, rules text that shows live numbers ("deal ~~6~~ 9 damage"), and a trace of why everything happened.
 - **No game engine required.** The core targets `netstandard2.1` and references no game engine. A [Godot addon](docs/godot.md) for the .NET edition of Godot 4.6 adds a node GDScript can drive, an importer so content ships in exported builds, and an editor dock for problems, tests and card text.
-- **Checked against effects from real games.** [docs/coverage.md](docs/coverage.md) re-creates effects from Slay the Spire, Monster Train, Hearthstone, Balatro, Magic, Inscryption, Dominion, Darkest Dungeon and Dota 2 under its own names, and records which the language writes directly, which need a workaround and which it cannot express yet, such as Balatro's poker hands. Cantrip is not affiliated with these games or their publishers. [`samples/slice`](samples/slice) is a small five-floor roguelite that a bot plays, 500 runs by default, to report win rates by card, relic and encounter.
+- **Checked against effects from real games.** [docs/coverage.md](docs/coverage.md) re-creates effects from Slay the Spire, Monster Train, Hearthstone, Balatro, Magic, Inscryption, Dominion, Darkest Dungeon and Dota 2 under its own names, and records which the language writes directly, which need a workaround and which it cannot express yet, such as Balatro's poker hands. Cantrip is not affiliated with these games or their publishers. [`samples/slice`](samples/slice) is a small five-floor roguelite that a bot plays, 500 runs by default, to report win rates by card, relic and encounter. [samples/README.md](samples/README.md) lists it with the other samples and says how to test each one.
 
 ## What it does not do
 
@@ -146,13 +146,13 @@ Installed as a local tool, the commands run as `dotnet cantrip ...`:
 | Command | What it does |
 |---|---|
 | `dotnet cantrip validate <path>... [--suppress codes]` | Reports errors, including unknown verbs |
-| `dotnet cantrip lint <path>... [--suppress codes]` | Also reports likely mistakes, such as events nothing raises |
-| `dotnet cantrip test <path>... [--filter text] [--trace]` | Runs the `test` blocks; `--trace` adds the causality trace to each failure |
+| `dotnet cantrip lint <path>... [--suppress codes] [--warnings-as-errors]` | Also reports likely mistakes, such as events nothing raises |
+| `dotnet cantrip test <path>... [--filter text] [--trace]` | Runs the `test` blocks; `--trace` adds the causality trace, with any `log` output, to each failure |
 | `dotnet cantrip describe <path>... [--name name]` | Prints generated rules text |
 | `dotnet cantrip repl <path>...` | Runs each statement you type as the player, against a 100 hp Dummy; `:state`, `:trace`, `:quit` |
 | `dotnet cantrip --version` | Prints the version and the commit it was built from |
 
-Paths are files or folders; a folder loads every `.cantrip` file under it. The exit code is 0 for success, 1 for content errors or failing tests and 2 for bad usage. `lint` fails only on errors: its warnings are printed but still exit 0, so in CI cover an effect with a `test` if it must not silently stop working. [Trying lines in the REPL](docs/writing-content.md#6-trying-lines-in-the-repl) shows a REPL session and what it cannot do.
+Paths are files or folders; a folder loads every `.cantrip` file under it. The exit code is 0 for success, 1 for content errors or failing tests and 2 for bad usage. `lint` fails only on errors, unless it is given `--warnings-as-errors`, which makes a warning fail it too, as this repository's CI does for its samples. The linter does not run the content, so cover an effect with a `test` if it must not silently stop working. [Trying lines in the REPL](docs/writing-content.md#6-trying-lines-in-the-repl) shows a REPL session and what it cannot do.
 
 ## Working on Cantrip
 
@@ -165,7 +165,7 @@ dotnet run --project src/Cantrip.Cli -- test samples/basic
 dotnet run --project src/Cantrip.Sim -c Release
 ```
 
-The last line has the bot play the sample roguelite. [CONTRIBUTING.md](CONTRIBUTING.md) has a map of the repository, what a pull request needs, and how releases are made.
+The last line has the bot play the sample roguelite; [Running the simulator](samples/README.md#running-the-simulator) lists its options, and [samples/README.md](samples/README.md) says what each sample shows. [CONTRIBUTING.md](CONTRIBUTING.md) has a map of the repository, what a pull request needs, and how releases are made.
 
 ## License
 

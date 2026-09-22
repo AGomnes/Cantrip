@@ -1,7 +1,8 @@
 # Coverage corpus: Slay the Spire style effects (cards, relics, statuses, enemy behaviour).
 # Names are our own; the "ref" comment names the mechanic being reproduced.
 # Classification and notes for every effect live in docs/coverage.md.
-# Tests: slay_the_spire.tests.cantrip.   Run:  cantrip test samples/corpus
+# Tests: slay_the_spire.tests.cantrip. Run them, with the rest of the corpus, from the root of the
+# repository:  dotnet run --project src/Cantrip.Cli -- test samples/corpus
 
 # --- Shared statuses ---------------------------------------------------------------------
 

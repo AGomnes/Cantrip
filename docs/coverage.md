@@ -244,6 +244,6 @@ Rules that are stated in the language reference but still caught this corpus out
 - **`discover` offers from everything loaded,** not only from the card's own file. Give a pool a tag of its own. See [Built-in verbs](language.md#built-in-verbs).
 - **`player` is always the game's player,** whichever side is acting. See [Names](language.md#names).
 - **In a test, block set in setup, and energy set below the maximum, are reset when the first turn starts;** winning the battle removes the player's statuses and returns every card to the draw pile; `play` cannot check that a card is refused; and an `item` is given with `relic`. See [Tests](language.md#tests).
-- **A name with spaces, hyphens or other punctuation** can only be written as a string later, and not after `name:` or `card:`. See [Files](language.md#files) and [Qualifiers](language.md#qualifiers).
+- **A name with spaces, hyphens or other punctuation is written in quotes wherever it is used,** after `name:` or `card:` too, as in `card:"Fire Bolt"`. See [Files](language.md#files) and [Qualifiers](language.md#qualifiers).
 
 The summary counts the rows of the per-game tables. If the two ever disagree, the rows are right.

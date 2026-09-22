@@ -30,13 +30,16 @@ paths may be files or folders (folders load every *.cantrip file, recursively).
 
 validate and lint options:
   --suppress <codes>  comma-separated diagnostic codes to leave out, e.g. CT306,CT310, or CT301
-                      for verbs your game registers in C#
+                      for verbs your game registers in C#. Errors from loading always show
+  --warnings-as-errors
+                      lint only: exit with 1 when there are warnings, as for errors
 
 test options:
   --filter <text>    only run tests whose name contains <text>
-  --trace            print the causality trace for failing tests
+  --trace            print the causality trace, with any log output, for failing tests
 
-exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
+exit codes: 0 success, 1 content errors or failing tests (or lint warnings, with
+--warnings-as-errors), 2 bad usage";
 
         private static int Main(string[] args)
         {
@@ -57,7 +60,8 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
             var paths = new List<string>();
             string? filter = null;
             bool trace = false;
-            var suppressed = new List<string>();
+            bool warningsAsErrors = false;
+            var suppressed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             for (int i = 1; i < args.Length; i++)
             {
@@ -66,8 +70,9 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
                     case "--filter" when i + 1 < args.Length: filter = args[++i]; break;
                     case "--name" when i + 1 < args.Length: filter = args[++i]; break;
                     case "--trace": trace = true; break;
+                    case "--warnings-as-errors": warningsAsErrors = true; break;
                     case "--suppress" when i + 1 < args.Length:
-                        suppressed.AddRange(args[++i].Split(',').Select(c => c.Trim()).Where(c => c.Length > 0));
+                        suppressed.UnionWith(args[++i].Split(',').Select(c => c.Trim()).Where(c => c.Length > 0));
                         break;
                     default:
                         if (args[i].StartsWith("--", StringComparison.Ordinal))
@@ -86,13 +91,21 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
                 return 2;
             }
 
+            // Only `lint` has warnings to fail on. Accepted by another command, the option would look
+            // like a check that is not being made.
+            if (warningsAsErrors && command != "lint")
+            {
+                Console.Error.WriteLine("--warnings-as-errors only applies to `lint`");
+                return 2;
+            }
+
             ContentLibrary? content = Load(paths);
             if (content == null) return 2;
 
             switch (command)
             {
                 case "validate": return Validate(content, suppressed);
-                case "lint": return Lint(content, suppressed);
+                case "lint": return Lint(content, suppressed, warningsAsErrors);
                 case "test": return Test(content, filter, trace);
                 case "describe": return Describe(content, filter);
                 case "repl": return Repl(content);
@@ -125,6 +138,13 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
             return !diagnostics.HasErrors;
         }
 
+        /// <summary>
+        /// What loading reported, less the warnings and notes that <c>--suppress</c> names. Its errors
+        /// always stay: content that did not load cannot be checked around them.
+        /// </summary>
+        private static List<Diagnostic> Loading(ContentLibrary content, ISet<string> suppressed) =>
+            content.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error || !suppressed.Contains(d.Code)).ToList();
+
         private static void Print(IEnumerable<Diagnostic> diagnostics)
         {
             foreach (Diagnostic diagnostic in diagnostics)
@@ -140,19 +160,27 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
             }
         }
 
-        private static int Lint(ContentLibrary content, IEnumerable<string> suppressed)
+        private static int Lint(ContentLibrary content, ISet<string> suppressed, bool warningsAsErrors)
         {
-            bool loaded = Report(content);
+            List<Diagnostic> loading = Loading(content, suppressed);
+            Print(loading);
 
             IReadOnlyList<Diagnostic> findings = Linter.Lint(content, Options(suppressed));
             Print(findings);
 
-            int errors = findings.Count(d => d.Severity == DiagnosticSeverity.Error) + content.Diagnostics.Errors.Count();
-            int warnings = findings.Count(d => d.Severity == DiagnosticSeverity.Warning) + content.Diagnostics.Warnings.Count();
-            int infos = findings.Count(d => d.Severity == DiagnosticSeverity.Info);
+            List<Diagnostic> all = loading.Concat(findings).ToList();
+            int errors = all.Count(d => d.Severity == DiagnosticSeverity.Error);
+            int warnings = all.Count(d => d.Severity == DiagnosticSeverity.Warning);
+            int infos = all.Count(d => d.Severity == DiagnosticSeverity.Info);
             Console.WriteLine($"{errors} error(s), {warnings} warning(s), {infos} note(s)");
 
-            return loaded && errors == 0 ? 0 : 1;
+            if (errors > 0) return 1;
+            if (warningsAsErrors && warnings > 0)
+            {
+                Console.WriteLine("failed, because --warnings-as-errors counts each warning as an error");
+                return 1;
+            }
+            return 0;
         }
 
         private static LintOptions Options(IEnumerable<string> suppressed)
@@ -162,9 +190,11 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
             return options;
         }
 
-        private static int Validate(ContentLibrary content, IEnumerable<string> suppressed)
+        private static int Validate(ContentLibrary content, ISet<string> suppressed)
         {
-            bool ok = Report(content);
+            List<Diagnostic> loading = Loading(content, suppressed);
+            Print(loading);
+            bool ok = !content.Diagnostics.HasErrors;
 
             // Loading catches what cannot be parsed; a misspelled verb such as `aply` parses fine and
             // only fails when a card runs it. Those are the linter's errors, so validate reports them
@@ -176,7 +206,7 @@ exit codes: 0 success, 1 content errors or failing tests, 2 bad usage";
             DiagnosticBag diagnostics = content.Diagnostics;
             Console.WriteLine(
                 $"{content.Files.Count()} file(s), {definitions} definition(s), {content.Verbs.Count()} verb(s), {content.Tests.Count} test(s): " +
-                $"{diagnostics.Errors.Count() + broken.Count} error(s), {diagnostics.Warnings.Count()} warning(s)");
+                $"{diagnostics.Errors.Count() + broken.Count} error(s), {loading.Count(d => d.Severity == DiagnosticSeverity.Warning)} warning(s)");
             return ok && broken.Count == 0 ? 0 : 1;
         }
 

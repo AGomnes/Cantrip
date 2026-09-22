@@ -53,7 +53,7 @@ namespace Cantrip.Syntax
         };
 
         /// <summary>Unit words that may follow a number after a space: <c>3 seconds</c> means <c>3s</c>.</summary>
-        private static readonly HashSet<string> UnitWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        internal static readonly HashSet<string> UnitWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "sec", "secs", "second", "seconds", "ms", "tick", "ticks", "turn", "turns",
         };

@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using Cantrip.Runtime;
 using Xunit;
@@ -211,6 +213,42 @@ card ""Scholar""
             // And it is an answer the runtime accepts: the chosen card is the one that went.
             Assert.Equal(PlayResult.Played, runtime.Answer(answer.EntityIds));
             Assert.Equal(Zones.Exhaust, runtime.State.Find(second)!.Zone);
+        }
+
+        /// <summary>
+        /// The words <c>AnswerChoice</c> gives script as its <c>reason</c>. A game compares against
+        /// them, so they are pinned one by one, and a rejection added without a word fails here
+        /// rather than in someone's game.
+        /// </summary>
+        [Fact]
+        public void Every_rejection_has_its_snake_case_word()
+        {
+            var words = new Dictionary<ChoiceRejection, string>
+            {
+                [ChoiceRejection.None] = "none",
+                [ChoiceRejection.NothingPending] = "nothing_pending",
+                [ChoiceRejection.StaleRequest] = "stale_request",
+                [ChoiceRejection.UnknownOption] = "unknown_option",
+                [ChoiceRejection.DuplicateOption] = "duplicate_option",
+                [ChoiceRejection.TooFew] = "too_few",
+                [ChoiceRejection.TooMany] = "too_many",
+            };
+
+            Assert.Equal(Enum.GetValues<ChoiceRejection>().OrderBy(r => r), words.Keys.OrderBy(r => r));
+            foreach (KeyValuePair<ChoiceRejection, string> word in words) Assert.Equal(word.Value, ChoiceAnswer.NameOf(word.Key));
+        }
+
+        [Fact]
+        public void A_rejected_answer_carries_its_word()
+        {
+            Asking(out ChoiceBridge bridge, "Recycle", "Strike", "Strike");
+
+            ChoiceAnswer tooFew = bridge.Validate(bridge.CurrentId, new int[0]);
+            ChoiceAnswer accepted = bridge.Validate(bridge.CurrentId, new[] { bridge.OptionIds[0] });
+
+            Assert.Equal("too_few", tooFew.ReasonName);
+            Assert.StartsWith("too_few: ", tooFew.ToString());
+            Assert.Equal("none", accepted.ReasonName);
         }
 
         [Fact]

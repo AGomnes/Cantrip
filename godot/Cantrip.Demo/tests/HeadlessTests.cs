@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Cantrip.Diagnostics;
 using Godot;
 
 namespace Cantrip.GodotAdapter.Demo
@@ -37,14 +38,22 @@ namespace Cantrip.GodotAdapter.Demo
             try
             {
                 ContentLoads();
+                ContentLoadsAgainAfterACollection();
                 ABattlePlaysOut();
                 EventsArriveAfterTheAction();
                 ViewsAndDescriptionsTellTheTruth();
                 ADeferredChoiceRollsBackAndReplays();
+                AnAnswerTurnedAwaySaysWhyInOneWord();
                 SavingAndLoadingReturnsTheSameGame();
+                APatchedWaitingBlockIsExplainedNotThrown();
                 HotReloadChangesARunningGame();
                 AChoiceIsAnsweredFromTheSignalThatAsks();
                 AHostCallbackCannotCallBackIn();
+                NorSaveHalfwayThroughAnEffect();
+                NorSetTheGameUpFromACallback();
+                ACallbackMustBeCallable();
+                WonIsNullUntilABattleEnds();
+                AnAutomaticLoadReportsItsProblems();
                 TheDebugChannelAnswersTheEditor();
 
                 code = _failures.Count == 0 ? 0 : 1;
@@ -75,6 +84,30 @@ namespace Cantrip.GodotAdapter.Demo
             Check("test blocks came with it", rules.Content.Tests.Count >= 3, rules.Content.Tests.Count + " test block(s)");
 
             rules.QueueFree();
+        }
+
+        /// <summary>
+        /// A content file left in Godot's resource cache can be found there by the next load after
+        /// the garbage collector has let go of its C# half but before Godot has freed it, and the
+        /// game then crashes, or not, depending on when the collector ran. So loading leaves nothing
+        /// in the cache, and content loads as often as a game or the dock asks, collections or not.
+        /// </summary>
+        private void ContentLoadsAgainAfterACollection()
+        {
+            const string cards = ContentFolder + "/cards.cantrip";
+
+            var library = new Cantrip.Content.ContentLibrary();
+            GodotContentLoader.LoadFolder(library, ContentFolder);
+            Check("loading leaves no content file in Godot's resource cache", !ResourceLoader.HasCached(cards));
+
+            for (int i = 0; i < 50; i++)
+            {
+                GC.Collect();
+                library = new Cantrip.Content.ContentLibrary();
+                GodotContentLoader.LoadFolder(library, ContentFolder);
+            }
+            Check("and content loads again and again with collections in between",
+                library.Find("Ember", "card") != null && !library.Diagnostics.HasErrors, library.Diagnostics.ToString());
         }
 
         private void ABattlePlaysOut()
@@ -187,6 +220,49 @@ namespace Cantrip.GodotAdapter.Demo
             rules.QueueFree();
         }
 
+        /// <summary>
+        /// A script compares <c>reason</c> against these words, so each one is pinned here as the
+        /// node gives it, in snake_case like every other word it gives.
+        /// </summary>
+        private void AnAnswerTurnedAwaySaysWhyInOneWord()
+        {
+            CantripRuntime rules = Loaded();
+            rules.CreatePlayer();
+            int slime = rules.SpawnEnemy("Slime");
+            rules.StartBattle(false, false);
+
+            void TurnedAway(string what, Godot.Collections.Dictionary answer, string word) =>
+                Check(what, !answer["accepted"].AsBool() && answer["reason"].AsString() == word, answer["reason"].AsString());
+
+            TurnedAway("with nothing asked, an answer is nothing_pending",
+                rules.AnswerChoice(1, new Godot.Collections.Array()), "nothing_pending");
+
+            int spare = rules.AddCard("Ember", "hand");
+            int keep = rules.AddCard("Guard", "hand");
+            int sort = rules.AddCard("Sort", "hand");
+            rules.Play(sort);
+            int first = rules.GetPendingChoice()["id"].AsInt32();
+            rules.CancelChoice();
+            rules.Play(sort);
+            int request = rules.GetPendingChoice()["id"].AsInt32();
+
+            TurnedAway("an answer to a question already dealt with is stale_request",
+                rules.AnswerChoice(first, new Godot.Collections.Array { spare }), "stale_request");
+            TurnedAway("a pick that was not offered is unknown_option",
+                rules.AnswerChoice(request, new Godot.Collections.Array { slime }), "unknown_option");
+            TurnedAway("the same pick twice is duplicate_option",
+                rules.AnswerChoice(request, new Godot.Collections.Array { spare, spare }), "duplicate_option");
+            TurnedAway("too few picks is too_few", rules.AnswerChoice(request, new Godot.Collections.Array()), "too_few");
+            TurnedAway("too many picks is too_many",
+                rules.AnswerChoice(request, new Godot.Collections.Array { spare, keep }), "too_many");
+
+            Godot.Collections.Dictionary answered = rules.AnswerChoice(request, new Godot.Collections.Array { spare });
+            Check("and an answer that is accepted is none",
+                answered["accepted"].AsBool() && answered["reason"].AsString() == "none", answered["message"].AsString());
+
+            rules.QueueFree();
+        }
+
         private void SavingAndLoadingReturnsTheSameGame()
         {
             CantripRuntime rules = Loaded();
@@ -210,7 +286,80 @@ namespace Cantrip.GodotAdapter.Demo
             Check("a save from other content is refused, not crashed into", !refused["accepted"].AsBool());
             Check("with a reason worth showing", refused["reason"].AsString() == "content_changed", refused["reason"].AsString());
 
+            // The right content, but no game inside: a file damaged or edited by hand.
+            string untouched = rules.StateHash();
+            Godot.Collections.Dictionary unreadable = LoadOrThrown(rules,
+                "{\"format\":1,\"fingerprint\":\"" + rules.Content.Fingerprint + "\",\"snapshot\":\"not a game\"}");
+            Check("a save whose game cannot be read is refused, not thrown",
+                !unreadable["accepted"].AsBool() && unreadable["reason"].AsString() == "wrong_format", unreadable["reason"] + ": " + unreadable["message"]);
+            Check("and changes nothing", rules.StateHash() == untouched);
+
+            // The right content and a game, but in a snapshot format this Cantrip.Core does not read.
+            Godot.Collections.Dictionary newer = LoadOrThrown(rules,
+                "{\"format\":1,\"fingerprint\":\"" + rules.Content.Fingerprint + "\",\"snapshot\":\"{\\\"FormatVersion\\\":99}\"}");
+            Check("a game saved in another snapshot format is wrong_format, not content_changed",
+                !newer["accepted"].AsBool() && newer["reason"].AsString() == "wrong_format", newer["reason"] + ": " + newer["message"]);
+            Check("and changes nothing either", rules.StateHash() == untouched);
+
             rules.QueueFree();
+        }
+
+        /// <summary>
+        /// A <c>next turn:</c> block that is waiting when a patch changes it keeps the statements it
+        /// was scheduled with, which the loaded content no longer has. Neither a save now nor one
+        /// from before the patch can hold it, and the node has to say so in words, not throw into
+        /// script, and leave the game in progress exactly as it was.
+        /// </summary>
+        private void APatchedWaitingBlockIsExplainedNotThrown()
+        {
+            const string folder = "user://headless";
+            const string path = folder + "/later.cantrip";
+            static string Later(int amount) => "card \"Later\"\n  cost 0\n  effect:\n    next turn:\n      block " + amount + "\n";
+
+            CantripRuntime rules = Loaded();
+            try
+            {
+                DirAccess.MakeDirRecursiveAbsolute(folder);
+                Godot.Collections.Array added = Patch(rules, path, Later(3));
+                Check("a card that waits a turn loads", Errors(added) == 0, Describe(added));
+
+                rules.CreatePlayer();
+                rules.SpawnEnemy("Slime");
+                rules.StartBattle(false, false);
+                rules.Play(rules.AddCard("Later", "hand"));
+                Check("a block waiting from content can be saved", rules.CanSave());
+                string save = rules.Save();
+
+                Patch(rules, path, Later(9));
+                Check("once a reload has changed the waiting block, a save cannot hold it", !rules.CanSave());
+                string why = SaveError(rules);
+                Check("and Save says so, not that effects are resolving", why.Contains("reload") && !why.Contains("resolving"), why);
+
+                int spare = rules.AddCard("Ember", "hand");
+                rules.Play(rules.AddCard("Sort", "hand"));
+                int request = rules.GetPendingChoice()["id"].AsInt32();
+                string before = rules.StateHash();
+
+                Godot.Collections.Dictionary loaded = LoadOrThrown(rules, save);
+                Check("a save from before the patch is refused, not thrown", !loaded["accepted"].AsBool(), loaded["reason"].AsString());
+                Check("as content_changed, with the rules' reason",
+                    loaded["reason"].AsString() == "content_changed" && loaded["message"].AsString().Contains("Later"),
+                    loaded["reason"] + ": " + loaded["message"]);
+                Check("and the game is as it was", rules.StateHash() == before, rules.StateHash() + " vs " + before);
+                Check("its open choice still open", rules.HasPendingChoice() && rules.GetPendingChoice()["id"].AsInt32() == request);
+
+                Godot.Collections.Dictionary answered = rules.AnswerChoice(request, new Godot.Collections.Array { spare });
+                Check("and answered as before", answered["accepted"].AsBool() && answered["result"].AsString() == "played", answered["message"].AsString());
+
+                rules.EndTurn();
+                Check("once the block has run, saving works again", rules.CanSave());
+            }
+            finally
+            {
+                DirAccess.RemoveAbsolute(path);
+                DirAccess.RemoveAbsolute(folder);
+                rules.QueueFree();
+            }
         }
 
         private void HotReloadChangesARunningGame()
@@ -290,6 +439,177 @@ namespace Cantrip.GodotAdapter.Demo
 
             Check("a host callback that calls back in is refused", refused);
             Check("and the game is still sound", rules.IsInBattle() && rules.GetStat(slime, "hp") == 30);
+
+            rules.QueueFree();
+        }
+
+        /// <summary>
+        /// A save taken in the middle of a card's effect would hold half an action. The rules see
+        /// that effects are resolving only while their queue runs, which a card's own effect does
+        /// not, so it is the node that has to refuse, as <c>CanSave</c> already says it will.
+        /// </summary>
+        private void NorSaveHalfwayThroughAnEffect()
+        {
+            CantripRuntime rules = Loaded();
+            DiagnosticBag peek = rules.Content.LoadText(
+                "card \"Peek\"\n  cost 0\n  target enemy\n  effect:\n    deal peek to target\n    block 5\n", "res://tests/peek.cantrip");
+            Check("a card whose effect asks a callback loads", !peek.HasErrors, peek.ToString());
+
+            rules.CreatePlayer();
+            int slime = rules.SpawnEnemy("Slime");
+            rules.StartBattle(false, false);
+            int card = rules.AddCard("Peek", "hand");
+
+            bool couldSave = true;
+            string why = "not asked";
+            rules.RegisterName("peek", Callable.From((Godot.Collections.Dictionary _) =>
+            {
+                couldSave = rules.CanSave();
+                why = SaveError(rules);
+                return 1;
+            }));
+
+            Check("the card plays", rules.Play(card, slime) == "played");
+            Check("in the middle of its effect, CanSave is false", !couldSave);
+            Check("and Save refuses, saying why", why.Contains("resolving"), why);
+            Check("once the card has resolved, saving works again", rules.CanSave() && SaveError(rules) == "saved");
+
+            rules.QueueFree();
+        }
+
+        /// <summary>
+        /// Setting a game up runs no rules, but it changes the game all the same, so a callback in
+        /// the middle of an effect may no more add a card or load a save than play one. Nor may a
+        /// callback that a query called: working out a cost evaluates content too.
+        /// </summary>
+        private void NorSetTheGameUpFromACallback()
+        {
+            CantripRuntime rules = Loaded();
+            DiagnosticBag priced = rules.Content.LoadText("card \"Priced\"\n  cost 1\n  modify cost: +meddle\n", "res://tests/priced.cantrip");
+            Check("a card whose cost asks a callback loads", !priced.HasErrors, priced.ToString());
+
+            int player = rules.CreatePlayer();
+            rules.SpawnEnemy("Slime");
+            rules.StartBattle(false, false);
+            int card = rules.AddCard("Priced", "hand");
+            string save = rules.Save();
+
+            var refused = new List<string>();
+            var allowed = new List<string>();
+            void Attempt(string call, Action action)
+            {
+                try
+                {
+                    action();
+                    allowed.Add(call);
+                }
+                catch (InvalidOperationException error) when (error.Message.StartsWith("The rules are resolving", StringComparison.Ordinal))
+                {
+                    refused.Add(call);
+                }
+                catch (Exception error)
+                {
+                    allowed.Add(call + " (failed for another reason: " + error.Message + ")");
+                }
+            }
+
+            rules.RegisterName("meddle", Callable.From((Godot.Collections.Dictionary _) =>
+            {
+                Attempt("CreatePlayer", () => rules.CreatePlayer());
+                Attempt("AddCard", () => rules.AddCard("Ember", "hand"));
+                Attempt("AddDeck", () => rules.AddDeck(new Godot.Collections.Array { "Guard" }));
+                Attempt("SpawnEnemy", () => rules.SpawnEnemy("Slime"));
+                Attempt("GrantAbility", () => rules.GrantAbility("Anything", player));
+                Attempt("LoadSave", () => rules.LoadSave(save));
+                Attempt("CancelChoice", () => rules.CancelChoice());
+                return 0;
+            }));
+
+            rules.Execute("log meddle", 0, 0);
+            Check("every setup call is refused from a callback an effect made",
+                allowed.Count == 0 && new HashSet<string>(refused).Count == 7, "allowed: " + string.Join(", ", allowed));
+
+            refused.Clear();
+            int cost = rules.CostOf(card);
+            Check("and from one a query made",
+                allowed.Count == 0 && new HashSet<string>(refused).Count == 7 && cost == 1, $"cost {cost}, allowed: " + string.Join(", ", allowed));
+
+            Check("so the game was not set up behind the rules' back",
+                rules.GetHand().Count == 1 && rules.GetZone(0, "draw").Count == 0 && rules.GetEnemies().Count == 1);
+
+            rules.QueueFree();
+        }
+
+        /// <summary>
+        /// A callback is kept as the Variant it arrived in, so the boundary accepts anything. What
+        /// could never be called is refused on registration, not the first time content asks.
+        /// </summary>
+        private void ACallbackMustBeCallable()
+        {
+            CantripRuntime rules = Loaded();
+            rules.CreatePlayer();
+            int slime = rules.SpawnEnemy("Slime");
+            rules.StartBattle(false, false);
+
+            Check("a number is not a callback", Throws<ArgumentException>(() => rules.RegisterName("seven", 7)));
+            Check("nor is a method that does not exist",
+                Throws<ArgumentException>(() => rules.RegisterFunction("nothing", new Callable(this, "NoSuchMethod"))));
+
+            rules.RegisterName("four", Callable.From((Godot.Collections.Dictionary _) => 4));
+            rules.Execute("deal four to target", 0, slime);
+            Check("a C# delegate still answers", rules.GetStat(slime, "hp") == 26, rules.GetStat(slime, "hp").ToString());
+
+            rules.QueueFree();
+        }
+
+        /// <summary>
+        /// Three answers, and script can only tell "not yet" from "lost" if the first is a real
+        /// null. In a conditional against a bool, a bare default is false.
+        /// </summary>
+        private void WonIsNullUntilABattleEnds()
+        {
+            CantripRuntime rules = Loaded();
+            rules.CreatePlayer();
+            int slime = rules.SpawnEnemy("Slime");
+            Check("before any battle, nothing is won or lost", rules.GetWon().VariantType == Variant.Type.Nil, rules.GetWon().ToString());
+
+            rules.StartBattle(false, false);
+            Check("nor while one runs", rules.GetWon().VariantType == Variant.Type.Nil, rules.GetWon().ToString());
+
+            rules.Execute("deal 99 to target", 0, slime);
+            Check("a battle won reads as true",
+                !rules.IsInBattle() && rules.GetWon().VariantType == Variant.Type.Bool && rules.GetWon().AsBool(), rules.GetWon().ToString());
+
+            rules.SpawnEnemy("Slime");
+            rules.StartBattle(false, false);
+            Check("and as null again once the next battle starts", rules.GetWon().VariantType == Variant.Type.Nil, rules.GetWon().ToString());
+
+            rules.QueueFree();
+        }
+
+        /// <summary>
+        /// With AutoLoad on, nothing receives what the load returns, so its problems have to reach
+        /// the Output panel by themselves or a running game never mentions them.
+        /// </summary>
+        private void AnAutomaticLoadReportsItsProblems()
+        {
+            GD.Print("HEADLESS: loading the deliberately broken fixture; the errors it reports next are expected.");
+
+            var heard = new ErrorLog();
+            OS.AddLogger(heard);
+            var rules = new CantripRuntime { ContentFolder = "res://tests/fixtures", Seed = 7 };
+            try
+            {
+                AddChild(rules);   // AutoLoad is on, so this loads
+            }
+            finally
+            {
+                OS.RemoveLogger(heard);
+            }
+
+            string expected = "res://tests/fixtures/broken.cantrip:6:18: error CT0018: ";
+            Check("an automatic load reports each error on one line, as the importer words it",
+                heard.Errors.Exists(line => line.StartsWith(expected, StringComparison.Ordinal)), string.Join(" | ", heard.Errors));
 
             rules.QueueFree();
         }
@@ -410,6 +730,48 @@ namespace Cantrip.GodotAdapter.Demo
             return rules;
         }
 
+        /// <summary>Writes a content file and reloads it into the running game, as a patch arrives.</summary>
+        private static Godot.Collections.Array Patch(CantripRuntime rules, string path, string text)
+        {
+            using (FileAccess file = FileAccess.Open(path, FileAccess.ModeFlags.Write)) file.StoreString(text);
+            return rules.ReloadContent(new Godot.Collections.Array { path })["diagnostics"].AsGodotArray();
+        }
+
+        /// <summary>What Save says when it cannot save, or "saved".</summary>
+        private static string SaveError(CantripRuntime rules)
+        {
+            try
+            {
+                rules.Save();
+                return "saved";
+            }
+            catch (InvalidOperationException error)
+            {
+                return error.Message;
+            }
+        }
+
+        /// <summary>
+        /// LoadSave, with anything it throws turned into a refusal, so a load that throws fails its
+        /// checks instead of ending the run.
+        /// </summary>
+        private static Godot.Collections.Dictionary LoadOrThrown(CantripRuntime rules, string save)
+        {
+            try
+            {
+                return rules.LoadSave(save);
+            }
+            catch (Exception error)
+            {
+                return new Godot.Collections.Dictionary
+                {
+                    ["accepted"] = false,
+                    ["reason"] = "threw " + error.GetType().Name,
+                    ["message"] = error.Message,
+                };
+            }
+        }
+
         private void OnEffectEvent(Godot.Collections.Dictionary effectEvent) => _events.Add(effectEvent["name"].AsString());
 
         private void OnChoiceRequested(Godot.Collections.Dictionary request) => _lastChoice = request;
@@ -419,6 +781,19 @@ namespace Cantrip.GodotAdapter.Demo
             _checks++;
             if (passed) return;
             _failures.Add(what + (detail.Length == 0 ? string.Empty : " (" + detail + ")"));
+        }
+
+        private static bool Throws<TException>(Action action) where TException : Exception
+        {
+            try
+            {
+                action();
+                return false;
+            }
+            catch (TException)
+            {
+                return true;
+            }
         }
 
         private static int Errors(Godot.Collections.Array problems)
@@ -450,6 +825,21 @@ namespace Cantrip.GodotAdapter.Demo
                 if (view["name"].AsString() == name) return view["counter"].AsInt32();
             }
             return 0;
+        }
+
+        /// <summary>Hears what reaches the Output panel as an error, as a person watching it would.</summary>
+        private sealed partial class ErrorLog : Logger
+        {
+            public List<string> Errors { get; } = new List<string>();
+
+            public override void _LogError(string function, string file, int line, string code, string rationale,
+                bool editorNotify, int errorType, Godot.Collections.Array<ScriptBacktrace> scriptBacktraces)
+            {
+                // push_error puts its text in code; an engine error keeps the condition there and
+                // explains it in rationale.
+                if (errorType != (int)ErrorType.Error) return;
+                lock (Errors) Errors.Add(string.IsNullOrEmpty(rationale) ? code : rationale);
+            }
         }
     }
 }

@@ -1,5 +1,5 @@
 # Sample content: small examples of the main features, plus the basics needed to run them.
-# Load with:  cantrip test samples/basic
+# Test it from the root of the repository:  dotnet run --project src/Cantrip.Cli -- test samples/basic
 
 # --- Cards -------------------------------------------------------------------------------
 

@@ -113,7 +113,7 @@ namespace Cantrip.Tests.Runtime
             ulong before = runtime.State.ComputeHash();
             runtime.State.Events.Periodic[0].NextDueAt += 1;
 
-            // Different futures must not hash alike, or a lockstep peer would miss the desync.
+            // Different futures must not hash alike, or comparing hashes would miss a replay drifting.
             Assert.NotEqual(before, runtime.State.ComputeHash());
         }
 

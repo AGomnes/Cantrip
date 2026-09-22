@@ -22,6 +22,7 @@ namespace Cantrip.GodotAdapter
         private CantripWorkspace? _workspace;
 
         private TabContainer? _tabs;
+        private Button? _reload;
         private Label? _status;
         private CantripProblemsTab? _problems;
         private CantripTestsTab? _tests;
@@ -40,13 +41,13 @@ namespace Cantrip.GodotAdapter
             var bar = new HBoxContainer();
             AddChild(bar);
 
-            var reload = new Button
+            _reload = new Button
             {
                 Text = "Reload",
-                TooltipText = "Discover, load and lint every .cantrip file again.",
+                TooltipText = "Read the cantrip/ project settings, then discover, load and lint every .cantrip file again.",
             };
-            reload.Pressed += OnReload;
-            bar.AddChild(reload);
+            _reload.Pressed += OnReload;
+            bar.AddChild(_reload);
 
             _status = new Label { SizeFlagsHorizontal = SizeFlags.ExpandFill, ClipText = true };
             bar.AddChild(_status);
@@ -93,7 +94,17 @@ namespace Cantrip.GodotAdapter
             if (index >= 0) _tabs.CurrentTab = index;
         }
 
-        private void OnReload() => _workspace?.Reload();
+        /// <summary>
+        /// Settings first, so that a folder or a host name changed in Project Settings counts
+        /// without switching the plugin off and on.
+        /// </summary>
+        private void OnReload()
+        {
+            if (_workspace == null) return;
+
+            _workspace.ReadSettings();
+            _workspace.Reload();
+        }
 
         private void UpdateStatus()
         {
@@ -132,6 +143,7 @@ namespace Cantrip.GodotAdapter
             report.Add(
                 $"content: {_workspace.Files.Count} file(s), {Definitions()} definition(s), " +
                 $"{_workspace.Content.Tests.Count} test(s), fingerprint {_workspace.Fingerprint}");
+            report.Add(SettingsSelfTest());
 
             if (_problems != null) report.Add(_problems.SelfTest());
             if (_tests != null) report.Add(_tests.SelfTest());
@@ -144,6 +156,36 @@ namespace Cantrip.GodotAdapter
             if (first != null) ShowSource(first.Span.File, first.Span.Line, first.Span.Column);
             report.Add($"dock: {(_tabs == null ? 0 : _tabs.GetTabCount())} tab(s) built");
             return report;
+        }
+
+        /// <summary>
+        /// Presses Reload with a project setting changed, then again with it put back, which proves
+        /// that the button reads settings afresh rather than only when the plugin starts. The
+        /// setting changes in memory only; nothing here saves the project.
+        /// </summary>
+        private string SettingsSelfTest()
+        {
+            if (_workspace == null || _reload == null) return "settings: not initialised";
+
+            const string probe = "cantrip_selftest_probe";
+            string key = CantripWorkspace.HostNamesSetting;
+            Variant before = ProjectSettings.HasSetting(key) ? ProjectSettings.GetSetting(key) : default;
+
+            ProjectSettings.SetSetting(key, probe);
+            _reload.EmitSignal(BaseButton.SignalName.Pressed);
+            bool read = _workspace.HostNames.Contains(probe);
+
+            // Setting null takes away a setting that was not there before.
+            ProjectSettings.SetSetting(key, before);
+            _reload.EmitSignal(BaseButton.SignalName.Pressed);
+            bool readAgain = !_workspace.HostNames.Contains(probe);
+
+            if (read && readAgain) return "settings: Reload reads the project settings again";
+
+            string failure = $"settings: {CantripPlugin.SelfTestFailed}, Reload " +
+                (read ? "kept a setting that had been taken away" : "did not see a changed setting");
+            GD.PushError("Cantrip self-test: " + failure);
+            return failure;
         }
     }
 }

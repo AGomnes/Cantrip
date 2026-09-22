@@ -294,56 +294,54 @@ sealed class SaveFile
 
 ```csharp
 // using System.Text.Json;
-if (runtime.CanCapture)   // false while effects are still resolving, so a save button can grey out
+if (runtime.CanCapture)   // false while a save cannot be taken (mid-action included), so a save button can grey out
 {
     var save = new SaveFile { Fingerprint = content.Fingerprint, Game = runtime.Capture() };
     File.WriteAllText("slot1.json", JsonSerializer.Serialize(save));
 }
 ```
 
-Loading checks the fingerprint, then restores into a new runtime and switches to it only once that has worked:
+Loading checks the fingerprint, then restores:
 
 ```csharp
 SaveFile save = JsonSerializer.Deserialize<SaveFile>(File.ReadAllText("slot1.json"))!;
 if (save.Fingerprint != content.Fingerprint)
 {
     // A definition has been added, renamed or removed since this save was made.
-    // Tell the player, or try it anyway: a failure below cannot touch the game in progress.
+    // Tell the player, or try it anyway: a save Restore refuses leaves the game as it was.
 }
 
-var restored = new CardRuntime(content, new RuntimeOptions { Host = host, Chooser = new DeferredChooser() });
 try
 {
-    restored.Restore(save.Game);
-    runtime = restored;             // its entities are new objects: look them up again
+    runtime.Restore(save.Game);
 }
 catch (InvalidOperationException error)
 {
-    ShowMessage(error.Message);     // The snapshot needs card "Defend", which is not loaded.
+    ShowMessage(error.Message);   // The snapshot needs card "Defend", which is not loaded.
 }
 ```
 
-A new runtime is the safe target because `Restore` finds a missing definition only after it has begun taking apart the game it was called on, and throws with that game half gone. Give it what the old one had: the same options (a real-time game's `TickClock` included) and every verb the game registers with `RegisterVerb`. Restoring into the running runtime also works, and keeps the `Entity` objects the game holds, when the save is known to match.
+`Restore` looks up everything a save needs before it changes anything, so when it refuses one, the game it was called on carries on untouched. That includes a damaged save, one with a list or a record missing, which it refuses as damaged. Restoring into the running runtime keeps its options and the verbs the game registered with `RegisterVerb`, and an `Entity` the game holds stays the same object if the save has it too. A new runtime works as well, given the same options (a real-time game's `TickClock` included) and the same verbs; its entities are new objects, so look them up again.
 
 The fingerprint covers the kinds and names of the definitions, content verbs and resources, and nothing else, so rebalancing a card leaves it unchanged. What a content change does to a save:
 
 | Since the save, the content has | `Restore` |
 |---|---|
-| changed a definition's numbers or effects | Succeeds. Each restored entity keeps the stats it was saved with, so a card saved at cost 1 stays at cost 1 although the content now says 2, and a stat the definition has since gained reads 0. Effects, listeners and modifiers are the new ones, and copies made from now on have the new numbers. Scheduled work is the exception, below. |
+| changed a definition's numbers or effects | Succeeds. Each restored entity keeps the stats it was saved with, so a card saved at cost 1 stays at cost 1 although the content now says 2, and a stat the definition has since gained reads 0. Effects, listeners and modifiers are the new ones, and copies made from now on have the new numbers. Work waiting in the save is the exception, below. |
 | added a definition | Succeeds, though the fingerprint differs. |
-| renamed or removed a definition the save uses | Throws `InvalidOperationException` part-way through. |
+| renamed or removed a definition the save uses | Refuses the save with `InvalidOperationException`, before changing anything. |
 
-Work waiting in the save, such as the `next turn:` block of a card played before saving, is recorded by its place in its definition (the first statement of Prepare's effect, say), not by its text. After an edit that leaves no such block in that place, even one that only adds a line above it, `Restore` throws the same way; after an edit that puts another block there, the restored game runs that block instead. Saves with nothing scheduled are not affected. `Restore` also refuses a snapshot from a different save format, before touching anything. The Godot node makes the fingerprint check itself (see [Saving](godot.md#saving)).
+Work waiting in the save, such as the `next turn:` block of a card played before saving, runs as it was when the game was saved. The save records the block's place in its definition and a hash of its statements, so an edit that moves the block within its definition, such as a line added above it, or that only changes its layout or comments, is safe. If an edit has changed the block's statements or removed it, `Restore` refuses the save, naming the definition, rather than run something else. Saves with nothing waiting are not affected. A save made by 0.1.0-preview.2 or earlier has no hash, so its waiting blocks are found by place alone: after an edit that moves one, it fails to load or runs another block.
+
+Listener limits and timers stay with their listener too. Which turn or battle a `once per` listener last fired in, and when an `on every` listener is next due, are saved with the listener's place among its definition's `on` blocks and a hash of the listener, so an edit that adds, removes or reorders `on` blocks, or only changes their layout or comments, is safe. So is an edit to the body of a listener that keeps its place, such as a new number: a `once per battle` listener that has fired stays used. A listener whose `on` line has changed (its event, filter, `once per`, `priority` or interval), or whose body changed as it moved, is not taken for the old one. It starts afresh, as a newly added listener would: it can fire once more in the turn, battle or run whose limit it had used, and an `on every` listener waits a full interval from the moment of the save. The save is never refused for this, and a record never goes to a listener with a different `on` line. A save made by 0.1.0-preview.2 or earlier records the place alone, so after an edit that adds, removes or reorders `on` blocks it can give a limit or timer to another listener.
+
+`Restore` also refuses a snapshot from a different save format, before touching anything. The Godot node makes the fingerprint check itself (see [Saving](godot.md#saving)).
 
 `Restore` abandons a pending choice, which belonged to the game being replaced. A save taken while a choice is pending holds the game as it was before the call that asked, so after loading, the player makes that move again.
 
-`Capture` refuses, with `InvalidOperationException`, a game still holding scheduled work that `Execute` started, such as `Execute("next turn: draw 1")`, because that block is not in the content to point at; `CanCapture` does not foresee this. `DeferredChooser` snapshots the game before every action, so under it the same work makes every later `Play`, `EndTurn` and `Execute` throw, and the battle cannot go on. To schedule work from game code, put the block in a [content verb](language.md#content-defined-verbs) and execute the verb. With this in content, `runtime.Execute("plan")` saves like any card:
+Work that `Execute` schedules, such as `Execute("next turn: draw 1")`, is saved with the statements themselves, so it restores whatever content is loaded. Apart from effects still resolving, one thing stops a save: a waiting block that the loaded content does not contain, either because a [hot reload](#hot-reload) changed it after it was scheduled, or because game code parsed it and ran it through `runtime.Interpreter` itself. `CanCapture` is false, and `Capture` throws, until that block has run. Choices are not affected: under `DeferredChooser`, an action that asks is rolled back to a copy of the game kept in memory, not to a save.
 
-```
-verb plan():
-  next turn:
-    draw 1
-```
+A save is trusted input. It sets every stat, and it holds the text of any work that `Execute` scheduled, which `Restore` parses and the game runs when that work comes due; that text can call any verb, the C# verbs the game registered included. `Restore` refuses text that does not parse, but anything that parses could have come from `Execute`, so an edited save can make the game do anything its content and verbs can. The hashes in a save let `Restore` recognise content; they are no check that the save is unaltered, since anyone editing it can compute them again. A game that loads saves it did not write itself, such as shared, downloaded or cloud saves, should sign them or verify them another way before calling `Restore`.
 
 ## Hot reload
 
@@ -361,7 +359,9 @@ else
 }
 ```
 
-Stats the game has changed keep their values; a card still at its printed cost takes the new one. Definitions that vanished are listed in the report, and their entities keep playing. `report.RulesetChanged` says the ruleset changed, which a running game does not pick up. Call `ApplyContentChanges` between actions: it throws while effects are resolving.
+Stats the game has changed keep their values; a card still at its printed cost takes the new one. Listeners keep what they remember: a `once per battle` listener that has fired stays used, and an `on every` listener stays on its interval. They are matched to the reloaded listeners as a restored save matches them (see [Save and load](#save-and-load)), so one whose `on` line the reload changed, or whose body changed as it moved, starts afresh. Definitions that vanished are listed in the report, and their entities keep playing. `report.RulesetChanged` says the ruleset changed, which a running game does not pick up. Call `ApplyContentChanges` between actions: it throws while effects are resolving.
+
+Work already waiting, such as the `next turn:` block of a card played before the reload, runs as it was when it was scheduled. If the reload changed that block, the game cannot be saved until it has run, and `CanCapture` says so.
 
 A file with errors is still loaded, as far as it goes. `LoadFile` replaces everything the file contributed with what the parser could recover, so a definition can come back with a block missing (an `effect` line without its colon leaves a card with no effect) or not come back at all (a misspelt `crad Defend` loses Defend). Rebinding to that would give the running game the broken version, or report the lost definitions as missing, which is why the check comes first. Until the file is fixed and loaded again, the running game keeps the definitions it is bound to, while anything newly made from content, by `AddCard` or `create`, comes from the broken version.
 
@@ -465,6 +465,8 @@ options.HostVerbs.Add("corrupt");
 options.HostEvents.Add("corrupted");
 IReadOnlyList<Diagnostic> problems = Linter.Lint(content, options);
 ```
+
+A block the game runs itself, reading it from `EntityDefinition.Blocks` and running it with `runtime.Interpreter.Execute`, goes in `options.HostBlocks`, as in `options.HostBlocks.Add("on_reveal")`. Otherwise the linter reports it as a line that never runs (CT313), since Cantrip itself runs only `effect:`, `move ...:` and listeners. The `cantrip` tool cannot be told about such a block, so run `cantrip lint` with `--suppress CT313`.
 
 The `cantrip` tool cannot run a verb that lives in your game, so content tests that use one belong in your game's own test suite, through `DslTestRunner` with the verb registered. For its checks, pass `--suppress CT301,CT304` to `cantrip validate` and `cantrip lint`.
 

@@ -58,7 +58,10 @@ namespace Cantrip.Testing
         /// <summary>Verbs that only exist inside <c>test</c> blocks.</summary>
         public static IReadOnlyCollection<string> TestVerbs { get; } = Session.VerbTable.Select(v => v.Name).ToArray();
 
-        /// <summary>Record the causality trace for every test (slower; attached to failures).</summary>
+        /// <summary>
+        /// Record the causality trace for every test (slower; attached to failures). The trace also
+        /// holds what <c>log</c> statements wrote, which a test otherwise shows nowhere.
+        /// </summary>
         public bool Trace { get; set; }
 
         public IReadOnlyList<DslTestResult> RunAll(string? nameFilter = null) =>
@@ -88,6 +91,11 @@ namespace Cantrip.Testing
             {
                 return new DslTestResult(test, false, "could not create runtime: " + e.Message, test.Syntax.Span, null);
             }
+
+            // `log` writes to an event nothing in a test listens to. Traced, its message goes into the
+            // trace as a `[log]` line under the `log` statement that wrote it.
+            if (Trace)
+                runtime.Interpreter.Logged += message => runtime.State.Trace.Record(runtime.State.Clock.Now, "log", message);
 
             var session = new Session(runtime, chooser);
             SourceSpan at = test.Syntax.Span;

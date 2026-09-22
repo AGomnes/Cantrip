@@ -429,10 +429,17 @@ namespace Cantrip.Runtime
         /// A stat the game has changed keeps its value, because a designer editing a card's cost
         /// must not heal the enemy that is halfway through a fight. A stat still sitting at the old
         /// definition's number takes the new one, which is what makes tweaking numbers live work.
+        /// Used <c>once per ...</c> limits and <c>on every</c> timers stay with their listeners,
+        /// matched as a restored save matches them, so a reload does not let a listener that has
+        /// fired this battle fire again.
         /// </remarks>
         internal void Rebind(Entity entity, EntityDefinition definition)
         {
             if (definition == null) throw new ArgumentNullException(nameof(definition));
+
+            var limits = new List<ListenerLimitSnapshot>();
+            var dues = new List<ListenerDueSnapshot>();
+            CaptureListeners(entity, limits, dues);
 
             EntityDefinition? old = entity.Definition;
             SetActive(entity, false);
@@ -462,6 +469,7 @@ namespace Cantrip.Runtime
             foreach (string tag in definition.Tags) entity.AddTag(tag);
 
             RefreshActivation(entity);
+            RestoreListeners(limits, dues);
             Touch();
         }
 
@@ -531,9 +539,10 @@ namespace Cantrip.Runtime
         // Determinism --------------------------------------------------------------------------
 
         /// <summary>
-        /// A hash of all rules state. Two games fed the same seed and inputs must produce the same
-        /// hash after every step; lockstep peers compare it to detect desyncs, and tests use it to
-        /// prove that replays are exact.
+        /// A hash of all rules state. Two games fed the same content, seed and inputs by the same
+        /// version of Cantrip produce the same hash after every step. Tests use it to prove that
+        /// replays and restored saves are exact, and a game can compare it to check that a replay,
+        /// or a second machine playing the same inputs, has not drifted.
         /// </summary>
         public ulong ComputeHash()
         {
@@ -627,8 +636,10 @@ namespace Cantrip.Runtime
                 Mix(action.Owner.Id);
                 Mix(action.DueAt);
                 MixText(action.Deadline ?? string.Empty);
-                Mix(action.Body?.Span.Line ?? 0);
-                Mix(action.Body?.Span.Column ?? 0);
+
+                // What the block will do, not where it was written: the same statements restored
+                // from a patch that moved them play the same, and different ones never hash alike.
+                MixText(action.Body == null ? string.Empty : BlockHash.Of(action.Body));
                 Mix(action.Undo.Count);
             }
 

@@ -352,8 +352,29 @@ namespace Cantrip.Syntax
                 return;
             }
 
+            // `card:"Fire Bolt"` and `name:"Strike+"`: a name that is not one word is quoted, as it
+            // is everywhere else. The string is read as usual and becomes the qualifier's value.
+            // No line starts with a qualifier, so one that does is a property written without a
+            // space, such as `rarity:"rare"`, and stays the property it has always been.
+            if (QualifierPrefixes.Contains(name)
+                && _position + 1 < _text.Length
+                && _text[_position] == ':'
+                && (_text[_position + 1] == '"' || _text[_position + 1] == '\'')
+                && !AtLineStart())
+            {
+                _position++; // colon
+                ReadString(_text[_position]);
+                Token quoted = _tokens[_tokens.Count - 1];
+                _tokens[_tokens.Count - 1] = new Token(TokenKind.QualifiedName, quoted.Text, SpanAt(start, _position - start), qualifier: name.ToLowerInvariant());
+                return;
+            }
+
             _tokens.Add(new Token(TokenKind.Identifier, name, SpanAt(start, _position - start)));
         }
+
+        /// <summary>True while nothing has been read yet on the current line.</summary>
+        private bool AtLineStart() =>
+            _tokens.Count == 0 || _tokens[_tokens.Count - 1].Kind is TokenKind.Newline or TokenKind.Indent or TokenKind.Dedent;
 
         private static bool IsIdentifierStart(char c) => char.IsLetter(c) || c == '_';
 

@@ -7,9 +7,9 @@ namespace Cantrip
     /// Fixed-point number used for every value the rules engine computes.
     /// </summary>
     /// <remarks>
-    /// The core never uses <see cref="float"/> or <see cref="double"/>: replays, lockstep
-    /// multiplayer and headless balance runs all require that the same inputs produce
-    /// bit-identical outputs on every machine, and IEEE floating point does not promise that
+    /// The core never uses <see cref="float"/> or <see cref="double"/>. Replays, tests, saves and
+    /// headless balance runs rely on the same content, seed and inputs producing the same game on
+    /// every machine, within one version of Cantrip, and IEEE floating point does not promise that
     /// once a JIT is allowed to contract or reorder operations.
     /// <para>
     /// Values are stored as a <see cref="long"/> scaled by <see cref="Scale"/> (one millionth),

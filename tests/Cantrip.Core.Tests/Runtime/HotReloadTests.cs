@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Cantrip.Content;
 using Cantrip.Runtime;
@@ -237,6 +238,135 @@ namespace Cantrip.Tests.Runtime
 
             runtime.EndTurn();
             Assert.Equal(94, enemy.GetInt("hp"));
+        }
+
+        [Fact]
+        [Trait("Regression", "rollback-after-reload-loses-definition")]
+        public void A_choice_after_a_reload_that_removed_a_definition_in_play_rolls_back_and_replays()
+        {
+            string content = Dummy + """
+                card "Filler"
+                  cost 0
+
+                card "Recycle"
+                  cost 0
+                  effect:
+                    choose 1 from hand as picked
+                    exhaust picked
+
+                relic "Tally"
+                  on card_played:
+                    gain 1 gold
+                """;
+            var library = new ContentLibrary();
+            library.LoadText(content, File);
+            var runtime = new CardRuntime(library, new RuntimeOptions { Seed = 1, Chooser = new DeferredChooser() });
+            runtime.CreatePlayer();
+            runtime.SpawnEnemy("Dummy");
+            runtime.AddCard("Recycle", Zones.Hand);
+            runtime.AddCard("Filler", Zones.Hand);
+            runtime.AddRelic("Tally");
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+
+            // Tally has gone from the file, so the relic in play keeps the definition it has.
+            library.LoadText(content.Substring(0, content.IndexOf("relic \"Tally\"", StringComparison.Ordinal)), File);
+            Assert.Contains("relic \"Tally\"", runtime.ApplyContentChanges().Missing);
+
+            // The action asks, so it is rolled back to the game as it was, Tally included.
+            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Recycle"));
+            Assert.Equal(PlayResult.Played, runtime.Answer(runtime.Pending!.Options[0].Id));
+
+            Assert.Empty(runtime.State.ZoneOf(runtime.Player, Zones.Hand));
+            Assert.Equal(1, runtime.Player!.GetInt("gold"));
+        }
+
+        // Listener limits and timers ------------------------------------------------------------
+
+        private const string Tally = Dummy + """
+            card "Filler"
+              cost 0
+
+            relic "Tally"
+              on card_played once per battle:
+                gain 1 gold
+            """;
+
+        /// <summary>A battle in which Tally's once-per-battle listener has fired.</summary>
+        private static CardRuntime UsedTally(out ContentLibrary library)
+        {
+            CardRuntime runtime = Start(Tally, out library);
+            runtime.SpawnEnemy("Dummy");
+            for (int i = 0; i < 3; i++) runtime.AddCard("Filler", Zones.Hand);
+            runtime.AddRelic("Tally");
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+
+            Assert.Equal(PlayResult.Played, runtime.Play("Filler"));
+            Assert.Equal(1, runtime.Player!.GetInt("gold"));
+            return runtime;
+        }
+
+        [Fact]
+        [Trait("Regression", "reload-resets-listener-limits")]
+        public void A_reload_keeps_a_used_once_per_battle_limit()
+        {
+            CardRuntime runtime = UsedTally(out ContentLibrary library);
+
+            // Any edit to the file gives every definition in it, Tally's included, new syntax.
+            library.LoadText(Tally.Replace("hp 100", "hp 120"), File);
+            runtime.ApplyContentChanges();
+            Assert.Equal(PlayResult.Played, runtime.Play("Filler"));
+
+            Assert.Equal(1, runtime.Player!.GetInt("gold"));
+        }
+
+        [Fact]
+        [Trait("Regression", "reload-resets-listener-limits")]
+        public void A_reload_that_changes_only_what_a_used_listener_does_keeps_its_limit()
+        {
+            CardRuntime runtime = UsedTally(out ContentLibrary library);
+
+            library.LoadText(Tally.Replace("gain 1 gold", "gain 5 gold"), File);
+            runtime.ApplyContentChanges();
+            Assert.Equal(PlayResult.Played, runtime.Play("Filler"));
+
+            Assert.Equal(1, runtime.Player!.GetInt("gold"));
+        }
+
+        [Fact]
+        public void A_reload_that_changes_a_listeners_on_line_starts_it_afresh()
+        {
+            CardRuntime runtime = UsedTally(out ContentLibrary library);
+
+            library.LoadText(Tally.Replace("once per battle", "once per turn"), File);
+            runtime.ApplyContentChanges();
+            Assert.Equal(PlayResult.Played, runtime.Play("Filler"));
+
+            Assert.Equal(2, runtime.Player!.GetInt("gold"));
+        }
+
+        [Fact]
+        [Trait("Regression", "reload-resets-listener-limits")]
+        public void A_reload_keeps_an_on_every_timer_mid_interval()
+        {
+            string clockwork = Dummy + """
+                relic "Clockwork"
+                  on every 2s:
+                    gain 1 gold
+                """;
+            var library = new ContentLibrary();
+            library.LoadText(clockwork, File);
+            var runtime = new CardRuntime(library, new RuntimeOptions { Seed = 1, Clock = new TickClock(10) });
+            runtime.CreatePlayer();
+            runtime.SpawnEnemy("Dummy");
+            runtime.AddRelic("Clockwork");
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+            runtime.Tick(10);
+
+            library.LoadText(clockwork.Replace("hp 100", "hp 120"), File);
+            runtime.ApplyContentChanges();
+
+            runtime.Tick(10);   // two seconds after the relic arrived, as before the reload
+            Assert.Equal(1, runtime.Player!.GetInt("gold"));
         }
     }
 }

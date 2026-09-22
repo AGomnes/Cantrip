@@ -390,7 +390,12 @@ namespace Cantrip.Descriptions
                         case BlockMemberNode block when block.Name == "move":
                         {
                             string move = block.Arguments.Count > 0 ? EntityDefinition.ReadWords(block.Arguments[0]).FirstOrDefault() ?? "?" : "?";
-                            sentences.Add(Phrase("move.enemy", ("move", Text(move)), ("body", Block(block.Body))));
+
+                            // A move limited to a phase says so, or the text would promise it at any time.
+                            string? phase = _definition.Moves.FirstOrDefault(m => m.Body == block.Body)?.Phase;
+                            sentences.Add(phase == null
+                                ? Phrase("move.enemy", ("move", Text(move)), ("body", Block(block.Body)))
+                                : Phrase("move.enemy.phase", ("move", Text(move)), ("phase", Text(phase)), ("body", Block(block.Body))));
                             break;
                         }
 
@@ -1157,7 +1162,11 @@ namespace Cantrip.Descriptions
             }
         }
 
-        /// <summary>The rules-relevant text of a definition, fed to <see cref="EffectHash"/>.</summary>
+        /// <summary>
+        /// The rules-relevant text of a definition, fed to <see cref="EffectHash"/>. It prints
+        /// expressions with <see cref="AstPrinter.PrintCompact"/>, the spelling hashes have always
+        /// been taken from, so a recorded <c>text_checked</c> survives changes to how text reads.
+        /// </summary>
         private static class Canonical
         {
             private static readonly HashSet<string> Presentation = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -1174,13 +1183,13 @@ namespace Cantrip.Descriptions
 
                     case PropertyNode property:
                         text.Append("property ").Append(property.Name);
-                        foreach (ExprNode value in property.Values) text.Append(' ').Append(AstPrinter.Print(value));
+                        foreach (ExprNode value in property.Values) text.Append(' ').Append(AstPrinter.PrintCompact(value));
                         text.Append('\n');
                         return;
 
                     case BlockMemberNode block:
                         text.Append("block ").Append(block.Name);
-                        foreach (ExprNode argument in block.Arguments) text.Append(' ').Append(AstPrinter.Print(argument));
+                        foreach (ExprNode argument in block.Arguments) text.Append(' ').Append(AstPrinter.PrintCompact(argument));
                         text.Append('\n');
                         Block(block.Body, text, 1);
                         return;
@@ -1188,7 +1197,7 @@ namespace Cantrip.Descriptions
                     case ListenerNode listener:
                         text.Append("on ").Append(listener.Phase).Append(' ').Append(listener.EventName)
                             .Append(' ').Append(listener.Interval.IsZero ? string.Empty : listener.Interval + (listener.IntervalUnit ?? string.Empty))
-                            .Append(' ').Append(listener.Filter == null ? string.Empty : AstPrinter.Print(listener.Filter))
+                            .Append(' ').Append(listener.Filter == null ? string.Empty : AstPrinter.PrintCompact(listener.Filter))
                             .Append(' ').Append(listener.Limit)
                             .Append(' ').Append(listener.Priority.ToString(CultureInfo.InvariantCulture))
                             .Append('\n');
@@ -1197,10 +1206,10 @@ namespace Cantrip.Descriptions
 
                     case ModifyNode modify:
                         text.Append("modify ").Append(modify.Channel)
-                            .Append(' ').Append(modify.Scope == null ? string.Empty : AstPrinter.Print(modify.Scope))
-                            .Append(' ').Append(modify.Filter == null ? string.Empty : AstPrinter.Print(modify.Filter))
+                            .Append(' ').Append(modify.Scope == null ? string.Empty : AstPrinter.PrintCompact(modify.Scope))
+                            .Append(' ').Append(modify.Filter == null ? string.Empty : AstPrinter.PrintCompact(modify.Filter))
                             .Append(' ').Append(modify.Layer)
-                            .Append(' ').Append(AstPrinter.Print(modify.Amount))
+                            .Append(' ').Append(AstPrinter.PrintCompact(modify.Amount))
                             .Append('\n');
                         return;
                 }
@@ -1218,17 +1227,17 @@ namespace Cantrip.Descriptions
                 {
                     case CommandNode command:
                         text.Append(command.Verb.ToLowerInvariant());
-                        foreach (ExprNode argument in command.Arguments) text.Append(' ').Append(AstPrinter.Print(argument));
+                        foreach (ExprNode argument in command.Arguments) text.Append(' ').Append(AstPrinter.PrintCompact(argument));
                         foreach (ClauseNode clause in command.Clauses)
                         {
                             text.Append(' ').Append(clause.Keyword);
-                            if (clause.Value != null) text.Append(' ').Append(AstPrinter.Print(clause.Value));
+                            if (clause.Value != null) text.Append(' ').Append(AstPrinter.PrintCompact(clause.Value));
                         }
                         text.Append('\n');
                         break;
 
                     case IfNode branch:
-                        text.Append("if ").Append(AstPrinter.Print(branch.Condition)).Append('\n');
+                        text.Append("if ").Append(AstPrinter.PrintCompact(branch.Condition)).Append('\n');
                         Block(branch.Then, text, depth + 1);
                         if (branch.Else != null)
                         {
@@ -1238,17 +1247,17 @@ namespace Cantrip.Descriptions
                         break;
 
                     case RepeatNode repeat:
-                        text.Append("repeat ").Append(AstPrinter.Print(repeat.Count)).Append('\n');
+                        text.Append("repeat ").Append(AstPrinter.PrintCompact(repeat.Count)).Append('\n');
                         Block(repeat.Body, text, depth + 1);
                         break;
 
                     case ForEachNode loop:
-                        text.Append("for ").Append(loop.Variable).Append(" in ").Append(AstPrinter.Print(loop.Source)).Append('\n');
+                        text.Append("for ").Append(loop.Variable).Append(" in ").Append(AstPrinter.PrintCompact(loop.Source)).Append('\n');
                         Block(loop.Body, text, depth + 1);
                         break;
 
                     case ChanceNode chance:
-                        text.Append("chance ").Append(AstPrinter.Print(chance.Probability)).Append('\n');
+                        text.Append("chance ").Append(AstPrinter.PrintCompact(chance.Probability)).Append('\n');
                         Block(chance.Body, text, depth + 1);
                         if (chance.Else != null)
                         {
@@ -1259,18 +1268,18 @@ namespace Cantrip.Descriptions
 
                     case ScheduleNode schedule:
                         text.Append("schedule ").Append(schedule.Kind)
-                            .Append(' ').Append(schedule.Delay == null ? string.Empty : AstPrinter.Print(schedule.Delay))
+                            .Append(' ').Append(schedule.Delay == null ? string.Empty : AstPrinter.PrintCompact(schedule.Delay))
                             .Append(' ').Append(schedule.Deadline ?? string.Empty)
                             .Append('\n');
                         Block(schedule.Body, text, depth + 1);
                         break;
 
                     case LetNode let:
-                        text.Append("let ").Append(let.Name).Append(" = ").Append(AstPrinter.Print(let.Value)).Append('\n');
+                        text.Append("let ").Append(let.Name).Append(" = ").Append(AstPrinter.PrintCompact(let.Value)).Append('\n');
                         break;
 
                     case AssignNode assign:
-                        text.Append(AstPrinter.Print(assign.Target)).Append(' ').Append(assign.Operator).Append(' ').Append(AstPrinter.Print(assign.Value)).Append('\n');
+                        text.Append(AstPrinter.PrintCompact(assign.Target)).Append(' ').Append(assign.Operator).Append(' ').Append(AstPrinter.PrintCompact(assign.Value)).Append('\n');
                         break;
 
                     case LabeledBlockNode labeled:

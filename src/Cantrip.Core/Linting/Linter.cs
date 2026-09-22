@@ -24,6 +24,12 @@ namespace Cantrip.Linting
 
         /// <summary>Names the game's <see cref="IEffectHost"/> resolves, and stats it only sets from C#.</summary>
         public ISet<string> HostNames { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Blocks the game runs itself, reading them from C# through <see cref="EntityDefinition.Blocks"/>,
+        /// such as a custom <c>on_reveal:</c>. The engine runs only <c>effect:</c> and <c>move ...:</c>.
+        /// </summary>
+        public ISet<string> HostBlocks { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -45,6 +51,9 @@ namespace Cantrip.Linting
         public const string UnusedVerb = "CT310";
         public const string StacksOutsideStatus = "CT311";
         public const string UnknownMove = "CT312";
+        public const string UnknownBlock = "CT313";
+        public const string ForOnDurationStatus = "CT314";
+        public const string IgnoredDuration = "CT315";
 
         /// <summary>Tags the engine itself gives meaning to, so using one never needs a declaration.</summary>
         private static readonly string[] EngineTags =
@@ -68,6 +77,21 @@ namespace Cantrip.Linting
         private static readonly HashSet<string> AimingVerbs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "play", "replay", "cast", "change",
+        };
+
+        /// <summary>The blocks in a declaration that the engine runs. Any other is only a label.</summary>
+        private static readonly string[] RunBlocks = { "effect", "move" };
+
+        /// <summary>Words that start a listener in other languages, and so in a mistyped one.</summary>
+        private static readonly HashSet<string> ListenerWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "when", "whenever", "upon", "at", "after", "before", "instead", "once", "on",
+        };
+
+        /// <summary>Names that only ever mean actors, never a card.</summary>
+        private static readonly HashSet<string> ActorWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "player", "controller", "enemy", "enemies", "allies", "everyone", "actors",
         };
 
         /// <summary>Verbs that act on the effect's target when they have no <c>to</c> clause.</summary>
@@ -209,8 +233,11 @@ namespace Cantrip.Linting
                 CheckEventUse(body);
                 CheckStacks(body);
                 CheckMoves(body);
+                CheckStatusLengths(body);
             }
 
+            CheckBlocks();
+            CheckIgnoredDurations();
             CheckListenedEvents();
             CheckEmittedEvents();
             CheckEventCycles();
@@ -576,7 +603,294 @@ namespace Cantrip.Linting
             }
         }
 
+        /// <summary>
+        /// CT314: <c>for N turns</c> on a <c>duration</c> or <c>refresh</c> status, longer than the
+        /// amount applied. Such a status loses its duration on its host's turns and lasts as many of
+        /// them as the amount, while <c>for</c> only adds a deadline, so <c>apply Weak for 2 turns</c>
+        /// is Weak for one turn. A <c>for</c> no longer than the amount can cut the status short, and
+        /// one on a status that does not tick down on turns, or that may land on a card, which has no
+        /// turns, is what removes it, so those are left alone.
+        /// </summary>
+        private void CheckStatusLengths(Body body)
+        {
+            foreach (CommandNode command in body.Facts.Commands)
+            {
+                bool apply = string.Equals(command.Verb, "apply", StringComparison.OrdinalIgnoreCase);
+                bool add = string.Equals(command.Verb, "add", StringComparison.OrdinalIgnoreCase);
+                if (!apply && !add) continue;
+
+                // Seconds and ticks belong to a real-time clock, where a duration status may never
+                // see a turn end and `for` is what removes it.
+                if (!(command.Clause("for") is NumberExpr { Unit: "turn" or "turns" or "t" } length) || !IsWholeCount(length.Value)) continue;
+
+                // `add "Weak"` adds a tag, so only `apply` names a status with a string.
+                string? name = command.Arguments.FirstOrDefault() switch
+                {
+                    NameExpr named when !IsLocal(body, named.Name) => named.Name,
+                    StringExpr quoted when apply => quoted.Value,
+                    _ => null,
+                };
+                EntityDefinition? status = name == null ? null : _content.FindAny(name, "status", "keyword");
+                if (status == null || (status.Stacking != StackingMode.Duration && status.Stacking != StackingMode.Refresh)) continue;
+                if (status.DecayAmount < Num.One || !(status.DecayOn is "turn_end" or "turn_start")) continue;
+                if (!LandsOnActors(body, command.Clause("to"))) continue;
+
+                Num amount = Num.One;
+                if (command.Arguments.Count > 1)
+                {
+                    if (!(command.Arguments[1] is NumberExpr { Unit: null } written) || !IsWholeCount(written.Value)) continue;
+                    amount = written.Value;
+                }
+                if (amount >= length.Value) continue;
+
+                string turns = length.Value + (length.Value == Num.One ? " turn" : " turns");
+                ExprNode? to = command.Clause("to");
+                Warn(ForOnDurationStatus,
+                    $"`for {turns}` does not make {status.Name} last {turns}. A `stacking {status.Stacking.ToString().ToLowerInvariant()}` status lasts as many of its host's turns as the amount applied, here {amount}; `for` only sets a deadline, which can end it sooner but never later.",
+                    command.Span,
+                    $"{command.Verb.ToLowerInvariant()} {AstPrinter.Name(status.Name)} {length.Value}" + (to == null ? string.Empty : " to " + AstPrinter.Print(to)));
+            }
+        }
+
+        /// <summary>
+        /// Whether a status applied to <paramref name="to"/> lands on actors, whose turns tick it
+        /// down: a word that only ever means actors, or, in a card's or ability's effect or an enemy's
+        /// move, the effect's own target. Anything else may be a card.
+        /// </summary>
+        private static bool LandsOnActors(Body body, ExprNode? to) => to switch
+        {
+            null => body.Kind == BodyKind.Effect,
+            NameExpr { Name: var name } when IsLocal(body, name) => false,
+            NameExpr { Name: var name } when string.Equals(name, "target", StringComparison.OrdinalIgnoreCase) => body.Kind == BodyKind.Effect,
+            NameExpr { Name: var name } => ActorWords.Contains(name) || (body.Kind == BodyKind.Test && IsTestBinding(name)),
+            SelectorExpr selector => LandsOnActors(body, selector.Source),
+            WhereExpr where => LandsOnActors(body, where.Source),
+            _ => false,
+        };
+
         // Whole-content checks -----------------------------------------------------------------
+
+        /// <summary>
+        /// CT313: a line in a declaration that ends in a colon but is neither a listener nor a block
+        /// the engine runs. The parser has to accept it, because a game may run blocks of its own from
+        /// C# (<see cref="LintOptions.HostBlocks"/>), so a listener written another way, such as
+        /// <c>when card_played:</c>, would otherwise load cleanly and never fire.
+        /// </summary>
+        private void CheckBlocks()
+        {
+            IEnumerable<EntityDefinition> definitions = _content.Definitions
+                .OrderBy(d => d.Syntax.Span.File, StringComparer.Ordinal)
+                .ThenBy(d => d.Syntax.Span.Line);
+
+            foreach (EntityDefinition definition in definitions)
+            {
+                foreach (MemberNode member in definition.Syntax.Members)
+                {
+                    if (!(member is BlockMemberNode block)) continue;
+                    if (RunBlocks.Contains(block.Name) || _options.HostBlocks.Contains(block.Name)) continue;
+
+                    string header = string.Join(" ", new[] { block.Name }.Concat(block.Arguments.Select(AstPrinter.Print)));
+                    Warn(UnknownBlock,
+                        $"`{header}:` in {definition} never runs. A line ending in `:` is only a label unless it is `effect:`, `move ...:` or a listener, which starts with `on`.",
+                        block.Span,
+                        SuggestBlock(block));
+                }
+            }
+        }
+
+        /// <summary>
+        /// What a CT313 block was probably meant to be: a listener when an event can be found in its
+        /// first line, else the closest of <c>effect:</c> and <c>move</c>, else a listener on the
+        /// closest event.
+        /// </summary>
+        private string? SuggestBlock(BlockMemberNode block)
+        {
+            var words = new List<(string Word, IReadOnlyList<ExprNode>? Filter)> { (block.Name, null) };
+            foreach (ExprNode argument in block.Arguments) words.AddRange(HeaderWords(argument));
+
+            // The event: a word that names one, or names one once `on_` or `when_` is taken off it, or
+            // two or three words that do once joined (`at turn start`), or else what follows `on`, or
+            // `when` and the like, as long as it can stand for an event (see TakeUnknownEvent).
+            int at = words.FindIndex(w => IsKnownListenerEvent(w.Word));
+            if (at < 0) at = words.FindIndex(w => IsKnownListenerEvent(StripListenerPrefix(w.Word)));
+            if (at < 0) JoinSplitEvent(words, ref at);
+            if (at < 0)
+            {
+                int on = words.FindIndex(w => string.Equals(w.Word, "on", StringComparison.OrdinalIgnoreCase));
+                if (on >= 0 && on + 1 < words.Count) at = on + 1;
+                else if (ListenerWords.Contains(block.Name) && words.Count > 1 && !ListenerWords.Contains(words[1].Word)) at = 1;
+
+                if (at >= 0 && !TakeUnknownEvent(words, at)) return null;
+            }
+
+            if (at >= 0)
+            {
+                string eventName = StripListenerPrefix(words[at].Word);
+
+                // `every 2 turns:` keeps its interval, which is a number rather than a word.
+                if (string.Equals(eventName, "every", StringComparison.OrdinalIgnoreCase))
+                {
+                    NumberExpr? interval = block.Arguments.OfType<NumberExpr>().FirstOrDefault();
+                    return interval == null ? null : $"on every {AstPrinter.Print(interval)}:";
+                }
+
+                if (Parser.NormalizeEventName(eventName).Phase == EventPhase.After && !eventName.StartsWith("after_", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (string.Equals(block.Name, "before", StringComparison.OrdinalIgnoreCase)) eventName = "before_" + eventName;
+                    else if (string.Equals(block.Name, "instead", StringComparison.OrdinalIgnoreCase)) eventName = "instead_of_" + eventName;
+                }
+
+                string filter = words[at].Filter is IReadOnlyList<ExprNode> clauses ? "(" + string.Join(", ", clauses.Select(AstPrinter.Print)) + ")" : string.Empty;
+
+                string limit = string.Empty;
+                for (int i = 0; i + 2 < words.Count; i++)
+                {
+                    if (string.Equals(words[i].Word, "once", StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(words[i + 1].Word, "per", StringComparison.OrdinalIgnoreCase)
+                        && words[i + 2].Word.ToLowerInvariant() is "turn" or "battle" or "run" or "chain")
+                        limit = " once per " + words[i + 2].Word.ToLowerInvariant();
+                }
+
+                return $"on {eventName}{filter}{limit}:";
+            }
+
+            string? known = Suggest.Closest(block.Name, RunBlocks);
+            if (known == "effect") return "effect:";
+            if (known == "move") return string.Join(" ", new[] { "move" }.Concat(block.Arguments.Select(AstPrinter.Print))) + ":";
+
+            // Not `every`, which needs an interval that a label with none cannot supply.
+            IEnumerable<string> events = ListenableEvents().Where(e => !string.Equals(e, BuiltinEvents.Every, StringComparison.OrdinalIgnoreCase));
+            string? closeEvent = Suggest.Closest(StripListenerPrefix(block.Name), events);
+            return closeEvent == null ? null : $"on {closeEvent}:";
+        }
+
+        /// <summary>
+        /// Whether the words from <paramref name="at"/> to the colon, or to a <c>once per</c> or
+        /// <c>priority</c>, can stand for the event when the linter knows none of them. An event
+        /// close to them joined takes their place: <c>turn starts</c> is <c>turn_start</c> and
+        /// <c>card_plyed</c> is <c>card_played</c>. Failing that, one word is kept, as an event the
+        /// game may raise from C#, while several are prose that suggests no listener, as in
+        /// <c>whenever player takes damage:</c>.
+        /// </summary>
+        private bool TakeUnknownEvent(List<(string Word, IReadOnlyList<ExprNode>? Filter)> words, int at)
+        {
+            var rest = words.Skip(at)
+                .TakeWhile(w => !string.Equals(w.Word, "once", StringComparison.OrdinalIgnoreCase) && !string.Equals(w.Word, "priority", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (rest.Count == 0) return false;
+
+            string? close = Suggest.Closest(StripListenerPrefix(string.Join("_", rest.Select(w => w.Word))), ListenableEvents());
+            if (close != null)
+            {
+                words[at] = (close, rest[rest.Count - 1].Filter);
+                return true;
+            }
+            return rest.Count == 1;
+        }
+
+        /// <summary>The events a listener can hear: the built-in ones, those content emits and the game's own.</summary>
+        private IEnumerable<string> ListenableEvents() => BuiltinEvents.Names.Concat(_emitted.Keys).Concat(_options.HostEvents);
+
+        /// <summary>
+        /// The words of a block's first line in order, each with the <c>(...)</c> after it, if any.
+        /// <c>once per battle on card_played</c> arrives as the expressions <c>per</c> and
+        /// <c>battle on card_played</c>, and comes back out as its five words.
+        /// </summary>
+        private static IEnumerable<(string Word, IReadOnlyList<ExprNode>? Filter)> HeaderWords(ExprNode node)
+        {
+            switch (node)
+            {
+                case NameExpr name:
+                    yield return (name.Name, null);
+                    break;
+                case MemberExpr member:
+                    yield return (AstPrinter.Print(member), null);
+                    break;
+                case CallExpr call:
+                    yield return ((call.Receiver == null ? string.Empty : AstPrinter.Print(call.Receiver) + ".") + call.Name, call.Arguments);
+                    break;
+                case BinaryExpr binary:
+                    foreach (var word in HeaderWords(binary.Left)) yield return word;
+                    yield return (AstPrinter.Symbol(binary.Operator), null);
+                    foreach (var word in HeaderWords(binary.Right)) yield return word;
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// <c>at turn start:</c> writes <c>turn_start</c> as two words. Finds the first run of two or
+        /// three words that names an event once joined with <c>_</c>, and puts the joined event in
+        /// place of its first word.
+        /// </summary>
+        private void JoinSplitEvent(List<(string Word, IReadOnlyList<ExprNode>? Filter)> words, ref int at)
+        {
+            for (int start = 0; start < words.Count; start++)
+            {
+                for (int length = 2; length <= 3 && start + length <= words.Count; length++)
+                {
+                    string joined = string.Join("_", words.Skip(start).Take(length).Select(w => w.Word));
+                    if (!IsKnownListenerEvent(joined)) continue;
+
+                    words[start] = (joined, words[start + length - 1].Filter);
+                    at = start;
+                    return;
+                }
+            }
+        }
+
+        /// <summary>True for an event a listener could hear, written with or without a scope and timing.</summary>
+        private bool IsKnownListenerEvent(string word)
+        {
+            if (word.Length == 0 || ListenerWords.Contains(word)) return false;
+            (string name, _) = Parser.NormalizeEventName(word);
+            return IsKnownEvent(EventPart(name));
+        }
+
+        /// <summary><c>on_turn_start</c> and <c>when_damaged</c>: the event with the listener word taken off.</summary>
+        private static string StripListenerPrefix(string word)
+        {
+            foreach (string prefix in ListenerWords)
+            {
+                if (word.Length > prefix.Length + 1 && word.StartsWith(prefix + "_", StringComparison.OrdinalIgnoreCase))
+                    return word.Substring(prefix.Length + 1);
+            }
+            return word;
+        }
+
+        /// <summary>
+        /// CT315: a <c>duration</c> line on a <c>duration</c>, <c>refresh</c> or <c>both</c> status.
+        /// Creating the status sets its duration from whoever applies it, as in <c>apply Weak 2</c>,
+        /// so the line's number never reaches a status in play. On any other status it is a stat
+        /// content may read, so it is left alone there.
+        /// </summary>
+        private void CheckIgnoredDurations()
+        {
+            // The number is still readable where the definition stands in for the status: in a
+            // `discover` filter, or as `event.status.duration` before the status exists. Content that
+            // reads a `duration` member anywhere, or a game that reads the stat from C#, keeps it.
+            if (_options.HostNames.Contains("duration")) return;
+            bool read = _bodies.Any(b =>
+                b.Facts.Members.Any(m => string.Equals(m.Member, "duration", StringComparison.OrdinalIgnoreCase))
+                || (b.Facts.Commands.Any(c => string.Equals(c.Verb, "discover", StringComparison.OrdinalIgnoreCase))
+                    && b.Facts.Names.Any(n => string.Equals(n.Name, "duration", StringComparison.OrdinalIgnoreCase))));
+            if (read) return;
+
+            foreach (EntityDefinition definition in _content.Definitions.OrderBy(d => d.Syntax.Span.File, StringComparer.Ordinal).ThenBy(d => d.Syntax.Span.Line))
+            {
+                if (definition.Kind != EntityKind.Status && definition.Kind != EntityKind.Keyword) continue;
+                if (definition.Stacking != StackingMode.Duration && definition.Stacking != StackingMode.Refresh && definition.Stacking != StackingMode.Both) continue;
+
+                PropertyNode? duration = definition.Property("duration");
+                if (duration == null) continue;
+
+                // `text: "Lasts {duration} turns."` prints the number, which is a use of a kind.
+                if (definition.Text?.IndexOf("{duration}", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+
+                Warn(IgnoredDuration,
+                    $"`duration` on {definition} does nothing: a `stacking {definition.Stacking.ToString().ToLowerInvariant()}` status takes its duration from whoever applies it, as in `apply {AstPrinter.Name(definition.Name)} 2`, never from its declaration.",
+                    duration.Span);
+            }
+        }
 
         private void CheckListenedEvents()
         {
@@ -784,6 +1098,9 @@ namespace Cantrip.Linting
         }
 
         private static bool StartsUpper(string name) => name.Length > 0 && char.IsUpper(name[0]);
+
+        /// <summary>A whole number of one or more, as a count of turns is.</summary>
+        private static bool IsWholeCount(Num value) => value >= Num.One && value == value.Floor();
 
         private static string? WordAt(CommandNode command, int index) =>
             index < command.Arguments.Count ? FirstWord(command.Arguments[index]) : null;

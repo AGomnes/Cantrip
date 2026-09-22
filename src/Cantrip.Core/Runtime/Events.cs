@@ -212,7 +212,7 @@ namespace Cantrip.Runtime
             if (result.Count > 1)
             {
                 // A stable sort with an explicit final tie-break on id: the order never depends on
-                // dictionary or hash ordering, so replays and lockstep peers always agree.
+                // dictionary or hash ordering, so a replay or a restored save always agrees.
                 result.Sort((a, b) => Compare(a, b, rules.Ordering, activeTeam));
             }
 

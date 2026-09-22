@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using Cantrip.Content;
 using Cantrip.Diagnostics;
 using Cantrip.Runtime;
@@ -852,10 +853,23 @@ namespace Cantrip
         {
             if (_deferring || !(Chooser is DeferredChooser deferred)) return action();
 
+            // The rollback never leaves this process, so waiting blocks are kept as the objects they
+            // are, including those a save could not hold, rather than looked up again by address.
+            // Definitions are kept the same way: after a hot reload, an entity whose definition has
+            // gone plays on with the one it had, which a lookup by name would no longer find.
+            var blocks = new Dictionary<long, BlockNode>();
+            Func<ScheduledSnapshot, BlockNode?> kept = record => blocks.TryGetValue(record.Id, out BlockNode? block) ? block : null;
+            var definitions = new Dictionary<int, EntityDefinition>();
+            foreach (Entity entity in State.Entities)
+            {
+                if (entity.Definition != null) definitions[entity.Id] = entity.Definition;
+            }
+            Func<EntitySnapshot, EntityDefinition?> bound = record => definitions.TryGetValue(record.Id, out EntityDefinition? definition) ? definition : null;
+
             GameSnapshot before;
             try
             {
-                before = Capture();
+                before = CaptureState((waiting, _) => blocks[waiting.Id] = waiting.Body!);
             }
             catch (InvalidOperationException error)
             {
@@ -894,7 +908,7 @@ namespace Cantrip
                 int[] optionIds = pending.Request.Options.Select(o => o.Id).ToArray();
                 int chooserId = pending.Request.Chooser?.Id ?? 0;
 
-                RestoreState(before);
+                RestoreState(before, kept, bound);
                 State.Trace.TruncateTo(traceMark);
 
                 Pending = new PendingChoice(
@@ -915,7 +929,7 @@ namespace Cantrip
                 // Definitions are immutable content, so they survive the rollback as they are.
                 int chooserId = pending.Offer.Chooser?.Id ?? 0;
 
-                RestoreState(before);
+                RestoreState(before, kept, bound);
                 State.Trace.TruncateTo(traceMark);
 
                 Pending = new PendingChoice(pending.Offer.Prompt, pending.Offer.Options, Live(chooserId), pending.Offer.Span);
@@ -1009,21 +1023,49 @@ namespace Cantrip
             }
         }
 
+        // Blocks that statements run by Execute can schedule, with the text they were parsed from.
+        // Weak, so the text is forgotten once nothing it scheduled can run any more.
+        private readonly ConditionalWeakTable<BlockNode, ExecutedStatements> _executed = new ConditionalWeakTable<BlockNode, ExecutedStatements>();
+
+        /// <summary>
+        /// Whether <see cref="Capture"/> would succeed right now, so a UI can grey out its save
+        /// button instead of catching an exception. It is false while effects are still resolving,
+        /// since snapshots are only valid between actions (a host callback that runs in the middle
+        /// of a card's effect sees it false too), and while a <c>next turn:</c> or
+        /// <c>in N turns:</c> block is waiting whose statements a save cannot hold: one a reload has
+        /// changed since it was scheduled, or one game code parsed and ran itself rather than
+        /// through <see cref="Execute"/>. Such a block stops blocking saves once it has run.
+        /// </summary>
+        public bool CanCapture => _runDepth == 0 && !Interpreter.HasPendingWork && State.Scheduled.All(s => s.Body == null || Describe(s) != null);
+
         /// <summary>
         /// Captures the full rules state. Only valid between actions; the returned object is plain
-        /// data that any serializer can store.
+        /// data that any serializer can store. Throws <see cref="InvalidOperationException"/>
+        /// whenever <see cref="CanCapture"/> is false.
         /// </summary>
-        /// <summary>
-        /// Whether <see cref="Capture"/> would succeed right now. Snapshots are only valid between
-        /// actions, so a UI can grey out its save button instead of catching an exception.
-        /// </summary>
-        public bool CanCapture => !Interpreter.HasPendingWork;
-
         public GameSnapshot Capture()
+        {
+            // An action's own effect can be running with nothing queued yet, as when a host
+            // callback asks for a save part way through it: that would save half an action.
+            if (_runDepth > 0) throw new InvalidOperationException("Cannot snapshot while effects are still resolving.");
+            return CaptureState(RecordBlock);
+        }
+
+        private void RecordBlock(ScheduledAction waiting, ScheduledSnapshot record)
+        {
+            var (address, hash, statements) = Describe(waiting) ?? throw new InvalidOperationException(
+                $"The block waiting at {waiting.Body!.Span} cannot be saved: the loaded content does not contain its statements, because a reload has changed them " +
+                "or game code parsed them itself instead of calling Execute. Save once it has run.");
+            record.Block = address;
+            record.BlockHash = hash;
+            record.Statements = statements;
+        }
+
+        private GameSnapshot CaptureState(Action<ScheduledAction, ScheduledSnapshot> recordBlock)
         {
             if (Interpreter.HasPendingWork) throw new InvalidOperationException("Cannot snapshot while effects are still resolving.");
 
-            GameSnapshot snapshot = State.Capture(Addresses);
+            GameSnapshot snapshot = State.Capture(recordBlock);
             snapshot.NextChainRoot = Interpreter.ChainCounter;
             snapshot.Won = Won;
             snapshot.SkipNextDraw = _skipNextDraw;
@@ -1031,31 +1073,134 @@ namespace Cantrip
         }
 
         /// <summary>
+        /// How a save finds the block of a waiting action again: its place in content, or in the
+        /// statements <see cref="Execute"/> ran, with a hash of its statements. Null when a save
+        /// cannot hold it.
+        /// </summary>
+        private (string Address, string Hash, string? Statements)? Describe(ScheduledAction waiting)
+        {
+            BlockNode block = waiting.Body!;
+            BlockAddressBook content = Addresses;
+            string? address = content.AddressOf(block);
+            if (address != null) return (address, content.HashOf(block), null);
+
+            if (_executed.TryGetValue(block, out ExecutedStatements? executed))
+                return (executed.Book.AddressOf(block)!, executed.Book.HashOf(block), executed.Text);
+
+            // A block from content a reload has since replaced, or one game code parsed itself. The
+            // same statements in the loaded content do exactly the same, so a save can name those.
+            // It names the ones in the definition of the card, relic or enemy that scheduled the
+            // block if it can, which is where they came from, so that a later patch to some other
+            // definition with the same statements does not turn the save away.
+            string hash = BlockHash.Of(block);
+            EntityDefinition? origin = waiting.Bindings.TryGetValue("self", out Value self) ? self.Entity?.Definition : null;
+            address = (origin == null ? null : content.Find(hash, origin.KindName + ":" + origin.Name)) ?? content.Find(hash);
+            return address == null ? null : (address, hash, (string?)null);
+        }
+
+        /// <summary>
         /// Replaces the current state with a snapshot. The runtime must have the same content
         /// loaded; the next inputs then play out exactly as they would have in the original game.
         /// A choice left pending is abandoned: it belonged to the game being replaced.
         /// </summary>
+        /// <remarks>
+        /// Everything the snapshot needs is looked up before anything changes, so when it throws
+        /// <see cref="InvalidOperationException"/>, because a definition the snapshot names is not
+        /// loaded or a block waiting in it has changed, the game in progress is left as it was.
+        /// </remarks>
         public void Restore(GameSnapshot snapshot)
         {
-            RestoreState(snapshot);
+            Dictionary<string, ExecutedStatements>? parsed = null;
+            RestoreState(snapshot, record => Saved(record, ref parsed));
             CancelPending();
         }
 
-        /// <summary>The state alone, for rolling back an action whose pending choice must survive.</summary>
-        private void RestoreState(GameSnapshot snapshot)
+        /// <summary>The state alone, also used to roll back an action whose pending choice must survive.</summary>
+        private void RestoreState(GameSnapshot snapshot, Func<ScheduledSnapshot, BlockNode?> resolveBlock, Func<EntitySnapshot, EntityDefinition?>? keptDefinition = null)
         {
             if (Interpreter.HasPendingWork) throw new InvalidOperationException("Cannot restore while effects are still resolving.");
 
-            State.Restore(snapshot, Addresses);
+            State.Restore(snapshot, resolveBlock, keptDefinition);
             Interpreter.ChainCounter = snapshot.NextChainRoot;
             Won = snapshot.Won;
             _skipNextDraw = snapshot.SkipNextDraw;
+        }
+
+        /// <summary>
+        /// The block a saved action runs. Content blocks are found by address and checked against
+        /// the saved hash; statements <see cref="Execute"/> ran are parsed again, once per text.
+        /// </summary>
+        private BlockNode? Saved(ScheduledSnapshot record, ref Dictionary<string, ExecutedStatements>? parsed)
+        {
+            string? address = record.Block;
+            if (address == null) return null;
+
+            if (record.Statements != null)
+            {
+                parsed ??= new Dictionary<string, ExecutedStatements>(StringComparer.Ordinal);
+                if (!parsed.TryGetValue(record.Statements, out ExecutedStatements? executed))
+                {
+                    BlockNode statements;
+                    try
+                    {
+                        statements = ParseStatements(record.Statements);
+                    }
+                    catch (DslException error)
+                    {
+                        throw new InvalidOperationException("The snapshot has work waiting from statements run by Execute that no longer parse. " + error.Message, error);
+                    }
+
+                    executed = new ExecutedStatements(record.Statements, statements);
+                    Remember(executed);
+                    parsed[record.Statements] = executed;
+                }
+
+                // A save always holds statements with the hash of the block, which is the body of a
+                // `next turn:` or `in N turns:` among them. Anything else did not come from Capture.
+                BlockNode? block = executed.Book.Resolve(address);
+                if (block == null || !executed.Book.CanWait(block) || record.BlockHash == null || executed.Book.HashOf(block) != record.BlockHash)
+                    throw new InvalidOperationException($"The snapshot has work waiting (`{address}`) that does not match the statements run by Execute saved with it, so the save has been altered.");
+                return block;
+            }
+
+            BlockAddressBook content = Addresses;
+            BlockNode? found = content.Resolve(address);
+
+            // A save made before hashes were recorded names its blocks by place alone.
+            if (record.BlockHash == null) return found ?? throw Unmatched(content, address);
+            if (found != null && content.HashOf(found) == record.BlockHash) return found;
+
+            // Lines added or removed above a block move it within its definition: its statements
+            // are what identify it.
+            string? moved = content.Find(record.BlockHash, content.RootOf(address));
+            return moved != null ? content.Resolve(moved) : throw Unmatched(content, address);
+        }
+
+        private static InvalidOperationException Unmatched(BlockAddressBook content, string address)
+        {
+            string root = content.RootOf(address);
+            int colon = root.IndexOf(':');
+            string kind = colon < 0 ? root : root.Substring(0, colon);
+            string name = colon < 0 ? string.Empty : root.Substring(colon + 1);
+            string what = kind == "verb" ? $"verb `{name}`" : $"{kind} \"{name}\"";
+
+            return new InvalidOperationException(content.HasRoot(root)
+                ? $"The snapshot has work waiting from {what} that the loaded {what} no longer contains (`{address}`): its statements have changed since the save was made."
+                : $"The snapshot has work waiting from {what}, which is not loaded (`{address}`).");
+        }
+
+        /// <summary>Lets every block these statements can schedule be saved as their text.</summary>
+        private void Remember(ExecutedStatements executed)
+        {
+            foreach (BlockNode body in executed.Book.ScheduleBodies) _executed.AddOrUpdate(body, executed);
         }
 
         // Ad hoc execution ---------------------------------------------------------------------
 
         /// <summary>
         /// Runs DSL statements directly, as the REPL and tests do: <c>runtime.Execute("deal 5 to enemy")</c>.
+        /// A <c>next turn:</c> or <c>in N turns:</c> block among them is saved with their text, so a
+        /// snapshot taken while it waits restores whatever content is loaded.
         /// </summary>
         public void Execute(string statements, Entity? self = null, Entity? target = null)
         {
@@ -1069,6 +1214,7 @@ namespace Cantrip
         private void ExecuteCore(string statements, Entity? self, Entity? target)
         {
             BlockNode block = ParseStatements(statements);
+            if (ExecutedStatements.Schedules(block)) Remember(new ExecutedStatements(statements, block));
             Entity? actor = self == null ? State.Player : self.Kind == EntityKind.Actor ? self : self.Controller;
 
             Run(actor, context =>

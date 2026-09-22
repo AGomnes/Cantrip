@@ -72,9 +72,12 @@ namespace Cantrip.GodotAdapter
 
             if (ResourceLoader.Exists(resPath))
             {
-                // Replace rather than reuse: hot reload asks for the same path again and must get
-                // what is on disk now, not what was cached before the designer hit save.
-                Resource? loaded = ResourceLoader.Load(resPath, string.Empty, ResourceLoader.CacheMode.Replace);
+                // Read past the cache and leave nothing in it. Hot reload asks for the same path again
+                // and must get what is on disk now, not what was cached before the designer hit
+                // save. And a copy left in the cache can still be found there after the garbage
+                // collector has let go of its C# half but before Godot has freed it: replacing that
+                // copy, as this once did, crashed a later load whenever the collector ran just then.
+                Resource? loaded = ResourceLoader.Load(resPath, string.Empty, ResourceLoader.CacheMode.Ignore);
                 if (loaded is CantripContentFile imported)
                 {
                     text = imported.Text ?? string.Empty;

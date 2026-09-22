@@ -1,5 +1,6 @@
 #nullable enable
 #if TOOLS
+using System;
 using System.Collections.Generic;
 using Godot;
 
@@ -29,9 +30,13 @@ namespace Cantrip.GodotAdapter
         /// <summary>
         /// Runs the dock's work once and prints the result. It is how a headless editor, which has
         /// no mouse, can still prove that the panels build and that loading, linting, testing and
-        /// describing all work against the project's real content.
+        /// describing all work against the project's real content. A check of the dock's own that
+        /// fails makes the editor exit with 1.
         /// </summary>
         private const string SelfTestFlag = "--cantrip-selftest";
+
+        /// <summary>What a self-test line says when a check of the dock's own has failed.</summary>
+        internal const string SelfTestFailed = "FAILED";
 
         private CantripImportPlugin? _importPlugin;
         private CantripExportCheck? _exportCheck;
@@ -141,14 +146,22 @@ namespace Cantrip.GodotAdapter
         {
             if (_panel == null) return;
 
-            foreach (string line in _panel.SelfTest()) GD.Print("Cantrip self-test: " + line);
+            var lines = new List<string>(_panel.SelfTest());
 
             // The debugger's tabs are the one part of the addon a headless editor would otherwise
             // never touch: they only ever exist inside a live session.
-            if (_debugger != null && _workspace != null)
+            if (_debugger != null && _workspace != null) lines.AddRange(_debugger.SelfTest(_workspace.Content));
+
+            bool failed = false;
+            foreach (string line in lines)
             {
-                foreach (string line in _debugger.SelfTest(_workspace.Content)) GD.Print("Cantrip self-test: " + line);
+                GD.Print("Cantrip self-test: " + line);
+                failed |= line.Contains(SelfTestFailed, StringComparison.Ordinal);
             }
+
+            // Most lines are a report: a count of failing content tests is about the content, not
+            // the dock. A check of the dock's own says FAILED, and fails the run with it.
+            if (failed) GetTree().Quit(1);
         }
     }
 }

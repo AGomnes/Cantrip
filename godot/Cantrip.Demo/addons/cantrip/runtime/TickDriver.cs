@@ -84,7 +84,7 @@ namespace Cantrip.GodotAdapter
         /// <summary>Clears the carried remainder and the counters, as after loading a save.</summary>
         public void Reset() => _accumulator.Reset();
 
-        /// <summary>Ticks run since the last reset, for a HUD or a desync check.</summary>
+        /// <summary>Ticks run since the last reset, for a HUD or for checking that two runs agree.</summary>
         public long TotalTicks() => _accumulator.TotalTicks;
 
         /// <summary>Ticks abandoned to the catch-up cap: time the game skipped rather than replayed.</summary>

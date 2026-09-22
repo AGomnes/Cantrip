@@ -62,10 +62,8 @@ namespace Cantrip.GodotAdapter
 
         public CantripWorkspace()
         {
-            ContentFolder = Setting(ContentFolderSetting, ContentPaths.ResourceScheme);
-            foreach (string verb in Words(Setting(HostVerbsSetting, string.Empty))) HostVerbs.Add(verb);
-            foreach (string name in Words(Setting(HostEventsSetting, string.Empty))) HostEvents.Add(name);
-            foreach (string name in Words(Setting(HostNamesSetting, string.Empty))) HostNames.Add(name);
+            ContentFolder = ContentPaths.ResourceScheme;
+            ReadSettings();
             foreach (string code in Words(EditorSetting(SuppressedSetting))) _suppressed.Add(code);
         }
 
@@ -98,7 +96,10 @@ namespace Cantrip.GodotAdapter
         /// <summary>Both of the above, in source order: file, then line, then column, then code.</summary>
         public IReadOnlyList<Diagnostic> Problems => _problems;
 
-        /// <summary>Verbs the game registers in C#. Seeded from project settings; editor tools may add more.</summary>
+        /// <summary>
+        /// Verbs the game registers in C#. Filled from project settings by <see cref="ReadSettings"/>,
+        /// which starts it afresh; editor tools may add more in between.
+        /// </summary>
         public ISet<string> HostVerbs { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         public ISet<string> HostEvents { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -116,6 +117,20 @@ namespace Cantrip.GodotAdapter
 
         /// <summary>What is loaded, as the core hashes it. Shown so a designer can tell two states apart.</summary>
         public string Fingerprint => Content.Fingerprint;
+
+        /// <summary>
+        /// Reads the <c>cantrip/*</c> project settings again: the content folder and the host verbs,
+        /// events and names. The dock's Reload button calls this first, so a setting changed in
+        /// Project Settings takes effect without restarting the plugin. The suppressed codes are the
+        /// dock's own and are not re-read.
+        /// </summary>
+        public void ReadSettings()
+        {
+            ContentFolder = Setting(ContentFolderSetting, ContentPaths.ResourceScheme);
+            Refill(HostVerbs, HostVerbsSetting);
+            Refill(HostEvents, HostEventsSetting);
+            Refill(HostNames, HostNamesSetting);
+        }
 
         /// <summary>
         /// Discovers, loads and lints the project's content, then tells the panels. Everything is
@@ -217,6 +232,12 @@ namespace Cantrip.GodotAdapter
             Variant value = ProjectSettings.GetSetting(key, fallback);
             string text = value.AsString();
             return string.IsNullOrWhiteSpace(text) ? fallback : text;
+        }
+
+        private static void Refill(ISet<string> words, string key)
+        {
+            words.Clear();
+            foreach (string word in Words(Setting(key, string.Empty))) words.Add(word);
         }
 
         /// <summary>An editor setting, which is this person's preference and stays on this machine.</summary>

@@ -1,6 +1,6 @@
 # Samples
 
-Worked `.cantrip` content, each folder with its tests. CI runs `test` and `lint` over every folder on each change.
+Worked `.cantrip` content, each folder with its tests. On each change, CI runs `test` over every folder, and `lint` with `--warnings-as-errors`, so a folder must stay free of warnings as well as errors.
 
 | Folder | What it shows |
 |---|---|
@@ -20,7 +20,7 @@ dotnet run --project src/Cantrip.Cli -- test samples/basic
 dotnet run --project src/Cantrip.Cli -- lint samples/basic
 ```
 
-Put `samples/recipes`, `samples/slice` or `samples/corpus` in place of `samples/basic` for the others. `test` runs every test and prints PASS or FAIL for each; `lint` checks the files for mistakes a test might not reach. Both end with a count, and `lint` reports notes as well as errors and warnings: a note is information, not a failure.
+Put `samples/recipes`, `samples/slice` or `samples/corpus` in place of `samples/basic` for the others. `test` runs every test and prints PASS or FAIL for each; `lint` checks the files for mistakes a test might not reach. Both end with a count, and `lint` reports notes as well as errors and warnings: a note is information, not a failure. `lint` fails only on errors unless you add `--warnings-as-errors`, as CI does.
 
 Load one folder at a time. The folders define some of the same names, such as `Strength`, so loading two together fails with error CT0110, "already defined".
 

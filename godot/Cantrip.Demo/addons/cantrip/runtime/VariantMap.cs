@@ -29,7 +29,7 @@ namespace Cantrip.GodotAdapter
         /// <summary>
         /// One resolved event. <c>amount</c> is the whole number a UI prints; <c>amount_raw</c> is
         /// the exact fixed-point value for anything that must stay bit-exact, because rounding a
-        /// number and calling it the truth is how replays and lockstep drift apart.
+        /// number and calling it the truth is how a replay drifts from the game it replays.
         /// </summary>
         public static Godot.Collections.Dictionary Event(EventRecord record)
         {

@@ -34,7 +34,7 @@ Content lives in `.cantrip` files. A folder loads every `.cantrip` file under it
 
 - **Indentation** delimits blocks. Use spaces; a tab counts as up to the next multiple of four. A line that does not line up with an enclosing block is error CT0001.
 - **Comments** start with `#` and run to the end of the line. Blank and comment-only lines are ignored entirely.
-- **Names** of definitions are strings (`card "Fire Bolt"`) or bare words (`status Poison`). A name with spaces, hyphens or other punctuation, such as `"Strike+"`, can only be referred to as a string later, and never after a qualifier such as `name:` (see [Qualifiers](#qualifiers)), so single-word names are easier to use.
+- **Names** of definitions are strings (`card "Fire Bolt"`) or bare words (`status Poison`). A name with spaces, hyphens or other punctuation, such as `"Strike+"`, is written in quotes wherever it is used, after a qualifier too, as in `name:"Strike+"` (see [Qualifiers](#qualifiers)), so single-word names are easier to type.
 - **Keywords** are case-insensitive. Names are matched case-insensitively.
 - A block can be written on the same line after its colon: `if target.dead: draw 1`, `effect: deal 6 to target`.
 - **Editors.** Any text editor will do. There is no syntax-highlighting package for text editors yet; the Godot addon's editor dock shows the source highlighted.
@@ -96,7 +96,7 @@ What each declaration reads, beyond the listeners, modifiers, `tags` and present
 
 `rarity` and `weight` are read by [`discover`](#built-in-verbs) on any kind of definition.
 
-**Anything else is accepted silently.** A property the engine does not read is only a stat, or nothing at all: `duration 3` on a status does not make it last three turns (see [Statuses](#statuses)). And any other line ending in a colon is taken as a labelled block, and a labelled block in a declaration never runs. A listener written the wrong way round, such as `when card_played:` or `once per battle on card_played:`, is one of these: `validate` and `lint` report nothing, `describe` still prints rules text for it, and it never fires. A listener always starts with `on`; if one seems never to fire, check that first.
+**Anything else is only a stat, or a label.** A property the engine does not read is accepted silently and becomes a stat, or nothing at all: `max_stack 3`, with the `s` missing, leaves a status with no cap. `duration 3` on a status does not make it last three turns either (see [Statuses](#statuses)). Any other line ending in a colon is taken as a labelled block, and a labelled block in a declaration never runs. A listener written the wrong way round, such as `when card_played:` or `once per battle on card_played:`, is one of these: it loads, `describe` still prints rules text for it, and it never fires. `lint` warns about every such block (CT313) and suggests the listener it looks like. A listener always starts with `on`. A game that runs a block of its own from C#, reading it through `EntityDefinition.Blocks`, names it in `LintOptions.HostBlocks` so the linter knows it runs.
 
 ## Cards
 
@@ -219,7 +219,7 @@ A status is removed when its counter reaches zero: `stacks` for intensity-like m
 
 Reading `host.Weak` gives that counter: stacks, or the remaining duration for duration and refresh statuses. Writing `host.Weak -1` changes the same counter, applying the status if it was absent.
 
-A status has no length of its own. The number comes from whoever applies it: `apply Weak 2` is a duration of 2. A `duration 2` line in the status's declaration is only a stat that nothing reads.
+A status has no length of its own. The number comes from whoever applies it: `apply Weak 2` is a duration of 2. A `duration 2` line in the status's declaration does not change that. On a `duration`, `refresh` or `both` status the duration always comes from the application, so the line does nothing and `lint` warns about it (CT315); on any other status it is only a stat.
 
 ### How long a duration status lasts
 
@@ -255,7 +255,7 @@ status Guarded
 
 **`for`** sets a deadline on the clock: `apply Chill 1 for 3s`, or `apply Shield for 2 turns`. The status is removed when the clock reaches it, whatever its counter says. The turn clock moves once per round, at the start of each player turn after the first, once that turn's `turn_start` event and `next turn:` blocks have run, so `for 2 turns` applied during the player's turn covers two enemy turns.
 
-`for` never lengthens a `duration` or `refresh` status: whichever runs out first removes it. `apply Weak for 2 turns` is a duration of 1, the default amount, with a two-turn deadline, so it covers one enemy turn; write `apply Weak 2`. Use `for` with `intensity`, `none` and `separate` statuses, which have no duration of their own. On a `stacking both` status the `for` length becomes the duration; `both` has no decay unless it declares one.
+`for` never lengthens a `duration` or `refresh` status: whichever runs out first removes it. `apply Weak for 2 turns` is a duration of 1, the default amount, with a two-turn deadline, so it covers one enemy turn; write `apply Weak 2`. `lint` warns when `for` gives more turns than the amount applied to such a status (CT314). It says nothing where the deadline can matter: on a status that decays on some other event or not at all, and where the status may land on a card, which has no turns to tick it down. Use `for` with `intensity`, `none` and `separate` statuses, which have no duration of their own. On a `stacking both` status the `for` length becomes the duration; `both` has no decay unless it declares one.
 
 The recipes [A debuff that lasts N enemy turns](writing-content.md#a-debuff-that-lasts-n-enemy-turns) and [A buff that lasts N enemy attacks](writing-content.md#a-buff-that-lasts-n-enemy-attacks) show these with tests.
 
@@ -344,6 +344,8 @@ The rules that decide what the player sees:
 - **Entering a phase restarts the pattern** from its first allowed move, because the old position counted through a list of moves that is no longer the same one. That is why Split is listed first: listed second, it would come a turn later.
 - **The phase changes as soon as a hit takes the enemy across the threshold**, and otherwise when its next intent is rolled. The **last** declared phase whose condition holds is the one that applies, so thresholds can be written in the order they are thought of (three quarters, then half, then a quarter) and the deepest one that is true wins.
 - **An enemy has one pattern**, written at the top level of the enemy, not inside a phase. Phases change which of its moves it can use.
+
+Generated rules text names the phase a move is limited to. `cantrip describe` gives the Slime King as "Chomp: Deal 11 damage to the player. Split (Broken phase only): Deal 5 damage to the player."
 
 **`retelegraph`** on a phase re-rolls the intent the moment the enemy enters that phase, so the player is shown the new phase's first move straight away. Without it, the intent already on show stays, and the new pattern starts on the enemy's next roll. For the Slime King, crossing half health during the player's turn gives:
 
@@ -447,7 +449,7 @@ relic "Bloodlust"
     event.amount += 2
 ```
 
-The line always starts with `on`, and `once per ...` and `priority` come after the event and its filter. A line written another way, such as `once per battle on card_played:`, is not a listener at all but a label that never runs (see [Declarations](#declarations)).
+The line always starts with `on`, and `once per ...` and `priority` come after the event and its filter. A line written another way, such as `once per battle on card_played:`, is not a listener at all but a label that never runs (see [Declarations](#declarations)); `lint` warns about it (CT313) and suggests `on card_played once per battle:`.
 
 | To run... | Write |
 |---|---|
@@ -480,7 +482,7 @@ The line always starts with `on`, and `once per ...` and `priority` come after t
 
 **Resolution.** Before and instead listeners run immediately. After listeners are queued and resolve in order once the current action finishes; work they raise joins the back of the queue. With `triggers: immediate` in the ruleset they run immediately instead.
 
-**Every.** `on every 1s:` fires on an interval rather than on an event. It is pumped by the clock instead of raised by anything, so only the listener whose interval has elapsed runs. The interval is written like any other duration (`1s`, `250ms`, `2 turns`), and the clock has to understand the unit: seconds mean nothing to a turn-based game, so `every 1s` there registers nothing at all rather than half-working. Filters and `once per ...` apply as they do to any listener. When the next firing is due is part of the saved game, so a reload resumes mid-interval instead of restarting it.
+**Every.** `on every 1s:` fires on an interval rather than on an event. It is pumped by the clock instead of raised by anything, so only the listener whose interval has elapsed runs. The interval is written like any other duration (`1s`, `250ms`, `2 turns`), and the clock has to understand the unit: seconds mean nothing to a turn-based game, so `every 1s` there registers nothing at all rather than half-working. Filters and `once per ...` apply as they do to any listener. When the next firing is due is part of the game's state, so a restored save resumes mid-interval instead of restarting it, and so does a hot reload. A content change can make a listener start afresh, as [Save and load](csharp.md#save-and-load) describes.
 
 **Ordering.** Listeners for the same event run by priority (higher first), then play order (the order their entities became active), then the active side first, then registration order. The ruleset can reorder the first three.
 
@@ -646,7 +648,7 @@ else:
 
 `repeat` binds `index` (from 0). `for each` iterates over a snapshot of the group, skipping entities removed meanwhile. `chance` rolls against a percentage.
 
-Inside a body, labelled blocks such as `setup:` or `first:` just run their statements; the label is for readers and tools. A labelled block directly inside a declaration is different: only `effect:` and `move ...:` run, and any other label is kept but never runs (see [Declarations](#declarations)).
+Inside a body, labelled blocks such as `setup:` or `first:` just run their statements; the label is for readers and tools. A labelled block directly inside a declaration is different: only `effect:` and `move ...:` run, and any other label is kept but never runs, which `lint` warns about (CT313; see [Declarations](#declarations)).
 
 ## Expressions
 
@@ -685,7 +687,7 @@ Percent values multiply as fractions: `10 * 50%` is 5. Division by zero gives 0.
 
 ### Qualifiers
 
-`tag:x`, `keyword:x`, `status:x`, `source:role`, `target:role`, `name:x`, `card:x`, `zone:x`, `team:x`, `kind:x`, `type:x`, `rarity:x`, `id:x`. They are written with no spaces around the colon, and the value is one word of letters, digits and `_`. A name such as `"Strike+"` or `"Fire Bolt"` cannot follow `name:` or `card:`; compare it instead, as in `hand where it.name == "Strike+"`.
+`tag:x`, `keyword:x`, `status:x`, `source:role`, `target:role`, `name:x`, `card:x`, `zone:x`, `team:x`, `kind:x`, `type:x`, `rarity:x`, `id:x`. They are written with no spaces around the colon. The value is one word of letters, digits and `_`, or, for a name that is not one word, text in quotes: `card:"Fire Bolt"`, `hand where name:"Strike+"`.
 
 A qualifier tests whatever is in focus: the candidate inside `where`, the value being computed inside a modifier, or the event inside a listener filter. Roles for `source:` and `target:` are `self`, `owner`, `player`, `enemy`/`enemies`, `ally`/`allies`, `target`, `any`, or an entity name. Roles compare controllers, so `source:self` on a relic matches damage from its holder's cards. `enemy` and `ally` roles are relative to the side the effect runs for; inside a modifier, that is the modifier owner's side.
 
@@ -738,7 +740,7 @@ A bare name resolves in this order: local variables (`let` bindings, `for each` 
 | `cancel` | In a `before_` or `instead_of_` listener, cancels the event. |
 | `replay` | `replay card [on target]` resolves a card's effect again, for free. |
 | `use` | In an enemy, performs one of its moves. |
-| `log` | `log "hp is" target.hp`, with the values separated by spaces, writes them to the runtime's `Logged` event. `cantrip repl` prints it; `cantrip test` does not show it, so in a test use `expect`, whose failure shows the value. |
+| `log` | `log "hp is" target.hp`, with the values separated by spaces, writes them to the runtime's `Logged` event. `cantrip repl` prints it. In a test it goes into the trace, as a `[log]` line under the `log` statement, which `cantrip test --trace` prints for a failing test. A passing test shows nothing, so to see a value there, use `expect`, whose failure shows it. |
 
 **`into`** binds what a damage verb actually achieved, so an effect can act on it: `deal 4 to all enemies into dealt`, then `heal dealt`. The number is what landed, summed across the targets — after modifiers changed the amount, after block absorbed what it could, and counting only what a dying target could still take, which is rarely the number the line asked for. Available on `deal`, `damage` and `attack`.
 
@@ -869,7 +871,7 @@ Placeholders are named after the values in the effect, in order: `{damage}`, `{d
 
 A computed amount, such as `deal 2 * target.Poison to target`, has no number until there is a game to read. Described against a live game with a target, it shows the number; described on its own, as `cantrip describe` and a deck list do, both the automatic text and its placeholder show the expression as written ("Deal 2 * target.Poison damage."). Ranges and `random` never show a rolled number: `deal 3..6` reads "Deal 3–6 damage." For such cards, write text that needs no number, such as `text_override: "Deal damage equal to twice the target's Poison."`.
 
-Descriptions show what was parsed, not what will run: a mistyped listener line that never fires (see [Declarations](#declarations)) is still described. Check behaviour with a [test](#tests).
+Descriptions show what was parsed, not what will run: a mistyped listener line that never fires (see [Declarations](#declarations)) is still described, though `lint` warns about it (CT313). Check behaviour with a [test](#tests).
 
 **Drift protection.** `cantrip lint` reports a placeholder that matches nothing (CT401). Add `text_checked "<hash>"` once a text has been reviewed; when the effect later changes, lint reports CT402 with the new hash to paste after re-reading the text. Presentation properties do not affect the hash.
 
@@ -907,7 +909,7 @@ test "Poison ticks and decays"
 
 **Setup runs before the battle starts, and the start of the first turn resets resources.** `player block 5` is wiped to 0, and `player energy 1` comes back as 3, the player's `max_energy`. A higher energy survives, because setting it also raises `max_energy`. To start a test with block or less energy, write a statement after setup: `block 5`, `player.energy = 1`. The same goes for any stat with a `reset_on turn_start` rule.
 
-**One comparison per `expect`.** A failing comparison shows the value it found: `expected enemy.Poison == 3, but enemy.Poison was 2`. Joined with `and`, it shows only the condition, and a test stops at its first failing `expect`, so the lines after it are not checked. To look further into a failure, `--filter <text>` runs only the tests whose names contain the text, and `--trace` prints what happened, step by step, in each failing test.
+**One comparison per `expect`.** A failing comparison shows the value it found: `expected enemy.Poison == 3, but enemy.Poison was 2`. Joined with `and`, it shows only the condition, and a test stops at its first failing `expect`, so the lines after it are not checked. To look further into a failure, `--filter <text>` runs only the tests whose names contain the text, and `--trace` prints what happened, step by step, in each failing test, with what any `log` statement wrote.
 
 **Setup does not check stat names.** In an `enemy` or `player` line, a word that is not a status becomes a stat, so `enemy hp 20 Weak 2` with no `Weak` defined sets a stat called `Weak` and the test carries on. `cantrip lint` says nothing about the setup line itself; it reports CT302 only where the test reads the name as a status, as in `expect enemy.Weak == 2`. An enemy's name is checked: `enemy Ghoul` with no Ghoul defined fails the test.
 
@@ -917,7 +919,7 @@ test "Poison ticks and decays"
 
 - span two battles, so it cannot show that something resets between battles;
 - check that a play was refused, since `play` fails the test when a card cannot be played. For a targeting rule, show it the other way round: play the card with no target and check what it picked;
-- show `log` output.
+- show `log` output when it passes. Only `--trace` shows it, and only for a failing test.
 
 **When the last enemy dies, the battle is won at once**, and winning removes the player's statuses that are not `persistent` and returns every card to the draw pile. A test that checks a status or a drawn card after a killing blow needs a second enemy to keep the battle going.
 
@@ -945,7 +947,7 @@ Every message starts with the file, line and column, then its level and code:
 game.cantrip:26:11: error CT302: Nothing called `Posion` is defined. Did you mean `Poison`?
 ```
 
-Codes with four digits come from reading and loading the files. An error among them stops `cantrip test`, `describe` and `repl` before they start. Codes with three digits come from the linter and the description checks, which `cantrip lint` runs; their errors do not stop a test, so a misspelt verb fails a test only when the test runs it. `cantrip validate` reports every error, and `cantrip lint` also reports warnings and notes, which it prints as `info`, but fails only on errors. `--suppress CT301,CT306` leaves the linter's codes out of either. A failure while content runs has no code: a test prints `runtime error:` and the message.
+Codes with four digits come from reading and loading the files. An error among them stops `cantrip test`, `describe` and `repl` before they start. Codes with three digits come from the linter and the description checks, which `cantrip lint` runs; their errors do not stop a test, so a misspelt verb fails a test only when the test runs it. `cantrip validate` reports every error, and `cantrip lint` also reports warnings and notes, which it prints as `info`. `lint` fails only on errors, unless it is given `--warnings-as-errors`, which makes a warning fail it too, though never a note: that is how a build server keeps a folder free of warnings. `--suppress CT301,CT306` leaves those codes out of either command, whether the linter or loading reported them, except that an error from reading or loading the files always shows. A failure while content runs has no code: a test prints `runtime error:` and the message.
 
 **Reading the files**
 
@@ -1014,6 +1016,9 @@ Codes with four digits come from reading and loading the files. An error among t
 | CT310 | note | A content verb that nothing calls. | Call it, or remove it. |
 | CT311 | warning | `stacks` outside a status, where it reads a stat that is probably never set. | Read the status by name, as in `target.Poison`. |
 | CT312 | error | `use` names a move the enemy does not have, or appears in something with no moves. | Fix the move's name. |
+| CT313 | warning | A line in a declaration that ends in `:` but is not `effect:`, `move ...:` or a listener, such as `when card_played:` or `once per battle on card_played:`. It is only a label, so it never runs. | Start a listener with `on`, with `once per ...` after the event: `on card_played once per battle:`. The message suggests the form the line looks like. For a block the game runs from C#, add its name to `LintOptions.HostBlocks`, or run with `--suppress CT313`. |
+| CT314 | warning | `for N turns` on a `duration` or `refresh` status that ticks down on its host's turns, with N more than the amount applied. The status lasts as many turns as the amount, and `for` can only end it sooner. | Give the turns as the amount: `apply Weak 2`, not `apply Weak for 2 turns`. |
+| CT315 | warning | A `duration` line on a `duration`, `refresh` or `both` status. The status takes its duration from whoever applies it, so the line does nothing. | Remove the line, and give the length where the status is applied: `apply Weak 2`. |
 
 **Descriptions**
 

@@ -217,7 +217,7 @@ test "Crossing half health changes the next move, not the one shown"
 | Command | What it does |
 |---|---|
 | `dotnet cantrip test tutorial` | Runs every test. `--filter <text>` runs only the tests whose names contain the text, and `--trace` prints a step-by-step account of what happened in each failing test. |
-| `dotnet cantrip lint tutorial` | Checks the files: unknown names, misspelt verbs, a listener on an event nothing raises, a `{placeholder}` in card text that matches nothing, and more. It reports errors, warnings and notes. |
+| `dotnet cantrip lint tutorial` | Checks the files: unknown names, misspelt verbs, a listener on an event nothing raises or written without `on`, a `{placeholder}` in card text that matches nothing, and more. It reports errors, warnings and notes. |
 | `dotnet cantrip validate tutorial` | Reports only errors, leaving out the linter's warnings and notes. |
 | `dotnet cantrip describe tutorial` | Prints the rules text of every definition, generated or written with `text:`, or of one with `--name "Venom Dart"`. |
 
@@ -237,7 +237,7 @@ tutorial/game.cantrip:26:11: error CT302: Nothing called `Posion` is defined. Di
 1 error(s), 0 warning(s), 0 note(s)
 ```
 
-Each message starts with the file, line and column. `lint` only counts errors as failure, so read its warnings too.
+Each message starts with the file, line and column. `lint` counts only errors as failure, so read its warnings too. To have a warning fail it as well, as on a build server, add `--warnings-as-errors`; notes never fail it, and `--suppress` with a warning's code, such as `--suppress CT303`, leaves that warning out.
 
 A failing `expect` shows the value it found. Change the Strike test to expect 15, and run it alone with `--filter`, adding `--trace` to see what happened before the `expect`:
 
@@ -267,14 +267,18 @@ Some habits make tests easier to live with:
 - **Cards go where you put them.** `deck Strike, Defend` puts cards in the draw pile and `hand` in the hand. A test does not shuffle or draw an opening hand.
 - **A test is one battle.** It cannot show something that resets between battles, and it cannot check that a card is refused, because `play` fails the test when a card cannot be played.
 - **Choices are answered with `answer`.** `answer "Defend"` picks Defend at the next choice. With no answer queued, the first option is taken.
-- **`log` prints nothing in a test.** Use `--trace`, or an `expect` that shows the value. `log` does print in the [REPL](#6-trying-lines-in-the-repl).
+- **`log` shows only in the trace.** With `--trace`, a failing test's trace has a `[log]` line under each `log` statement that ran, with the values it wrote. A passing test prints no trace, so there use an `expect` that shows the value. `log` also prints in the [REPL](#6-trying-lines-in-the-repl).
 
 The full list of test verbs is under [Tests](language.md#tests).
 
+`lint` also warns about lines that load but do nothing:
+
+- **A line ending in a colon that is not a block the declaration runs** (CT313). `when card_played:` inside a relic is taken as a label and never runs, because a listener always starts with `on`. The warning suggests the listener the line looks like. [Declarations](language.md#declarations) lists what each kind of declaration reads.
+- **A length the status never uses** (CT314, CT315). `apply Weak for 2 turns` on a `stacking duration` status lasts one turn, and a `duration 2` line in the status's declaration does nothing; see [A debuff that lasts N enemy turns](#a-debuff-that-lasts-n-enemy-turns).
+
 Some mistakes neither command reports:
 
-- **A line ending in a colon that is not a block the declaration knows.** `when card_played:` inside a relic is taken as a label and never runs. A listener always starts with `on`. [Declarations](language.md#declarations) lists what each kind of declaration reads.
-- **A property the engine does not read.** `duration 2` on a status is only a stat; it does not make the status last two turns.
+- **A property the engine does not read.** It is only a stat: `max_stack 3`, with the `s` missing, leaves the status with no cap, and `duration 2` on a status that stacks by intensity does not make it last two turns.
 - **A misspelt status in a test's `enemy` or `player` line.** In `enemy hp 20 Posion 3`, a word that is not a status becomes a plain stat, so the enemy gets a stat called Posion and no status. Neither command reports the line itself; `lint` reports CT302 only where the test goes on to read `enemy.Posion`. Check what the status does, such as the hp the enemy has lost after `end turn`, and the test fails instead.
 
 Nor is `describe` a check: it prints rules text for what was written, whether or not it will ever run. Only a test shows that it does.
@@ -399,7 +403,7 @@ test "Sap weakens the Brute's next two attacks"
   expect player.hp == 56
 ```
 
-The number goes after the status's name: `apply Weak 2`. `apply Weak for 2 turns` is a different thing, a deadline added to a duration of 1, and covers only one enemy turn. The same number means something else on the player, because the player's turn ends before the enemies act: see [How long a duration status lasts](language.md#how-long-a-duration-status-lasts), which also shows how to protect the player for the next N enemy turns. File: [debuff-for-enemy-turns.cantrip](../samples/recipes/debuff-for-enemy-turns.cantrip).
+The number goes after the status's name: `apply Weak 2`. `apply Weak for 2 turns` is a different thing, a deadline added to a duration of 1, and covers only one enemy turn; `lint` warns about it (CT314). A `duration 2` line in the status's declaration does nothing either (CT315). The same number means something else on the player, because the player's turn ends before the enemies act: see [How long a duration status lasts](language.md#how-long-a-duration-status-lasts), which also shows how to protect the player for the next N enemy turns. File: [debuff-for-enemy-turns.cantrip](../samples/recipes/debuff-for-enemy-turns.cantrip).
 
 ### A buff that lasts N enemy attacks
 
@@ -541,7 +545,7 @@ test "War Horn draws two after the first attack of the battle only"
   expect count(hand) == 2
 ```
 
-- `once per battle` goes after the event and its filter, just before the colon. Written first, as in `once per battle on card_played:`, the line is taken as a label and never runs.
+- `once per battle` goes after the event and its filter, just before the colon. Written first, as in `once per battle on card_played:`, the line is taken as a label and never runs, and `lint` warns about it (CT313).
 - The limit resets when the next battle starts. A test is a single battle, so it cannot show that.
 - `once per turn`, `once per run` and `once per chain` work the same way; see [Listeners](language.md#listeners).
 

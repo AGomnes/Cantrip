@@ -2,7 +2,9 @@ extends Node
 
 # Proves the GDScript path, which C# tests cannot reach: that the node is instantiable by its
 # global class name, that its members answer under their C# (PascalCase) names, that dictionaries
-# and arrays marshal both ways, and that signals arrive.
+# and arrays marshal both ways, that signals arrive, that a lambda or a bound method registered
+# as a callback reaches the rules whole, and that an answer turned away says why in the word
+# docs/godot.md gives.
 #
 # Two rules this file exists to pin down, both of which fail loudly rather than subtly:
 #   - members keep their C# names; there is no snake_case alias
@@ -37,6 +39,7 @@ func _run() -> void:
 	var slime: int = rules.SpawnEnemy("Slime", 0)
 	rules.StartBattle(false, false)
 	_check("the battle is running", rules.IsInBattle())
+	_check("and is neither won nor lost: GetWon() is null", rules.GetWon() == null, str(rules.GetWon()))
 
 	var ember: int = rules.AddCard("Ember", "hand")
 	_check("the hand came back as an array of ids", rules.GetHand().has(ember))
@@ -56,7 +59,65 @@ func _run() -> void:
 	var intent: Dictionary = rules.DescribeIntent(slime)
 	_check("so does an intent", intent.get("name", "") == "Swipe", str(intent.get("name")))
 
+	_check_callbacks(rules, slime)
+	_check_answers(rules)
+
 	_finish()
+
+# An answer that is turned away says why in a snake_case word, like every other word the node gives.
+func _check_answers(rules: CantripRuntime) -> void:
+	var early: Dictionary = rules.AnswerChoice(1, [])
+	_check("an answer with nothing asked is nothing_pending", not early["accepted"] and early["reason"] == "nothing_pending", str(early))
+
+	var spare: int = rules.AddCard("Guard", "hand")
+	var sort: int = rules.AddCard("Sort", "hand")
+	_check("a card that asks stops for the answer", rules.Play(sort, 0) == "pending")
+	var first: int = rules.GetPendingChoice()["id"]
+	rules.CancelChoice()
+	rules.Play(sort, 0)
+	var request: Dictionary = rules.GetPendingChoice()
+
+	var late: Dictionary = rules.AnswerChoice(first, [spare])
+	_check("an answer to a request already dealt with is stale_request", late["reason"] == "stale_request", str(late))
+	var twice: Dictionary = rules.AnswerChoice(request["id"], [spare, spare])
+	_check("the same pick twice is duplicate_option", twice["reason"] == "duplicate_option", str(twice))
+	var none: Dictionary = rules.AnswerChoice(request["id"], [])
+	_check("no pick at all is too_few", none["reason"] == "too_few", str(none))
+
+	var answer: Dictionary = rules.AnswerChoice(request["id"], [spare])
+	_check("and the right answer is accepted", answer["accepted"] and answer["reason"] == "none" and answer["result"] == "played", str(answer))
+
+# Any Callable answers content: a lambda, a lambda kept in a variable, a method with .bind(), and a
+# plain method. C#'s Callable can hold only the last, so the first three used to arrive empty.
+func _check_callbacks(rules: CantripRuntime, enemy: int) -> void:
+	var bonus := 1
+	rules.RegisterName("two_at_target", func(context: Dictionary) -> Variant: return 2 if context["target"] == enemy else 0)
+	var plus_bonus := func(args: Array, _context: Dictionary) -> Variant: return int(args[0]) + bonus
+	rules.RegisterFunction("plus_bonus", plus_bonus)
+	rules.RegisterFunction("plus_ten", _plus.bind(10))
+	rules.RegisterName("three", _three)
+
+	var hp: int = rules.GetStat(enemy, "hp")
+	rules.Execute("deal two_at_target to target", 0, enemy)
+	_check("a lambda answers a name, with the context", rules.GetStat(enemy, "hp") == hp - 2, str(rules.GetStat(enemy, "hp")))
+
+	hp = rules.GetStat(enemy, "hp")
+	rules.Execute("deal plus_bonus(3) to target", 0, enemy)
+	_check("a stored lambda answers a function", rules.GetStat(enemy, "hp") == hp - 4, str(rules.GetStat(enemy, "hp")))
+
+	hp = rules.GetStat(enemy, "hp")
+	rules.Execute("deal plus_ten(1) to target", 0, enemy)
+	_check("so does a method with .bind()", rules.GetStat(enemy, "hp") == hp - 11, str(rules.GetStat(enemy, "hp")))
+
+	hp = rules.GetStat(enemy, "hp")
+	rules.Execute("deal three to target", 0, enemy)
+	_check("and a plain method still answers", rules.GetStat(enemy, "hp") == hp - 3, str(rules.GetStat(enemy, "hp")))
+
+func _plus(args: Array, _context: Dictionary, amount: int) -> Variant:
+	return int(args[0]) + amount
+
+func _three(_context: Dictionary) -> Variant:
+	return 3
 
 func _on_effect_event(effect_event: Dictionary) -> void:
 	_events.append(effect_event["name"])

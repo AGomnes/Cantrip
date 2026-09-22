@@ -79,12 +79,19 @@ namespace Cantrip.Tests.Snapshots
         }
 
         [Fact]
-        public void Blocks_scheduled_by_ad_hoc_code_cannot_be_saved()
+        [Trait("Regression", "execute-schedule-cannot-be-saved")]
+        public void Blocks_scheduled_by_Execute_survive_a_round_trip()
         {
-            CardRuntime runtime = SnapshotScenario.NewBattle(seed: 1);
-            runtime.Execute("next turn:\n  draw 1");
+            CardRuntime original = SnapshotScenario.NewBattle(seed: 1);
+            original.Execute("next turn:\n  draw 1");
 
-            Assert.Throws<InvalidOperationException>(() => runtime.Capture());
+            Assert.True(original.CanCapture);
+            CardRuntime restored = SnapshotScenario.RoundTrip(original);
+            Assert.Equal(original.State.ComputeHash(), restored.State.ComputeHash());
+
+            original.EndTurn();
+            restored.EndTurn();
+            Assert.Equal(original.State.ComputeHash(), restored.State.ComputeHash());
         }
     }
 

@@ -178,6 +178,7 @@ namespace Cantrip.Descriptions
             ["decay"] = "Loses {amount} at the end of its holder's turn.",
             ["decay.turn_start"] = "Loses {amount} at the start of its holder's turn.",
             ["move.enemy"] = "{move}: {body}",
+            ["move.enemy.phase"] = "{move} ({phase} phase only): {body}",
             ["cooldown"] = "Cooldown {amount}.",
             ["keyword.exhaust"] = "Exhaust.",
             ["keyword.retain"] = "Retain.",

@@ -242,10 +242,13 @@ You end the turn.
 The same seed plays the same battle, so yours reads the same. What the script relies on:
 
 - **Loading.** With `AutoLoad` on, which is the default, the node loads `ContentFolder` itself as
-  it enters the tree, and the problems it finds are not returned to your script; the dock lists
-  them in the editor. This script turns it off and calls `LoadContent`, which returns them. Load
-  before anything else: once a player, a card or a query has brought the rules into being,
-  `LoadContent` fails and [`ReloadContent`](#hot-reload) is the way to change content.
+  it enters the tree. Nothing hands your script what the parser found, so the node reports each
+  error and warning in the Output panel, one line each, in the form `dotnet cantrip lint` uses:
+  `res://content/game.cantrip:12:3: warning CT0101: ...`. Loading does not lint; the dock shows
+  the linter's findings. This script turns `AutoLoad` off and calls `LoadContent`, which returns
+  the parser's problems instead. Load before anything else: once a player, a card or a query has
+  brought the rules into being, `LoadContent` fails and [`ReloadContent`](#hot-reload) is the
+  way to change content.
 - **Every argument is passed.** `SpawnEnemy("Ghoul", 0)` passes 0 for the hp, which means the hp
   its content gives it; any other number overrides that. `StartBattle(true, true)` shuffles the
   draw pile and then draws the opening hand.
@@ -279,7 +282,7 @@ none. Everything else crosses as strings, numbers, arrays and dictionaries with 
 | Export | Default | What it does |
 |---|---|---|
 | `ContentFolder` | `"res://content"` | Where `.cantrip` files are found, including every folder below it |
-| `AutoLoad` | `true` | Loads `ContentFolder` when the node enters the tree |
+| `AutoLoad` | `true` | Loads `ContentFolder` when the node enters the tree, reporting its errors and warnings in the Output panel |
 | `Seed` | `1` | Every random roll comes from it: the same seed and the same calls play the same game |
 | `Trace` | `false` | Records why things happened, for the debugger. It costs time. |
 | `RealTime` | `false` | Runs on a tick clock instead of turns; see [Real time](#real-time) |
@@ -357,7 +360,7 @@ that is the value to pass if you have no other in mind.
 | `GetLegalTargets(cardId: int) -> Array` | The ids it may be aimed at, for highlighting |
 | `IsInBattle() -> bool` | Whether a battle is running |
 | `GetTurn() -> int` | The turn number, counted from 1 in each battle |
-| `GetWon() -> bool` | True once a battle has been won. It is also false while a battle runs, so ask `IsInBattle()` first. |
+| `GetWon() -> Variant` | How the last battle ended: `true` if the player won it, `false` if not, and `null` while a battle runs and before the first has ended |
 | `StateHash() -> String` | The whole rules state as 16 hex digits, for checking that two runs agree |
 
 **Text**
@@ -467,10 +470,18 @@ the live number), `base_text` (the printed number as text), `changed`, `trend` (
 | `file`, `line` | The line of content that asked |
 
 **The answer**, from `AnswerChoice`: `accepted`, `reason`, `message`, and when it was accepted,
-`result`, which is the same word `Play` gives. `reason` is `"none"`, or why the answer was turned
-away: `"nothingpending"`, `"stalerequest"` (answering a request that has been dealt with),
-`"unknownoption"`, `"duplicateoption"`, `"toofew"` or `"toomany"`. `message` says the same in a
-sentence.
+`result`, which is the same word `Play` gives. `message` says in a sentence what `reason` says in a
+word:
+
+| `reason` | |
+|---|---|
+| `"none"` | The answer was accepted |
+| `"nothing_pending"` | No choice is waiting |
+| `"stale_request"` | The request has already been answered or cancelled, and another is waiting |
+| `"unknown_option"` | A pick that is not in `option_ids` |
+| `"duplicate_option"` | The same pick twice |
+| `"too_few"` | Fewer picks than `min` |
+| `"too_many"` | More picks than `max` |
 
 **A problem**, in the arrays from `LoadContent`, `ReloadContent` and `ContentReloaded`:
 `severity` (`"error"`, `"warning"` or `"info"`), `code` (such as `"CT0101"`), `message`,
@@ -481,8 +492,9 @@ definitions), `missing` (names of definitions that have gone), `ruleset_changed`
 `diagnostics` (the problems found).
 
 **A load**, from `LoadSave`: `accepted`, `reason` and `message`. `reason` is `"none"`,
-`"wrong_format"` (not a save, or one from another version of the addon), `"no_payload"` or
-`"content_changed"`.
+`"wrong_format"` (not a save, a damaged one, or one from a version of the addon or of Cantrip.Core
+that writes saves differently), `"no_payload"` or `"content_changed"` (the content has changed in a
+way the save cannot survive; see [Saving](#saving)).
 
 **An event** is under [Events](#events).
 
@@ -602,8 +614,9 @@ func _on_choice_requested(request: Dictionary) -> void:
 
 `min` and `max` say how many options to pick: `discard 2` needs both at once, in one answer.
 Unlike the C# runtime, the node refuses an answer with too few or too many picks, a pick twice, or
-a pick that was not offered, and leaves the choice open. `CancelChoice()` abandons the action
-instead, leaving the game as it was.
+a pick that was not offered, and leaves the choice open; the answer's `reason` says which, in the
+words listed under [Dictionaries](#dictionaries). `CancelChoice()` abandons the action instead,
+leaving the game as it was.
 
 Listen for the signal rather than checking what `Play` returned, because more than `Play` can
 stop. A relic that asks for a choice at the start of a turn stops `EndTurn`; one that asks at the
@@ -644,8 +657,12 @@ func start_next_battle() -> void:  # when the reward screen closes
 	rules.StartBattle(true, true)
 ```
 
-Outside the `BattleEnded` handler, `GetWon()` tells a won battle from a lost one, once
-`IsInBattle()` is false.
+Outside the `BattleEnded` handler, `GetWon()` says how the last battle ended: `true` or `false`,
+or `null` while a battle is running and before the first one has ended.
+
+`Execute` suits a step like the rest above: a line or two, run now and then. It is checked only
+when it runs, so anything longer, or anything a card, relic or status should own, belongs in
+content, where the linter and your tests see it.
 
 ## Saving
 
@@ -660,14 +677,29 @@ func load_game() -> void:
 		print(result["message"])  # reason "content_changed": the save predates a content edit
 ```
 
-`CanSave()` is false while effects are resolving, which only a callback sees. A save holds the
-whole game, the player, the piles and the enemies included, so it loads into a node that has only
-loaded its content: there is no need to create a player first.
+`CanSave()` is false while effects are resolving, which only a callback sees. It is also false
+after `ReloadContent` has changed a waiting `next turn:` or `in N turns:` block, until that block
+has run: the block runs the statements it was scheduled with, and a save can only name statements
+the loaded content still has. `Save()` fails at such a time, and the error in the Output panel says
+which of the two stopped it.
 
-The save carries a fingerprint of the content it was taken against, so a save from before a patch
-is refused with a message instead of failing part-way through a restore. Editing a card's numbers
-or effects does not change the fingerprint; adding, renaming or deleting a definition does. See
+A save holds the whole game, the player, the piles and the enemies included, so it loads into a
+node that has only loaded its content: there is no need to create a player first.
+
+The save carries a fingerprint of the content it was taken against. Adding, renaming or deleting a
+definition changes the fingerprint, so a save from before such a patch is refused with a message
+before anything is restored, with the `reason` `"content_changed"`. Editing a card's numbers or
+effects does not change the fingerprint, and such a save loads, with one exception: if a
+`next turn:` or `in N turns:` block was waiting when the game was saved and a patch has since
+changed that block's statements, the save is refused as `"content_changed"` too, with a message
+naming the definition the block belongs to. A save made by 0.1.0-preview.2 or earlier finds such a
+block by its place alone instead: it runs whatever block is in that place now, and is refused only
+if there is none. A refused save leaves the game as it was, a choice it is waiting on included. See
 [Saves after a content update](stability.md#saves-after-a-content-update).
+
+A save is trusted input: the node restores whatever the file holds, including statements the game
+runs later, so a game that loads saves it did not write itself, such as shared or downloaded ones,
+should check them first, for example with a signature.
 
 ## Hot reload
 
@@ -681,7 +713,8 @@ func reload_content() -> void:  # call it from a debug key, for example
 ```
 
 Stats the game has changed keep their values, while a card still at its printed cost takes the new
-one. The report says how many entities rebound, which definitions have gone, and whether the
+one. A `once per` listener that has fired stays used, and an `on every` listener stays on its
+interval, unless the reload changed its `on` line. The report says how many entities rebound, which definitions have gone, and whether the
 ruleset changed: a running game keeps the rules it started with. Wire it to a debug key, and a
 designer can change a number, save, press the key and play on.
 
@@ -707,16 +740,29 @@ func _ascended(args: Array, context: Dictionary) -> Variant:
 A name's method gets `context`; a function's gets `args` and then `context`. `context` holds the
 ids of `self`, `source`, `target` and `card`, and the name of the `event` being handled, if any.
 Return a number, a bool, a string, an array of entity ids (one entity is `[id]`, since a bare
-number is a number), or null for no answer. Pass a method of your script, as above: a lambda, or a
-method with `.bind()`, reaches the addon as an empty callable, and content that uses it fails with
-an error.
+number is a number), or null for no answer.
 
-These run in the middle of an effect, so they may read the game (`GetEntity`, `GetStat` and the
-other queries) but must not change it. `Play`, `EndTurn`, `Save`, `ReloadContent` and the other
-calls that run rules fail with an error there; the setup calls, such as `AddCard` and
-`SpawnEnemy`, are not stopped, so do not make them either. They must also give the same answer
-every time the same game asks, or a seed stops replaying and a choice replays differently: answer
-from the node's queries and from values fixed for the run, in whole numbers.
+Any Callable will do, not only a method: a lambda suits a one-line answer, and `.bind()` passes
+more arguments after `context`. Registering a name again replaces its callable. One that cannot be
+called, such as a method the object does not have, is refused with an error as you register it;
+one that takes the wrong arguments fails with an error naming it when content first asks.
+
+```gdscript
+func _register_more() -> void:
+	rules.RegisterName("ascension", func(_context: Dictionary) -> Variant: return ascension)
+	rules.RegisterFunction("elite", _scaled.bind(3))  # elite(6) calls _scaled([6.0], context, 3)
+
+func _scaled(args: Array, _context: Dictionary, factor: int) -> Variant:
+	return int(args[0]) * factor
+```
+
+Callbacks run in the middle of an effect, or of a query such as `CanPlay` or `Describe` that
+works a number out from content. They may read the game (`GetEntity`, `GetStat` and the other
+queries) but not change it: every call that would, from `CreatePlayer`, `AddCard` and
+`SpawnEnemy` to `Play`, `EndTurn`, `LoadSave` and `ReloadContent`, fails there with an error that
+says so, and `Save` fails in the middle of an effect. They must also give the same answer every
+time the same game asks, or a seed stops replaying and a choice replays differently: answer from
+the node's queries and from values fixed for the run, in whole numbers.
 [Determinism](stability.md#determinism) lists what to avoid, `randi()` among it.
 
 The linter reports a name it does not know (CT302). To keep it quiet about the names your game
@@ -785,8 +831,7 @@ Project Settings with Advanced Settings switched on:
 | `cantrip/lint/host_verbs` | Verbs your game's C# registers |
 
 Each list is written as words separated by commas or spaces. The dock reads these settings when
-the plugin starts, so after changing one, switch the plugin off and on again in Project Settings →
-Plugins, or reopen the project.
+the plugin starts and again each time you press **Reload**, so after changing one, press it.
 
 ## Live debugging
 
@@ -844,9 +889,10 @@ godot --headless --path godot/Cantrip.Demo --import -- --cantrip-selftest
 ```
 
 The `ExportRelease` build is the cheap proof that no editor-only code escaped `#if TOOLS`; the
-scenes exit non-zero on failure, and `--cantrip-selftest` exercises the dock without a mouse.
-Always give Godot a timeout: a script that cannot parse never quits. `gdscript_smoke` enforces the
-two rules for GDScript, because both fail in confusing ways.
+scenes exit non-zero on failure, and `--cantrip-selftest` exercises the dock without a mouse,
+exiting with 1 when one of its own checks prints `FAILED`. Always give Godot a timeout: a script
+that cannot parse never quits. `gdscript_smoke` enforces the two rules for GDScript, because both
+fail in confusing ways.
 
 The demo inherits this repository's build settings, so it cannot show what a user's own project
 sees. `tools/godot-install-smoke.sh` can: it unzips the addon into a blank Godot project outside
@@ -854,8 +900,8 @@ the repository, adds Cantrip.Core with the command in [Installing](#installing),
 build warning or a plugin that does not load. It then runs [Your first battle](#your-first-battle)
 from the blocks marked `<!-- smoke: ... -->` in this page, exactly as written, and compares what it
 prints with the first turn shown there. It also checks that the content is the quickstart's, word
-for word, and plays a `discover` offer through the node. CI runs it on every push to `main`, on
-pull requests and before every release:
+for word, answers content from a GDScript lambda, and plays a `discover` offer through the node.
+CI runs it on every push to `main`, on pull requests and before every release:
 
 ```
 dotnet pack src/Cantrip.Core -c Release -o /tmp/feed

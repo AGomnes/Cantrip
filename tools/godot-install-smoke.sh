@@ -164,10 +164,20 @@ func _run() -> void:
 	_check("a card plays", rules.Play(strike, ghoul) == "played")
 	_check("and hits", rules.GetStat(ghoul, "hp") == 24, str(rules.GetStat(ghoul, "hp")))
 
+	# A lambda, which C#'s Callable cannot carry, answers content; and the game still exits cleanly
+	# with it registered, which the status check below sees.
+	var bonus := 2
+	rules.RegisterName("bonus", func(_context: Dictionary) -> Variant: return bonus)
+	rules.Execute("deal bonus to target", 0, ghoul)
+	_check("a lambda answers content", rules.GetStat(ghoul, "hp") == 22, str(rules.GetStat(ghoul, "hp")))
+
 	var scholar: int = rules.AddCard("Scholar", "hand")
 	_check("discover asks the player", rules.Play(scholar, 0) == "pending")
 	var choice: Dictionary = rules.GetPendingChoice()
 	_check("as an offer of three cards", choice.get("kind") == "offer" and choice.get("options", []).size() == 3, str(choice))
+	var outside: Dictionary = rules.AnswerChoice(choice["id"], [3])
+	_check("a position the offer does not have is turned away as unknown_option",
+		not outside["accepted"] and outside["reason"] == "unknown_option", str(outside))
 	var picked: String = choice["options"][1]["name"]
 	var answer: Dictionary = rules.AnswerChoice(choice["id"], [1])
 	_check("answering by position finishes the card", answer.get("result") == "played", str(answer))
@@ -219,7 +229,7 @@ if [ -n "$problem" ]; then
 fi
 cat "$work/first_battle.out"
 
-echo "== Checks of its own: a battle and a discover offer from GDScript"
+echo "== Checks of its own: a battle, a lambda callback and a discover offer from GDScript"
 status=0
 timeout 300 "$godot" --headless --path "$project" res://main.tscn > "$work/run.log" 2>&1 || status=$?
 grep "INSTALL:" "$work/run.log" || true

@@ -35,18 +35,20 @@ namespace Cantrip.GodotAdapter
         public string Message { get; }
 
         /// <summary>The rejection as a snake_case word, for the dictionary that crosses into script.</summary>
-        public string ReasonName => Reason == SaveRejection.None ? "none" : Snake(Reason.ToString());
+        public string ReasonName => NameOf(Reason);
 
-        private static string Snake(string name)
+        /// <summary>
+        /// The word script is given for each rejection, written out for the same reason as
+        /// <see cref="ChoiceAnswer.NameOf"/>: renaming a member must not quietly change one.
+        /// </summary>
+        public static string NameOf(SaveRejection reason) => reason switch
         {
-            var text = new System.Text.StringBuilder(name.Length + 2);
-            for (int i = 0; i < name.Length; i++)
-            {
-                if (i > 0 && char.IsUpper(name[i])) text.Append('_');
-                text.Append(char.ToLowerInvariant(name[i]));
-            }
-            return text.ToString();
-        }
+            SaveRejection.None => "none",
+            SaveRejection.WrongFormat => "wrong_format",
+            SaveRejection.NoPayload => "no_payload",
+            SaveRejection.ContentChanged => "content_changed",
+            _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, "This rejection has no word for script yet."),
+        };
 
         public override string ToString() => Accepted ? "accepted" : ReasonName + ": " + Message;
     }
@@ -56,14 +58,16 @@ namespace Cantrip.GodotAdapter
     /// content it was taken against.
     /// </summary>
     /// <remarks>
-    /// The fingerprint is the point of this type. <c>GameState.Restore</c> refuses a snapshot
-    /// naming a definition that is no longer loaded, and it refuses it by throwing, halfway
-    /// through tearing the old game down. Checking <c>ContentLibrary.Fingerprint</c> first turns
-    /// "the player loaded a save from before the patch" into a message the game can show while its
-    /// current game is still intact.
+    /// The fingerprint is the point of this type. Checking <c>ContentLibrary.Fingerprint</c> turns
+    /// "the player loaded a save from before the patch" into a message the game can show before
+    /// the snapshot is even read. <c>CardRuntime.Restore</c> refuses a snapshot naming a
+    /// definition that is no longer loaded as well, before it changes anything, but by throwing.
     /// <para>
     /// The fingerprint covers the kinds and names of every definition, and nothing else, so
-    /// rebalancing a card does not invalidate anyone's save; deleting or renaming one does.
+    /// rebalancing a card does not invalidate anyone's save; deleting or renaming one does. A
+    /// <c>next turn:</c> or <c>in N turns:</c> block waiting in the save whose statements have
+    /// since changed is left to the restore to find, and the node reports that refusal as
+    /// <see cref="SaveRejection.ContentChanged"/> too.
     /// </para>
     /// </remarks>
     public sealed class SaveEnvelope

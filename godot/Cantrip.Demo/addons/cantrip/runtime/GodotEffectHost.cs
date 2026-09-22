@@ -39,14 +39,27 @@ namespace Cantrip.GodotAdapter
     /// because the rules are waiting for the answer. <see cref="InCallback"/> is true while they do,
     /// so the node's entry points can refuse a call that came back round instead of re-entering.
     /// </para>
+    /// <para>
+    /// Callables are kept as the Variants they arrived in and called inside the engine, never
+    /// converted to C#'s <see cref="Callable"/>. That struct can hold only an object and a method
+    /// name, or a C# delegate: a GDScript lambda, or any Callable with <c>.bind()</c>, converted to
+    /// one arrives empty, and calling it fails with "Attempt to call callable null::null".
+    /// </para>
+    /// <para>
+    /// The host owns each Variant it is given and disposes it when the registration is replaced or
+    /// removed, or <see cref="ClearCallbacks"/> runs. That has to happen while the game is still
+    /// running: a GDScript lambda that C# still holds when Godot shuts down is released after
+    /// GDScript has gone, and the process crashes on exit.
+    /// </para>
     /// </remarks>
     public sealed class GodotEffectHost : IEffectHost
     {
         /// <summary>The built-in conversion, used unless the node supplies its own.</summary>
         public static readonly IValueMarshal DefaultMarshal = new IdMarshal();
 
-        private readonly Dictionary<string, Callable> _names = new Dictionary<string, Callable>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, Callable> _functions = new Dictionary<string, Callable>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, Variant> _names = new Dictionary<string, Variant>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, Variant> _functions = new Dictionary<string, Variant>(StringComparer.OrdinalIgnoreCase);
+        private readonly List<ScriptCall> _calls = new List<ScriptCall>();
         private IReadOnlyList<string> _trackedStats = EventBuffer.DefaultTrackedStats;
         private IValueMarshal _marshal = DefaultMarshal;
         private int _depth;
@@ -91,32 +104,41 @@ namespace Cantrip.GodotAdapter
 
         /// <summary>
         /// Answers a name the content uses but the rules cannot know, such as a spatial group.
-        /// The Callable is called as <c>f(context)</c> and returns null to fall through.
+        /// The Callable is called as <c>f(context)</c> and returns null to fall through. Any valid
+        /// Callable will do, lambdas and bound Callables included; a C# <see cref="Callable"/>
+        /// converts to the Variant implicitly. The host keeps the Variant and disposes it when it is
+        /// done with it, so pass one made for the call rather than one you go on using or register
+        /// twice: the copies of a Variant share what it holds, so disposing one breaks the others.
         /// </summary>
-        public void RegisterName(string name, Callable callable)
+        public void RegisterName(string name, Variant callable)
         {
             if (string.IsNullOrEmpty(name)) throw new ArgumentException("A host name cannot be empty.", nameof(name));
-            _names[name] = callable;
+            Store(_names, name, Checked(name, callable));
         }
 
-        public bool UnregisterName(string name) => name != null && _names.Remove(name);
+        public bool UnregisterName(string name) => Remove(_names, name);
 
         /// <summary>
         /// Answers a function such as <c>within(5)</c>. The Callable is called as
         /// <c>f(args, context)</c>, where args is an Array of the converted arguments, and returns
-        /// null to fall through.
+        /// null to fall through. Any valid Callable will do, and is kept, as for <see cref="RegisterName"/>.
         /// </summary>
-        public void RegisterFunction(string name, Callable callable)
+        public void RegisterFunction(string name, Variant callable)
         {
             if (string.IsNullOrEmpty(name)) throw new ArgumentException("A host function cannot be empty.", nameof(name));
-            _functions[name] = callable;
+            Store(_functions, name, Checked(name, callable));
         }
 
-        public bool UnregisterFunction(string name) => name != null && _functions.Remove(name);
+        public bool UnregisterFunction(string name) => Remove(_functions, name);
 
-        /// <summary>Drops every registration, as when a scene that owned them leaves the tree.</summary>
+        /// <summary>
+        /// Drops every registration, as when a scene that owned them leaves the tree. The runtime
+        /// node calls this as it is freed.
+        /// </summary>
         public void ClearCallbacks()
         {
+            foreach (Variant callable in _names.Values) callable.Dispose();
+            foreach (Variant callable in _functions.Values) callable.Dispose();
             _names.Clear();
             _functions.Clear();
         }
@@ -126,9 +148,9 @@ namespace Cantrip.GodotAdapter
         public bool TryResolveName(string name, EvalContext context, out Value value)
         {
             value = Value.None;
-            if (name == null || !_names.TryGetValue(name, out Callable callable)) return false;
+            if (name == null || !_names.TryGetValue(name, out Variant callable)) return false;
 
-            Variant result = Invoke(callable, ContextOf(context));
+            Variant result = Invoke(name, callable, ContextOf(context));
             if (result.VariantType == Variant.Type.Nil) return false;
 
             value = Marshal.ToValue(result, StateOf(context));
@@ -138,7 +160,7 @@ namespace Cantrip.GodotAdapter
         public bool TryCall(string function, IReadOnlyList<Value> arguments, EvalContext context, out Value value)
         {
             value = Value.None;
-            if (function == null || !_functions.TryGetValue(function, out Callable callable)) return false;
+            if (function == null || !_functions.TryGetValue(function, out Variant callable)) return false;
 
             var args = new Godot.Collections.Array();
             if (arguments != null)
@@ -146,7 +168,7 @@ namespace Cantrip.GodotAdapter
                 for (int i = 0; i < arguments.Count; i++) args.Add(Marshal.ToVariant(arguments[i]));
             }
 
-            Variant result = Invoke(callable, args, ContextOf(context));
+            Variant result = Invoke(function, callable, args, ContextOf(context));
             if (result.VariantType == Variant.Type.Nil) return false;
 
             value = Marshal.ToValue(result, StateOf(context));
@@ -174,17 +196,61 @@ namespace Cantrip.GodotAdapter
         /// action, which the runtime already unwinds cleanly, rather than quietly answer "nothing"
         /// and let the rules carry on with a wrong number.
         /// </summary>
-        private Variant Invoke(Callable callable, params Variant[] args)
+        private Variant Invoke(string name, Variant callable, params Variant[] args)
         {
+            // One caller for each level of nesting. A callback may ask the node a question whose
+            // answer asks another callback, and an Expression remembers only its latest run.
+            while (_calls.Count <= _depth) _calls.Add(new ScriptCall());
+            ScriptCall call = _calls[_depth];
+
             _depth++;
             try
             {
-                return callable.Call(args);
+                return call.Invoke(name, callable, args);
             }
             finally
             {
                 _depth--;
             }
+        }
+
+        /// <summary>
+        /// Refuses anything that could never be called, while the mistake is still in sight. What is
+        /// refused is disposed like anything else the host was given.
+        /// </summary>
+        private Variant Checked(string name, Variant callable)
+        {
+            string? problem = null;
+            if (callable.VariantType != Variant.Type.Callable)
+            {
+                problem = $"`{name}` needs a Callable, such as a method of your script or a lambda, but was given a value of type {callable.VariantType}.";
+            }
+            else
+            {
+                if (_calls.Count == 0) _calls.Add(new ScriptCall());
+                if (!_calls[0].IsValid(callable))
+                    problem = $"The Callable given for `{name}` cannot be called: its object has gone, or it has no such method.";
+            }
+
+            if (problem == null) return callable;
+
+            callable.Dispose();
+            throw new ArgumentException(problem, nameof(callable));
+        }
+
+        private static void Store(Dictionary<string, Variant> callbacks, string name, Variant callable)
+        {
+            if (callbacks.TryGetValue(name, out Variant replaced)) replaced.Dispose();
+            callbacks[name] = callable;
+        }
+
+        private static bool Remove(Dictionary<string, Variant> callbacks, string name)
+        {
+            if (name == null || !callbacks.TryGetValue(name, out Variant removed)) return false;
+
+            callbacks.Remove(name);
+            removed.Dispose();
+            return true;
         }
 
         /// <summary>Who is acting, as ids, so script never holds an engine object.</summary>
@@ -201,6 +267,62 @@ namespace Cantrip.GodotAdapter
 
         private GameState? StateOf(EvalContext? context) =>
             State ?? context?.Self?.State ?? context?.Source?.State ?? context?.Target?.State;
+
+        /// <summary>
+        /// Calls a Callable held in a Variant without turning it into C#'s <see cref="Callable"/>,
+        /// which would lose a lambda or a bound Callable. An <see cref="Expression"/> is the engine's
+        /// own way to call a method on a Variant, and unlike <c>callv</c> it says when a call failed.
+        /// </summary>
+        /// <remarks>
+        /// The Array of inputs holds a reference to the Callable, so it is disposed as soon as the
+        /// call returns rather than left for the garbage collector; see the class remarks.
+        /// </remarks>
+        private sealed class ScriptCall
+        {
+            private static readonly string[] Inputs = { "f", "a0", "a1" };
+
+            private readonly Expression?[] _byArity = new Expression?[Inputs.Length];
+            private Expression? _validity;
+
+            public Variant Invoke(string name, Variant callable, Variant[] args)
+            {
+                Expression expression = ByArity(args.Length);
+                using var inputs = new Godot.Collections.Array { callable };
+                foreach (Variant arg in args) inputs.Add(arg);
+
+                Variant result = expression.Execute(inputs, null, false);
+                if (expression.HasExecuteFailed())
+                    throw new InvalidOperationException(
+                        $"The Callable registered for `{name}` could not be called as f({(args.Length == 1 ? "context" : "args, context")}). " +
+                        "Check that it takes those arguments, followed by any it was bound with, and that its object still exists.");
+                return result;
+            }
+
+            public bool IsValid(Variant callable)
+            {
+                _validity ??= Parsed("f.is_valid()", 0);
+                using var inputs = new Godot.Collections.Array { callable };
+                Variant valid = _validity.Execute(inputs, null, false);
+                return !_validity.HasExecuteFailed() && valid.AsBool();
+            }
+
+            private Expression ByArity(int arity)
+            {
+                if (arity < 1 || arity >= Inputs.Length) throw new ArgumentOutOfRangeException(nameof(arity));
+                return _byArity[arity] ??= Parsed("f.call(" + string.Join(", ", Inputs, 1, arity) + ")", arity);
+            }
+
+            private static Expression Parsed(string text, int arity)
+            {
+                var expression = new Expression();
+                string[] names = new string[arity + 1];
+                Array.Copy(Inputs, names, names.Length);
+
+                Error parsed = expression.Parse(text, names);
+                if (parsed != Error.Ok) throw new InvalidOperationException($"Cantrip could not parse `{text}`: {expression.GetErrorText()}");
+                return expression;
+            }
+        }
 
         /// <summary>
         /// Entities cross as ids and nothing else, per the addon's rule for the script boundary.

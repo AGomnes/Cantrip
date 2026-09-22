@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Cantrip.Content;
+using Cantrip.Syntax;
 
 namespace Cantrip.Runtime
 {
@@ -96,8 +97,25 @@ namespace Cantrip.Runtime
         public int Timing { get; set; }
         public int OwnerId { get; set; }
 
-        /// <summary>Content address of the block to run, e.g. <c>card:Prepare/effect/0.body</c>.</summary>
+        /// <summary>
+        /// Where the block to run is: its place in content, such as <c>card:Prepare/effect/0.body</c>,
+        /// or within <see cref="Statements"/> when those are set, such as <c>execute/0.body</c>.
+        /// </summary>
         public string? Block { get; set; }
+
+        /// <summary>
+        /// A hash of the block's statements. A restore that finds other statements at
+        /// <see cref="Block"/> looks for these elsewhere in the same definition, and refuses the
+        /// snapshot if they are gone. Null in saves made before it was recorded, which are
+        /// matched by place alone.
+        /// </summary>
+        public string? BlockHash { get; set; }
+
+        /// <summary>
+        /// The statements <c>CardRuntime.Execute</c> ran, when the block is part of them rather than
+        /// of content. A restore parses them again, so such work needs nothing from content.
+        /// </summary>
+        public string? Statements { get; set; }
 
         public long DueAt { get; set; }
         public string? Deadline { get; set; }
@@ -135,6 +153,15 @@ namespace Cantrip.Runtime
         /// <summary>Index of the listener among its owner's listeners, in definition order.</summary>
         public int Index { get; set; }
 
+        /// <summary>
+        /// A hash of the listener as written: of its <c>on</c> line, then, after a colon, of its body.
+        /// A restore gives the window back to the listener with this hash, wherever it now is among
+        /// its owner's, or else to the listener at <see cref="Index"/> if only its body has changed,
+        /// and otherwise drops it. Null in saves made before it was recorded, which are matched by
+        /// <see cref="Index"/> alone.
+        /// </summary>
+        public string? ListenerHash { get; set; }
+
         public long Window { get; set; }
     }
 
@@ -146,12 +173,20 @@ namespace Cantrip.Runtime
         /// <summary>Index of the listener among its owner's listeners, in definition order.</summary>
         public int Index { get; set; }
 
+        /// <summary>The listener's hash, matched as <see cref="ListenerLimitSnapshot.ListenerHash"/> is.</summary>
+        public string? ListenerHash { get; set; }
+
         public long DueAt { get; set; }
     }
 
     public sealed partial class GameState
     {
-        internal GameSnapshot Capture(BlockAddressBook addresses)
+        /// <summary>
+        /// Captures the state. <paramref name="recordBlock"/> records how the block of each waiting
+        /// action that has one is found again: by address for a save, or kept in memory for a
+        /// rollback. It throws if it cannot.
+        /// </summary>
+        internal GameSnapshot Capture(Action<ScheduledAction, ScheduledSnapshot> recordBlock)
         {
             var snapshot = new GameSnapshot
             {
@@ -196,15 +231,7 @@ namespace Cantrip.Runtime
                 record.Attached.AddRange(entity.Attached.Select(a => a.Id));
                 snapshot.Entities.Add(record);
 
-                IReadOnlyList<Listener> listeners = Events.OwnedBy(entity);
-                for (int i = 0; i < listeners.Count; i++)
-                {
-                    if (listeners[i].LimitWindow != long.MinValue)
-                        snapshot.ListenerLimits.Add(new ListenerLimitSnapshot { OwnerId = entity.Id, Index = i, Window = listeners[i].LimitWindow });
-
-                    if (listeners[i].IntervalUnits > 0)
-                        snapshot.ListenerDues.Add(new ListenerDueSnapshot { OwnerId = entity.Id, Index = i, DueAt = listeners[i].NextDueAt });
-                }
+                CaptureListeners(entity, snapshot.ListenerLimits, snapshot.ListenerDues);
             }
 
             foreach (var zone in _zones.OrderBy(z => z.Key.Owner).ThenBy(z => z.Key.Zone, StringComparer.Ordinal))
@@ -218,22 +245,15 @@ namespace Cantrip.Runtime
 
             foreach (ScheduledAction action in _scheduled)
             {
-                string? block = null;
-                if (action.Body != null)
-                {
-                    block = addresses.AddressOf(action.Body) ?? throw new InvalidOperationException(
-                        "A scheduled block that is not part of loaded content (for example one started by Execute or a test) cannot be saved.");
-                }
-
                 var record = new ScheduledSnapshot
                 {
                     Id = action.Id,
                     Timing = (int)action.Timing,
                     OwnerId = action.Owner.Id,
-                    Block = block,
                     DueAt = action.DueAt,
                     Deadline = action.Deadline,
                 };
+                if (action.Body != null) recordBlock(action, record);
                 foreach (var binding in action.Bindings) record.Bindings[binding.Key] = ToSnapshot(binding.Value);
                 foreach (TemporaryChange change in action.Undo)
                 {
@@ -252,11 +272,60 @@ namespace Cantrip.Runtime
             return snapshot;
         }
 
-        internal void Restore(GameSnapshot snapshot, BlockAddressBook addresses)
+        /// <summary>
+        /// Replaces the state with a snapshot. <paramref name="resolveBlock"/> gives the block a
+        /// waiting action runs, or null for one without a block; it throws when the snapshot's block
+        /// cannot be found, and is asked about every action before anything changes.
+        /// <paramref name="keptDefinition"/>, when given, supplies an entity's definition as it was
+        /// captured, for a rollback that never left this process; otherwise, and wherever it gives
+        /// null, a definition is looked up in the loaded content by kind and name.
+        /// </summary>
+        internal void Restore(GameSnapshot snapshot, Func<ScheduledSnapshot, BlockNode?> resolveBlock, Func<EntitySnapshot, EntityDefinition?>? keptDefinition = null)
         {
             if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
             if (snapshot.FormatVersion != GameSnapshot.CurrentFormat)
                 throw new InvalidOperationException($"Snapshot format {snapshot.FormatVersion} is not supported (expected {GameSnapshot.CurrentFormat}).");
+
+            // Everything that can refuse the snapshot is looked up before the game is touched, so a
+            // refused save leaves the game in progress exactly as it was.
+            CheckComplete(snapshot);
+            var definitions = new EntityDefinition?[snapshot.Entities.Count];
+            var ids = new HashSet<int>(snapshot.Entities.Count);
+            for (int i = 0; i < snapshot.Entities.Count; i++)
+            {
+                EntitySnapshot record = snapshot.Entities[i];
+                ids.Add(record.Id);
+                if (record.DefinitionKind != null)
+                {
+                    definitions[i] = keptDefinition?.Invoke(record)
+                        ?? Content.Find(record.DefinitionName ?? string.Empty, record.DefinitionKind)
+                        ?? throw new InvalidOperationException($"The snapshot needs {record.DefinitionKind} \"{record.DefinitionName}\", which is not loaded.");
+                }
+            }
+
+            void Require(int id)
+            {
+                if (!ids.Contains(id)) throw Missing(id);
+            }
+
+            foreach (EntitySnapshot record in snapshot.Entities)
+            {
+                foreach (int attached in record.Attached) Require(attached);
+            }
+            foreach (ZoneSnapshot zone in snapshot.Zones)
+            {
+                foreach (int id in zone.Entities) Require(id);
+            }
+            foreach (ScheduledSnapshot record in snapshot.Scheduled)
+            {
+                Require(record.OwnerId);
+                foreach (UndoSnapshot change in record.Undo) Require(change.EntityId);
+            }
+            if (snapshot.Rng == null || snapshot.Rng.Length != 4)
+                throw new InvalidOperationException("The snapshot's random number generator state is not four numbers.");
+
+            var bodies = new BlockNode?[snapshot.Scheduled.Count];
+            for (int i = 0; i < bodies.Length; i++) bodies[i] = resolveBlock(snapshot.Scheduled[i]);
 
             // Tear down: every listener and modifier goes, then every entity. The instances are
             // kept aside first: restoring into the same game reuses the ones whose ids match, so an
@@ -269,14 +338,10 @@ namespace Cantrip.Runtime
             _active.Clear();
             _scheduled.Clear();
 
-            foreach (EntitySnapshot record in snapshot.Entities)
+            for (int i = 0; i < snapshot.Entities.Count; i++)
             {
-                EntityDefinition? definition = null;
-                if (record.DefinitionKind != null)
-                {
-                    definition = Content.Find(record.DefinitionName ?? string.Empty, record.DefinitionKind)
-                        ?? throw new InvalidOperationException($"The snapshot needs {record.DefinitionKind} \"{record.DefinitionName}\", which is not loaded.");
-                }
+                EntitySnapshot record = snapshot.Entities[i];
+                EntityDefinition? definition = definitions[i];
 
                 Entity entity;
                 if (previous.TryGetValue(record.Id, out Entity? existing)
@@ -346,14 +411,10 @@ namespace Cantrip.Runtime
                 snapshot.TurnHistory.Select(kv => new KeyValuePair<string, Num>(kv.Key, Num.FromRaw(kv.Value))),
                 snapshot.BattleHistory.Select(kv => new KeyValuePair<string, Num>(kv.Key, Num.FromRaw(kv.Value))));
 
-            foreach (ScheduledSnapshot record in snapshot.Scheduled)
+            for (int i = 0; i < snapshot.Scheduled.Count; i++)
             {
-                BlockNodeOrNull body = record.Block == null
-                    ? default
-                    : new BlockNodeOrNull(addresses.Resolve(record.Block) ?? throw new InvalidOperationException(
-                        $"The snapshot schedules content block `{record.Block}`, which does not exist in the loaded content."));
-
-                var action = new ScheduledAction(record.Id, (ScheduleTiming)record.Timing, Lookup(record.OwnerId) ?? throw Missing(record.OwnerId), body.Block)
+                ScheduledSnapshot record = snapshot.Scheduled[i];
+                var action = new ScheduledAction(record.Id, (ScheduleTiming)record.Timing, Lookup(record.OwnerId) ?? throw Missing(record.OwnerId), bodies[i])
                 {
                     DueAt = record.DueAt,
                     Deadline = record.Deadline,
@@ -375,37 +436,176 @@ namespace Cantrip.Runtime
             foreach (Entity entity in _entities.OrderBy(e => e.Sequence)) SetActive(entity, ShouldBeActive(entity));
             foreach (Entity entity in _entities.OrderBy(e => e.Sequence)) SetActive(entity, ShouldBeActive(entity));
 
-            foreach (ListenerLimitSnapshot limit in snapshot.ListenerLimits)
-            {
-                Entity? owner = Lookup(limit.OwnerId);
-                if (owner == null) continue;
-                IReadOnlyList<Listener> listeners = Events.OwnedBy(owner);
-                if (limit.Index < listeners.Count) listeners[limit.Index].LimitWindow = limit.Window;
-            }
-
-            foreach (ListenerDueSnapshot due in snapshot.ListenerDues)
-            {
-                Entity? owner = Lookup(due.OwnerId);
-                if (owner == null) continue;
-                IReadOnlyList<Listener> listeners = Events.OwnedBy(owner);
-                if (due.Index < listeners.Count) listeners[due.Index].NextDueAt = due.DueAt;
-            }
+            RestoreListeners(snapshot.ListenerLimits, snapshot.ListenerDues);
 
             Touch();
+        }
+
+        /// <summary>
+        /// Refuses a snapshot with a list or map missing, or a record in one that is null.
+        /// <see cref="Capture"/> never writes one, but a damaged or hand-edited save can, and
+        /// finding it part way through a restore would leave the game half taken apart.
+        /// </summary>
+        private static void CheckComplete(GameSnapshot snapshot)
+        {
+            static InvalidOperationException Damaged(string what) =>
+                new InvalidOperationException($"The snapshot is damaged: {what} is missing.");
+
+            if (snapshot.Entities == null) throw Damaged("its list of entities");
+            if (snapshot.Zones == null) throw Damaged("its list of zones");
+            if (snapshot.Scheduled == null) throw Damaged("its list of waiting work");
+            if (snapshot.ListenerLimits == null) throw Damaged("its list of listener limits");
+            if (snapshot.ListenerDues == null) throw Damaged("its list of listener timers");
+            if (snapshot.TurnHistory == null || snapshot.BattleHistory == null) throw Damaged("its history");
+
+            foreach (EntitySnapshot? record in snapshot.Entities)
+            {
+                if (record == null) throw Damaged("an entity");
+                if (record.Stats == null) throw Damaged($"the stats of entity {record.Id}");
+                if (record.Tags == null || record.Tags.Contains(null!)) throw Damaged($"the tags of entity {record.Id}");
+                if (record.Attached == null) throw Damaged($"what is attached to entity {record.Id}");
+            }
+            foreach (ZoneSnapshot? zone in snapshot.Zones)
+            {
+                if (zone == null || zone.Zone == null) throw Damaged("a zone");
+                if (zone.Entities == null) throw Damaged($"the contents of zone {zone.Zone}");
+            }
+            foreach (ScheduledSnapshot? record in snapshot.Scheduled)
+            {
+                if (record == null) throw Damaged("a waiting action");
+                if (record.Bindings == null || record.Bindings.Values.Contains(null!)) throw Damaged($"the bindings of waiting action {record.Id}");
+                if (record.Undo == null || record.Undo.Contains(null!)) throw Damaged($"what waiting action {record.Id} undoes");
+            }
+            if (snapshot.ListenerLimits.Contains(null!)) throw Damaged("a listener limit");
+            if (snapshot.ListenerDues.Contains(null!)) throw Damaged("a listener timer");
+        }
+
+        /// <summary>
+        /// Records what an entity's registered listeners remember: the window each used
+        /// <c>once per ...</c> limit was last used in, and when each <c>on every</c> listener is next due.
+        /// </summary>
+        private void CaptureListeners(Entity entity, List<ListenerLimitSnapshot> limits, List<ListenerDueSnapshot> dues)
+        {
+            IReadOnlyList<Listener> listeners = Events.OwnedBy(entity);
+            for (int i = 0; i < listeners.Count; i++)
+            {
+                Listener listener = listeners[i];
+                if (listener.LimitWindow != long.MinValue)
+                {
+                    limits.Add(new ListenerLimitSnapshot
+                    {
+                        OwnerId = entity.Id,
+                        Index = i,
+                        ListenerHash = BlockHash.Of(listener.Syntax),
+                        Window = listener.LimitWindow,
+                    });
+                }
+
+                if (listener.IntervalUnits > 0)
+                {
+                    dues.Add(new ListenerDueSnapshot
+                    {
+                        OwnerId = entity.Id,
+                        Index = i,
+                        ListenerHash = BlockHash.Of(listener.Syntax),
+                        DueAt = listener.NextDueAt,
+                    });
+                }
+            }
+        }
+
+        /// <summary>Gives the listeners registered now the records <see cref="CaptureListeners"/> made, as <see cref="MatchListeners"/> pairs them.</summary>
+        private void RestoreListeners(List<ListenerLimitSnapshot> limits, List<ListenerDueSnapshot> dues)
+        {
+            Listener?[] limited = MatchListeners(limits, limit => (limit.OwnerId, limit.Index, limit.ListenerHash));
+            for (int i = 0; i < limited.Length; i++)
+            {
+                Listener? listener = limited[i];
+                if (listener != null) listener.LimitWindow = limits[i].Window;
+            }
+
+            Listener?[] timed = MatchListeners(dues, due => (due.OwnerId, due.Index, due.ListenerHash));
+            for (int i = 0; i < timed.Length; i++)
+            {
+                Listener? listener = timed[i];
+                if (listener != null) listener.NextDueAt = dues[i].DueAt;
+            }
+        }
+
+        /// <summary>
+        /// The listener each recorded limit or timer belongs to, now that listeners have been registered
+        /// again from the loaded content by a restore or a hot reload, or null where there is none.
+        /// Each listener takes at most one record.
+        /// </summary>
+        /// <remarks>
+        /// A content patch may have added, removed, reordered or changed its owner's <c>on</c> blocks,
+        /// so the recorded place alone could name another listener. A record goes to the listener at
+        /// its place if that is unchanged, else to the unchanged listener wherever it has moved, else
+        /// to the listener at its place if only that listener's body has changed: a rebalanced
+        /// listener is still the one that fired, and its <c>on</c> line, which decides when it fires
+        /// and what its window means, is the same. Anything else is dropped, and that listener starts
+        /// afresh, as if newly added: a record never goes to a listener with a different <c>on</c>
+        /// line. A record without a hash, from a save made before hashes were recorded, is matched by
+        /// place alone.
+        /// </remarks>
+        private Listener?[] MatchListeners<T>(List<T> records, Func<T, (int Owner, int Index, string? Hash)> read)
+        {
+            if (records.Count == 0) return Array.Empty<Listener?>();
+
+            var found = new Listener?[records.Count];
+            var claimed = new HashSet<Listener>();
+
+            Listener? AtPlace(int owner, int index)
+            {
+                Entity? entity = Lookup(owner);
+                if (entity == null) return null;
+                IReadOnlyList<Listener> listeners = Events.OwnedBy(entity);
+                return index >= 0 && index < listeners.Count ? listeners[index] : null;
+            }
+
+            // Unchanged, and where it was.
+            for (int i = 0; i < records.Count; i++)
+            {
+                var (owner, index, hash) = read(records[i]);
+                Listener? listener = AtPlace(owner, index);
+                if (listener == null || (hash != null && BlockHash.Of(listener.Syntax) != hash)) continue;
+                if (claimed.Add(listener)) found[i] = listener;
+            }
+
+            // Unchanged, but moved among its owner's listeners.
+            for (int i = 0; i < records.Count; i++)
+            {
+                var (owner, _, hash) = read(records[i]);
+                Entity? entity = found[i] == null && hash != null ? Lookup(owner) : null;
+                if (entity == null) continue;
+                foreach (Listener listener in Events.OwnedBy(entity))
+                {
+                    if (claimed.Contains(listener) || BlockHash.Of(listener.Syntax) != hash) continue;
+                    claimed.Add(listener);
+                    found[i] = listener;
+                    break;
+                }
+            }
+
+            // Where it was, with the same `on` line and another body.
+            for (int i = 0; i < records.Count; i++)
+            {
+                var (owner, index, hash) = read(records[i]);
+                if (found[i] != null || hash == null) continue;
+                Listener? listener = AtPlace(owner, index);
+                if (listener == null || claimed.Contains(listener)) continue;
+                if (BlockHash.OnLineOf(BlockHash.Of(listener.Syntax)) != BlockHash.OnLineOf(hash)) continue;
+                claimed.Add(listener);
+                found[i] = listener;
+            }
+
+            return found;
         }
 
         private Entity? Lookup(int id) => id == 0 ? null : Find(id);
 
         private static InvalidOperationException Missing(int id) =>
             new InvalidOperationException($"The snapshot refers to entity #{id}, which it does not contain.");
-
-        /// <summary>Wraps a nullable block so the ternary above stays readable under C# 9 typing rules.</summary>
-        private readonly struct BlockNodeOrNull
-        {
-            public BlockNodeOrNull(Syntax.BlockNode block) => Block = block;
-
-            public Syntax.BlockNode? Block { get; }
-        }
 
         internal static ValueSnapshot ToSnapshot(Value value)
         {

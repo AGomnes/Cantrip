@@ -11,7 +11,7 @@ namespace Cantrip.Syntax
 
         Identifier,
 
-        /// <summary>A <c>tag:fire</c> style qualified name, lexed as one token.</summary>
+        /// <summary>A <c>tag:fire</c> or <c>card:"Fire Bolt"</c> style qualified name, lexed as one token.</summary>
         QualifiedName,
 
         Number,
@@ -91,7 +91,7 @@ namespace Cantrip.Syntax
             TokenKind.Indent => "indent",
             TokenKind.Dedent => "dedent",
             TokenKind.String => $"\"{Text}\"",
-            TokenKind.QualifiedName => $"{Qualifier}:{Text}",
+            TokenKind.QualifiedName => AstPrinter.Qualified(Qualifier ?? string.Empty, Text),
             _ => Text,
         };
     }

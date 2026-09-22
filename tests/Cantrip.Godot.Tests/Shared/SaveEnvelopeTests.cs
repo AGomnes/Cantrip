@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using Cantrip.Content;
 using Cantrip.Runtime;
@@ -88,6 +91,25 @@ namespace Cantrip.GodotAdapter.Tests.Shared
 
             // Two libraries with nothing loaded agree, so an empty game can still be saved.
             Assert.True(new SaveEnvelope(SaveEnvelope.CurrentFormat, null, "{}").Check(null).Accepted);
+        }
+
+        /// <summary>
+        /// The words <c>LoadSave</c> gives script as its <c>reason</c>, pinned one by one, so that
+        /// renaming a member of the enum cannot change what a game's script compares against.
+        /// </summary>
+        [Fact]
+        public void Every_rejection_has_its_snake_case_word()
+        {
+            var words = new Dictionary<SaveRejection, string>
+            {
+                [SaveRejection.None] = "none",
+                [SaveRejection.WrongFormat] = "wrong_format",
+                [SaveRejection.NoPayload] = "no_payload",
+                [SaveRejection.ContentChanged] = "content_changed",
+            };
+
+            Assert.Equal(Enum.GetValues<SaveRejection>().OrderBy(r => r), words.Keys.OrderBy(r => r));
+            foreach (KeyValuePair<SaveRejection, string> word in words) Assert.Equal(word.Value, SaveCheck.NameOf(word.Key));
         }
 
         // The payload --------------------------------------------------------------------------

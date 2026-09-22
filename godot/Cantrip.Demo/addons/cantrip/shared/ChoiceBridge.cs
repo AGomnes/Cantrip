@@ -43,6 +43,9 @@ namespace Cantrip.GodotAdapter
 
         public ChoiceRejection Reason { get; }
 
+        /// <summary>The rejection as a snake_case word, for the dictionary that crosses into script.</summary>
+        public string ReasonName => NameOf(Reason);
+
         /// <summary>Why it was rejected, ready to show or log. Empty when accepted.</summary>
         public string Message { get; }
 
@@ -52,7 +55,24 @@ namespace Cantrip.GodotAdapter
         /// </summary>
         public IReadOnlyList<int> EntityIds { get; }
 
-        public override string ToString() => Accepted ? "accepted" : Reason + ": " + Message;
+        /// <summary>
+        /// The word script is given for each rejection. Written out rather than made from the
+        /// member's name, because a game's script compares against these words: renaming a member
+        /// must not quietly change one.
+        /// </summary>
+        public static string NameOf(ChoiceRejection reason) => reason switch
+        {
+            ChoiceRejection.None => "none",
+            ChoiceRejection.NothingPending => "nothing_pending",
+            ChoiceRejection.StaleRequest => "stale_request",
+            ChoiceRejection.UnknownOption => "unknown_option",
+            ChoiceRejection.DuplicateOption => "duplicate_option",
+            ChoiceRejection.TooFew => "too_few",
+            ChoiceRejection.TooMany => "too_many",
+            _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, "This rejection has no word for script yet."),
+        };
+
+        public override string ToString() => Accepted ? "accepted" : ReasonName + ": " + Message;
     }
 
     /// <summary>

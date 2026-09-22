@@ -17,6 +17,7 @@ The [issue forms](https://github.com/AGomnes/Cantrip/issues/new/choose) ask for 
 | `src/Cantrip.Core` | The library: parser, content loading, rules engine, interpreter, linter, rules text, test runner |
 | `src/Cantrip.Cli` | The `cantrip` tool |
 | `src/Cantrip.Sim` | Plays runs of the sample roguelite with a bot and reports win rates. `dotnet run --project src/Cantrip.Sim -c Release -- --help` lists its options, such as `--runs N`, and `--watch SEED` to follow one run turn by turn |
+| `samples` | Worked content with its tests, one folder to a game. [samples/README.md](samples/README.md) says what each folder shows, and how to test, lint and simulate it |
 | `samples/basic` | Small examples of most features, including the Fireball, Frozen and Kindling in the README, and the Strike, Defend and Jaw Worm its C# example uses |
 | `samples/corpus` | Effects re-created from existing games |
 | `samples/slice` | The sample roguelite: a witch climbing a tower, fire against frost, with a boss that changes its moves at half health |
@@ -30,9 +31,9 @@ The [issue forms](https://github.com/AGomnes/Cantrip/issues/new/choose) ask for 
 Please open an issue first for anything beyond a small fix, so we can agree on the approach before you spend time on it. Then:
 
 - `dotnet build Cantrip.sln` has no warnings, and `dotnet test tests/Cantrip.Core.Tests` and `dotnet test tests/Cantrip.Godot.Tests` pass.
-- Lint and tests pass on each folder in `samples/`, each loaded on its own, with the tool run from source:
+- Lint passes with no warnings, and the tests pass, on each folder in `samples/`, each loaded on its own, with the tool run from source. CI lints with `--warnings-as-errors`, so a warning fails the build there:
   ```
-  dotnet run --project src/Cantrip.Cli -- lint samples/basic
+  dotnet run --project src/Cantrip.Cli -- lint samples/basic --warnings-as-errors
   dotnet run --project src/Cantrip.Cli -- test samples/basic
   ```
 - A behaviour change comes with a test, and a language change with its entry in [docs/language.md](docs/language.md).
@@ -47,6 +48,8 @@ By contributing you agree that your contribution is licensed under the [MIT lice
 ## Working on the Godot addon
 
 Building the demo, the headless Godot tests, the install test in a blank project, and packaging the addon are described in [Working on the addon](docs/godot.md#working-on-the-addon) at the end of the Godot guide.
+
+The install test, `tools/godot-install-smoke.sh`, also holds the Godot guide to the quickstart. It fails unless the `content/game.cantrip` block in `docs/godot.md` is byte for byte the one in `docs/quickstart.md`, and unless the first battle prints what `docs/godot.md` shows for its first turn and still ends with the Ghoul falling on turn 3. So a change to the quickstart's content means the same change in `docs/godot.md`, and a fresh copy of the first-turn output printed there.
 
 ## Releasing (maintainer)
 
