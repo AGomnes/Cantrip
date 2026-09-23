@@ -19,6 +19,8 @@ Cantrip is a rules language and rules engine for the combat in single-player, tu
 
 The hard part is rarely a single card or ability. It is how they combine: a relic that reacts when a status wears off, a status that changes what fire damage does, a boss that changes its moves at half health. Hand-written in C#, cards tend to become classes, combinations tend to become special cases, and a balance tweak usually means a rebuild.
 
+What Cantrip models is the combat action. A card is an action whose availability is a deck, an ability is one on a cooldown, and an enemy's move is one its pattern picks; the effect body is the same in all three. That is why a game with no cards is the same engine with the piles left out.
+
 In Cantrip each effect is a few readable lines that say only what that effect does. Events, ordering, stacking, modifiers and targeting are the rules engine's job, so effects that were never written with each other in mind still combine, by rules the [language reference](docs/language.md) sets out. Those rules have sharp edges, and [docs/coverage.md](docs/coverage.md) records each one found so far. A designer can change a number, save, and see it in the running game once it reloads the content.
 
 ## What it looks like

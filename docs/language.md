@@ -104,6 +104,19 @@ What each declaration reads, beyond the listeners, modifiers, `tags` and present
 
 ## Cards
 
+A card, an ability and an enemy's move are the same thing: an action in combat, with an effect and a
+target. They differ only in what decides when it can be used.
+
+| | Available when | Lives as |
+|---|---|---|
+| `card` | it is in hand and its cost is paid | an entity in a zone, so it can be drawn, discarded, copied or changed on its own |
+| [`ability`](#abilities-and-real-time) | its cooldown has run out | part of the actor it was granted to |
+| [`move`](#enemies) | its enemy's pattern picks it, and its phase allows it | part of the enemy that has it |
+
+The effect body is the same in all three, and so are the events it raises and the rules text it
+generates. A game with no cards at all is the same engine with the piles left out, as
+[samples/abilities](../samples/abilities) shows.
+
 ```
 card "Strike"
   cost 1
