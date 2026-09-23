@@ -61,40 +61,48 @@ namespace Cantrip.Tests.Review
     {
         public static (int ExitCode, string Output) Run(string command, string dsl, params string[] options)
         {
-            string cli = FindCli();
             string folder = Path.Combine(Path.GetTempPath(), "ge-review-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(folder);
             try
             {
                 File.WriteAllText(Path.Combine(folder, "content.cantrip"), dsl);
-
-                var start = new ProcessStartInfo(Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet")
-                {
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                };
-                start.ArgumentList.Add(cli);
-                start.ArgumentList.Add(command);
-                start.ArgumentList.Add(folder);
-                foreach (string option in options) start.ArgumentList.Add(option);
-
-                using Process process = Process.Start(start) ?? throw new InvalidOperationException("Could not start cantrip.");
-                Task<string> stdout = process.StandardOutput.ReadToEndAsync();
-                Task<string> stderr = process.StandardError.ReadToEndAsync();
-                if (!process.WaitForExit(120_000))
-                {
-                    process.Kill(true);
-                    throw new TimeoutException("cantrip did not finish within two minutes.");
-                }
-                process.WaitForExit();
-                return (process.ExitCode, stdout.Result + stderr.Result);
+                return RunIn(folder, command, options);
             }
             finally
             {
                 try { Directory.Delete(folder, true); }
                 catch (Exception) { /* best effort cleanup of a temp folder */ }
             }
+        }
+
+        /// <summary>
+        /// Runs the CLI over a folder that already holds content, so the same folder can be run
+        /// twice and the two transcripts compared.
+        /// </summary>
+        public static (int ExitCode, string Output) RunIn(string folder, string command, params string[] options)
+        {
+            string cli = FindCli();
+            var start = new ProcessStartInfo(Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+            start.ArgumentList.Add(cli);
+            start.ArgumentList.Add(command);
+            start.ArgumentList.Add(folder);
+            foreach (string option in options) start.ArgumentList.Add(option);
+
+            using Process process = Process.Start(start) ?? throw new InvalidOperationException("Could not start cantrip.");
+            Task<string> stdout = process.StandardOutput.ReadToEndAsync();
+            Task<string> stderr = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(120_000))
+            {
+                process.Kill(true);
+                throw new TimeoutException("cantrip did not finish within two minutes.");
+            }
+            process.WaitForExit();
+            return (process.ExitCode, stdout.Result + stderr.Result);
         }
 
         /// <summary>First part of a process transcript, so a stack overflow dump does not flood the test log.</summary>

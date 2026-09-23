@@ -14,7 +14,7 @@ namespace Cantrip.Tests.Review
     {
         private static readonly string[] Vocabulary =
         {
-            "card", "status", "relic", "enemy", "ability", "verb", "ruleset", "test", "resource", "\"X\"", "Y", "effect", "move",
+            "card", "status", "relic", "enemy", "ability", "verb", "ruleset", "test", "scenario", "resource", "\"X\"", "Y", "effect", "move",
             "on", "modify", "damage", "cost", "hp", "stacking", "decay", "max_stacks", "pattern", "tags", "flags", "immune",
             "events", "loops", "ordering", "where", "of", "to", "from", "for", "as", "by", "into", "tag:fire", "source:self",
             "target", "self", "owner", "event", "if", "else", "repeat", "each", "in", "chance", "next", "turn", "until", "once",

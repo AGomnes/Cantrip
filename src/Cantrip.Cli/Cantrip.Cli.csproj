@@ -16,6 +16,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Cantrip.Core\Cantrip.Core.csproj" />
+    <!-- `sim` lives in Cantrip.Sim, which is not packed on its own: its assembly ships inside this tool. -->
+    <ProjectReference Include="..\Cantrip.Sim\Cantrip.Sim.csproj" />
     <None Include="PACKAGE.md" Pack="true" PackagePath="README.md" />
   </ItemGroup>
 

@@ -603,6 +603,14 @@ namespace Cantrip.Syntax
         public BlockNode Body { get; }
     }
 
+    /// <summary>A <c>scenario</c> block: a gauntlet stated once and played many times by a bot.</summary>
+    public sealed class ScenarioDeclNode : DeclarationNode
+    {
+        public ScenarioDeclNode(string name, BlockNode body, SourceSpan span) : base(name, span) => Body = body;
+
+        public BlockNode Body { get; }
+    }
+
     /// <summary>Everything parsed out of a single source file.</summary>
     public sealed class SourceFileNode : Node
     {

@@ -66,7 +66,7 @@ None of these knows about the others. A Fireball on a frozen enemy deals its 6 d
 - **A rules engine that runs it.** Turns, card play, draw and enemy intents. It is deterministic by design, with fixed-point maths and a seeded random generator, so the same seed and inputs replay the same game within one version of Cantrip; CI checks exact results on Linux and Windows x64. Battle state can be saved between actions and loaded again against the same content. Content can be reloaded into a running game. And an effect can stop to ask the player something, such as which card to discard, and carry on once your UI answers.
 - **Tools for the people writing content.** Tests written in content, a linter for unknown names, events nothing raises and similar mistakes, rules text that shows live numbers ("deal ~~6~~ 9 damage"), and a trace of why everything happened.
 - **No game engine required.** The core targets `netstandard2.1` and references no game engine. A [Godot addon](docs/godot.md) for the .NET edition of Godot 4.6 adds a node GDScript can drive, an importer so content ships in exported builds, and an editor dock for problems, tests and card text.
-- **Checked against effects from real games.** [docs/coverage.md](docs/coverage.md) re-creates effects from Slay the Spire, Monster Train, Hearthstone, Balatro, Magic, Inscryption, Dominion, Darkest Dungeon and Dota 2 under its own names, and records which the language writes directly, which need a workaround and which it cannot express yet, such as Balatro's poker hands. Cantrip is not affiliated with these games or their publishers. [`samples/slice`](samples/slice) is a small five-floor roguelite that a bot plays, 500 runs by default, to report win rates by card, relic and encounter. [samples/README.md](samples/README.md) lists it with the other samples and says how to test each one.
+- **Checked against effects from real games.** [docs/coverage.md](docs/coverage.md) re-creates effects from Slay the Spire, Monster Train, Hearthstone, Balatro, Magic, Inscryption, Dominion, Darkest Dungeon and Dota 2 under its own names, and records which the language writes directly, which need a workaround and which it cannot express yet, such as Balatro's poker hands. Cantrip is not affiliated with these games or their publishers. [`samples/slice`](samples/slice) is a small five-floor roguelite that a bot plays, to find content that throws, stalls or can never be played. [samples/README.md](samples/README.md) lists it with the other samples and says how to test each one.
 
 ## What it does not do
 
@@ -137,6 +137,7 @@ You need the .NET edition of Godot 4.6 and the .NET SDK 8 or later, even if your
 - [The Godot addon](docs/godot.md)
 - [Architecture](docs/architecture.md): how the library fits together, and where to extend it
 - [Coverage](docs/coverage.md): which effects from existing games the language can express
+- [Simulating](docs/simulating.md): playing a scenario many times with a bot, and what that measures
 - [Slice friction](docs/slice-friction.md): what building a small roguelite on Cantrip needed
 - [Stability](docs/stability.md): what may change, platforms, performance and known limitations
 - [Changelog](CHANGELOG.md)
@@ -150,6 +151,7 @@ Installed as a local tool, the commands run as `dotnet cantrip ...`:
 | `dotnet cantrip validate <path>... [--suppress codes]` | Reports errors, including unknown verbs |
 | `dotnet cantrip lint <path>... [--suppress codes] [--warnings-as-errors]` | Also reports likely mistakes, such as events nothing raises |
 | `dotnet cantrip test <path>... [--filter text] [--trace]` | Runs the `test` blocks; `--trace` adds the causality trace, with any `log` output, to each failure |
+| `dotnet cantrip sim <path>... [--runs N] [--seed S] [--turn-limit N] [--watch SEED]` | Plays the `scenario` blocks many times with a bot and reports what the content allowed |
 | `dotnet cantrip describe <path>... [--name name]` | Prints generated rules text |
 | `dotnet cantrip repl <path>...` | Runs each statement you type as the player, against a 100 hp Dummy; `:state`, `:trace`, `:quit` |
 | `dotnet cantrip --version` | Prints the version and the commit it was built from |
@@ -164,10 +166,10 @@ You need the .NET 9 SDK or later:
 dotnet build Cantrip.sln
 dotnet test tests/Cantrip.Core.Tests
 dotnet run --project src/Cantrip.Cli -- test samples/basic
-dotnet run --project src/Cantrip.Sim -c Release
+dotnet run --project src/Cantrip.Cli -- sim samples/slice
 ```
 
-The last line has the bot play the sample roguelite; [Running the simulator](samples/README.md#running-the-simulator) lists its options, and [samples/README.md](samples/README.md) says what each sample shows. [CONTRIBUTING.md](CONTRIBUTING.md) has a map of the repository, what a pull request needs, and how releases are made.
+The last line has a bot play the sample roguelite; [Simulating](docs/simulating.md) says what it measures and what it refuses to, and [samples/README.md](samples/README.md) says what each sample shows. [CONTRIBUTING.md](CONTRIBUTING.md) has a map of the repository, what a pull request needs, and how releases are made.
 
 ## License
 

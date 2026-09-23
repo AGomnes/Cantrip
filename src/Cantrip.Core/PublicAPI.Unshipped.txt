@@ -1,1 +1,21 @@
 #nullable enable
+Cantrip.Content.ContentLibrary.Scenarios.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Content.ScenarioDefinition!>!
+Cantrip.Content.Scenario
+Cantrip.Content.ScenarioDefinition
+Cantrip.Content.ScenarioDefinition.File.get -> string!
+Cantrip.Content.ScenarioDefinition.Name.get -> string!
+Cantrip.Content.ScenarioDefinition.Syntax.get -> Cantrip.Syntax.ScenarioDeclNode!
+Cantrip.Syntax.ScenarioDeclNode
+Cantrip.Syntax.ScenarioDeclNode.Body.get -> Cantrip.Syntax.BlockNode!
+Cantrip.Syntax.ScenarioDeclNode.ScenarioDeclNode(string! name, Cantrip.Syntax.BlockNode! body, Cantrip.Diagnostics.SourceSpan span) -> void
+Cantrip.Testing.SetupSession
+Cantrip.Testing.SetupSession.Defined(string! name, Cantrip.Diagnostics.SourceSpan span, string! what, params string![]! kinds) -> string!
+Cantrip.Testing.SetupSession.Run(Cantrip.Syntax.StatementNode! statement) -> void
+Cantrip.Testing.SetupSession.SetupSession(Cantrip.CardRuntime! runtime, Cantrip.Runtime.ScriptedChooser! chooser) -> void
+const Cantrip.Linting.Linter.NothingToFight = "CT317" -> string!
+const Cantrip.Linting.Linter.RunCount = "CT318" -> string!
+const Cantrip.Linting.Linter.UnknownMeasurement = "CT319" -> string!
+static Cantrip.Content.Scenario.Metrics.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+static Cantrip.Content.Scenario.SetupVerbs.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+static Cantrip.Content.Scenario.Verbs.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+static Cantrip.Testing.SetupSession.Names(Cantrip.Runtime.VerbCall! call) -> System.Collections.Generic.IReadOnlyList<string!>!

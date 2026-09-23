@@ -56,7 +56,8 @@ namespace Cantrip.Testing
         public DslTestRunner(ContentLibrary content) => _content = content ?? throw new ArgumentNullException(nameof(content));
 
         /// <summary>Verbs that only exist inside <c>test</c> blocks.</summary>
-        public static IReadOnlyCollection<string> TestVerbs { get; } = Session.VerbTable.Select(v => v.Name).ToArray();
+        public static IReadOnlyCollection<string> TestVerbs { get; } =
+            SetupSession.SetupVerbTable.Select(v => v.Name).Concat(Session.VerbTable.Select(v => v.Name)).ToArray();
 
         /// <summary>
         /// Record the causality trace for every test (slower; attached to failures). The trace also
@@ -138,7 +139,7 @@ namespace Cantrip.Testing
                 }
                 return new DslTestResult(test, true, null, SourceSpan.None, Trace ? runtime.State.Trace.FormatTree() : null);
             }
-            catch (TestFailure failure)
+            catch (SetupFailure failure)
             {
                 return new DslTestResult(test, false, failure.Message, failure.Span, Trace ? runtime.State.Trace.FormatTree() : null);
             }
@@ -198,30 +199,17 @@ namespace Cantrip.Testing
             return null;
         }
 
-        private sealed class TestFailure : Exception
-        {
-            public TestFailure(string message, SourceSpan span) : base(message) => Span = span;
-
-            public SourceSpan Span { get; }
-        }
-
-        /// <summary>One running test: its runtime, its variables, and the test-only verbs.</summary>
+        /// <summary>One running test: its setup, and the verbs only a test has.</summary>
         private sealed class Session
         {
             private readonly CardRuntime _runtime;
-            private readonly ScriptedChooser _chooser;
-            private readonly EvalContext _context;
-            private int _enemies;
+            private readonly SetupSession _setup;
 
             public Session(CardRuntime runtime, ScriptedChooser chooser)
             {
                 _runtime = runtime;
-                _chooser = chooser;
-
-                // The runner's ConfigureRuntime may have made the player already.
-                Entity player = runtime.Player ?? runtime.CreatePlayer();
-                _context = new EvalContext(player) { Source = player };
-                RegisterVerbs();
+                _setup = new SetupSession(runtime, chooser);
+                foreach (var (name, bind) in VerbTable) Interpreter.RegisterVerb(name, bind(this));
             }
 
             public bool Started { get; private set; }
@@ -235,161 +223,25 @@ namespace Cantrip.Testing
                 _runtime.StartBattle(shuffle: false, drawOpeningHand: false);
             }
 
-            public void Run(StatementNode statement)
-            {
-                Interpreter.ResetSteps();
-                _context.Chain = Interpreter.NewChain();
-                Interpreter.Execute(new BlockNode(new[] { statement }, statement.Span), _context);
-                Interpreter.Drain();
-                if (State.InBattle) _runtime.CheckBattleOver();
-            }
+            public void Run(StatementNode statement) => _setup.Run(statement);
 
             /// <summary>
-            /// Every test-only verb. The single source of truth: it drives registration and
+            /// The verbs a test has beyond setup. With <see cref="SetupSession.SetupVerbTable"/> it
+            /// is the single source of truth: the two drive registration and
             /// <see cref="DslTestRunner.TestVerbs"/>, which the linter reads.
             /// </summary>
             internal static readonly (string Name, Func<Session, VerbHandler> Bind)[] VerbTable =
             {
-                ("enemy", s => s.Enemy),
-                ("player", s => call => s.SetStats(s.State.Player!, call, 0)),
-                ("hand", s => call => s.AddCards(call, Zones.Hand)),
-                ("deck", s => call => s.AddCards(call, Zones.Draw)),
-                ("discard_pile", s => call => s.AddCards(call, Zones.Discard)),
-                ("relic", s => call => { foreach (string name in Names(call)) s._runtime.AddRelic(s.Defined(name, call, "relic or item", "relic", "item")); }),
-                ("seed", s => call => s.State.Rng.Reseed((ulong)call.Number(0, Num.One).ToInt())),
-                ("answer", s => call => { foreach (string name in Names(call)) s._chooser.Enqueue(name); }),
-                ("realtime", s => _ => { }),
                 ("play", s => s.Play),
                 ("end", s => s.EndTurn),
                 ("end_turn", s => s.EndTurn),
                 ("expect", s => s.Expect),
                 ("tick", s => call => s._runtime.Tick(call.Number(0, Num.One).ToInt())),
-                ("grant", s => call => { foreach (string name in Names(call)) s._runtime.GrantAbility(s.Defined(name, call, "ability", "ability"), s.State.Player!); }),
                 ("cast", s => s.Cast),
             };
 
-            private void RegisterVerbs()
-            {
-                foreach (var (name, bind) in VerbTable) Interpreter.RegisterVerb(name, bind(this));
-            }
-
-            /// <summary><c>enemy hp 6</c>, <c>enemy "Jaw Worm"</c>, <c>enemy Slime hp 12 Poison 3</c>.</summary>
-            private void Enemy(VerbCall call)
-            {
-                IReadOnlyList<ExprNode> nodes = call.Node.Arguments;
-                int index = 0;
-                Entity enemy;
-
-                string? named = nodes.Count > 0 ? nodes[0] switch { NameExpr n => n.Name, StringExpr s => s.Value, _ => null } : null;
-                if (named != null && _runtime.Content.Find(named, "enemy") != null)
-                {
-                    enemy = _runtime.SpawnEnemy(named);
-                    index = 1;
-                }
-                else
-                {
-                    // `enemy Ghoul` with no Ghoul defined. Stats come in pairs, so an odd count means
-                    // one word is unpaired; it is a name only when it comes first with no value of its
-                    // own after it and is not a status. `enemy hp 20 block` is a missing value instead.
-                    if (nodes.Count % 2 == 1 && nodes[0] is NameExpr missing
-                        && (nodes.Count == 1 || nodes[1] is NameExpr)
-                        && _runtime.Content.FindAny(missing.Name, "status", "keyword") == null)
-                    {
-                        EntityDefinition? other = _runtime.Content.Find(missing.Name);
-                        if (other != null)
-                        {
-                            throw Fail(
-                                $"`{missing.Name}` is {A(other.KindName)}, not an enemy. Write `enemy \"{missing.Name}\" hp 20` for a plain enemy with that label.",
-                                call.Span);
-                        }
-
-                        string? close = Suggest.Closest(missing.Name, _runtime.Content.Pool("enemy").Select(d => d.Name));
-                        throw Fail(
-                            $"No enemy named `{missing.Name}` is defined." + (close == null ? string.Empty : $" Did you mean `{close}`?") +
-                            $" Define it with `enemy {missing.Name}`, or write `enemy \"{missing.Name}\" hp 20` for a plain enemy with that label.",
-                            call.Span);
-                    }
-
-                    string name = nodes.Count > 0 && nodes[0] is StringExpr label ? label.Value : "Enemy";
-                    if (nodes.Count > 0 && nodes[0] is StringExpr) index = 1;
-                    enemy = State.Spawn(name, EntityKind.Actor, null, Team.Enemy, Zones.Board);
-                    enemy.SetBase("max_hp", 10);
-                    enemy.SetBase("hp", 10);
-                    enemy.SetBase("block", 0);
-                }
-
-                // SpawnEnemy already rolled an intent if the battle is running; rolling again here
-                // would make a cycling enemy skip its opening move.
-                SetStats(enemy, call, index);
-
-                _enemies++;
-                if (_enemies == 1) _context.SetLocal("enemy", Value.FromEntity(enemy));
-                _context.SetLocal("enemy" + _enemies, Value.FromEntity(enemy));
-            }
-
-            /// <summary>Reads <c>stat value</c> pairs. Status names apply that many stacks.</summary>
-            private void SetStats(Entity actor, VerbCall call, int start)
-            {
-                IReadOnlyList<ExprNode> nodes = call.Node.Arguments;
-                for (int i = start; i < nodes.Count; i += 2)
-                {
-                    string stat = nodes[i] is NameExpr name ? name.Name : throw Fail($"expected a stat name, found `{AstPrinter.Print(nodes[i])}`.", call.Span);
-                    if (i + 1 >= nodes.Count) throw Fail($"`{stat}` needs a value.", call.Span);
-                    Num value = Interpreter.EvaluateNumber(nodes[i + 1], call.Context);
-
-                    if (_runtime.Content.FindAny(stat, "status", "keyword") != null)
-                    {
-                        _runtime.ApplyStatus(stat, actor, value.ToInt());
-                        continue;
-                    }
-
-                    actor.SetBase(stat, value);
-                    if (string.Equals(stat, "hp", StringComparison.OrdinalIgnoreCase) && actor.GetBase("max_hp") < value)
-                        actor.SetBase("max_hp", value);
-                    if (string.Equals(stat, "energy", StringComparison.OrdinalIgnoreCase) && actor.GetBase("max_energy") < value)
-                        actor.SetBase("max_energy", value);
-                }
-            }
-
-            private void AddCards(VerbCall call, string zone)
-            {
-                foreach (string name in Names(call)) _runtime.AddCard(Defined(name, call, "card", "card"), zone);
-            }
-
-            /// <summary>
-            /// Fails the test, naming the nearest definition, when <paramref name="name"/> names
-            /// nothing of the <paramref name="kinds"/> a line needs, as in <c>hand Strik</c>.
-            /// </summary>
-            private string Defined(string name, VerbCall call, string what, params string[] kinds)
-            {
-                ContentLibrary content = _runtime.Content;
-                if (content.FindAny(name, kinds) != null) return name;
-
-                EntityDefinition? other = content.Find(name);
-                if (other != null) throw Fail($"`{name}` is {A(other.KindName)}, not {A(what)}.", call.Span);
-
-                string? close = Suggest.Closest(name, kinds.SelectMany(kind => content.Pool(kind)).Select(d => d.Name));
-                throw Fail($"No {what} named `{name}` is defined." + (close == null ? string.Empty : $" Did you mean `{close}`?"), call.Span);
-            }
-
-            /// <summary>"a card", "an ability".</summary>
-            private static string A(string noun) => ("aeiou".IndexOf(char.ToLowerInvariant(noun[0])) >= 0 ? "an " : "a ") + noun;
-
-            /// <summary>Names written as <c>A B</c>, <c>A, B</c> or <c>"Twin Strike", Defend</c>.</summary>
-            private static IEnumerable<string> Names(VerbCall call)
-            {
-                foreach (ExprNode node in call.Node.Arguments)
-                {
-                    if (node is NameExpr n) yield return n.Name;
-                    else if (node is StringExpr s) yield return s.Value;
-                }
-                foreach (ClauseNode clause in call.Node.Clauses)
-                {
-                    if (clause.Value == null) yield return clause.Keyword;
-                    else if (clause.Value is StringExpr s) yield return s.Value;
-                    else if (clause.Value is NameExpr n) yield return n.Name;
-                }
-            }
+            private string Defined(string name, VerbCall call, string what, params string[] kinds) =>
+                _setup.Defined(name, call.Span, what, kinds);
 
             /// <summary><c>play Strike on enemy</c>. Cards not already in hand are put there first.</summary>
             private void Play(VerbCall call)
@@ -460,7 +312,7 @@ namespace Cantrip.Testing
 
             private static string Show(Value value) => value.Kind == ValueKind.Text ? "\"" + value.Text + "\"" : value.ToString();
 
-            private static TestFailure Fail(string message, SourceSpan span) => new TestFailure(message, span);
+            private static Exception Fail(string message, SourceSpan span) => SetupSession.Fail(message, span);
         }
     }
 }

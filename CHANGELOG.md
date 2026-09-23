@@ -10,9 +10,24 @@ When a release changes any of the following, its section says so under that name
 
 ## [Unreleased]
 
+### Added
+
+- A `scenario` declaration, beside `test`: a whole run stated once — a deck, some fights in order, and whatever happens between them — for a bot to play many times. Its body is statements, as a test's is, with three lines of its own: `battle "Cinder Imp", "Frost Wisp"`, `runs 500`, and an `expect` that measures every run rather than one game (`expect no stalls`, `expect wins >= 55%`). See [Scenarios](docs/language.md#scenarios).
+
+  `validate` counts the scenarios in a folder and `lint` checks them as it checks a test, so a misspelt card, relic, ability or enemy is the same error, CT302. Three new codes: CT317 a scenario with nothing to fight, CT318 a run count too small to measure with or not a whole number, CT319 an `expect` a scenario cannot check.
+- `cantrip sim <path>...` plays those scenarios, hundreds of times each, and reports what happened over them: a run that threw, with the seed and the statement to replay it; a battle that reached the turn limit; a card that was held and never playable, or never drawn; an enemy move that never fired; and, where nothing the scenario reaches rolls a die, that every run went the same way. What happened at least once happened in the content, whoever plays; what never happened is bounded by what the bot reached, and the report says so. Its options are `--name`, `--runs`, `--seed`, `--turn-limit`, `--watch SEED` and `--suppress`, and it exits 1 on a content error, no scenario to play, a run that threw, a battle that stalled or an expectation that failed. See [Simulating](docs/simulating.md).
+
+  **The bot in this release is a placeholder**: it plays the first card or ability it can, in hand order. The report therefore prints no win rate, no rating and no comparison between decks, and `expect wins`, `expect hp_left` and `expect turns` are reported as not checked. `expect no stalls` and `expect no errors` are checked, because they are true of the content whoever plays. Bots that weigh a play come next; from then on this changelog carries a **Bot behaviour** line whenever a release changes what the bot does.
+- `Cantrip.Testing.SetupSession`: the setup half of a `test` or a `scenario` — the verbs `enemy`, `player`, `hand`, `deck`, `discard_pile`, `relic`, `seed`, `answer`, `realtime` and `grant` registered on a runtime, and the statement loop that runs a line. `DslTestRunner` and `cantrip sim` share it, so a setup line cannot mean one thing in a test and another in a scenario.
+
 ### Changed
 
 - The README says what Cantrip is for more exactly: the combat of single-player turn-based games, cards optional. `samples/abilities` is new and shows a fight with no cards in it, run by CI like the other sample folders.
+- `samples/slice/sim.cantrip` and `samples/abilities/sim.cantrip` state each folder's fights as a scenario, and CI plays both.
+
+### Breaking changes
+
+- A whole number before a name in a setup line now repeats it: `deck 4 Zap, 4 Ward` puts eight cards in the draw pile. Before, the number was dropped with no word from anywhere, so the line put in one of each and the test measured a different deck from the one it was written as. It reads the same way on `deck`, `hand`, `discard_pile`, `relic`, `grant` and `answer`, in a `test` as well as a `scenario`. A number that is not a whole count from 1 to 1000, and a count with no name after it, now fail the line rather than being ignored. No sample or test in this repository wrote a number on such a line; content elsewhere that did will hold more cards than it did before.
 
 ## [0.1.0-preview.3] - 2026-09-22
 

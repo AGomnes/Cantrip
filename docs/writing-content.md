@@ -224,6 +224,7 @@ test "Crossing half health changes the next move, not the one shown"
 | `dotnet cantrip lint tutorial` | Checks the files: unknown names, misspelt verbs, a listener on an event nothing raises or written without `on`, a `{placeholder}` in card text that matches nothing, and more. It reports errors, warnings and notes. |
 | `dotnet cantrip validate tutorial` | Reports only errors, leaving out the linter's warnings and notes. |
 | `dotnet cantrip describe tutorial` | Prints the rules text of every definition, generated or written with `text:`, or of one with `--name "Venom Dart"`. |
+| `dotnet cantrip sim tutorial` | Plays the `scenario` blocks hundreds of times with a bot, and reports what the content allowed: a run that threw, a fight that never ended, a card that was never playable, an enemy move that never fired. The tutorial has no scenario yet, so it says so; [Simulating](simulating.md) shows how to write one. |
 
 Run `test` and `lint` after every change, because they catch different things. Misspell Poison in Venom Dart as `apply Posion 4 to target`, and `test` finds it only because two tests play the card:
 
@@ -882,6 +883,7 @@ The [language reference](language.md) has the full rules for each idea used here
 | verbs such as `deal`, `discover` and `into` | [Built-in verbs](language.md#built-in-verbs) |
 | rules text and placeholders | [Descriptions](language.md#descriptions) |
 | test verbs, and what a test cannot do | [Tests](language.md#tests) |
+| scenarios, and playing them many times with a bot | [Scenarios](language.md#scenarios), [Simulating](simulating.md) |
 | the order of a turn | [How a battle runs](language.md#how-a-battle-runs) |
 
 For more worked content with tests, [samples/basic](../samples/basic) has small examples of many features, and [samples/slice](../samples/slice) is the content of a small five-floor roguelite, including the Archmage, a boss with two phases.

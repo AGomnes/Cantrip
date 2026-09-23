@@ -17,6 +17,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Cantrip.Core\Cantrip.Core.csproj" />
+    <!-- The scenario runner, so a test can play one without going through the command. -->
+    <ProjectReference Include="..\..\src\Cantrip.Sim\Cantrip.Sim.csproj" />
   </ItemGroup>
 
 </Project>

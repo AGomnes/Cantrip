@@ -55,6 +55,12 @@ namespace Cantrip.Linting
         public const string ForOnDurationStatus = "CT314";
         public const string IgnoredDuration = "CT315";
         public const string TagWrittenAsProperty = "CT316";
+        public const string NothingToFight = "CT317";
+        public const string RunCount = "CT318";
+        public const string UnknownMeasurement = "CT319";
+
+        /// <summary>Below this many runs, a scenario's numbers move about from one run to the next (CT318).</summary>
+        private const int FewRuns = 100;
 
         /// <summary>Tags the engine itself gives meaning to, so using one never needs a declaration.</summary>
         private static readonly string[] EngineTags =
@@ -138,9 +144,10 @@ namespace Cantrip.Linting
             Modifier,
             Verb,
             Test,
+            Scenario,
         }
 
-        /// <summary>One piece of content to check: a block, a listener, a modifier, a verb or a test.</summary>
+        /// <summary>One piece of content to check: a block, a listener, a modifier, a verb, a test or a scenario.</summary>
         private sealed class Body
         {
             public Body(BodyKind kind, Node anchor, EntityDefinition? owner)
@@ -259,6 +266,7 @@ namespace Cantrip.Linting
             foreach (Body body in _bodies)
             {
                 CheckVerbs(body);
+                CheckScenario(body); // before CheckNames: `stalls` and `wins` are measurements, not names
                 CheckNames(body);
                 CheckTags(body);
                 CheckEventUse(body);
@@ -336,6 +344,9 @@ namespace Cantrip.Linting
             foreach (TestDefinition test in _content.Tests)
                 _bodies.Add(new Body(BodyKind.Test, test.Syntax, null) { Block = test.Syntax.Body });
 
+            foreach (ScenarioDefinition scenario in _content.Scenarios)
+                _bodies.Add(new Body(BodyKind.Scenario, scenario.Syntax, null) { Block = scenario.Syntax.Body });
+
             foreach (Body body in _bodies)
             {
                 if (body.Block != null) body.Facts.VisitBlock(body.Block);
@@ -406,9 +417,9 @@ namespace Cantrip.Linting
 
                         case "player":
                         case "enemy":
-                            // Test setup writes stats by name: `player rage 5`. The name in
-                            // `enemy Ghoul hp 12` is not one, defined or not.
-                            if (body.Kind == BodyKind.Test)
+                            // Test and scenario setup write stats by name: `player rage 5`. The name
+                            // in `enemy Ghoul hp 12` is not one, defined or not.
+                            if (body.Kind == BodyKind.Test || body.Kind == BodyKind.Scenario)
                             {
                                 NameExpr? enemyName = verb == "enemy" ? TestEnemyName(command) : null;
                                 foreach (ExprNode argument in command.Arguments)
@@ -430,14 +441,175 @@ namespace Cantrip.Linting
             {
                 if (command.Verb.Length == 0) continue; // a statement with no verb: the parser has reported it (CT0010)
                 if (_verbs.Contains(command.Verb)) continue;
-                if (body.Kind == BodyKind.Test && DslTestRunner.TestVerbs.Contains(command.Verb, StringComparer.OrdinalIgnoreCase)) continue;
 
-                IEnumerable<string> candidates = body.Kind == BodyKind.Test ? _verbs.Concat(DslTestRunner.TestVerbs) : _verbs;
-                string extra = body.Kind != BodyKind.Test && DslTestRunner.TestVerbs.Contains(command.Verb, StringComparer.OrdinalIgnoreCase)
-                    ? " It only exists inside `test` blocks."
-                    : string.Empty;
+                IReadOnlyCollection<string> allowed = BlockVerbs(body);
+                if (allowed.Contains(command.Verb, StringComparer.OrdinalIgnoreCase)) continue;
 
-                Error(UnknownVerb, $"Unknown verb `{command.Verb}`.{extra}", command.Span, Suggest.Closest(command.Verb, candidates));
+                // `enemy Ghoul hp 12` is how a test spawns one, and it is too far from `battle` for
+                // the spelling guess to reach, so say it outright: it is the likeliest slip of all.
+                // Otherwise a scenario line that was spelt right and written in the wrong block gets
+                // no guess at all, because the message already says where the verb lives and
+                // "did you mean `replay`?" under "`play` only exists inside `test` blocks" argues
+                // with itself.
+                string elsewhere = Elsewhere(body, command.Verb);
+                string? suggestion = body.Kind == BodyKind.Scenario && string.Equals(command.Verb, "enemy", StringComparison.OrdinalIgnoreCase)
+                    ? "battle"
+                    : body.Kind == BodyKind.Scenario && elsewhere.Length > 0
+                        ? null
+                        : Suggest.Closest(command.Verb, _verbs.Concat(allowed));
+
+                Error(UnknownVerb, $"Unknown verb `{command.Verb}`.{elsewhere}", command.Span, suggestion);
+            }
+        }
+
+        /// <summary>The verbs a body may use beyond the ones any effect can: a test's, or a scenario's.</summary>
+        private static IReadOnlyCollection<string> BlockVerbs(Body body) => body.Kind switch
+        {
+            BodyKind.Test => DslTestRunner.TestVerbs,
+            BodyKind.Scenario => Scenario.Verbs,
+            _ => Array.Empty<string>(),
+        };
+
+        /// <summary>
+        /// The rest of a CT301 message when the verb is a real one written in the wrong kind of
+        /// block, which is a likelier slip than a typo and deserves to be said rather than guessed at.
+        /// </summary>
+        private static string Elsewhere(Body body, string verb)
+        {
+            if (body.Kind != BodyKind.Test && DslTestRunner.TestVerbs.Contains(verb, StringComparer.OrdinalIgnoreCase))
+            {
+                return body.Kind == BodyKind.Scenario
+                    ? " It only exists inside `test` blocks. A `scenario` states the fight; a bot plays it."
+                    : " It only exists inside `test` blocks.";
+            }
+
+            if (body.Kind != BodyKind.Scenario && Scenario.IsVerb(verb)) return " It only exists inside `scenario` blocks.";
+
+            return string.Empty;
+        }
+
+        /// <summary>
+        /// CT317, CT318 and CT319: the three lines only a scenario has. A scenario that names no
+        /// enemy fights nothing; a count too small to measure with says less than it looks as if it
+        /// does; and an <c>expect</c> in a scenario checks one measurement over every run rather
+        /// than the state of one game, which a scenario never has to hand.
+        /// </summary>
+        private void CheckScenario(Body body)
+        {
+            if (body.Kind != BodyKind.Scenario) return;
+
+            bool fights = false;
+            foreach (CommandNode command in body.Facts.Commands)
+            {
+                switch (command.Verb.ToLowerInvariant())
+                {
+                    case "battle":
+                        if (TestNames(command).Any()) fights = true;
+                        else Warn(NothingToFight, "`battle` names no enemy, so it fights nothing.", command.Span, "battle \"Name\"");
+                        break;
+                    case "runs":
+                        CheckRunCount(command);
+                        break;
+                    case "expect":
+                        CheckMeasurement(command);
+                        break;
+                }
+            }
+
+            if (fights) return;
+
+            string name = ((ScenarioDeclNode)body.Anchor).Name;
+            Warn(NothingToFight, $"scenario \"{name}\" has no `battle` line, so there is nothing to play and nothing to measure.",
+                body.Anchor.Span, "battle \"Name\"");
+        }
+
+        /// <summary>CT318: <c>runs</c> takes a whole count, and a small one measures very little.</summary>
+        private void CheckRunCount(CommandNode command)
+        {
+            if (!(command.Arguments.FirstOrDefault() is NumberExpr { Unit: null } count) || !IsWholeCount(count.Value))
+            {
+                Error(RunCount, "`runs` needs a whole number of runs, one or more.", command.Span, "runs 500");
+                return;
+            }
+
+            if (count.Value >= FewRuns) return;
+
+            Info(RunCount, $"{count.Value} runs is few enough that the same content answers differently each time. {FewRuns} or more settles it down.", command.Span);
+        }
+
+        /// <summary>
+        /// CT319: <c>expect no stalls</c> or <c>expect wins &gt;= 55%</c>. A scenario plays many
+        /// games, so it has no one <c>enemy.hp</c> to compare: the words it can name are in
+        /// <see cref="Scenario.Metrics"/>.
+        /// </summary>
+        private void CheckMeasurement(CommandNode command)
+        {
+            IReadOnlyList<ExprNode> arguments = command.Arguments;
+
+            // `expect no stalls`: the same as `expect stalls == 0`, and how it reads best.
+            if (arguments.Count == 2 && arguments[0] is NameExpr negated && string.Equals(negated.Name, "no", StringComparison.OrdinalIgnoreCase))
+            {
+                _reported.Add(negated);
+                RequireMeasurement(arguments[1]);
+                return;
+            }
+
+            if (arguments.Count == 1 && arguments[0] is BinaryExpr comparison && AstPrinter.IsComparison(comparison.Operator))
+            {
+                RequireMeasurement(comparison.Left);
+                if (comparison.Right is NumberExpr { Unit: null or "%" }) return;
+
+                Error(UnknownMeasurement, "A scenario's `expect` compares a measurement with a plain number or a percentage.",
+                    comparison.Right.Span, "expect wins >= 55%");
+                return;
+            }
+
+            foreach (ExprNode argument in arguments) Measured(argument);
+            Error(UnknownMeasurement,
+                "A scenario's `expect` checks one measurement over every run, not the state of one game, which a scenario never has to hand.",
+                command.Span, "expect no errors");
+        }
+
+        private void RequireMeasurement(ExprNode node)
+        {
+            if (node is NameExpr measurement)
+            {
+                _reported.Add(measurement);
+                if (Scenario.IsMetric(measurement.Name)) return;
+
+                Error(UnknownMeasurement, $"A scenario does not measure `{measurement.Name}`.", node.Span,
+                    Suggest.Closest(measurement.Name, Scenario.Metrics));
+                return;
+            }
+
+            Measured(node);
+            Error(UnknownMeasurement,
+                $"`{AstPrinter.Print(node)}` is not something a scenario measures; it measures {string.Join(", ", Scenario.Metrics)}.",
+                node.Span);
+        }
+
+        /// <summary>
+        /// Marks the words of an <c>expect</c> as already answered for. A scenario's <c>expect</c>
+        /// never reads them as names, so CT302 saying `wins` is not a stat would be a second and
+        /// wrong complaint about a line CT319 has just explained.
+        /// </summary>
+        private void Measured(ExprNode node)
+        {
+            switch (node)
+            {
+                case NameExpr name:
+                    _reported.Add(name);
+                    break;
+                case UnaryExpr unary:
+                    Measured(unary.Operand);
+                    break;
+                case BinaryExpr binary:
+                    Measured(binary.Left);
+                    Measured(binary.Right);
+                    break;
+                case MemberExpr member:
+                    Measured(member.Target);
+                    break;
             }
         }
 
@@ -480,7 +652,7 @@ namespace Cantrip.Linting
                 }
             }
 
-            if (body.Kind == BodyKind.Test) CheckTestNames(body);
+            if (body.Kind == BodyKind.Test || body.Kind == BodyKind.Scenario) CheckSetupNames(body);
 
             foreach (CallExpr call in body.Facts.Calls)
             {
@@ -550,12 +722,14 @@ namespace Cantrip.Linting
         }
 
         /// <summary>
-        /// The test lines that name a definition, which the runner looks up and fails the test
-        /// without: <c>hand</c>, <c>deck</c> and <c>discard_pile</c> name cards, <c>relic</c> a relic
-        /// or item, <c>grant</c> and <c>cast</c> an ability, <c>play</c> a card, and <c>enemy</c>
-        /// an enemy when its first word stands alone as a name (<c>enemy Ghoul hp 12</c>).
+        /// The lines of a test or a scenario that name a definition, which the runner looks up and
+        /// fails without: <c>hand</c>, <c>deck</c> and <c>discard_pile</c> name cards, <c>relic</c> a
+        /// relic or item, <c>grant</c> and <c>cast</c> an ability, <c>play</c> a card, <c>battle</c>
+        /// enemies, and <c>enemy</c> an enemy when its first word stands alone as a name
+        /// (<c>enemy Ghoul hp 12</c>). Each verb is checked only in the kind of block it belongs to,
+        /// so a verb written in the wrong one is CT301 on its own and not CT302 as well.
         /// </summary>
-        private void CheckTestNames(Body body)
+        private void CheckSetupNames(Body body)
         {
             foreach (CommandNode command in body.Facts.Commands)
             {
@@ -572,13 +746,16 @@ namespace Cantrip.Linting
                     case "grant":
                         RequireDefinitions(body, TestNames(command), "ability");
                         break;
-                    case "play":
+                    case "battle" when body.Kind == BodyKind.Scenario:
+                        RequireDefinitions(body, TestNames(command), "enemy");
+                        break;
+                    case "play" when body.Kind == BodyKind.Test:
                         RequireDefinition(body, Aimed(command.Arguments.FirstOrDefault()), "card");
                         break;
-                    case "cast":
+                    case "cast" when body.Kind == BodyKind.Test:
                         RequireDefinition(body, Aimed(command.Arguments.FirstOrDefault()), "ability");
                         break;
-                    case "enemy":
+                    case "enemy" when body.Kind == BodyKind.Test:
                         RequireDefinition(body, TestEnemyName(command), "enemy");
                         break;
                 }

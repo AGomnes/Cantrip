@@ -22,6 +22,20 @@ namespace Cantrip.Content
         public string Name => Syntax.Name;
     }
 
+    /// <summary>A <c>scenario</c> block together with the file it came from.</summary>
+    public sealed class ScenarioDefinition
+    {
+        internal ScenarioDefinition(ScenarioDeclNode syntax, string file)
+        {
+            Syntax = syntax;
+            File = file;
+        }
+
+        public ScenarioDeclNode Syntax { get; }
+        public string File { get; }
+        public string Name => Syntax.Name;
+    }
+
     /// <summary>
     /// Every definition loaded from DSL files. Parse errors are collected rather than thrown, so a
     /// designer sees all the problems in a folder at once. Reloading a file replaces exactly the
@@ -51,6 +65,7 @@ namespace Cantrip.Content
             new Dictionary<string, ResourceRule>(StringComparer.OrdinalIgnoreCase);
 
         private readonly List<TestDefinition> _tests = new List<TestDefinition>();
+        private readonly List<ScenarioDefinition> _scenarios = new List<ScenarioDefinition>();
         private readonly Dictionary<string, SourceFileNode> _files = new Dictionary<string, SourceFileNode>(FileNames);
         private readonly Dictionary<string, DiagnosticBag> _fileDiagnostics = new Dictionary<string, DiagnosticBag>(FileNames);
         /// <summary>Ruleset blocks in load order. A list, not a dictionary, so "last loaded" survives unloads.</summary>
@@ -115,6 +130,7 @@ namespace Cantrip.Content
         public IEnumerable<EntityDefinition> Definitions => _definitions.Values;
         public IEnumerable<VerbDefinition> Verbs => _verbs.Values;
         public IReadOnlyList<TestDefinition> Tests => _tests;
+        public IReadOnlyList<ScenarioDefinition> Scenarios => _scenarios;
         public IReadOnlyDictionary<string, ResourceRule> Resources => _resources;
         public IEnumerable<SourceFileNode> Files => _files.Values;
 
@@ -198,6 +214,7 @@ namespace Cantrip.Content
                 _verbs.Remove(verb);
 
             _tests.RemoveAll(t => SameFile(t.File, file));
+            _scenarios.RemoveAll(s => SameFile(s.File, file));
             AddBuiltInResources();
             Generation++;
         }
@@ -280,6 +297,10 @@ namespace Cantrip.Content
 
                 case TestDeclNode test:
                     _tests.Add(new TestDefinition(test, file));
+                    break;
+
+                case ScenarioDeclNode scenario:
+                    _scenarios.Add(new ScenarioDefinition(scenario, file));
                     break;
             }
         }

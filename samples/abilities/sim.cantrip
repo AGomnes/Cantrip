@@ -1,0 +1,23 @@
+# The same fight as the tests, played many times. There is not a card in it: the player has two
+# abilities on cooldowns, so this is what `cantrip sim` has to keep working for a turn-based
+# roguelike rather than a deckbuilder.
+#
+# Nothing here rolls a die — the Ghast cycles its moves — so every run goes the same way, and the
+# report says so rather than pretending that 200 runs measured more than one.
+#
+# It also reports that Screech never fires: the Ghast is wounded before its turn comes round, and
+# the wounded phase re-telegraphs, so the move at the end of its pattern is never reached. That is
+# the sort of thing this is for.
+#
+# Run:  dotnet run --project src/Cantrip.Cli -- sim samples/abilities
+
+scenario "The Ghast, with Cleave and Brace"
+  runs 200
+
+  player hp 40
+  grant Cleave, Brace
+
+  battle Ghast
+
+  expect no stalls
+  expect no errors

@@ -26,6 +26,7 @@ This page sets out the declarations, statements and rules of the `.cantrip` lang
 - [How a battle runs](#how-a-battle-runs)
 - [Descriptions](#descriptions)
 - [Tests](#tests)
+- [Scenarios](#scenarios)
 - [Determinism](#determinism)
 - [Diagnostics](#diagnostics)
 - [Implementation notes](#implementation-notes)
@@ -76,6 +77,7 @@ Content lives in `.cantrip` files. A folder loads every `.cantrip` file under it
 | `verb name(params):` | A verb written in the DSL |
 | `ruleset` | Rules the content is written against |
 | `test "Name"` | A test run by `cantrip test` |
+| `scenario "Name"` | A gauntlet played many times by `cantrip sim` |
 
 Inside a declaration:
 
@@ -902,7 +904,7 @@ test "Poison ticks and decays"
 |---|---|---|
 | `enemy [Name] [stat N]...` | yes | Spawns an enemy: a defined one, or a plain 10 hp enemy (`enemy "Label" hp 20`). A status name applies that status, as `apply Name N` would. The first is `enemy` and `enemy1`, then `enemy2`... |
 | `player stat N...` | yes | Sets player stats or applies statuses: `player hp 40 Strength 2` |
-| `hand`, `deck`, `discard_pile` | yes | Adds cards to the hand, the draw pile or the discard pile, in that order: `deck Strike, Strike, Defend`. As a test verb, `deck` is the draw pile only; the name `deck` in an expression is draw, hand and discard together. |
+| `hand`, `deck`, `discard_pile` | yes | Adds cards to the hand, the draw pile or the discard pile, in that order: `deck Strike, Strike, Defend`, or `deck 4 Strike, 2 Defend`. As a test verb, `deck` is the draw pile only; the name `deck` in an expression is draw, hand and discard together. |
 | `relic Name` | yes | Gives the player a relic or an item |
 | `grant Ability` | yes | Gives the player an ability |
 | `seed N` | yes | Reseeds the game's RNG |
@@ -923,6 +925,8 @@ test "Poison ticks and decays"
 
 **Names of definitions are checked.** A line that names a card, relic, item, ability or enemy that is not defined, such as `hand Strik`, `relic Anchr`, `grant Zapp`, `play Strik on enemy` or `enemy Ghol hp 12`, fails the test with a message that names the nearest definition, and `cantrip lint` reports it as error CT302.
 
+**A count before a name repeats it.** `deck 4 Strike, 2 Defend` puts six cards in the draw pile, and the same reading applies to `hand`, `discard_pile`, `relic`, `grant` and `answer`. The count is a whole number from 1 to 1000; anything else, or a count with no name after it, fails the test.
+
 **Choices** are answered from the `answer` queue. With nothing queued, the first option is taken, which is enough for `discard 1` when the candidates are identical or there is only one.
 
 **What a test cannot do:**
@@ -935,6 +939,59 @@ test "Poison ticks and decays"
 **When the last enemy dies, the battle is won at once**, and winning removes the player's statuses that are not `persistent` and returns every card to the draw pile. A test that checks a status or a drawn card after a killing blow needs a second enemy to keep the battle going.
 
 To try statements one at a time, `dotnet cantrip repl <folder>` loads the content and runs each line you type as the player, with a 100 hp enemy called Dummy as the target, and prints the state after each. It prints `log` output, but has none of the test verbs above. [Trying lines in the REPL](writing-content.md#6-trying-lines-in-the-repl) shows a session and its limits.
+
+## Scenarios
+
+```
+scenario "The tower, starter deck"
+  runs 500
+
+  player hp 60 energy 3
+  deck 4 Zap, 4 Ward, Kindle, Rime
+
+  battle "Cinder Imp"
+  battle "Frost Wisp", "Cinder Imp"
+  heal 12                       # the rest between fights, stated rather than chosen
+  battle "Tower Guard", "Frost Wisp"
+  battle Archmage
+
+  expect no stalls
+  expect no errors
+```
+
+A test plays one fight the way you tell it to. A scenario states a whole run — a deck, some fights in order, and whatever happens between them — and `dotnet cantrip sim <folder>` plays it many times with a bot.
+
+**Nothing above the fights you name is simulated.** There is no map, no reward offer, no shop and no gold. A rest, a relic picked up or a curse taken is written as a statement where it happens, so a scenario measures only what it says.
+
+The body is statements, as a test's is, and most of it is ordinary DSL: `heal 12`, `apply Curse 1 to player`, `relic "Ember Charm"`, `grant Cleave`. Three lines are the scenario's own:
+
+| Verb | Meaning |
+|---|---|
+| `battle Name[, Name...]` | Spawns those enemies and lets the bot fight them to the end. Each name must be an `enemy` declaration, and a count before one repeats it: `battle 2 "Cinder Imp"`. |
+| `runs N` | How many times to play the scenario |
+| `expect <measurement> <op> <number>` | Fails the scenario if it does not hold. `expect no stalls` is the same as `expect stalls == 0`. |
+
+Setup is shared with a test, and each verb means the same thing in both: `player`, `deck`, `hand`, `discard_pile`, `relic`, `grant`, `seed` and `answer`. See [Tests](#tests) for what each one does. A `setup:` block groups them here too, though nothing turns on where setup ends: a scenario starts a battle where it says `battle`, and nowhere else.
+
+**A scenario never plays a card itself.** `play`, `cast`, `end turn` and `tick` belong to a test: a bot plays a scenario, and a line choosing a card by hand would fight it. `realtime` is out for the same reason — when to act in continuous time is the game's own frame loop, not a bot's.
+
+**`expect` measures every run, not one game.** A scenario plays hundreds of games, so there is no single `enemy.hp` to compare. What it can measure:
+
+| Measurement | Meaning |
+|---|---|
+| `stalls` | Battles that reached the turn limit without ending |
+| `errors` | Runs that threw |
+| `wins` | The share of runs won |
+| `hp_left` | The player's hp at the end |
+| `turns` | Turns per battle |
+
+Anything else is error CT319.
+
+**A win rate is a fact about the bot, not about your content.** Two bots given the same content can be ten points apart, so `expect wins >= 55%` is worth writing as a gate against your own regressions, against a stated bot and a stated version of Cantrip. It is not a measure of how strong a card is, and it should not be quoted as one. The bot in this release is a placeholder, so `wins`, `hp_left` and `turns` are reported unchecked; `stalls` and `errors` are checked, because they hold whoever plays.
+
+`cantrip validate` counts the scenarios in a folder, and `cantrip lint` checks them as it checks anything else: a misspelt card, relic, ability or enemy is error CT302, the same code as in a test, so a scenario that names nothing real fails in milliseconds rather than after a hundred runs.
+
+[Simulating](simulating.md) has the command, its options and exit codes, what the report says and what it refuses to say.
 
 ## Determinism
 
@@ -1015,8 +1072,8 @@ Codes with four digits come from reading and loading the files. An error among t
 
 | Code | Level | Meaning | Typical fix |
 |---|---|---|---|
-| CT301 | error | An unknown verb, or a test verb such as `play` outside a test. | Fix the spelling. For a verb the game registers in C#, run with `--suppress CT301`. |
-| CT302 | error or warning | An unknown name. It is an error where a definition must be named (`apply Posion`, `card:Strke`, or a test line such as `hand Strik`) or a status is read (`target.Posion`), and a warning for other names, which the game may supply at runtime. | Fix the spelling, or define it. |
+| CT301 | error | An unknown verb, or one written in the wrong kind of block: a test verb such as `play` outside a test, or a scenario verb such as `battle` outside a scenario. | Fix the spelling, or move the line. For a verb the game registers in C#, run with `--suppress CT301`. |
+| CT302 | error or warning | An unknown name. It is an error where a definition must be named (`apply Posion`, `card:Strke`, or a test or scenario line such as `hand Strik` or `battle Ghol`) or a status is read (`target.Posion`), and a warning for other names, which the game may supply at runtime. | Fix the spelling, or define it. |
 | CT303 | warning | A `tag:` test for a tag no definition has, so it never matches. | Fix the spelling, or give the tag to what should match. |
 | CT304 | warning | A listener on an event that nothing raises: it is not [built in](#built-in-events) and no content emits it, or it is `<stat>_changed` for a stat nothing in the content has. | Fix the event or stat name. The message suggests the nearest event, such as `turn_start` for `start_of_turn`. |
 | CT305 | note | An event is emitted but no content listens for it. | Nothing, if the game listens in its own code. Otherwise check the name. |
@@ -1031,6 +1088,9 @@ Codes with four digits come from reading and loading the files. An error among t
 | CT314 | warning | `for N turns` on a `duration` or `refresh` status that ticks down on its host's turns, with N more than the amount applied. The status lasts as many turns as the amount, and `for` can only end it sooner. | Give the turns as the amount: `apply Weak 2`, not `apply Weak for 2 turns`. |
 | CT315 | warning | A `duration` line on a `duration`, `refresh` or `both` status. The status takes its duration from whoever applies it, so the line does nothing. | Remove the line, and give the length where the status is applied: `apply Weak 2`. |
 | CT316 | warning | A tag with behaviour of its own written on a line of its own: `exhaust`, `retain`, `ethereal`, `unplayable`, `power` or `attack` under a card, or `buff` or `debuff` under a status. The line is a property that nothing reads, so the behaviour never happens. | Put the word on the `tags` line: `tags exhaust`. The message suggests the whole line. |
+| CT317 | warning | A [scenario](#scenarios) with no `battle` line, or a `battle` that names no enemy. There is nothing to play and nothing to measure. | Name the enemies to fight: `battle "Cinder Imp"`. |
+| CT318 | note or error | A scenario's `runs` count: a note below 100, where the same content answers differently each time, and an error when it is not a whole number of one or more. | `runs 500`. |
+| CT319 | error | An `expect` a scenario cannot check: a measurement it does not take, or a condition about one game, such as `expect enemy.hp == 3`. A scenario plays hundreds of games and measures `stalls`, `errors`, `wins`, `hp_left` and `turns` over all of them. | Compare a measurement with a number: `expect wins >= 55%`, `expect no stalls`. |
 
 **Descriptions**
 

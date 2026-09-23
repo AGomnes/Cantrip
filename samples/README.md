@@ -1,13 +1,13 @@
 # Samples
 
-Worked `.cantrip` content, each folder with its tests. On each change, CI runs `test` over each of the four folders in `samples`, and `lint` with `--warnings-as-errors`, so a folder must stay free of warnings as well as errors.
+Worked `.cantrip` content, each folder with its tests. On each change, CI runs `test` over each folder in `samples`, and `lint` with `--warnings-as-errors`, so a folder must stay free of warnings as well as errors. Two of them also have a `scenario`, which CI plays with `sim`.
 
 | Folder | What it shows |
 |---|---|
 | [`basic`](basic) | Small examples of most features in one file, with a test for each: Fireball, Frozen and Kindling from the README, poison and other statuses, a content-defined verb, a real-time ability, and the Strike, Defend and Jaw Worm that the README's C# example and the [C# guide](../docs/csharp.md) use. |
 | [`recipes`](recipes) | The content from [Writing content](../docs/writing-content.md). [`recipes/tutorial`](recipes/tutorial) holds the tutorial's finished files, and every other file is one recipe with its tests, such as [a boss that switches moves at half health](recipes/boss-switches-at-half-health.cantrip) or [a debuff that lasts N enemy turns](recipes/debuff-for-enemy-turns.cantrip). Some recipes use the tutorial's Strike, Defend, Poison or Bog Troll, so load the whole folder. |
-| [`abilities`](abilities) | A fight with no cards in it, as a turn-based roguelike has: two abilities on cooldowns, a bleed that ticks, and an enemy whose moves change when it is wounded, with tests for each. Everything a deckbuilder uses except the cards. |
-| [`slice`](slice) | A small roguelite: a witch climbing a five-floor tower, fire against frost, with 17 cards, 4 relics and 5 enemies, among them a boss, the Archmage, that changes its moves at half health. The simulator below plays it. |
+| [`abilities`](abilities) | A fight with no cards in it, as a turn-based roguelike has: two abilities on cooldowns, a bleed that ticks, and an enemy whose moves change when it is wounded, with tests for each. Everything a deckbuilder uses except the cards. [`sim.cantrip`](abilities/sim.cantrip) plays that fight many times. |
+| [`slice`](slice) | A small roguelite: a witch climbing a five-floor tower, fire against frost, with 17 cards, 4 relics and 5 enemies, among them a boss, the Archmage, that changes its moves at half health. [`sim.cantrip`](slice/sim.cantrip) states the tower as a scenario, and the simulator below plays a fuller run of it. |
 | [`corpus`](corpus) | Effects from nine existing games, re-created under our own names, one content file and one test file per game. [Coverage](../docs/coverage.md) says which the language writes directly, which need a workaround and which it cannot express yet. |
 | [`godot/Cantrip.Demo`](../godot/Cantrip.Demo) | A Godot project, kept beside the addon rather than here, that plays a battle from GDScript. [`demo/battle.gd`](../godot/Cantrip.Demo/demo/battle.gd) builds a hand of card buttons and enemy panels that show their intents, tells what happened in a log at a steady pace, and answers a card's choice with its first option where a game would open a picker. It plays the content in its `content` folder, which has tests of its own. To run it, build it once with `dotnet build godot/Cantrip.Demo/Cantrip.Demo.csproj`, open the folder in the .NET edition of Godot 4.6 and press Play. CI builds it and has it play a battle by itself. [godot.md](../docs/godot.md) explains the addon it uses. |
 
@@ -28,9 +28,20 @@ Load one folder at a time. The folders define some of the same names, such as `S
 
 In a project that has the tool installed, as the [quickstart](../docs/quickstart.md) sets up, the same commands are `dotnet cantrip test <folder>` and `dotnet cantrip lint <folder>`. `dotnet cantrip describe <folder>` prints the rules text of each definition, generated or written with `text:`, and `dotnet cantrip repl <folder>` runs single lines against a live battle. [The edit, lint and test loop](../docs/writing-content.md#5-the-edit-lint-and-test-loop) explains all four.
 
-## Running the simulator
+## Simulating a sample
 
-`src/Cantrip.Sim` plays whole runs of the slice with a bot and reports how they went. From the root of the repository:
+`samples/slice` and `samples/abilities` each hold a `scenario`: a deck, some fights in order, and whatever happens between them, played many times by a bot.
+
+```
+dotnet run --project src/Cantrip.Cli -- sim samples/slice
+dotnet run --project src/Cantrip.Cli -- sim samples/abilities --watch 1
+```
+
+The report leads with what the content allowed, whichever bot played: a run that threw, with the seed to replay it; a battle that reached the turn limit; a card that was never playable; an enemy move that never fired. `--watch SEED` plays one run and prints every statement, turn and play. [Simulating](../docs/simulating.md) covers the command, and says what the numbers under it do not mean.
+
+## Running the older whole-run simulator
+
+`src/Cantrip.Sim` is a separate program with the tower written in C# rather than in content. It plays whole runs of the slice with a bot, including the reward offer and the rest between floors, which a scenario does not have. From the root of the repository:
 
 ```
 dotnet run --project src/Cantrip.Sim -c Release -- --runs 500
@@ -56,5 +67,7 @@ For example, to follow one run turn by turn, then compare a random bot with the 
 dotnet run --project src/Cantrip.Sim -c Release -- --watch 7
 dotnet run --project src/Cantrip.Sim -c Release -- --runs 500 --bot random
 ```
+
+Its card and relic tables compare the runs that took a card with the runs that did not, and those runs differ in everything else as well; the bot decided both sides. Read them as a prompt to go and look at a card, never as a measure of one. [Simulating](../docs/simulating.md) says why a level is a fact about the bot.
 
 The tower, the rewards and the rest between floors are C# in [`src/Cantrip.Sim/Run.cs`](../src/Cantrip.Sim/Run.cs). It is a worked example of carrying one player through several battles in one runtime, which [Winning, losing and several battles](../docs/csharp.md#winning-losing-and-several-battles) describes.

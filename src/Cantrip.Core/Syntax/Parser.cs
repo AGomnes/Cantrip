@@ -230,6 +230,7 @@ namespace Cantrip.Syntax
             if (keyword == "verb") return ParseVerbDeclaration();
             if (keyword == "ruleset") return ParseRulesetDeclaration();
             if (keyword == "test") return ParseTestDeclaration();
+            if (keyword == "scenario") return ParseScenarioDeclaration();
             if (DeclarationKeywords.Contains(keyword)) return ParseEntityDeclaration();
 
             _diagnostics.Error(
@@ -247,6 +248,7 @@ namespace Cantrip.Syntax
             yield return "verb";
             yield return "ruleset";
             yield return "test";
+            yield return "scenario";
         }
 
         private EntityDeclNode ParseEntityDeclaration()
@@ -403,6 +405,23 @@ namespace Cantrip.Syntax
             if (Match(TokenKind.Indent)) ParseIndentedStatements(statements);
 
             return new TestDeclNode(name, new BlockNode(statements, keyword.Span), keyword.Span);
+        }
+
+        /// <summary>
+        /// A <c>scenario</c> body is statements, exactly as a test's is. The verbs that only appear
+        /// in one or the other, such as <c>battle</c> and <c>play</c>, are told apart by the linter
+        /// and by whoever runs the block, not here: the grammar attaches no meaning to a verb.
+        /// </summary>
+        private ScenarioDeclNode ParseScenarioDeclaration()
+        {
+            Token keyword = Advance();
+            string name = ParseDeclarationName("scenario");
+            Expect(TokenKind.Newline, "end of line");
+
+            var statements = new List<StatementNode>();
+            if (Match(TokenKind.Indent)) ParseIndentedStatements(statements);
+
+            return new ScenarioDeclNode(name, new BlockNode(statements, keyword.Span), keyword.Span);
         }
 
         // -----------------------------------------------------------------------------------

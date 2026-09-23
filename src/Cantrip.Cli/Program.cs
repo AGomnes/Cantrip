@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -9,6 +10,7 @@ using Cantrip.Descriptions;
 using Cantrip.Diagnostics;
 using Cantrip.Linting;
 using Cantrip.Runtime;
+using Cantrip.Sim.Scenarios;
 using Cantrip.Testing;
 
 namespace Cantrip.Cli
@@ -21,6 +23,7 @@ usage:
   cantrip validate <path>... [options] load content and report its errors, including unknown verbs and names
   cantrip lint <path>... [options]    load content and run static checks
   cantrip test <path>... [options]    run the `test` blocks in content
+  cantrip sim <path>... [options]     play the `scenario` blocks in content many times with a bot
   cantrip describe <path>... [--name <name>]
                                     print generated descriptions (all definitions, or one)
   cantrip repl <path>...              load content and run DSL statements interactively
@@ -28,7 +31,7 @@ usage:
 
 paths may be files or folders (folders load every *.cantrip file, recursively).
 
-validate and lint options:
+validate, lint and sim options:
   --suppress <codes>  comma-separated diagnostic codes to leave out, e.g. CT306,CT310, or CT301
                       for verbs your game registers in C#. Errors from loading always show
   --warnings-as-errors
@@ -38,8 +41,15 @@ test options:
   --filter <text>    only run tests whose name contains <text>
   --trace            print the causality trace, with any log output, for failing tests
 
-exit codes: 0 success, 1 content errors or failing tests (or lint warnings, with
---warnings-as-errors), 2 bad usage";
+sim options:
+  --name <text>      only scenarios whose name contains <text>
+  --runs N           play each scenario N times, whatever its `runs` line says
+  --seed S           the first seed (default 1); runs use S, S+1, ...
+  --turn-limit N     turns one battle may take before the run counts as a stall (default 50)
+  --watch SEED       play one run of one scenario and print every turn, play and statement
+
+exit codes: 0 success, 1 content errors, failing tests, a run that threw, a battle that hit the
+turn limit or a failed expectation (or lint warnings, with --warnings-as-errors), 2 bad usage";
 
         private static int Main(string[] args)
         {
@@ -62,6 +72,7 @@ exit codes: 0 success, 1 content errors or failing tests (or lint warnings, with
             bool trace = false;
             bool warningsAsErrors = false;
             var suppressed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var numbers = new Dictionary<string, string>(StringComparer.Ordinal);
 
             for (int i = 1; i < args.Length; i++)
             {
@@ -71,6 +82,12 @@ exit codes: 0 success, 1 content errors or failing tests (or lint warnings, with
                     case "--name" when i + 1 < args.Length: filter = args[++i]; break;
                     case "--trace": trace = true; break;
                     case "--warnings-as-errors": warningsAsErrors = true; break;
+                    case "--runs" when i + 1 < args.Length:
+                    case "--seed" when i + 1 < args.Length:
+                    case "--turn-limit" when i + 1 < args.Length:
+                    case "--watch" when i + 1 < args.Length:
+                        numbers[args[i]] = args[++i];
+                        break;
                     case "--suppress" when i + 1 < args.Length:
                         suppressed.UnionWith(args[++i].Split(',').Select(c => c.Trim()).Where(c => c.Length > 0));
                         break;
@@ -99,6 +116,14 @@ exit codes: 0 success, 1 content errors or failing tests (or lint warnings, with
                 return 2;
             }
 
+            // Only `sim` plays scenarios. Accepted by another command these would read as settings
+            // that were being used, which is worse than being refused.
+            if (numbers.Count > 0 && command != "sim")
+            {
+                Console.Error.WriteLine($"{string.Join(", ", numbers.Keys.OrderBy(o => o, StringComparer.Ordinal))} only applies to `sim`");
+                return 2;
+            }
+
             ContentLibrary? content = Load(paths);
             if (content == null) return 2;
 
@@ -107,6 +132,7 @@ exit codes: 0 success, 1 content errors or failing tests (or lint warnings, with
                 case "validate": return Validate(content, suppressed);
                 case "lint": return Lint(content, suppressed, warningsAsErrors);
                 case "test": return Test(content, filter, trace);
+                case "sim": return Sim(content, filter, suppressed, numbers);
                 case "describe": return Describe(content, filter);
                 case "repl": return Repl(content);
                 default:
@@ -205,7 +231,8 @@ exit codes: 0 success, 1 content errors or failing tests (or lint warnings, with
             int definitions = content.Definitions.Count();
             DiagnosticBag diagnostics = content.Diagnostics;
             Console.WriteLine(
-                $"{content.Files.Count()} file(s), {definitions} definition(s), {content.Verbs.Count()} verb(s), {content.Tests.Count} test(s): " +
+                $"{content.Files.Count()} file(s), {definitions} definition(s), {content.Verbs.Count()} verb(s), " +
+                $"{content.Tests.Count} test(s), {content.Scenarios.Count} scenario(s): " +
                 $"{diagnostics.Errors.Count() + broken.Count} error(s), {loading.Count(d => d.Severity == DiagnosticSeverity.Warning)} warning(s)");
             return ok && broken.Count == 0 ? 0 : 1;
         }
@@ -243,6 +270,83 @@ exit codes: 0 success, 1 content errors or failing tests (or lint warnings, with
             Console.WriteLine();
             Console.WriteLine($"{results.Count - failed} passed, {failed} failed");
             return failed == 0 ? 0 : 1;
+        }
+
+        /// <summary>
+        /// Plays the <c>scenario</c> blocks many times and reports what happened. It refuses to
+        /// start on a content error, the linter's errors included, so a scenario that names an
+        /// enemy nothing defines fails in milliseconds instead of after a hundred runs.
+        /// </summary>
+        private static int Sim(ContentLibrary content, string? name, ISet<string> suppressed, IReadOnlyDictionary<string, string> given)
+        {
+            // The options first: bad usage is bad usage, whatever the content turns out to be.
+            var options = new ScenarioOptions();
+            ulong? watch = null;
+            foreach (string option in given.Keys.OrderBy(o => o, StringComparer.Ordinal))
+            {
+                // A count of nothing is not a count; a seed of 0 is a seed like any other. A count
+                // past int.MaxValue is refused rather than quietly cut down to it, which would run
+                // a different number of times from the one asked for and say nothing.
+                bool counted = option == "--runs" || option == "--turn-limit";
+                if (!ulong.TryParse(given[option], NumberStyles.None, CultureInfo.InvariantCulture, out ulong value)
+                    || (counted && (value < 1 || value > int.MaxValue)))
+                {
+                    Console.Error.WriteLine(
+                        $"{option} takes a whole number{(counted ? $" from 1 to {int.MaxValue}" : string.Empty)}, not \"{given[option]}\"");
+                    return 2;
+                }
+
+                switch (option)
+                {
+                    case "--runs": options.Runs = (int)value; break;
+                    case "--turn-limit": options.TurnLimit = (int)value; break;
+                    case "--seed": options.FirstSeed = value; break;
+                    default: watch = value; break;
+                }
+            }
+
+            List<Diagnostic> loading = Loading(content, suppressed);
+            Print(loading);
+            List<Diagnostic> broken = Linter.Lint(content, Options(suppressed)).Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
+            Print(broken);
+            if (content.Diagnostics.HasErrors || broken.Count > 0) return 1;
+
+            List<ScenarioDefinition> scenarios = content.Scenarios
+                .Where(s => name == null || s.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0)
+                .ToList();
+
+            if (scenarios.Count == 0)
+            {
+                Console.Error.WriteLine(name == null
+                    ? "no `scenario` blocks are loaded. A scenario states a deck, the fights in order and what to measure."
+                    : $"no scenario's name contains \"{name}\"");
+                return 1;
+            }
+
+            var runner = new ScenarioRunner(content, options);
+
+            if (watch != null)
+            {
+                if (scenarios.Count > 1)
+                {
+                    Console.Error.WriteLine($"--watch plays one run of one scenario, and {scenarios.Count} are loaded. Pick one with --name <text>.");
+                    return 2;
+                }
+
+                RunResult one = runner.Replay(scenarios[0], watch.Value, Console.WriteLine);
+                return one.Error == null && !one.Stalled ? 0 : 1;
+            }
+
+            var results = new List<ScenarioResult>();
+            foreach (ScenarioDefinition scenario in scenarios)
+            {
+                ScenarioResult result = runner.Run(scenario);
+                SimReport.Print(result);
+                results.Add(result);
+            }
+
+            SimReport.Summary(results);
+            return results.Any(r => r.Failed) ? 1 : 0;
         }
 
         private static int Describe(ContentLibrary content, string? name)
