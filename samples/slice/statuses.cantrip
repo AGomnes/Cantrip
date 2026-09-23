@@ -1,7 +1,7 @@
 # The slice: a witch climbing a tower, with fire and frost pulling against each other.
 # From the root of the repository:
 #   test it with       dotnet run --project src/Cantrip.Cli -- test samples/slice
-#   simulate it with   dotnet run --project src/Cantrip.Sim -c Release
+#   simulate it with   dotnet run --project src/Cantrip.Cli -- sim samples/slice
 
 # --- Statuses --------------------------------------------------------------------------------
 # Burn is deliberately not tagged fire: a fire hit shatters Frozen, and a tick of Burn should not.

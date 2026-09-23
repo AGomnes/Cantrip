@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Cantrip.Content;
-using Cantrip.Sim.Scenarios;
+using Cantrip.Sim;
 using Xunit;
 
 namespace Cantrip.Tests.Sim
@@ -44,8 +44,8 @@ scenario ""A fight with a die in it""
         [Fact]
         public void The_same_seed_plays_the_same_run()
         {
-            ScenarioResult first = Play(Chancy, new ScenarioOptions { FirstSeed = 12, Runs = 6 });
-            ScenarioResult again = Play(Chancy, new ScenarioOptions { FirstSeed = 12, Runs = 6 });
+            ScenarioOutcome first = Play(Chancy, new ScenarioOptions { FirstSeed = 12, Runs = 6 }.Bot());
+            ScenarioOutcome again = Play(Chancy, new ScenarioOptions { FirstSeed = 12, Runs = 6 }.Bot());
 
             Assert.Equal(Transcript(first), Transcript(again));
         }
@@ -53,8 +53,8 @@ scenario ""A fight with a die in it""
         [Fact]
         public void A_different_first_seed_plays_different_runs()
         {
-            ScenarioResult first = Play(Chancy, new ScenarioOptions { FirstSeed = 12, Runs = 6 });
-            ScenarioResult other = Play(Chancy, new ScenarioOptions { FirstSeed = 500, Runs = 6 });
+            ScenarioOutcome first = Play(Chancy, new ScenarioOptions { FirstSeed = 12, Runs = 6 }.Bot());
+            ScenarioOutcome other = Play(Chancy, new ScenarioOptions { FirstSeed = 500, Runs = 6 }.Bot());
 
             Assert.NotEqual(Transcript(first), Transcript(other));
         }
@@ -62,10 +62,10 @@ scenario ""A fight with a die in it""
         [Fact]
         public void Watching_a_seed_replays_the_run_the_report_counted()
         {
-            var options = new ScenarioOptions { FirstSeed = 40, Runs = 3 };
+            var options = new ScenarioOptions { FirstSeed = 40, Runs = 3 }.Bot();
             ContentLibrary content = Load(Chancy);
             var runner = new ScenarioRunner(content, options);
-            ScenarioResult result = runner.Run(content.Scenarios[0]);
+            ScenarioResult result = runner.Run(content.Scenarios[0]).ByBot[0];
 
             var lines = new List<string>();
             RunResult watched = runner.Replay(content.Scenarios[0], 41, lines.Add);
@@ -75,6 +75,9 @@ scenario ""A fight with a die in it""
             Assert.Equal(result.Runs[1].Battles[0].Turns, watched.Battles[0].Turns);
             Assert.Contains(lines, line => line.Contains("turn 1"));
             Assert.Contains(lines, line => line.Contains("deck 6 Zap"));
+
+            // Which bot played is part of what a watched run is: another one plays it differently.
+            Assert.Contains(lines, line => line.Contains("cautious bot"));
         }
 
         /// <summary>
@@ -85,7 +88,7 @@ scenario ""A fight with a die in it""
         [Fact]
         public void A_run_that_throws_is_counted_rather_than_thrown()
         {
-            ScenarioResult result = Play(@"
+            ScenarioOutcome result = Play(@"
 enemy Slime
   hp 10
   move Splat:
@@ -96,7 +99,7 @@ scenario ""A typo""
   runs 3
   player hp 20
   battle Slim
-", new ScenarioOptions());
+", new ScenarioOptions().Bot());
 
             Assert.Equal(3, result.Errors);
             Assert.All(result.Runs, run => Assert.Contains("No enemy named `Slim` is defined", run.Error));
@@ -112,7 +115,7 @@ scenario ""A typo""
         [Fact]
         public void A_battle_that_never_ends_is_a_stall_and_not_a_hang()
         {
-            ScenarioResult result = Play(@"
+            ScenarioOutcome result = Play(@"
 enemy Wall
   hp 500
   move Wait:
@@ -124,7 +127,7 @@ scenario ""A wall""
   player hp 50
   battle Wall
   expect no stalls
-", new ScenarioOptions { TurnLimit = 6 });
+", new ScenarioOptions { TurnLimit = 6 }.Bot());
 
             Assert.Equal(2, result.Stalls);
             Assert.All(result.Runs, run => Assert.True(run.Stalled));
@@ -140,7 +143,7 @@ scenario ""A wall""
         [Fact]
         public void A_lost_battle_ends_the_run_where_it_stands()
         {
-            ScenarioResult result = Play(@"
+            ScenarioOutcome result = Play(@"
 enemy Hammer
   hp 100
   move Smash:
@@ -152,7 +155,7 @@ scenario ""Two fights, one survivable""
   player hp 10
   battle Hammer
   battle Hammer
-", new ScenarioOptions());
+", new ScenarioOptions().Bot());
 
             Assert.All(result.Runs, run => Assert.Single(run.Battles));
             Assert.All(result.Runs, run => Assert.False(run.Won));
@@ -173,7 +176,7 @@ scenario ""Two fights, one survivable""
             content.Diagnostics.ThrowIfErrors();
 
             ScenarioDefinition scenario = Assert.Single(content.Scenarios);
-            ScenarioResult result = new ScenarioRunner(content, new ScenarioOptions { Runs = 20 }).Run(scenario);
+            ScenarioOutcome result = new ScenarioRunner(content, new ScenarioOptions { Runs = 20 }.Bot()).Run(scenario);
 
             Assert.True(result.EveryRunIdentical);
             Assert.Equal(0, result.Errors);
@@ -188,7 +191,7 @@ scenario ""Two fights, one survivable""
         [Fact]
         public void A_bot_uses_abilities_where_there_are_no_cards()
         {
-            ScenarioResult result = Play(@"
+            ScenarioOutcome result = Play(@"
 ability Smite
   cooldown 1 turns
   target enemy
@@ -206,7 +209,7 @@ scenario ""No cards anywhere""
   player hp 40
   grant Smite
   battle Idol
-", new ScenarioOptions());
+", new ScenarioOptions().Bot());
 
             Assert.Equal(0, result.Stalls);
             Assert.All(result.Runs, run => Assert.True(run.Won));
@@ -220,7 +223,7 @@ scenario ""No cards anywhere""
         [Fact]
         public void A_move_that_never_fires_and_a_card_that_is_never_playable_are_both_reported()
         {
-            ScenarioResult result = Play(@"
+            ScenarioOutcome result = Play(@"
 card Zap
   cost 1
   target enemy
@@ -247,11 +250,54 @@ scenario ""What never happens""
   player hp 40 energy 3
   deck 4 Zap, Ruinous
   battle Idol
-", new ScenarioOptions());
+", new ScenarioOptions().Bot());
 
             Assert.Equal(new[] { "Ruinous" }, result.Facts.NeverPlayable);
             Assert.Contains(("Idol", "Wail"), result.Facts.NeverFired);
             Assert.DoesNotContain(("Idol", "Stare"), result.Facts.NeverFired);
+        }
+
+        /// <summary>
+        /// A card made part way through a turn and played from the hand it was made into. Reading
+        /// the hand only at the start of a turn never sees it, so the report would say it never
+        /// reached a hand and was never playable — both false, and both said in the block that is
+        /// supposed to hold whoever plays. The engine's own events are what settle it.
+        /// </summary>
+        [Fact]
+        public void A_card_created_into_the_hand_mid_turn_reached_a_hand_and_was_playable()
+        {
+            ScenarioOutcome result = Play(@"
+card Scrap
+  cost 0
+  effect:
+    create Windfall into hand
+
+card Windfall
+  cost 0
+  target enemy
+  effect:
+    deal 5 to target
+
+enemy Idol
+  hp 10
+  move Stare:
+    block 1
+  pattern cycle Stare
+
+scenario ""A card that arrives mid-turn""
+  runs 2
+  player hp 40 energy 3
+  deck 4 Scrap
+  battle Idol
+", new ScenarioOptions().Bot());
+
+            // The guard: Windfall really was made, and really was played.
+            Assert.Equal(0, result.Errors);
+            Assert.Contains("Windfall", result.ByBot[0].Meter.Cards.Select(t => t.Name));
+            Assert.Contains("Windfall", result.Facts.CardsOwned);
+
+            Assert.Empty(result.Facts.NeverHeld);
+            Assert.Empty(result.Facts.NeverPlayable);
         }
 
         [Fact]
@@ -273,7 +319,7 @@ scenario ""What never happens""
         [InlineData("realtime 60", "turn-based")]
         public void A_line_a_scenario_cannot_have_is_refused_by_the_runner(string line, string says)
         {
-            ScenarioResult result = Play(@"
+            ScenarioOutcome result = Play(@"
 enemy Slime
   hp 10
   move Splat:
@@ -285,19 +331,38 @@ scenario ""Wrong block""
   player hp 20
   " + line + @"
   battle Slime
-", new ScenarioOptions());
+", new ScenarioOptions().Bot());
 
             Assert.Equal(2, result.Errors);
             Assert.All(result.Runs, run => Assert.Contains(says, run.Error));
         }
 
-        private static ScenarioResult Play(string dsl, ScenarioOptions options)
+        /// <summary>
+        /// Two bots play the same runs from the same seeds, and what each did is kept apart. What
+        /// the content allowed is not: a fact either bot reached is a fact about the content.
+        /// </summary>
+        [Fact]
+        public void Two_bots_play_the_same_seeds_and_share_one_set_of_facts()
+        {
+            ScenarioOutcome result = Play(Chancy, new ScenarioOptions { Runs = 4 });
+
+            Assert.Equal(new[] { Bots.Cautious, Bots.Patient }, result.ByBot.Select(b => b.Bot));
+            Assert.All(result.ByBot, bot => Assert.Equal(new ulong[] { 1, 2, 3, 4 }, bot.Runs.Select(r => r.Seed)));
+            Assert.Equal(8, result.Runs.Count());
+            Assert.Equal(4, result.RunsEach);
+
+            // One block of facts for both of them, and one `expect no stalls` answered over both.
+            Assert.Empty(result.Facts.NeverPlayable);
+            Assert.Equal(2, result.Expectations.Count);
+        }
+
+        internal static ScenarioOutcome Play(string dsl, ScenarioOptions options)
         {
             ContentLibrary content = Load(dsl);
             return new ScenarioRunner(content, options).Run(content.Scenarios[0]);
         }
 
-        private static ContentLibrary Load(string dsl)
+        internal static ContentLibrary Load(string dsl)
         {
             ContentLibrary content = ContentLibrary.FromText(dsl);
             content.Diagnostics.ThrowIfErrors();
@@ -305,18 +370,32 @@ scenario ""Wrong block""
         }
 
         /// <summary>Everything a run came to, as text, so two runs can be compared whole.</summary>
-        private static string Transcript(ScenarioResult result) =>
+        private static string Transcript(ScenarioOutcome result) =>
             string.Join("\n", result.Runs.Select(run =>
                 $"{run.Seed} {run.Won} {run.HpLeft} {run.Error} " +
                 string.Join(",", run.Battles.Select(b => $"{b.Label}:{b.Won}:{b.Turns}:{b.HpLost}"))));
 
-        private static string RepositoryRoot()
+        internal static string RepositoryRoot()
         {
             for (DirectoryInfo? directory = new DirectoryInfo(AppContext.BaseDirectory); directory != null; directory = directory.Parent)
             {
                 if (File.Exists(Path.Combine(directory.FullName, "Cantrip.sln"))) return directory.FullName;
             }
             throw new InvalidOperationException("Could not find the repository root.");
+        }
+    }
+
+    internal static class SimOptions
+    {
+        /// <summary>
+        /// Pins the options to one bot. A test that counts runs, errors or stalls is measuring the
+        /// runner rather than a bot, and two bots would only double every number in it.
+        /// </summary>
+        public static ScenarioOptions Bot(this ScenarioOptions options, string name = Bots.Cautious)
+        {
+            options.MakeBots.Clear();
+            options.MakeBots.Add(Bots.Make(name));
+            return options;
         }
     }
 }

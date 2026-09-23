@@ -151,7 +151,7 @@ Installed as a local tool, the commands run as `dotnet cantrip ...`:
 | `dotnet cantrip validate <path>... [--suppress codes]` | Reports errors, including unknown verbs |
 | `dotnet cantrip lint <path>... [--suppress codes] [--warnings-as-errors]` | Also reports likely mistakes, such as events nothing raises |
 | `dotnet cantrip test <path>... [--filter text] [--trace]` | Runs the `test` blocks; `--trace` adds the causality trace, with any `log` output, to each failure |
-| `dotnet cantrip sim <path>... [--runs N] [--seed S] [--turn-limit N] [--watch SEED]` | Plays the `scenario` blocks many times with a bot and reports what the content allowed |
+| `dotnet cantrip sim <path>... [--runs N] [--seed S] [--bot name] [--turn-limit N] [--watch SEED]` | Plays the `scenario` blocks many times with two bots, and reports what the content allowed and where the hp went |
 | `dotnet cantrip describe <path>... [--name name]` | Prints generated rules text |
 | `dotnet cantrip repl <path>...` | Runs each statement you type as the player, against a 100 hp Dummy; `:state`, `:trace`, `:quit` |
 | `dotnet cantrip --version` | Prints the version and the commit it was built from |

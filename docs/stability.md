@@ -41,13 +41,13 @@ Same-seed results are not on that list. A 1.x release may change what the same c
 
 ## Performance
 
-On a Windows laptop (an Intel Core Ultra 5 125U, plugged in), the simulator plays its default 500 runs of the sample roguelite in about 8.5 seconds, or 17 ms per run. From the repository root:
+On a Windows laptop (an Intel Core Ultra 5 125U, plugged in), `cantrip sim` plays 500 runs of the sample roguelite's gauntlet with the cautious bot in about 14 seconds, or 28 ms per run. From the repository root:
 
 ```
-dotnet run --project src/Cantrip.Sim -c Release
+dotnet run --project src/Cantrip.Cli -c Release -- sim samples/slice --runs 500 --bot cautious
 ```
 
-The first line of its report gives the time. Each run is up to five floors of battles, and before each card it plays, the bot tries every legal play, ends the turn to score the result, and restores a snapshot of the game. A build instrumented to count them shows that the 500 runs make about 205,000 plays, 214,000 turn ends and 206,000 restores, most of them trial moves that are rolled back. So a play or a turn end, with its share of the snapshots, averages about 20 microseconds. Nothing yet measures memory, allocations or how long content takes to load.
+The bot's table gives the time. Each run is four battles, and before every play the bot tries each legal play, ends the turn to score the result, and restores a snapshot of the game. Those trials are most of the work: over 200 runs the engine raises about 1.18 million events inside them against 91 thousand in the play that counted, thirteen times as many. Two bots play by default, which costs about twice as long — about 30 seconds for the same 500 runs — and the patient bot is slower again at about 37 ms per run; `--bot random` tries nothing and finishes the same 500 runs in under two seconds. Nothing yet measures memory, allocations or how long content takes to load.
 
 ## Determinism
 

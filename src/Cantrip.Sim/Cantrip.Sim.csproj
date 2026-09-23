@@ -1,19 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
     <RootNamespace>Cantrip.Sim</RootNamespace>
-    <AssemblyName>cantrip-sim</AssemblyName>
-    <!-- Built for net9.0 but runs on any later runtime, so a machine with only a newer .NET can use it. -->
-    <RollForward>Major</RollForward>
-    <!-- A tool for this repository, not something to install. -->
+    <AssemblyName>Cantrip.Sim</AssemblyName>
+    <!-- A library, shipped inside the `cantrip` tool rather than packed or installed on its own. -->
     <IsPackable>false</IsPackable>
-    <Description>Plays whole runs of the slice headlessly with a bot, and reports how they went.</Description>
+    <Description>What `cantrip sim` runs: the scenario runner, its bots and the meter that records what the engine raised.</Description>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Cantrip.Core\Cantrip.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The meter's per-run ledger is checked against the engine's own hp, which is a test's job. -->
+    <InternalsVisibleTo Include="Cantrip.Core.Tests" />
   </ItemGroup>
 
 </Project>

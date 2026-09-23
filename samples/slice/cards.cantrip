@@ -1,5 +1,5 @@
 # --- Starter deck ----------------------------------------------------------------------------
-# 4 Zap, 4 Ward, Kindle and Rime. The simulator builds the deck; the cards only say what they do.
+# 4 Zap, 4 Ward, Kindle and Rime. sim.cantrip states the deck; the cards only say what they do.
 
 card Zap
   cost 1

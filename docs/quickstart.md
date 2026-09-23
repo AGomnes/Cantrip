@@ -171,7 +171,7 @@ The whole rules engine is behind those few calls. Nothing in `Program.cs` knows 
 - [language.md](language.md) is the full language reference: every declaration, event, verb and modifier.
 - [godot.md](godot.md) runs the same content in Godot 4.6 through an addon, with an editor dock for problems, tests and card text.
 - [csharp.md](csharp.md) covers the rest of the C# side: showing events in a game's frame loop, player choices a UI answers, several battles in one run, saving and loading, hot reload, shipping content, and tracing why something happened.
-- [samples/slice](../samples/slice) is a bigger example, a five-floor roguelite. `dotnet cantrip sim samples/slice` plays its tower hundreds of times with a bot and reports what the content allowed: a run that threw, a fight that never ended, a card that was never playable, an enemy move that never fired. [Simulating](simulating.md) covers it. The samples are in the repository rather than the packages, so clone it to run them; [samples/README.md](../samples/README.md) shows how, and describes the other samples.
+- [samples/slice](../samples/slice) is a bigger example, a five-floor roguelite. `dotnet cantrip sim samples/slice` plays its tower hundreds of times with two bots and reports what the content allowed: a run that threw, a fight that never ended, a card that was never playable, an enemy move that never fired — and where the hp went, which is the engine's own arithmetic rather than a judgement about play. [Simulating](simulating.md) covers it. The samples are in the repository rather than the packages, so clone it to run them; [samples/README.md](../samples/README.md) shows how, and describes the other samples.
 
 ## Working from source
 

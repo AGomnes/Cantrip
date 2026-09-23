@@ -9,7 +9,7 @@ using Cantrip.Runtime;
 using Cantrip.Syntax;
 using Cantrip.Testing;
 
-namespace Cantrip.Sim.Scenarios
+namespace Cantrip.Sim
 {
     /// <summary>How the runner plays a scenario. The command line sets these; nothing else does.</summary>
     public sealed class ScenarioOptions
@@ -23,8 +23,19 @@ namespace Cantrip.Sim.Scenarios
         /// <summary>Turns one battle may take before the run is called a stall.</summary>
         public int TurnLimit { get; set; } = ScenarioRunner.DefaultTurnLimit;
 
-        /// <summary>Makes the bot for a run from its seed. Replacing this is how a new bot arrives.</summary>
-        public Func<ulong, IBot> MakeBot { get; set; } = seed => new FirstPlayableBot(seed);
+        /// <summary>
+        /// The bots that play, in the order the report prints them. Each one plays every run, from
+        /// the same seeds, so the two are comparable run for run. Two of them play by default,
+        /// because how far a run got is a fact about the bot and the second one is there to say so.
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// options.MakeBots.Clear();
+        /// options.MakeBots.Add(Bots.Make(Bots.Random));
+        /// </code>
+        /// </example>
+        public IList<Func<ulong, IBot>> MakeBots { get; } =
+            new List<Func<ulong, IBot>>(Bots.Pair.Select(Bots.Make));
     }
 
     /// <summary>
@@ -37,7 +48,7 @@ namespace Cantrip.Sim.Scenarios
     /// <example>
     /// <code>
     /// var runner = new ScenarioRunner(content, new ScenarioOptions { Runs = 100 });
-    /// ScenarioResult result = runner.Run(content.Scenarios[0]);
+    /// ScenarioOutcome outcome = runner.Run(content.Scenarios[0]);
     /// </code>
     /// </example>
     public sealed class ScenarioRunner
@@ -77,50 +88,116 @@ namespace Cantrip.Sim.Scenarios
             return written ?? DefaultRuns;
         }
 
-        /// <summary>Plays the scenario <see cref="RunCount"/> times and measures what happened.</summary>
-        public ScenarioResult Run(ScenarioDefinition scenario)
+        /// <summary>
+        /// Plays the scenario <see cref="RunCount"/> times with every bot, and measures what
+        /// happened. What the content allowed is collected once over all of them; what each bot did
+        /// with it is kept apart, one table each.
+        /// </summary>
+        public ScenarioOutcome Run(ScenarioDefinition scenario)
         {
             if (scenario == null) throw new ArgumentNullException(nameof(scenario));
+            if (_options.MakeBots.Count == 0)
+                throw new InvalidOperationException("A scenario needs a bot to play it, and ScenarioOptions.MakeBots is empty.");
 
-            var result = new ScenarioResult(scenario, _options.MakeBot(_options.FirstSeed), _options.TurnLimit);
+            var outcome = new ScenarioOutcome(scenario, _options.TurnLimit);
             foreach (CommandNode command in Commands(scenario.Syntax.Body))
             {
-                if (Is(command, "battle")) result.BattleLines++;
-                else if (!Is(command, "runs") && !Is(command, "expect")) result.OtherLines++;
+                if (Is(command, "battle")) outcome.BattleLines++;
+                else if (!Is(command, "runs") && !Is(command, "expect")) outcome.OtherLines++;
             }
 
             int runs = RunCount(scenario);
-            var clock = Stopwatch.StartNew();
-            for (int i = 0; i < runs; i++)
-                result.Runs.Add(new OneRun(this, scenario, _options.FirstSeed + (ulong)i, result.Facts, null).Play());
-            clock.Stop();
-            result.Elapsed = clock.Elapsed;
+            foreach (Func<ulong, IBot> makeBot in _options.MakeBots)
+            {
+                IBot named = makeBot(_options.FirstSeed);
+                var result = new ScenarioResult(named.Name, named.Description);
 
-            foreach (ExpectResult expectation in Measure(scenario, result)) result.Expectations.Add(expectation);
-            return result;
+                // One meter for all of this bot's runs: what the engine raised is added up over
+                // them, and it is kept apart from the other bot's, because which plays happened is
+                // this bot's doing even though what they cost is the content's.
+                Meter meter = NewMeter(outcome.Facts);
+                result.Meter = meter;
+
+                var clock = Stopwatch.StartNew();
+                for (int i = 0; i < runs; i++)
+                    result.Runs.Add(new OneRun(this, scenario, _options.FirstSeed + (ulong)i, outcome.Facts, meter, makeBot, null).Play());
+                clock.Stop();
+
+                result.Elapsed = clock.Elapsed;
+                outcome.ByBot.Add(result);
+            }
+
+            foreach (ExpectResult expectation in Measure(scenario, outcome)) outcome.Expectations.Add(expectation);
+            return outcome;
         }
 
         /// <summary>
-        /// Plays one run and tells <paramref name="log"/> every turn, play and statement, for
-        /// <c>--watch</c>. It is the same run the report counted: the seed decides everything.
+        /// Plays one run with the first bot and tells <paramref name="log"/> every turn, play and
+        /// statement, for <c>--watch</c>. It is the same run the report counted: the seed and the
+        /// bot decide everything.
         /// </summary>
         public RunResult Replay(ScenarioDefinition scenario, ulong seed, Action<string> log)
         {
             if (scenario == null) throw new ArgumentNullException(nameof(scenario));
             if (log == null) throw new ArgumentNullException(nameof(log));
+            if (_options.MakeBots.Count == 0)
+                throw new InvalidOperationException("A scenario needs a bot to play it, and ScenarioOptions.MakeBots is empty.");
 
-            return new OneRun(this, scenario, seed, new ContentFacts(), log).Play();
+            var facts = new ContentFacts();
+            return new OneRun(this, scenario, seed, facts, NewMeter(facts), _options.MakeBots[0], log).Play();
+        }
+
+        /// <summary>
+        /// A meter wired to this scenario: a move it sees fire goes into the facts as well, as does
+        /// a card it sees reach a hand, and a span it has to name is placed in whichever
+        /// declaration it falls in.
+        /// </summary>
+        private Meter NewMeter(ContentFacts facts) => new Meter
+        {
+            MoveFired = (enemy, move) => facts.MovesFired.Add((enemy, move)),
+            CardInHand = (card, played) =>
+            {
+                facts.CardsHeld.Add(card.Name);
+
+                // A card that was played was playable, whether or not it could have been played at
+                // the start of the turn: the energy for it may have arrived halfway through.
+                if (played) facts.CardsPlayable.Add(card.Name);
+            },
+            Owner = Declaring,
+        };
+
+        /// <summary>
+        /// The declaration a line belongs to: the last one that starts at or before it in the same
+        /// file. It is how a choice nothing could judge is reported as a card's name rather than as
+        /// a line number nobody recognises.
+        /// </summary>
+        private string? Declaring(SourceSpan span)
+        {
+            if (span.IsNone) return null;
+
+            DeclarationNode? best = null;
+            foreach (SourceFileNode file in _content.Files)
+            {
+                if (!string.Equals(file.Path, span.File, StringComparison.OrdinalIgnoreCase)) continue;
+                foreach (DeclarationNode declaration in file.Declarations)
+                {
+                    if (declaration.Span.Line > span.Line) continue;
+                    if (best == null || declaration.Span.Line > best.Span.Line) best = declaration;
+                }
+            }
+            return best?.Name;
         }
 
         // Expectations -----------------------------------------------------------------------
 
         /// <summary>
-        /// Reads each <c>expect</c> line and answers it from the runs. <c>stalls</c> and
-        /// <c>errors</c> are facts about the content and are checked. <c>wins</c>, <c>hp_left</c>
-        /// and <c>turns</c> measure what the bot did, and this release's bot is a placeholder, so
-        /// they are reported unchecked rather than answered with a number nobody should quote.
+        /// Reads each <c>expect</c> line and answers it from the runs of every bot. <c>stalls</c>
+        /// and <c>errors</c> are facts about the content and are checked. <c>wins</c>,
+        /// <c>hp_left</c> and <c>turns</c> are levels, which are facts about the bot — two bots
+        /// reach two numbers on the same content — so they are reported unchecked rather than
+        /// answered with a number nobody should quote.
         /// </summary>
-        private static IEnumerable<ExpectResult> Measure(ScenarioDefinition scenario, ScenarioResult result)
+        private static IEnumerable<ExpectResult> Measure(ScenarioDefinition scenario, ScenarioOutcome result)
         {
             foreach (CommandNode command in Commands(scenario.Syntax.Body))
             {
@@ -160,7 +237,7 @@ namespace Cantrip.Sim.Scenarios
                 }
                 else
                 {
-                    answer.Detail = $"not checked: `{metric.ToLowerInvariant()}` measures what the bot did, and the bot in this release is a placeholder";
+                    answer.Detail = $"not checked: `{metric.ToLowerInvariant()}` is a level, and a level is a fact about the bot rather than about your content";
                 }
 
                 yield return answer;
@@ -284,27 +361,45 @@ namespace Cantrip.Sim.Scenarios
             private readonly CardRuntime _runtime;
             private readonly SetupSession _setup;
             private readonly IBot _bot;
+            private readonly Trials _trials;
+            private readonly Meter _meter;
+            private readonly HpLedger _ledger = new HpLedger();
             private int _battles;
             private bool _over;
 
-            public OneRun(ScenarioRunner owner, ScenarioDefinition scenario, ulong seed, ContentFacts facts, Action<string>? log)
+            public OneRun(ScenarioRunner owner, ScenarioDefinition scenario, ulong seed, ContentFacts facts, Meter meter, Func<ulong, IBot> makeBot, Action<string>? log)
             {
                 _owner = owner;
                 _scenario = scenario;
                 _facts = facts;
                 _log = log;
-                _result = new RunResult(seed);
-                _bot = owner._options.MakeBot(seed);
+                _meter = meter;
+                _result = new RunResult(seed) { Ledger = _ledger };
+                _bot = makeBot(seed);
 
                 var answers = new ScriptedChooser();
+                var chooser = new ScenarioChooser(answers, _bot.Chooser, meter);
                 var options = new RuntimeOptions
                 {
                     Seed = seed,
-                    Chooser = new ScenarioChooser(answers, _bot.Chooser),
-                    Host = new FactHost(facts),
+                    Chooser = chooser,
+                    Host = meter,
                 };
                 _runtime = new CardRuntime(owner._content, options);
                 _setup = new SetupSession(_runtime, answers);
+
+                // The meter adds up over every run of one bot, but its hp ledger is this run's: it
+                // is checked against actors that only exist here.
+                meter.Recording = true;
+                meter.Ledger = _ledger;
+
+                // The switch a bot's lookahead throws: while it is trying a play, nothing that
+                // happens is happening, so nothing is recorded and no `answer` is spent.
+                _trials = new Trials(_runtime, on =>
+                {
+                    meter.Recording = on;
+                    chooser.Answering = on;
+                });
 
                 // Beside the setup verbs: what a scenario has instead of a test's `play` and
                 // `end turn`. `runs` and `expect` are read from the body before a run starts, so
@@ -320,7 +415,7 @@ namespace Cantrip.Sim.Scenarios
 
             public RunResult Play()
             {
-                _log?.Invoke($"{_scenario.Name}, seed {_result.Seed}");
+                _log?.Invoke($"{_scenario.Name}, seed {_result.Seed}, {_bot.Name} bot");
                 StatementNode? at = null;
 
                 try
@@ -364,9 +459,15 @@ namespace Cantrip.Sim.Scenarios
                 Entity player = _runtime.Player ?? throw Refuse("the scenario has no player to fight with.", call);
                 int hpBefore = player.GetInt("hp");
 
+                // The hp ledger watches from the first fight: before that a statement may set hp
+                // outright, which is a number the engine raises nothing for and so nothing to
+                // check the meter against. Each enemy joins it at the hp it spawned with.
+                _ledger.Watch(player);
+
                 foreach (string name in names)
                 {
                     Entity enemy = _runtime.SpawnEnemy(_setup.Defined(name, call.Span, "enemy", "enemy"));
+                    _ledger.Watch(enemy);
                     foreach (MoveDefinition move in enemy.Definition?.Moves ?? Array.Empty<MoveDefinition>())
                         _facts.MovesDefined.Add((enemy.Name, move.Name));
                 }
@@ -381,7 +482,7 @@ namespace Cantrip.Sim.Scenarios
                     Observe();
                     log?.Invoke($"    turn {battle.Turns}  {Watch.Board(_runtime)}");
                     if (log != null && Watch.Hand(_runtime) is string hand) log("      " + hand);
-                    _bot.PlayTurn(_runtime, log == null ? null : new Action<string>(line => log("      " + line)));
+                    _bot.PlayTurn(_runtime, _trials, log == null ? null : new Action<string>(line => log("      " + line)));
                     if (_runtime.Won != null) break;
                     _runtime.EndTurn();
                 }
@@ -434,50 +535,50 @@ namespace Cantrip.Sim.Scenarios
         }
 
         /// <summary>
-        /// Writes what the engine raised into the facts. Only <c>move</c> matters yet; the damage
-        /// meter that comes next hangs off the same call, which fires after every event.
-        /// </summary>
-        /// <remarks>
-        /// Every turn the placeholder bot plays is played for real, so everything this hears
-        /// happened. A bot that tries a play through <c>Capture</c> and <c>Restore</c> before
-        /// choosing must be able to stop this recording while it does, or a move it merely tried
-        /// is counted as one that fired. That switch belongs with the first bot that needs it.
-        /// </remarks>
-        private sealed class FactHost : EffectHostBase
-        {
-            private readonly ContentFacts _facts;
-
-            public FactHost(ContentFacts facts) => _facts = facts;
-
-            public override void OnEvent(GameEvent gameEvent)
-            {
-                if (gameEvent.Source == null || !string.Equals(gameEvent.Name, "move", StringComparison.Ordinal)) return;
-                if (gameEvent.Data.TryGetValue("move", out Value move) && move.Text != null)
-                    _facts.MovesFired.Add((gameEvent.Source.Name, move.Text));
-            }
-        }
-
-        /// <summary>
         /// Answers what a scenario's <c>answer</c> lines queued, and leaves the rest to the bot, so
         /// a choice content asks for mid-effect is made by whatever is playing.
         /// </summary>
+        /// <remarks>
+        /// An answer is spent when it is used, and a queue cannot be wound back, so a play a bot
+        /// merely tried would take an answer the run still needs and the scenario would go on
+        /// without the one it wrote. While a trial is open the bot therefore answers its own
+        /// choices and the queue is left alone; a trial of a play whose answer was written can
+        /// come out differently from the play itself, which is the cheaper of the two mistakes.
+        /// </remarks>
         private sealed class ScenarioChooser : IChoiceProvider, IDefinitionChooser
         {
             private readonly ScriptedChooser _answers;
             private readonly IChoiceProvider _bot;
+            private readonly Meter _meter;
 
-            public ScenarioChooser(ScriptedChooser answers, IChoiceProvider bot)
+            public ScenarioChooser(ScriptedChooser answers, IChoiceProvider bot, Meter meter)
             {
                 _answers = answers;
                 _bot = bot;
+                _meter = meter;
             }
 
-            public IReadOnlyList<Entity> Choose(ChoiceRequest request, GameState state) =>
-                _answers.Remaining > 0 ? _answers.Choose(request, state) : _bot.Choose(request, state);
+            /// <summary>False while a bot is trying a play, when an answer must not be spent.</summary>
+            public bool Answering { get; set; } = true;
+
+            private bool Scripted => Answering && _answers.Remaining > 0;
+
+            public IReadOnlyList<Entity> Choose(ChoiceRequest request, GameState state)
+            {
+                if (Scripted) return _answers.Choose(request, state);
+
+                // Nothing here judged this: the bot looks one play ahead, not into the middle of
+                // one. The report names the line rather than letting the rest of it be read as a
+                // measurement of a card whose effect was settled by a coin.
+                _meter.Guessed(request.Span);
+                return _bot.Choose(request, state);
+            }
 
             public EntityDefinition? ChooseDefinition(DefinitionChoice request, GameState state)
             {
-                if (_answers.Remaining > 0) return _answers.ChooseDefinition(request, state);
+                if (Scripted) return _answers.ChooseDefinition(request, state);
+
+                _meter.Guessed(request.Span);
                 return _bot is IDefinitionChooser chooser
                     ? chooser.ChooseDefinition(request, state)
                     : request.Options.FirstOrDefault();

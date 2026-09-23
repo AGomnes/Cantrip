@@ -2,11 +2,11 @@ using System.Collections.Generic;
 using System.Linq;
 using Cantrip.Runtime;
 
-namespace Cantrip.Sim.Scenarios
+namespace Cantrip.Sim
 {
     /// <summary>
-    /// What a turn looks like written down, for <c>--watch</c>. The older whole-run simulator has
-    /// the same two helpers in Run.cs; they become one when it goes.
+    /// What a turn looks like written down, for <c>--watch</c>: the board before the bot acts, and
+    /// the hand it chose from.
     /// </summary>
     internal static class Watch
     {

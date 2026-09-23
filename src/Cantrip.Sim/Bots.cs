@@ -1,169 +1,224 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Cantrip.Content;
 using Cantrip.Runtime;
 
 namespace Cantrip.Sim
 {
     /// <summary>
-    /// Plays for the player. It is also the runtime's chooser, so the same policy answers the
-    /// decisions content asks for mid-effect: which card to discard, which card to discover.
+    /// The bots <c>--bot</c> knows, and how a run makes one. A bot is made afresh for every run,
+    /// from that run's seed, so the same command plays the same runs on any machine.
     /// </summary>
-    public interface IBot : IChoiceProvider, IDefinitionChooser
+    /// <remarks>
+    /// All of them weigh a position the same way — the player's hp against the enemies' — so they
+    /// are wrong in the same direction about a card that draws, and about anything that pays off
+    /// several turns later. Two of them agreeing is therefore not evidence that either is right.
+    /// </remarks>
+    public static class Bots
     {
-        void PlayTurn(CardRuntime runtime, Action<string>? log);
-        int PickReward(IReadOnlyList<string> offer, CardRuntime runtime);
-        bool FightElite(CardRuntime runtime);
-    }
+        /// <summary>One turn of lookahead. The default, with <see cref="Patient"/> beside it.</summary>
+        public const string Cautious = "cautious";
 
-    internal static class Plays
-    {
-        /// <summary>Every card in hand that can be paid for now, with each target it may be aimed at.</summary>
-        public static List<(int Card, int Target)> Legal(CardRuntime runtime)
+        /// <summary>The same, two turns out. Its job is to disagree with <see cref="Cautious"/>.</summary>
+        public const string Patient = "patient";
+
+        /// <summary>The floor, and the fastest way to fuzz content.</summary>
+        public const string Random = "random";
+
+        /// <summary>What <c>--bot both</c> is called on the command line.</summary>
+        public const string Both = "both";
+
+        /// <summary>Every bot's name, in the order a report prints them.</summary>
+        public static IReadOnlyList<string> Names { get; } = new[] { Cautious, Patient, Random };
+
+        /// <summary>
+        /// The two bots that play when nobody says otherwise. A level one bot reaches is a fact
+        /// about that bot, and the second one is there to say so out loud.
+        /// </summary>
+        public static IReadOnlyList<string> Pair { get; } = new[] { Cautious, Patient };
+
+        /// <summary>Whether <paramref name="name"/> is one of <see cref="Names"/>, in any case.</summary>
+        public static bool Exists(string name) =>
+            Names.Any(known => string.Equals(known, name, StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>How a run makes the named bot from its seed.</summary>
+        /// <exception cref="ArgumentException">Nothing is called that.</exception>
+        public static Func<ulong, IBot> Make(string name)
         {
-            var plays = new List<(int, int)>();
-            foreach (Entity card in runtime.State.ZoneOf(runtime.Player, Zones.Hand).ToArray())
-            {
-                if (!runtime.CanPlay(card)) continue;
+            if (name == null) throw new ArgumentNullException(nameof(name));
 
-                // An enemy or ally card is aimed at each legal target in turn; anything else is
-                // played at nothing and resolves its own target, as a self card does.
-                string mode = runtime.TargetMode(card);
-                if (mode == "enemy" || mode == "ally")
-                {
-                    foreach (Entity target in runtime.LegalTargets(card)) plays.Add((card.Id, target.Id));
-                }
-                else
-                {
-                    plays.Add((card.Id, 0));
-                }
-            }
-            return plays;
+            if (string.Equals(name, Cautious, StringComparison.OrdinalIgnoreCase))
+                return seed => new LookaheadBot(Cautious, turns: 1, seed);
+            if (string.Equals(name, Patient, StringComparison.OrdinalIgnoreCase))
+                return seed => new LookaheadBot(Patient, turns: 2, seed);
+            if (string.Equals(name, Random, StringComparison.OrdinalIgnoreCase))
+                return seed => new RandomBot(seed);
+
+            throw new ArgumentException($"No bot is called `{name}`. The bots are {string.Join(", ", Names)}.", nameof(name));
         }
-
-        public static PlayResult Play(CardRuntime runtime, (int Card, int Target) play) =>
-            runtime.Play(runtime.State.Find(play.Card)!, play.Target == 0 ? null : runtime.State.Find(play.Target));
-
-        public static string Describe(CardRuntime runtime, (int Card, int Target) play)
-        {
-            string card = runtime.State.Find(play.Card)?.Name ?? "?";
-            return play.Target == 0 ? card : card + " -> " + runtime.State.Find(play.Target)?.Name;
-        }
-    }
-
-    /// <summary>Plays random affordable cards at random targets until nothing is affordable.</summary>
-    public sealed class RandomBot : IBot
-    {
-        private readonly Rng _rng;
-
-        public RandomBot(ulong seed) => _rng = new Rng(seed ^ 0xB07UL);
-
-        public void PlayTurn(CardRuntime runtime, Action<string>? log)
-        {
-            for (int guard = 0; guard < 30 && runtime.Won == null; guard++)
-            {
-                List<(int, int)> plays = Plays.Legal(runtime);
-                if (plays.Count == 0) return;
-                (int, int) play = plays[_rng.NextInt(0, plays.Count - 1)];
-                log?.Invoke(Plays.Describe(runtime, play));
-                Plays.Play(runtime, play);
-            }
-        }
-
-        public int PickReward(IReadOnlyList<string> offer, CardRuntime runtime) => _rng.NextInt(0, offer.Count - 1);
-
-        public bool FightElite(CardRuntime runtime) => _rng.NextInt(0, 1) == 1;
-
-        public IReadOnlyList<Entity> Choose(ChoiceRequest request, GameState state)
-        {
-            var options = request.Options.ToList();
-            _rng.Shuffle(options);
-            return options.Take(Math.Max(request.Min, Math.Min(request.Max, options.Count))).ToList();
-        }
-
-        public EntityDefinition? ChooseDefinition(DefinitionChoice request, GameState state) =>
-            request.Options.Count == 0 ? null : request.Options[_rng.NextInt(0, request.Options.Count - 1)];
     }
 
     /// <summary>
-    /// One-card lookahead through the engine itself: for every legal play it snapshots the game,
-    /// plays the card, ends the turn so the enemies answer, scores what is left, and rolls back.
-    /// It then makes the best play, and stops when ending the turn now scores as well as anything.
-    /// It knows no card by name, so new content needs no bot changes. It does see the outcome of
-    /// the next few random rolls, which a player would not; treat its numbers as a skilled player's.
+    /// Looks ahead through the engine itself. For every legal play it captures the game, makes the
+    /// play, ends the turn so that the enemies answer, scores what is left and puts it all back; it
+    /// then makes the best play it found. It stops when ending the turn scores as well as anything
+    /// it could do, which is how it decides to hold a card.
     /// </summary>
-    public sealed class GreedyBot : IBot
+    /// <remarks>
+    /// <para>
+    /// It knows no card, ability, status or enemy by name, so it needs no change for new content,
+    /// and it scores a position on hp alone: 1.5 times the player's, less the enemies'. Block,
+    /// burn and the rest are not scored, because they are already in the hp: the score is taken
+    /// after the enemies have answered, so a block that stopped a hit shows up as hp the player
+    /// still has. A status worth naming in one game is worth nothing in another, and a bot that
+    /// knew the names in one sample would be measuring itself.
+    /// </para>
+    /// <para>
+    /// Every play it tries is fogged (see <see cref="Trials"/>), so it cannot read a roll before it
+    /// chooses, and nothing it tries is recorded as having happened.
+    /// </para>
+    /// </remarks>
+    internal sealed class LookaheadBot : IBot
     {
+        /// <summary>A turn that plays this many times is a rules loop rather than a turn.</summary>
+        private const int MaxPlaysPerTurn = 50;
+
+        /// <summary>Winning is worth more than any position, and losing less than any.</summary>
+        private const double Won = 1e9;
+
+        private readonly RandomChooser _chooser;
         private readonly Rng _rng;
+        private readonly int _turns;
 
-        public GreedyBot(ulong seed) => _rng = new Rng(seed ^ 0x6EEDUL);
-
-        public void PlayTurn(CardRuntime runtime, Action<string>? log)
+        /// <param name="name">What the report calls it.</param>
+        /// <param name="turns">How many turns are played out before a position is scored.</param>
+        /// <param name="seed">The run's seed. Its choices and its fog are forked from it, so a run repeats exactly.</param>
+        public LookaheadBot(string name, int turns, ulong seed)
         {
-            for (int guard = 0; guard < 30 && runtime.Won == null; guard++)
+            Name = name;
+            _turns = turns;
+            _chooser = new RandomChooser(seed ^ 0xB07UL);
+            _rng = new Rng(seed ^ 0x6EEDUL);
+        }
+
+        public string Name { get; }
+
+        public string Description => _turns == 1
+            ? "tries every legal play, ends the turn so the enemies answer, and keeps the one that leaves it with the most hp and the enemies with the least"
+            : "does the same as the cautious bot but scores two turns out, so it will take a hit now for a card that pays off next turn";
+
+        public IChoiceProvider Chooser => _chooser;
+
+        public void PlayTurn(CardRuntime runtime, Trials trials, Action<string>? log)
+        {
+            if (runtime == null) throw new ArgumentNullException(nameof(runtime));
+            if (trials == null) throw new ArgumentNullException(nameof(trials));
+
+            for (int guard = 0; guard < MaxPlaysPerTurn && runtime.Won == null; guard++)
             {
-                List<(int, int)> plays = Plays.Legal(runtime);
-                if (plays.Count == 0) return;
+                List<Option> options = Options.Legal(runtime);
+                if (options.Count == 0) return;
 
-                GameSnapshot before = runtime.Capture();
-                double best = ScoreEndingTurn(runtime);
-                runtime.Restore(before);
-                (int, int)? choice = null;
-
-                foreach ((int, int) play in plays)
+                // Nothing can be tried while an effect is resolving or a block is waiting that a
+                // snapshot cannot hold. Playing something beats passing the turn, so it plays.
+                if (!trials.CanTry)
                 {
-                    if (Plays.Play(runtime, play) == PlayResult.Played)
+                    if (!Options.TakeAny(runtime, options, log)) return;
+                    continue;
+                }
+
+                // One roll for the whole decision, so every play is judged against the same luck.
+                ulong fog = _rng.NextUInt64();
+
+                // What ending the turn now is worth. A play has to beat that, and ties go to
+                // playing: a card whose worth only shows later is worth at least nothing.
+                double best = Try(runtime, trials, fog, null);
+                Option? choice = null;
+
+                foreach (Option option in options)
+                {
+                    double score = Try(runtime, trials, fog, option);
+                    if (double.IsNaN(score)) continue;
+                    if (score >= best)
                     {
-                        double score = runtime.Won == true ? double.MaxValue : ScoreEndingTurn(runtime);
-                        // Ties go to playing: a card whose value only shows next turn (a draw, an
-                        // energy gain) is worth at least nothing.
-                        if (score >= best)
-                        {
-                            best = score;
-                            choice = play;
-                        }
+                        best = score;
+                        choice = option;
                     }
-                    runtime.Restore(before);
                 }
 
                 if (choice == null) return;
-                log?.Invoke(Plays.Describe(runtime, choice.Value));
-                Plays.Play(runtime, choice.Value);
+
+                string what = Options.Describe(runtime, choice.Value);
+
+                // Refused for real although the trial took it: the turn ends rather than the same
+                // play being chosen again, which would be a loop.
+                if (!Options.Take(runtime, choice.Value)) return;
+                log?.Invoke(what);
             }
         }
 
-        private static double ScoreEndingTurn(CardRuntime runtime)
+        /// <summary>
+        /// What the board is worth after <paramref name="option"/>, or after doing nothing when it
+        /// is null. Not a number when content refused the play as it resolved.
+        /// </summary>
+        private double Try(CardRuntime runtime, Trials trials, ulong fog, Option? option)
         {
-            if (runtime.Won == null) runtime.EndTurn();
-            if (runtime.Won == true) return 100000;
-            if (runtime.Won == false) return -100000;
-
-            Entity player = runtime.Player!;
-            double score = 1.5 * player.GetInt("hp");
-            foreach (Entity enemy in runtime.State.Actors(Team.Enemy))
+            using (trials.Begin(fog))
             {
-                score -= enemy.GetInt("hp");
-                // Damage still to come, at a discount, and hits already softened.
-                score += 0.8 * enemy.CounterOf("Burn");
-                score += 0.5 * enemy.CounterOf("Chill");
-                score -= 1.0 * enemy.CounterOf("Strength");
+                if (option != null && !Options.Take(runtime, option.Value)) return double.NaN;
+                return Score(runtime);
             }
+        }
+
+        private double Score(CardRuntime runtime)
+        {
+            for (int turn = 0; turn < _turns && runtime.Won == null; turn++) runtime.EndTurn();
+
+            if (runtime.Won == true) return Won;
+            if (runtime.Won == false) return -Won;
+
+            double score = 1.5 * runtime.Player!.GetInt("hp");
+            foreach (Entity enemy in runtime.State.Actors(Team.Enemy)) score -= enemy.GetInt("hp");
             return score;
         }
+    }
 
-        public int PickReward(IReadOnlyList<string> offer, CardRuntime runtime) => _rng.NextInt(0, offer.Count - 1);
+    /// <summary>
+    /// Plays legal cards and abilities at random until it can play no more. It is the floor every
+    /// other bot has to beat, and the fastest way to fuzz content, because it tries nothing first.
+    /// </summary>
+    internal sealed class RandomBot : IBot
+    {
+        private const int MaxPlaysPerTurn = 50;
 
-        public bool FightElite(CardRuntime runtime)
+        private readonly RandomChooser _chooser;
+        private readonly Rng _rng;
+
+        /// <param name="seed">The run's seed. Its plays are forked from it, so a run repeats exactly.</param>
+        public RandomBot(ulong seed)
         {
-            Entity player = runtime.Player!;
-            return player.GetInt("hp") * 100 >= player.GetInt("max_hp") * 60;
+            _chooser = new RandomChooser(seed ^ 0xB07UL);
+            _rng = new Rng(seed ^ 0x5A17UL);
         }
 
-        public IReadOnlyList<Entity> Choose(ChoiceRequest request, GameState state) =>
-            request.Options.Take(Math.Max(request.Min, Math.Min(request.Max, request.Options.Count))).ToList();
+        public string Name => Bots.Random;
 
-        public EntityDefinition? ChooseDefinition(DefinitionChoice request, GameState state) =>
-            request.Options.Count == 0 ? null : request.Options[0];
+        public string Description => "plays legal cards and abilities at random, in a random order, until it can play no more";
+
+        public IChoiceProvider Chooser => _chooser;
+
+        public void PlayTurn(CardRuntime runtime, Trials trials, Action<string>? log)
+        {
+            if (runtime == null) throw new ArgumentNullException(nameof(runtime));
+
+            for (int guard = 0; guard < MaxPlaysPerTurn && runtime.Won == null; guard++)
+            {
+                List<Option> options = Options.Legal(runtime);
+                if (options.Count == 0) return;
+
+                _rng.Shuffle(options);
+                if (!Options.TakeAny(runtime, options, log)) return;
+            }
+        }
     }
 }

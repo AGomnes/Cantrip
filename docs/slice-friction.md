@@ -1,6 +1,6 @@
 # Slice friction log
 
-The slice in [`samples/slice`](../samples/slice) tests whether the library holds up inside a real roguelite, played headlessly by `src/Cantrip.Sim`. This log records every place where building it needed a workaround, C# the content could not replace, or a surprise. Each entry is classed as a **language gap**, an **API gap**, a **defect**, or **fine as host code**.
+The slice in [`samples/slice`](../samples/slice) tests whether the library holds up inside a real roguelite, played headlessly by `cantrip sim`. This log records every place where building it needed a workaround, C# the content could not replace, or a surprise. Each entry is classed as a **language gap**, an **API gap**, a **defect**, or **fine as host code**.
 
 ## Found while building the first cut
 

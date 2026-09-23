@@ -90,9 +90,72 @@ scenario ""A fight with a die in it""
             Assert.Contains("expect no stalls", output);
 
             // The claim the report rests on, printed in the report rather than only in the docs:
-            // what it found holds whoever plays, what it did not find is bounded by this bot.
+            // what it found holds whoever plays, what it did not find is bounded by the bots. It
+            // sits with the lines it is about rather than only in a footer a build server may have
+            // cut off, so it has to come before the first bot's table.
             Assert.Contains("what happened at least once happened in your content", output);
+            Assert.Contains("may instead be something these bots never reached", output);
+            Assert.InRange(
+                output.IndexOf("may instead be something these bots never reached", StringComparison.Ordinal),
+                0,
+                output.IndexOf("What the cautious bot did with it", StringComparison.Ordinal));
+
+            // Two bots by default, each with a table of its own, and the warning that goes with
+            // any level at all.
+            Assert.Contains("What the cautious bot did with it", output);
+            Assert.Contains("What the patient bot did with it", output);
+            Assert.Contains("A level is a fact about the bot", output);
+        }
+
+        /// <summary>
+        /// One bot is one answer, and the report says as much rather than leaving the reader to
+        /// suppose that the number would have held under another bot.
+        /// </summary>
+        [Fact]
+        public void One_bot_prints_one_table_and_says_a_second_would_disagree()
+        {
+            (int exitCode, string output) = ReviewCli.Run("sim", Clean, "--runs", "5", "--bot", "random");
+
+            Assert.True(exitCode == 0, $"exit code {exitCode}:\n{ReviewCli.Head(output)}");
+            Assert.Contains("What the random bot did with it", output);
+            Assert.DoesNotContain("What the cautious bot did with it", output);
+            Assert.Contains("`--bot both` plays the", output);
             Assert.Contains("may instead be something this bot never reached", output);
+        }
+
+        /// <summary>
+        /// The meter, as a build server sees it: inside the bot's block, with the numbers the
+        /// engine raised and the sentence that says which side of the line they are on.
+        /// </summary>
+        [Fact]
+        public void The_report_says_where_the_hp_went_and_whose_doing_the_plays_were()
+        {
+            (int exitCode, string output) = ReviewCli.Run("sim", Clean, "--runs", "5", "--bot", "cautious");
+
+            Assert.True(exitCode == 0, $"exit code {exitCode}:\n{ReviewCli.Head(output)}");
+            Assert.Contains("Where the hp went, under the cautious bot", output);
+            Assert.Contains("Which plays were made is this bot's doing; what each one cost is your content's.", output);
+
+            // Zap says 6 and the Slime has 20 hp, so each run takes 6, 6, 6 and then the last 2:
+            // 20 a run, 100 over five, which is the enemy's whole hp bar and nothing besides.
+            Assert.Matches(@"Zap\s+100\s+100\.0%", output);
+            Assert.Contains("dealt to the enemies, by what dealt it", output);
+
+            // The Splat is the Slime's, not a card's, so it is named after the enemy that swung.
+            Assert.Contains("taken by the player, by what dealt it", output);
+            Assert.Matches(@"Slime\s+\d+\s+100\.0%", output);
+
+            Assert.Contains("also counted, over the same plays", output);
+            Assert.Contains("cards", output);
+        }
+
+        [Fact]
+        public void A_bot_nothing_is_called_is_bad_usage()
+        {
+            (int exitCode, string output) = ReviewCli.Run("sim", Clean, "--runs", "5", "--bot", "clever");
+
+            Assert.True(exitCode == 2, $"exit code {exitCode}:\n{ReviewCli.Head(output)}");
+            Assert.Contains("--bot takes cautious, patient, random or both", output);
         }
 
         [Fact]
@@ -124,9 +187,10 @@ scenario ""A typo""
             Assert.DoesNotContain("run(s)", output);
 
             // Suppressed, the same mistake becomes a run that threw, with the seed to replay it.
+            // Both bots play, and both of them throw on the same line: four runs, not two.
             (int suppressed, string report) = ReviewCli.Run("sim", dsl, "--runs", "2", "--suppress", "CT302");
             Assert.True(suppressed == 1, $"exit code {suppressed}:\n{ReviewCli.Head(report)}");
-            Assert.Contains("2 run(s) threw", report);
+            Assert.Contains("4 run(s) threw", report);
             Assert.Contains("battle Slim", report);
 
             // The seed is the point: without it the report names a failure nobody can reproduce.
@@ -157,9 +221,14 @@ scenario ""A typo""
                 // Guards, so this cannot pass for want of anything to disagree about: the runs
                 // differ from each other, and the report holds two lists that are put in order by
                 // name rather than left in the order a hash set happened to give them.
-                Assert.DoesNotContain("every run went the same way", one);
+                Assert.DoesNotContain("every run came out the same way", one);
                 Assert.Contains("never playable: Ruin, Wrath", one);
                 Assert.Contains("Slime: Howl, Wail", one);
+
+                // The meter's tables are in there too, and they are the ones most likely to come
+                // out in a different order twice: they are built from dictionaries.
+                Assert.Contains("Where the hp went", one);
+                Assert.Contains("dealt to the enemies, by what dealt it", one);
             }
             finally
             {
@@ -172,7 +241,7 @@ scenario ""A typo""
         /// How long the runs took is the one thing in the report that is not a measurement of the
         /// content, and the one thing that moves between two identical commands.
         /// </summary>
-        private static string WithoutTheClock(string report) => Regex.Replace(report, @", \d+\.\d+s", ", <time>");
+        private static string WithoutTheClock(string report) => Regex.Replace(report, @"\d+\.\d+s", "<time>");
 
         [Fact]
         public void A_folder_with_no_scenarios_says_so()
@@ -243,8 +312,9 @@ scenario ""Another fight""
         }
 
         /// <summary>
-        /// A level is a fact about the bot, and this release's bot is a placeholder, so the report
-        /// says nothing about how often a run was won and refuses to answer an `expect` that asks.
+        /// A level is a fact about the bot, so `expect wins >= 55%` is not a thing the content can
+        /// be held to: the report quotes what each bot reached, under a heading that says not to
+        /// quote it, and leaves the expectation unchecked rather than answering it with a number.
         /// </summary>
         [Fact]
         public void A_measurement_that_only_the_bot_decides_is_reported_unchecked()
@@ -262,13 +332,13 @@ scenario ""Levels""
 
             Assert.True(exitCode == 0, $"exit code {exitCode}:\n{ReviewCli.Head(output)}");
             Assert.Contains("not checked", output);
-            Assert.Contains("placeholder", output);
+            Assert.Contains("a level is a fact about the bot", output);
 
-            // No level anywhere: the only `%` in the report is the one the scenario itself wrote,
-            // and no line says how often a run was won.
-            Assert.Single(Regex.Matches(output, "%"));
-            Assert.DoesNotContain("won", output);
-            Assert.DoesNotContain("win rate", output);
+            // The level is printed, once per bot, and never without the warning beside it.
+            Assert.Contains("Levels, for reference only", output);
+            Assert.Contains("cautious bot", output);
+            Assert.Contains("patient bot", output);
+            Assert.Contains("do not quote one", output);
         }
     }
 }

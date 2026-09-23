@@ -16,7 +16,7 @@ The [issue forms](https://github.com/AGomnes/Cantrip/issues/new/choose) ask for 
 |---|---|
 | `src/Cantrip.Core` | The library: parser, content loading, rules engine, interpreter, linter, rules text, test runner |
 | `src/Cantrip.Cli` | The `cantrip` tool |
-| `src/Cantrip.Sim` | Plays runs of the sample roguelite with a bot and reports win rates. `dotnet run --project src/Cantrip.Sim -c Release -- --help` lists its options, such as `--runs N`, and `--watch SEED` to follow one run turn by turn |
+| `src/Cantrip.Sim` | What `cantrip sim` runs, as a library shipped inside the tool: the scenario runner, its bots, and the meter that records what the engine raised |
 | `samples` | Worked content with its tests, one folder to a game. [samples/README.md](samples/README.md) says what each folder shows, and how to test, lint and simulate it |
 | `samples/basic` | Small examples of most features, including the Fireball, Frozen and Kindling in the README, and the Strike, Defend and Jaw Worm its C# example uses |
 | `samples/corpus` | Effects re-created from existing games |

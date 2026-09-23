@@ -309,7 +309,7 @@ if (runtime.Won == true)
 
 A card made during a battle, such as a Wound, stays in the deck like any other. To make it temporary, take it out between battles with `runtime.Execute("destroy target", target: wound)`.
 
-[src/Cantrip.Sim/Run.cs](../src/Cantrip.Sim/Run.cs) is a reference host for a five-floor run: it keeps hp from fight to fight, offers reward cards, rests with `Execute("heal N")` and hands out a relic after an elite.
+[src/Cantrip.Sim/ScenarioRunner.cs](../src/Cantrip.Sim/ScenarioRunner.cs) is a worked example of a run above the battle: one runtime carries hp, deck and relics from fight to fight, and whatever the scenario writes between them — `heal 12`, `relic "Ember Charm"` — runs as a statement.
 
 ## Enemy intents
 
@@ -574,4 +574,4 @@ IReadOnlyList<DslTestResult> results = new DslTestRunner(content).RunAll();
 - [language.md](language.md) describes everything content can say; its [Built-in events](language.md#built-in-events) table lists each event's fields.
 - [architecture.md](architecture.md) explains how the library fits together, and [Extending](architecture.md#extending) lists every seam a game can plug into.
 - [stability.md](stability.md) says what may change between previews, which platforms are tested, and what is known not to work yet.
-- [src/Cantrip.Sim](../src/Cantrip.Sim) is a bot that plays whole runs through this API, 500 of them by default.
+- [src/Cantrip.Sim](../src/Cantrip.Sim) is what `cantrip sim` runs: a scenario runner, three bots that play through this API, and a meter that records what the engine raised.

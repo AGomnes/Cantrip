@@ -7,7 +7,7 @@ Worked `.cantrip` content, each folder with its tests. On each change, CI runs `
 | [`basic`](basic) | Small examples of most features in one file, with a test for each: Fireball, Frozen and Kindling from the README, poison and other statuses, a content-defined verb, a real-time ability, and the Strike, Defend and Jaw Worm that the README's C# example and the [C# guide](../docs/csharp.md) use. |
 | [`recipes`](recipes) | The content from [Writing content](../docs/writing-content.md). [`recipes/tutorial`](recipes/tutorial) holds the tutorial's finished files, and every other file is one recipe with its tests, such as [a boss that switches moves at half health](recipes/boss-switches-at-half-health.cantrip) or [a debuff that lasts N enemy turns](recipes/debuff-for-enemy-turns.cantrip). Some recipes use the tutorial's Strike, Defend, Poison or Bog Troll, so load the whole folder. |
 | [`abilities`](abilities) | A fight with no cards in it, as a turn-based roguelike has: two abilities on cooldowns, a bleed that ticks, and an enemy whose moves change when it is wounded, with tests for each. Everything a deckbuilder uses except the cards. [`sim.cantrip`](abilities/sim.cantrip) plays that fight many times. |
-| [`slice`](slice) | A small roguelite: a witch climbing a five-floor tower, fire against frost, with 17 cards, 4 relics and 5 enemies, among them a boss, the Archmage, that changes its moves at half health. [`sim.cantrip`](slice/sim.cantrip) states the tower as a scenario, and the simulator below plays a fuller run of it. |
+| [`slice`](slice) | A small roguelite: a witch climbing a five-floor tower, fire against frost, with 17 cards, 4 relics and 5 enemies, among them a boss, the Archmage, that changes its moves at half health. [`sim.cantrip`](slice/sim.cantrip) states the tower as a scenario, which `cantrip sim` plays hundreds of times. |
 | [`corpus`](corpus) | Effects from nine existing games, re-created under our own names, one content file and one test file per game. [Coverage](../docs/coverage.md) says which the language writes directly, which need a workaround and which it cannot express yet. |
 | [`godot/Cantrip.Demo`](../godot/Cantrip.Demo) | A Godot project, kept beside the addon rather than here, that plays a battle from GDScript. [`demo/battle.gd`](../godot/Cantrip.Demo/demo/battle.gd) builds a hand of card buttons and enemy panels that show their intents, tells what happened in a log at a steady pace, and answers a card's choice with its first option where a game would open a picker. It plays the content in its `content` folder, which has tests of its own. To run it, build it once with `dotnet build godot/Cantrip.Demo/Cantrip.Demo.csproj`, open the folder in the .NET edition of Godot 4.6 and press Play. CI builds it and has it play a battle by itself. [godot.md](../docs/godot.md) explains the addon it uses. |
 
@@ -34,40 +34,14 @@ In a project that has the tool installed, as the [quickstart](../docs/quickstart
 
 ```
 dotnet run --project src/Cantrip.Cli -- sim samples/slice
+dotnet run --project src/Cantrip.Cli -- sim samples/slice --bot random
 dotnet run --project src/Cantrip.Cli -- sim samples/abilities --watch 1
 ```
 
-The report leads with what the content allowed, whichever bot played: a run that threw, with the seed to replay it; a battle that reached the turn limit; a card that was never playable; an enemy move that never fired. `--watch SEED` plays one run and prints every statement, turn and play. [Simulating](../docs/simulating.md) covers the command, and says what the numbers under it do not mean.
+The report leads with what the content allowed, whichever bot played: a run that threw, with the seed to replay it; a battle that reached the turn limit; a card that was never playable; an enemy move that never fired. What it found holds whoever plays; what it did not find is bounded by what the bots reached, and the block says so. Under it comes a table per bot, for what that bot did with it.
 
-## Running the older whole-run simulator
+Two bots play by default — `cautious` and `patient`, which looks a turn further ahead — and each plays every run, so the slice's 500 runs take about 30 seconds rather than about 14. `--bot cautious` plays one of them, and `--bot random` is eight times quicker again and is the one for fuzzing. `--watch SEED` plays one run and prints every statement, turn and play. [Simulating](../docs/simulating.md) covers the command and the bots, and says what the numbers under them do not mean.
 
-`src/Cantrip.Sim` is a separate program with the tower written in C# rather than in content. It plays whole runs of the slice with a bot, including the reward offer and the rest between floors, which a scenario does not have. From the root of the repository:
+The tables under each bot say where the hp went: what dealt the damage the enemies took, what tags those hits carried, and what took the player's hp. Those amounts are the engine's own — it raised every one of them — so they hold for anyone who made those plays. Which plays were made is still the bot's, and so is the mix: on the slice, Burn is 37.6% of what the cautious bot's plays dealt and 48.2% of what the patient bot's dealt. What both agree on is that no tick of Burn ever carried `attack`, so a modifier written on that tag would have reached none of it — which is the kind of thing a tag column is for.
 
-```
-dotnet run --project src/Cantrip.Sim -c Release -- --runs 500
-```
-
-A run is five floors: two battles, an elite or a rest, another battle and the Archmage. After each battle before the boss the bot is offered three cards and takes one, and beating the elite also gives a relic. The report gives the win rate, how many floors runs cleared, where runs ended, and a table each for encounters, cards and relics: how often a card was offered and taken, and how runs that took it did against runs that did not. Its last line says whether any run threw an error; if one did, the command exits with 1 and names the seeds to replay.
-
-| Option | Default | What it does |
-|---|---|---|
-| `--runs N` | 500 | How many runs to play. |
-| `--seed S` | 1 | The first seed. Runs use S, S+1, and so on, so the same options play the same runs. |
-| `--watch SEED` | | Plays one run and prints every turn, every card played and every reward, instead of the report. |
-| `--bot greedy` or `--bot random` | `greedy` | `greedy` looks one card ahead through the engine; `random` plays anything it can. |
-| `--picks random` or `--picks rollout` | `random` | How the bot picks a reward card: at random, or by playing out the rest of the run with each offered card on a copy of the game. Random picks compare cards most cleanly; rollout picks are slower but show what a card is worth. |
-| `--elite auto`, `always`, `never` or `rollout` | `auto` | Whether floor 3 is the elite fight or a rest. `auto` leaves it to the bot: the greedy bot fights at 60% hp or more, and the random bot at random. `rollout` plays out both and takes the better. |
-| `--rollouts N` | 2 | Play-outs per option for `--picks rollout` and `--elite rollout`. |
-| `--content PATH` | `samples/slice` | The content folder. It must define the cards of the starter deck and the enemies of the tower, which are in `Run.cs`; cards tagged `reward` are the offers. |
-| `--help` | | Lists the options. |
-
-For example, to follow one run turn by turn, then compare a random bot with the greedy one:
-
-```
-dotnet run --project src/Cantrip.Sim -c Release -- --watch 7
-dotnet run --project src/Cantrip.Sim -c Release -- --runs 500 --bot random
-```
-
-Its card and relic tables compare the runs that took a card with the runs that did not, and those runs differ in everything else as well; the bot decided both sides. Read them as a prompt to go and look at a card, never as a measure of one. [Simulating](../docs/simulating.md) says why a level is a fact about the bot.
-
-The tower, the rewards and the rest between floors are C# in [`src/Cantrip.Sim/Run.cs`](../src/Cantrip.Sim/Run.cs). It is a worked example of carrying one player through several battles in one runtime, which [Winning, losing and several battles](../docs/csharp.md#winning-losing-and-several-battles) describes.
+Nothing a bot merely tried is in any of it. A bot that looks ahead plays its options through the engine and rolls them back, and over 200 runs of the slice that raises 1.18 million events against 91 thousand in the play that counted — thirteen times as many. The meter is switched off for the duration, or every number above would be an order of magnitude too big.

@@ -4,7 +4,7 @@ using System.Linq;
 using Cantrip.Content;
 using Cantrip.Diagnostics;
 
-namespace Cantrip.Sim.Scenarios
+namespace Cantrip.Sim
 {
     /// <summary>One <c>battle</c> line of one run.</summary>
     public sealed class BattleResult
@@ -58,17 +58,37 @@ namespace Cantrip.Sim.Scenarios
         public int HpLeft { get; internal set; }
 
         /// <summary>
-        /// Everything about this run that does not depend on its seed. Two runs with the same
-        /// signature went the same way, which is how "every run was identical" is known.
+        /// What the meter said happened to each actor's hp in this run, against what the engine
+        /// says its hp did. It is a check on the meter rather than something to report, so it is
+        /// not part of the tool's surface; a test runs it over the samples.
         /// </summary>
+        internal HpLedger? Ledger { get; set; }
+
+        /// <summary>
+        /// What this run came to: each battle's label, result, turns and hp lost, then whether the
+        /// run was won, the hp left and anything it threw. Two runs with the same signature came
+        /// out the same way, which is how "every run came out the same" is known.
+        /// </summary>
+        /// <remarks>
+        /// It is the outcome that is compared and not the plays, so content that rolls a die which
+        /// never changes the outcome counts as settled here. That is the claim the report makes,
+        /// and it is weaker than "nothing rolls a die".
+        /// </remarks>
         internal string Signature =>
             string.Join("|", Battles.Select(b => $"{b.Label}:{b.Won}:{b.Turns}:{b.HpLost}")) + $"|{Won}|{HpLeft}|{Error}";
     }
 
     /// <summary>
-    /// What the engine saw over every run, whatever the bot chose: which of each enemy's moves
-    /// fired, and which cards ever became playable. These are facts about what the content allows.
+    /// What the engine saw over every run of every bot: which of each enemy's moves fired, and
+    /// which cards ever became playable. These are facts about what the content allows, so a fact
+    /// one bot reached is the content's whether or not the other bot reached it, and they are
+    /// collected in one place for all of them.
     /// </summary>
+    /// <remarks>
+    /// Nothing a bot merely tried is in here. A play tried through <c>Capture</c> and
+    /// <c>Restore</c> raises the same events as a real one, so the run stops recording while a
+    /// trial is open; see <see cref="Trials"/>.
+    /// </remarks>
     public sealed class ContentFacts
     {
         internal ContentFacts()
@@ -133,18 +153,18 @@ namespace Cantrip.Sim.Scenarios
         public string Detail { get; internal set; } = string.Empty;
     }
 
-    /// <summary>Every run of one scenario, and what they came to.</summary>
+    /// <summary>
+    /// What one bot made of a scenario: every run it played, and what they came to. Everything in
+    /// here is a fact about that bot as much as about the content, which is why it is kept apart
+    /// from <see cref="ScenarioOutcome.Facts"/> and never merged with another bot's.
+    /// </summary>
     public sealed class ScenarioResult
     {
-        internal ScenarioResult(ScenarioDefinition scenario, IBot bot, int turnLimit)
+        internal ScenarioResult(string bot, string description)
         {
-            Scenario = scenario;
-            Bot = bot.Name;
-            BotDescription = bot.Description;
-            TurnLimit = turnLimit;
+            Bot = bot;
+            BotDescription = description;
         }
-
-        public ScenarioDefinition Scenario { get; }
 
         /// <summary>The name of the bot that played, for the report to say so.</summary>
         public string Bot { get; }
@@ -152,22 +172,18 @@ namespace Cantrip.Sim.Scenarios
         /// <summary>One line saying what that bot does, which every report has to carry.</summary>
         public string BotDescription { get; }
 
-        public int TurnLimit { get; }
-
         public IList<RunResult> Runs { get; } = new List<RunResult>();
 
-        public ContentFacts Facts { get; } = new ContentFacts();
+        /// <summary>
+        /// What the engine raised over this bot's runs: damage by what dealt it and by tag,
+        /// healing, block, moves, statuses and cards. The amounts are the content's — they are the
+        /// engine's own, and another bot making the same plays would reach the same ones — but
+        /// which plays were made is this bot's, which is why there is one meter per bot.
+        /// </summary>
+        public Meter Meter { get; internal set; } = new Meter();
 
-        public IList<ExpectResult> Expectations { get; } = new List<ExpectResult>();
-
-        /// <summary>How long every run took together.</summary>
+        /// <summary>How long this bot's runs took together.</summary>
         public TimeSpan Elapsed { get; internal set; }
-
-        /// <summary>How many <c>battle</c> lines the scenario has.</summary>
-        public int BattleLines { get; internal set; }
-
-        /// <summary>How many other statements sit between them.</summary>
-        public int OtherLines { get; internal set; }
 
         public int Errors => Runs.Count(r => r.Error != null);
 
@@ -175,10 +191,74 @@ namespace Cantrip.Sim.Scenarios
         public int Stalls => Runs.Sum(r => r.Battles.Count(b => b.Won == null));
 
         /// <summary>
-        /// True when every run went exactly the same way. Then the content has no randomness the
-        /// scenario reaches, and one run said everything the others did.
+        /// How many runs this bot finished, having won every battle the scenario names. It is a
+        /// fact about the bot: another bot given the same content reaches another number.
+        /// </summary>
+        public int RunsWon => Runs.Count(r => r.Won);
+
+        /// <summary>
+        /// The same as a share of the runs, or null when nothing was played. A level, so the report
+        /// prints it only with the warning that goes with it and never as a result.
+        /// </summary>
+        public double? Level => Runs.Count == 0 ? (double?)null : (double)RunsWon / Runs.Count;
+
+        /// <summary>
+        /// True when every run of this bot came out the same. Either nothing the scenario reaches
+        /// rolls a die, or nothing it rolls changed the outcome; either way one run of this bot
+        /// said everything its others did.
         /// </summary>
         public bool EveryRunIdentical => Runs.Count > 1 && Runs.Select(r => r.Signature).Distinct().Count() == 1;
+    }
+
+    /// <summary>
+    /// One scenario, played by every bot that was asked for. The facts are one block for all of
+    /// them, because a move that fired under either bot is a move the content reached; what each
+    /// bot did with those facts is one block each, because that is all a level ever is.
+    /// </summary>
+    public sealed class ScenarioOutcome
+    {
+        internal ScenarioOutcome(ScenarioDefinition scenario, int turnLimit)
+        {
+            Scenario = scenario;
+            TurnLimit = turnLimit;
+        }
+
+        public ScenarioDefinition Scenario { get; }
+
+        public int TurnLimit { get; }
+
+        /// <summary>What the content allowed, found by whichever bot found it.</summary>
+        public ContentFacts Facts { get; } = new ContentFacts();
+
+        /// <summary>One per bot, in the order they played.</summary>
+        public IList<ScenarioResult> ByBot { get; } = new List<ScenarioResult>();
+
+        public IList<ExpectResult> Expectations { get; } = new List<ExpectResult>();
+
+        /// <summary>How many <c>battle</c> lines the scenario has.</summary>
+        public int BattleLines { get; internal set; }
+
+        /// <summary>How many other statements sit between them.</summary>
+        public int OtherLines { get; internal set; }
+
+        /// <summary>How many runs each bot played.</summary>
+        public int RunsEach => ByBot.Count == 0 ? 0 : ByBot.Max(b => b.Runs.Count);
+
+        /// <summary>Every run of every bot.</summary>
+        public IEnumerable<RunResult> Runs => ByBot.SelectMany(b => b.Runs);
+
+        public TimeSpan Elapsed => new TimeSpan(ByBot.Sum(b => b.Elapsed.Ticks));
+
+        public int Errors => ByBot.Sum(b => b.Errors);
+
+        /// <summary>Battles that reached the turn limit without ending, under any bot.</summary>
+        public int Stalls => ByBot.Sum(b => b.Stalls);
+
+        /// <summary>
+        /// True when no bot found anything that changed an outcome: every run of every bot came out
+        /// the same as that bot's others. Two bots still came out differently from each other.
+        /// </summary>
+        public bool EveryRunIdentical => ByBot.Count > 0 && ByBot.All(b => b.EveryRunIdentical);
 
         /// <summary>Whether this scenario is a reason to fail the command.</summary>
         public bool Failed => Errors > 0 || Stalls > 0 || Expectations.Any(e => e.Held == false);

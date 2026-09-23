@@ -61,9 +61,10 @@ jobs:
       - name: DSL tests (samples/slice)
         run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- test samples/slice
 
-      # The tower stated as a scenario and played a hundred times. It fails on a run that throws, a
-      # battle that reaches the turn limit and an expectation that does not hold, which is how a
-      # rules loop or a runtime error in content shows up long before a person would find it.
+      # The tower stated as a scenario and played a hundred times by each of the two default bots.
+      # It fails on a run that throws, a battle that reaches the turn limit and an expectation that
+      # does not hold, which is how a rules loop or a runtime error in content shows up long before
+      # a person would find it.
       - name: Simulate samples/slice
         run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- sim samples/slice --runs 100
 
@@ -82,16 +83,10 @@ jobs:
       - name: DSL tests (samples/abilities)
         run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- test samples/abilities
 
-      # The same fight with no cards, played a hundred times: a bot that could only play cards
-      # would stall every run here, and a stall fails this step.
+      # The same fight with no cards, played a hundred times by each bot: a bot that could only
+      # play cards would stall every run here, and a stall fails this step.
       - name: Simulate samples/abilities
         run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- sim samples/abilities --runs 100
-
-      # Whole runs of the slice, played by a bot over a tower written in C# rather than in content.
-      # Its only cover beyond `sim` above is the reward offer and the rest between floors; it goes
-      # when src/Cantrip.Sim does.
-      - name: Simulate the slice
-        run: dotnet run --project src/Cantrip.Sim -c Release --no-build -- --runs 100
 
       # Pack the two NuGet packages and follow docs/quickstart.md word for word against them, in an
       # empty folder. This is what a new user does first, so it is what must never break. Linux

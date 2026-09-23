@@ -4,10 +4,9 @@ using System.Linq;
 using Cantrip.Content;
 using Cantrip.Runtime;
 
-// This namespace is what `cantrip sim` runs: the scenario runner, its bot and its report. The
-// older whole-run simulator beside it (Run.cs, Bots.cs, Program.cs) is a separate program with a
-// hard-coded tower, and keeps its own `IBot` and `Plays`; the two are merged when it goes.
-namespace Cantrip.Sim.Scenarios
+// Everything `cantrip sim` runs: the scenario runner, its bots and the meter that records what the
+// engine raised. It is a library, shipped inside the `cantrip` tool rather than installed on its own.
+namespace Cantrip.Sim
 {
     /// <summary>
     /// Plays the player's turns of a scenario. It is also the runtime's chooser of last resort, so
@@ -15,9 +14,8 @@ namespace Cantrip.Sim.Scenarios
     /// to discover.
     /// </summary>
     /// <remarks>
-    /// The runner talks to a bot only through this, so a bot that weighs a play can replace the
-    /// placeholder without the runner changing. Nothing the report calls a fact about the content
-    /// is read from the bot.
+    /// The runner talks to a bot only through this, so a new bot is a new implementation and
+    /// nothing else. Nothing the report calls a fact about the content is read from the bot.
     /// </remarks>
     public interface IBot
     {
@@ -32,8 +30,12 @@ namespace Cantrip.Sim.Scenarios
         /// plays nothing is legal, and ends its turns doing nothing.
         /// </summary>
         /// <param name="runtime">The live game. Anything a player could do, a bot may do.</param>
+        /// <param name="trials">
+        /// How to try a play without making it. Everything a bot does outside a trial happened and
+        /// is counted; everything inside one did not.
+        /// </param>
         /// <param name="log">Given a line per play while a single run is being watched.</param>
-        void PlayTurn(CardRuntime runtime, Action<string>? log);
+        void PlayTurn(CardRuntime runtime, Trials trials, Action<string>? log);
 
         /// <summary>
         /// Answers a choice content asks for mid-effect, when no <c>answer</c> is queued. Give one
@@ -41,6 +43,96 @@ namespace Cantrip.Sim.Scenarios
         /// or a <c>discover</c> takes the first option it is offered.
         /// </summary>
         IChoiceProvider Chooser { get; }
+    }
+
+    /// <summary>
+    /// How a bot tries a play without making it: the game is captured, the play is made, what is
+    /// left is scored, and everything is put back.
+    /// </summary>
+    /// <remarks>
+    /// What happens inside a trial did not happen, and the run has to know it, or an enemy move
+    /// made only in a trial is reported as one the content reached. So while a trial is open the
+    /// run records nothing the engine raises and spends none of the scenario's <c>answer</c> lines,
+    /// and the dice are reseeded, so that a bot cannot choose the play that wins a roll it has read
+    /// in advance. The reseeding costs three lines and changes nothing on content that telegraphs
+    /// what is coming, as Cantrip's does; it is there for the card that says <c>chance 50: deal 20</c>.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// using (trials.Begin(fog))
+    /// {
+    ///     Options.Take(runtime, option);
+    ///     score = Score(runtime);
+    /// }
+    /// </code>
+    /// </example>
+    public sealed class Trials
+    {
+        private readonly CardRuntime _runtime;
+        private readonly Action<bool> _recording;
+        private int _open;
+
+        internal Trials(CardRuntime runtime, Action<bool> recording)
+        {
+            _runtime = runtime;
+            _recording = recording;
+        }
+
+        /// <summary>True while a trial is open, which is to say while nothing is really happening.</summary>
+        public bool Open => _open > 0;
+
+        /// <summary>
+        /// Whether a trial can be opened at all right now. It is false while an effect is still
+        /// resolving, and while a block is waiting that a snapshot cannot hold. A bot that finds it
+        /// false has to choose without looking, which is still better than passing the turn.
+        /// </summary>
+        public bool CanTry => _runtime.CanCapture;
+
+        /// <summary>Opens one; disposing it puts the game back exactly as it was.</summary>
+        /// <param name="fog">
+        /// The dice the trial rolls instead of the run's own. Give every play of one decision the
+        /// same fog and they are compared on the same luck, rather than on which of them happened
+        /// to draw the kinder number.
+        /// </param>
+        public IDisposable Begin(ulong fog)
+        {
+            GameSnapshot before = _runtime.Capture();
+            if (++_open == 1) _recording(false);
+            _runtime.State.Rng.Reseed(fog);
+            return new Scope(this, before);
+        }
+
+        private void End(GameSnapshot before)
+        {
+            try
+            {
+                _runtime.Restore(before);
+            }
+            finally
+            {
+                if (--_open == 0) _recording(true);
+            }
+        }
+
+        private sealed class Scope : IDisposable
+        {
+            private readonly Trials _owner;
+            private readonly GameSnapshot _before;
+            private bool _closed;
+
+            public Scope(Trials owner, GameSnapshot before)
+            {
+                _owner = owner;
+                _before = before;
+            }
+
+            public void Dispose()
+            {
+                if (_closed) return;
+                _closed = true;
+                _owner.End(_before);
+            }
+        }
     }
 
     /// <summary>One thing the player could do now: play a card, or use an ability.</summary>
@@ -125,58 +217,25 @@ namespace Cantrip.Sim.Scenarios
         /// <summary>The names of the cards, not the abilities, among a turn's options.</summary>
         public static IEnumerable<string> CardNames(CardRuntime runtime, IEnumerable<Option> options) =>
             options.Where(o => !o.Ability).Select(o => runtime.State.Find(o.Source)?.Name).Where(n => n != null)!;
-    }
 
-    /// <summary>
-    /// A placeholder. It plays the first thing it can, over and over, until nothing is left to do,
-    /// and then ends the turn. It weighs nothing, looks nowhere ahead and knows no card by name.
-    /// </summary>
-    /// <remarks>
-    /// It exists so that a scenario can be played at all: a run that throws, a battle that never
-    /// ends and a card that is never playable show up under any bot, and those are the only things
-    /// this release reports. How often it wins, and how long it takes, are facts about this bot.
-    /// Bots that weigh a play come next; when they do, this one stays as the floor.
-    /// </remarks>
-    public sealed class FirstPlayableBot : IBot
-    {
-        /// <summary>A turn that plays this many times is a rules loop rather than a turn.</summary>
-        private const int MaxPlaysPerTurn = 50;
-
-        private readonly RandomChooser _chooser;
-
-        /// <param name="seed">The run's seed. Its choices are forked from it, so a run repeats exactly.</param>
-        public FirstPlayableBot(ulong seed) => _chooser = new RandomChooser(seed ^ 0xB07UL);
-
-        public string Name => "placeholder";
-
-        public string Description => "plays the first card or ability it can, in hand order, until it can play no more";
-
-        public IChoiceProvider Chooser => _chooser;
-
-        public void PlayTurn(CardRuntime runtime, Action<string>? log)
+        /// <summary>
+        /// Plays the first option the engine accepts and says whether anything was played. It is
+        /// what the random bot does once it has shuffled its options, and what a bot that cannot
+        /// look ahead falls back on.
+        /// </summary>
+        public static bool TakeAny(CardRuntime runtime, IEnumerable<Option> options, Action<string>? log)
         {
-            if (runtime == null) throw new ArgumentNullException(nameof(runtime));
-
-            for (int guard = 0; guard < MaxPlaysPerTurn && runtime.Won == null; guard++)
+            foreach (Option option in options)
             {
-                List<Option> options = Options.Legal(runtime);
-                if (options.Count == 0) return;
+                // What can be played is asked in advance; content can still refuse a play while it
+                // resolves, and no check made beforehand sees that, so the next option is tried.
+                string what = Describe(runtime, option);
+                if (!Take(runtime, option)) continue;
 
-                // The first option is the choice; the rest are only tried if it turns out content
-                // refuses it while it resolves, which no check made in advance can see.
-                bool played = false;
-                foreach (Option option in options)
-                {
-                    string what = Options.Describe(runtime, option);
-                    if (!Options.Take(runtime, option)) continue;
-
-                    log?.Invoke(what);
-                    played = true;
-                    break;
-                }
-
-                if (!played) return;
+                log?.Invoke(what);
+                return true;
             }
+            return false;
         }
     }
 }

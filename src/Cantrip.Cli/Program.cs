@@ -10,7 +10,7 @@ using Cantrip.Descriptions;
 using Cantrip.Diagnostics;
 using Cantrip.Linting;
 using Cantrip.Runtime;
-using Cantrip.Sim.Scenarios;
+using Cantrip.Sim;
 using Cantrip.Testing;
 
 namespace Cantrip.Cli
@@ -45,8 +45,11 @@ sim options:
   --name <text>      only scenarios whose name contains <text>
   --runs N           play each scenario N times, whatever its `runs` line says
   --seed S           the first seed (default 1); runs use S, S+1, ...
+  --bot <name>       cautious, patient, random, or both (default both, which is cautious and
+                     patient; two bots take about twice as long as one)
   --turn-limit N     turns one battle may take before the run counts as a stall (default 50)
-  --watch SEED       play one run of one scenario and print every turn, play and statement
+  --watch SEED       play one run of one scenario with the first bot, printing every turn, play
+                     and statement
 
 exit codes: 0 success, 1 content errors, failing tests, a run that threw, a battle that hit the
 turn limit or a failed expectation (or lint warnings, with --warnings-as-errors), 2 bad usage";
@@ -69,6 +72,7 @@ turn limit or a failed expectation (or lint warnings, with --warnings-as-errors)
             string command = args[0];
             var paths = new List<string>();
             string? filter = null;
+            string? bot = null;
             bool trace = false;
             bool warningsAsErrors = false;
             var suppressed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -80,6 +84,7 @@ turn limit or a failed expectation (or lint warnings, with --warnings-as-errors)
                 {
                     case "--filter" when i + 1 < args.Length: filter = args[++i]; break;
                     case "--name" when i + 1 < args.Length: filter = args[++i]; break;
+                    case "--bot" when i + 1 < args.Length: bot = args[++i]; break;
                     case "--trace": trace = true; break;
                     case "--warnings-as-errors": warningsAsErrors = true; break;
                     case "--runs" when i + 1 < args.Length:
@@ -118,9 +123,12 @@ turn limit or a failed expectation (or lint warnings, with --warnings-as-errors)
 
             // Only `sim` plays scenarios. Accepted by another command these would read as settings
             // that were being used, which is worse than being refused.
-            if (numbers.Count > 0 && command != "sim")
+            List<string> forSim = numbers.Keys.Concat(bot == null ? Enumerable.Empty<string>() : new[] { "--bot" })
+                .OrderBy(o => o, StringComparer.Ordinal)
+                .ToList();
+            if (forSim.Count > 0 && command != "sim")
             {
-                Console.Error.WriteLine($"{string.Join(", ", numbers.Keys.OrderBy(o => o, StringComparer.Ordinal))} only applies to `sim`");
+                Console.Error.WriteLine($"{string.Join(", ", forSim)} only applies to `sim`");
                 return 2;
             }
 
@@ -132,7 +140,7 @@ turn limit or a failed expectation (or lint warnings, with --warnings-as-errors)
                 case "validate": return Validate(content, suppressed);
                 case "lint": return Lint(content, suppressed, warningsAsErrors);
                 case "test": return Test(content, filter, trace);
-                case "sim": return Sim(content, filter, suppressed, numbers);
+                case "sim": return Sim(content, filter, bot, suppressed, numbers);
                 case "describe": return Describe(content, filter);
                 case "repl": return Repl(content);
                 default:
@@ -277,11 +285,24 @@ turn limit or a failed expectation (or lint warnings, with --warnings-as-errors)
         /// start on a content error, the linter's errors included, so a scenario that names an
         /// enemy nothing defines fails in milliseconds instead of after a hundred runs.
         /// </summary>
-        private static int Sim(ContentLibrary content, string? name, ISet<string> suppressed, IReadOnlyDictionary<string, string> given)
+        private static int Sim(ContentLibrary content, string? name, string? bot, ISet<string> suppressed, IReadOnlyDictionary<string, string> given)
         {
             // The options first: bad usage is bad usage, whatever the content turns out to be.
             var options = new ScenarioOptions();
             ulong? watch = null;
+
+            if (bot != null)
+            {
+                bool both = string.Equals(bot, Bots.Both, StringComparison.OrdinalIgnoreCase);
+                if (!both && !Bots.Exists(bot))
+                {
+                    Console.Error.WriteLine($"--bot takes {string.Join(", ", Bots.Names)} or {Bots.Both}, not \"{bot}\"");
+                    return 2;
+                }
+
+                options.MakeBots.Clear();
+                foreach (string chosen in both ? Bots.Pair : new[] { bot }) options.MakeBots.Add(Bots.Make(chosen));
+            }
             foreach (string option in given.Keys.OrderBy(o => o, StringComparer.Ordinal))
             {
                 // A count of nothing is not a count; a seed of 0 is a seed like any other. A count
@@ -337,12 +358,12 @@ turn limit or a failed expectation (or lint warnings, with --warnings-as-errors)
                 return one.Error == null && !one.Stalled ? 0 : 1;
             }
 
-            var results = new List<ScenarioResult>();
+            var results = new List<ScenarioOutcome>();
             foreach (ScenarioDefinition scenario in scenarios)
             {
-                ScenarioResult result = runner.Run(scenario);
-                SimReport.Print(result);
-                results.Add(result);
+                ScenarioOutcome outcome = runner.Run(scenario);
+                SimReport.Print(outcome);
+                results.Add(outcome);
             }
 
             SimReport.Summary(results);

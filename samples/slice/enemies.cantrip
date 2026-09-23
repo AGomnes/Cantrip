@@ -1,8 +1,8 @@
 # --- Enemies ---------------------------------------------------------------------------------
-# Tuned with src/Cantrip.Sim. The greedy bot wins about 64% fighting the elite whenever healthy and about
-# 80% when it decides floor 3 by playing out both paths, which it then fights about a fifth of the
-# time; the random bot wins about 5%. Damage taken rises floor by floor, and the Archmage gains
-# Strength so a long fight punishes a weak deck. Re-run it after changing any number here.
+# Tuned by playing sim.cantrip: `cantrip sim samples/slice`. Damage taken rises floor by floor, and
+# the Archmage gains Strength so a long fight punishes a weak deck. Re-run it after changing any
+# number here, and read the tables the right way round: how far a bot got is a fact about the bot,
+# while where the hp went is the engine's own arithmetic over the plays that were made.
 
 enemy "Cinder Imp"
   hp 24

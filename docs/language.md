@@ -959,7 +959,7 @@ scenario "The tower, starter deck"
   expect no errors
 ```
 
-A test plays one fight the way you tell it to. A scenario states a whole run — a deck, some fights in order, and whatever happens between them — and `dotnet cantrip sim <folder>` plays it many times with a bot.
+A test plays one fight the way you tell it to. A scenario states a whole run — a deck, some fights in order, and whatever happens between them — and `dotnet cantrip sim <folder>` plays it many times with two bots.
 
 **Nothing above the fights you name is simulated.** There is no map, no reward offer, no shop and no gold. A rest, a relic picked up or a curse taken is written as a statement where it happens, so a scenario measures only what it says.
 
@@ -987,7 +987,7 @@ Setup is shared with a test, and each verb means the same thing in both: `player
 
 Anything else is error CT319.
 
-**A win rate is a fact about the bot, not about your content.** Two bots given the same content can be ten points apart, so `expect wins >= 55%` is worth writing as a gate against your own regressions, against a stated bot and a stated version of Cantrip. It is not a measure of how strong a card is, and it should not be quoted as one. The bot in this release is a placeholder, so `wins`, `hp_left` and `turns` are reported unchecked; `stalls` and `errors` are checked, because they hold whoever plays.
+**A win rate is a fact about the bot, not about your content.** Two bots given the same content reach two numbers: on `samples/slice`, over the same 500 seeds, the cautious bot finished 70.8% of the runs and the patient bot 74.0%. So `wins`, `hp_left` and `turns` are reported unchecked, with each bot's number quoted beside the other's; `stalls` and `errors` are checked, because they hold whoever plays. [Simulating](simulating.md#the-bots) has the bots and what each is for.
 
 `cantrip validate` counts the scenarios in a folder, and `cantrip lint` checks them as it checks anything else: a misspelt card, relic, ability or enemy is error CT302, the same code as in a test, so a scenario that names nothing real fails in milliseconds rather than after a hundred runs.
 
