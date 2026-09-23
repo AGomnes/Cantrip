@@ -68,6 +68,14 @@ jobs:
       - name: DSL tests (samples/recipes)
         run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- test samples/recipes
 
+      # A fight with no cards in it, which the README points at: the combat of a turn-based
+      # roguelike, so a change that quietly made cards compulsory would fail here.
+      - name: Lint samples/abilities
+        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- lint samples/abilities --warnings-as-errors
+
+      - name: DSL tests (samples/abilities)
+        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- test samples/abilities
+
       # Whole runs of the slice, played by a bot. It fails on any run that throws, which is how a
       # rules loop or a runtime error in content shows up long before a person would find it.
       - name: Simulate the slice

@@ -10,7 +10,9 @@ When a release changes any of the following, its section says so under that name
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- The README says what Cantrip is for more exactly: the combat of single-player turn-based games, cards optional. `samples/abilities` is new and shows a fight with no cards in it, run by CI like the other sample folders.
 
 ## [0.1.0-preview.3] - 2026-09-22
 

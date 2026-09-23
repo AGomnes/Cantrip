@@ -1,0 +1,61 @@
+# A fight with no cards in it: the combat of a turn-based roguelike, where actors use abilities
+# on cooldowns rather than playing cards. Everything else is as it is in a deckbuilder: statuses
+# stack and tick, the enemy telegraphs its move, and its moves change when it is wounded.
+#
+# Run:  dotnet run --project src/Cantrip.Cli -- test samples/abilities
+
+status Bleed
+  tags debuff
+  stacking intensity
+  on turn_end:
+    deal stacks to owner, ignore block
+    stacks -1
+
+ability "Cleave"
+  cooldown 2 turns
+  target enemy
+  effect:
+    deal 8 to target
+    apply Bleed 2 to target
+
+ability "Brace"
+  cooldown 1 turns
+  effect:
+    block 6
+
+enemy Ghast
+  hp 30
+  phase Wounded when hp <= max_hp / 2, retelegraph
+  move Rake:
+    deal 5 to player
+    apply Bleed 1 to player
+  move Screech:
+    block 4
+  move Frenzy phase Wounded:
+    deal 9 to player
+  # Frenzy is skipped until the Ghast is wounded, so the fight opens with Rake.
+  pattern cycle Frenzy, Rake, Rake, Screech
+
+test "Cleave wounds the Ghast and leaves it bleeding"
+  enemy Ghast
+  grant Cleave
+  cast Cleave on enemy
+  expect enemy.hp == 22
+  expect enemy.Bleed == 2
+
+test "Bracing turns the Ghast's rake aside"
+  player hp 40
+  enemy Ghast
+  grant Brace
+  cast Brace
+  end turn
+  expect player.hp == 40
+  expect player.Bleed == 1
+
+test "A hit that wounds the Ghast changes what it telegraphs"
+  enemy Ghast hp 20 max_hp 30
+  grant Cleave
+  expect enemy.intent == "Rake"
+  cast Cleave on enemy
+  expect enemy.hp == 12
+  expect enemy.intent == "Frenzy"
