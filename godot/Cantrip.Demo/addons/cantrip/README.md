@@ -18,7 +18,7 @@ https://github.com/AGomnes/Cantrip/blob/main/docs/godot.md. In short:
 3. Add the rules engine from NuGet, in the folder with your `.csproj`. The version must match this
    addon's, which is also in `plugin.cfg`:
    ```
-   dotnet add package Cantrip.Core --version 0.1.0-preview.3
+   dotnet add package Cantrip.Core --version 0.1.0-preview.4
    ```
    Offline, reference the `Cantrip.Core.dll` from the `.nupkg` on the GitHub release instead; the
    guide shows how.
