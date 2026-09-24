@@ -74,7 +74,7 @@ None of these knows about the others. A Fireball on a frozen enemy deals its 6 d
 
 ## What it does not do
 
-- **Two players, or an opponent with its own hand and deck.** There is one player, and enemies act from move patterns. There is no networking.
+- **A second player.** There is one player; enemies act from move patterns, and nothing can respond to a card while it is being played, so a counterspell or an interrupt has nowhere to happen. There is no networking. An enemy *can* hold cards of its own and play them, since a card belongs to whoever controls it, but your game decides what it plays.
 - **The run.** The map, rewards, shops and events between battles are your game's code.
 - **Space.** There is one row of actors per side. Positions and area queries such as `within` must come from your game.
 - **Rendering, input and animation.** Your game presents what happened from the events the rules engine reports.

@@ -129,7 +129,7 @@ namespace Cantrip.GodotAdapter
             _built = true;
             _lines.Clear();
 
-            // The source view sets the text; anything else (the script editor) is asked for it.
+            // The dock's editor sets the text; anything else (the script editor) is asked for it.
             string text = _source ?? GetTextEdit()?.Text ?? string.Empty;
             Palette palette = _palette ??= Palette.FromEditor();
 

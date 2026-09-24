@@ -32,7 +32,8 @@ https://github.com/AGomnes/Cantrip/blob/main/docs/godot.md. In short:
 
 - A node that loads content, runs battles and hands everything to script as ids and dictionaries.
 - A dock with problems (parse errors and lint findings), your content's own tests, description
-  previews with live values, and a source viewer with syntax highlighting.
+  previews with live values, and an editor with syntax highlighting that checks what you type and
+  saves with Ctrl+S.
 - An importer so `.cantrip` files reach an exported build, and an export check that fails a build where
   they would not.
 - Two tabs in the debugger: a running game's causality trace, with pause and step, and the entities

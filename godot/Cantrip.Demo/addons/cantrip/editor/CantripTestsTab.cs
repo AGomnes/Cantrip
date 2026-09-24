@@ -130,6 +130,7 @@ namespace Cantrip.GodotAdapter
 
             _traces.Clear();
             _ranAtGeneration = -1;
+            Failed = 0;
             if (_trace != null) _trace.Text = string.Empty;
 
             Fill(null);
@@ -176,6 +177,7 @@ namespace Cantrip.GodotAdapter
             {
                 if (!result.Passed) failed++;
             }
+            Failed = failed;
             if (_summary != null) _summary.Text = $"{results.Count - failed} passed, {failed} failed";
         }
 
@@ -274,6 +276,12 @@ namespace Cantrip.GodotAdapter
 
         /// <summary>Whether the results on show were produced from the content now loaded.</summary>
         public bool IsCurrent => _workspace != null && _ranAtGeneration == _workspace.Generation;
+
+        /// <summary>What the last run came to, in the words on the tab's own summary label.</summary>
+        public string Summary => _summary?.Text ?? string.Empty;
+
+        /// <summary>How many of the last run's tests failed. Zero before anything has been run.</summary>
+        public int Failed { get; private set; }
 
         private readonly struct SourceSpanLike
         {

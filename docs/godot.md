@@ -140,8 +140,9 @@ card Sift
     draw 2
 ```
 
-Godot has no editor for `.cantrip` files; write them in any text editor. The quickstart explains
-the content and how to test it, and [writing-content.md](writing-content.md) goes further.
+Write it in the dock's Source tab, or in any text editor; see
+[The editor dock](#the-editor-dock). The quickstart explains the content and how to test it, and
+[writing-content.md](writing-content.md) goes further.
 
 Then create a scene whose root is a plain Node, attach a new script called `first_battle.gd` to
 it, and replace the script's text with this:
@@ -977,12 +978,147 @@ With the plugin enabled, the *Cantrip* dock sits at the bottom of the editor:
   content that uses one fails there, with an error such as ``Unknown name `front_row`.``
 - **Preview**: any definition's rules text with live values, its flavour, its keyword tooltips,
   and the hash to paste into `text_checked`.
-- **Source**: a viewer, because Godot cannot open a non-script file at a line. Its highlighting
-  uses the engine's own lexer, so it cannot drift from the language.
+- **Source**: the editor. Write a card here, save it with Ctrl+S, and read what the parser and the
+  linter make of it while you type. Godot cannot open a non-script file at a line, so this is also
+  where every double-click in the dock lands. Its highlighting uses the engine's own lexer, so it
+  cannot drift from the language.
 
-The dock does not notice a saved file by itself: press its **Reload** button. It reads every
-`.cantrip` file in the project. These project settings change what it does; add them under
-Project Settings with Advanced Settings switched on:
+### Writing content in the Source tab
+
+Double-click a problem, a test or a definition anywhere in the dock and the file opens at that
+line, ready to type in. The buttons across the top are:
+
+| Button | |
+|---|---|
+| **Save** | Writes the buffer to the file, and tells Godot, so the importer picks it up. Ctrl+S does the same while the caret is in the buffer |
+| **Revert** | Throws away the unsaved changes in this buffer and reads the file again |
+| **Run tests** | Runs the `test` blocks against what is in the buffers, saved or not |
+| **Open externally** | Opens the file in whatever your system uses for text files |
+
+A buffer with unsaved changes says so in three places: a `*` before the path, the Save and Revert
+buttons becoming available, and the tab itself reading **Source (1)** for as long as one file is
+waiting. Nothing else in the editor marks it, so the dock has to.
+
+One buffer the dock does not keep: building the C# project reloads the addon's assembly, which takes
+the dock down and puts a new one up, and unsaved buffers go with the old one. The Output panel says
+so when it happens. Save your content before you build.
+
+**It indents with spaces, at the width the file already uses.** Every example in this guide, in the
+quickstart and in the samples is written with two spaces, so in those files two spaces is what Tab
+inserts, what a new line after `effect:` starts with, and what a pasted block is widened to. This is
+not a preference. The language decides where a block ends by how deep a line is, and it counts a tab
+as four columns, so one tab in a two-space file opens a block that nothing on screen looks like
+opening. A file written with four spaces gets four; one written with tabs gets four spaces, which is
+what its tabs already meant.
+
+A file written with spaces never acquires an indenting tab, whatever route the text arrives by.
+Typing is covered by Godot's own settings, both clipboards are widened as they are pasted — the
+ordinary one and the primary selection a middle click pastes on Linux — and a block dropped on the
+editor from another window, which Godot handles itself and no addon can stand in front of, is
+widened the moment it lands, into exactly the columns its tabs already stood for. A file whose
+author wrote it with tabs is left alone: its tabs mean what they mean, and rewriting somebody's
+indentation because they typed a character into the file would be the worse surprise.
+
+Line endings: Godot's editor buffer holds a line without its carriage return, so a file written on
+Windows is saved back with `\n`. Nothing in the language or the tools reads it differently, and
+`.gitattributes` in a repository that normalises text will not show a diff for it.
+
+### Problems while you type
+
+A third of a second after you stop typing, the content is loaded and linted again, and the file
+you are in shows what came of it: a mark in the gutter beside each line with a problem on it — `!`
+for an error, `*` for a warning, `.` for a note — the line tinted to match, and the problem itself
+written out under the buffer as you put the caret on its line: its line and column, its code, its
+message, and the word it suggests when it has one. **Apply fix** puts that word in, so a misspelt
+`targt` becomes `target` without retyping it.
+
+The Problems tab is looking at the same answer, so the two never disagree, and neither does the
+Preview tab or the count in the dock's own bar.
+
+**What is checked is the folder, not the file.** A card that names a status defined next door is
+correct, so a single file cannot be judged on its own. Each check loads the folder as the dock last
+read it, with every unsaved buffer put in place of its own file, and lints the lot. Two consequences
+worth knowing: a problem can appear in a file you are not editing, because of what you typed in the
+one you are; and the tests, the preview and the card text all answer about your unsaved text too.
+
+A file the dock does not load — one outside `cantrip/content/folder` — can still be opened and
+edited here, and the line under the buffer says that nothing checks it. "No problems" would be a
+claim about a file nobody looked at.
+
+A check costs one to three milliseconds in this repository's demo project, which has five files, and
+about ten with `samples/corpus` copied into it — 23 files, 1,800 lines, 131 definitions and 90 test
+blocks, the largest arrangement there is here. Reading the files is most of what a check would
+otherwise cost, so the dock keeps what it read and reads again only when Godot says the project's
+files have changed; the first check after that takes about 20 ms on those same 23 files.
+`--cantrip-selftest` prints both numbers for your own project, as
+`check: 23 file(s), 19.6 ms reading them all, 9.6 ms while typing`. Those are from a Godot with a
+window on one machine; the same thing headless, as CI runs it, measured two to three times slower.
+
+It is one folder's worth of parsing and linting, on the editor's own thread, so it grows with the
+project: a single 12,000-line file measured about 80 ms a check on that machine, which is a pause
+you would feel. Splitting content across files does not help by itself — the folder is what is
+loaded — but it is the shape the numbers above were measured in.
+
+### Running the tests from the editor
+
+**Run tests** brings the buffers up to date and then presses the Tests tab's own Run, so there is
+one runner and one list of results. A clean run says `12 passed, 0 failed` under the buffer and
+leaves you where you were typing; a run with a failure in it brings the Tests tab forward, where
+each test says PASS or FAIL and a double-click opens the line it failed on. The tests run without
+your game, as they do in the Tests tab and on the command line: see that tab's note above.
+
+### When the file changes underneath you
+
+Save from another editor, or pull a teammate's change, and Godot tells the dock. If you have typed
+nothing, the buffer is reread and a line under it says so. If you have unsaved changes, nothing is
+touched: one line appears across the top saying the file changed on disk, with **Keep mine**, which
+dismisses it and leaves your buffer to be saved over the top, and **Take theirs**, which throws your
+buffer away and reads the file. The same change cannot raise that line twice, the warning follows
+the file rather than the tab — switch away with one pending and it is there again when you come
+back — and there is no dialog anywhere in the dock.
+
+Delete the file from underneath an open buffer and the buffer stays: it is the only copy of that
+text left, and **Save** writes the file again. The line under the buffer says what happened. The
+content itself loses the file, because a file that is not there is not part of the game.
+
+A `.cantrip` file added or deleted anywhere in the project joins or leaves the loaded content by
+itself, a third of a second after Godot notices it. **Reload** is for the `cantrip/` settings, and
+for reading everything again when you want to be sure.
+
+Switching files with changes pending asks nothing either. The buffer is parked with its caret where
+you left it, it keeps being checked, the tab keeps saying how many files are waiting, and opening the
+file again brings it all back.
+
+How much of this is proven: `--cantrip-selftest` types into a file, checks it while it is unsaved,
+parks it, applies a suggested fix, saves it and reads the file back; it measures what Godot inserts
+when it indents, and what a block of tabs dropped into a two-space file turns into; it types into a
+file written with Windows line endings and takes the character out again, which has to leave the
+file unmarked; it presses **Run tests** with a test block that exists only in an unsaved buffer and
+counts the results; and it adds and deletes a file outside the dock and checks that the content
+follows. Run in a Godot with a window rather than headless, it also pastes a tabbed block from the
+real clipboard and checks what lands.
+
+What is left by hand, because a headless editor has no mouse and no keyboard: the Ctrl+S keystroke
+and the button presses reaching the handlers underneath them, the line that appears when a file
+changes underneath you, and the primary selection a middle click pastes on Linux, which Windows has
+no equivalent of to test.
+
+### What it does not do yet
+
+No completion, no go-to-definition, and no editing a file a running game has loaded — the game
+picks up a saved file only when its own code calls `ReloadContent`, as [Hot reload](#hot-reload)
+shows. Unsaved buffers do not survive a C# build. The check runs on the editor's thread, so a very
+large project pauses for it.
+
+The next pass should send a save to the attached game over the debugger channel, which already
+accepts one; offer the names a file can use as you type them, which the linter already knows, since
+CT302 is the same question asked after the fact; keep unsaved buffers across an assembly reload; and
+do the check off the editor's thread so that a big project does not wait for it.
+
+### Settings
+
+The dock reads every `.cantrip` file in the project. These project settings change what it does;
+add them under Project Settings with Advanced Settings switched on:
 
 | Setting | |
 |---|---|
@@ -993,6 +1129,9 @@ Project Settings with Advanced Settings switched on:
 
 Each list is written as words separated by commas or spaces. The dock reads these settings when
 the plugin starts and again each time you press **Reload**, so after changing one, press it.
+**Reload** also reads and lints every file again from scratch, and it keeps your unsaved buffers.
+Adding or deleting a `.cantrip` file outside the editor does not need it: Godot tells the dock, and
+the next check discovers afresh.
 
 ## Live debugging
 
@@ -1065,7 +1204,9 @@ godot --headless --path godot/Cantrip.Demo --import -- --cantrip-selftest
 
 The `ExportRelease` build is the cheap proof that no editor-only code escaped `#if TOOLS`; the
 scenes exit non-zero on failure, and `--cantrip-selftest` exercises the dock without a mouse,
-exiting with 1 when one of its own checks prints `FAILED`. Always give Godot a timeout: a script
+exiting with 1 when one of its own checks prints `FAILED`. That includes the editing: it asks
+Godot to indent a line and measures what went in, then types into a scratch file, checks it while
+it is unsaved, parks it, applies a suggested fix, saves it and takes it away again. Always give Godot a timeout: a script
 that cannot parse never quits. `gdscript_smoke` enforces the two rules for GDScript, because both
 fail in confusing ways.
 

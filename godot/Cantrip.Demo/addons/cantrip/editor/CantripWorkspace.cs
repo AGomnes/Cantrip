@@ -28,6 +28,13 @@ namespace Cantrip.GodotAdapter
     /// as a connected signal can. One event covers everything, because every panel shows a
     /// projection of the same reload.
     /// </para>
+    /// <para>
+    /// Since the dock's Source tab became an editor, what is loaded is the folder as saved with the
+    /// dock's unsaved buffers put in place of their own files (see <see cref="Drafts"/>). Content
+    /// resolves across files, so a buffer cannot be checked on its own, and checking the file on
+    /// disk while the designer is typing would answer about text nobody can see. Every panel reads
+    /// the same library, so Problems, Tests and Preview all answer about what is on screen.
+    /// </para>
     /// </remarks>
     public sealed class CantripWorkspace
     {
@@ -60,6 +67,13 @@ namespace Cantrip.GodotAdapter
         private readonly List<Diagnostic> _problems = new List<Diagnostic>();
         private readonly SortedSet<string> _suppressed = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// What each file held when it was last read, so a check while someone types reads only the
+        /// buffer they are typing into. Emptied by <see cref="Reload"/> and
+        /// <see cref="ForgetCachedText"/>, which are the two moments the text on disk can have moved.
+        /// </summary>
+        private readonly Dictionary<string, string> _cached = new Dictionary<string, string>(StringComparer.Ordinal);
+
         public CantripWorkspace()
         {
             ContentFolder = ContentPaths.ResourceScheme;
@@ -72,6 +86,13 @@ namespace Cantrip.GodotAdapter
 
         /// <summary>The folder content is discovered under. Defaults to the whole project.</summary>
         public string ContentFolder { get; set; }
+
+        /// <summary>
+        /// The files the dock's editor has open, and what the designer has typed into them. A file
+        /// with an unsaved buffer is loaded from that buffer rather than from disk, so every panel
+        /// answers about the text on screen.
+        /// </summary>
+        public CantripDrafts Drafts { get; } = new CantripDrafts();
 
         public ContentLibrary Content { get; private set; } = new ContentLibrary();
 
@@ -139,9 +160,58 @@ namespace Cantrip.GodotAdapter
         /// </summary>
         public void Reload()
         {
+            _cached.Clear();
+            LoadAndLint(GodotContentLoader.Discover(ContentFolder));
+        }
+
+        /// <summary>
+        /// Loads and lints again from the files already discovered, which is what the editor asks
+        /// for after a pause in typing. Discovery is skipped on purpose: walking the project on
+        /// every keystroke costs more than the check itself, and a file list that changed mid-word
+        /// would move problems about under the designer's hands. The Reload button, the plugin
+        /// starting and a save all discover afresh.
+        /// </summary>
+        /// <remarks>
+        /// The text of every file but the one being typed into is taken from
+        /// <see cref="_cached"/> rather than read again. Reading a content file goes through the
+        /// imported resource, which costs far more than parsing it: on this repository's largest
+        /// arrangement, 23 files, reading took about 34 ms of a 40 ms check and parsing and linting
+        /// the remaining 6. The cache is emptied whenever the project's files change and whenever
+        /// Reload is pressed, which are the only two moments the text on disk can have moved.
+        /// </remarks>
+        public void Recheck()
+        {
+            if (!IsLoaded)
+            {
+                Reload();
+                return;
+            }
+            LoadAndLint(Files);
+        }
+
+        /// <summary>
+        /// Forgets the text read from disk, so the next check reads it again. The dock calls this
+        /// when the editor reports that the project's files have changed.
+        /// </summary>
+        public void ForgetCachedText() => _cached.Clear();
+
+        /// <summary>
+        /// Rediscovers and reloads with the text of one file taken as given rather than read. The
+        /// editor calls this the moment it has written that file: reading a content file prefers
+        /// Godot's imported copy, and until the reimport has run that copy still holds what the
+        /// file used to say, which would have the dock reporting on text nobody can see.
+        /// </summary>
+        public void ReloadAfterSaving(string path, string text)
+        {
+            _cached.Clear();
+            if (!string.IsNullOrEmpty(path)) _cached[path] = text ?? string.Empty;
+            LoadAndLint(GodotContentLoader.Discover(ContentFolder));
+        }
+
+        private void LoadAndLint(IReadOnlyList<string> files)
+        {
             var library = new ContentLibrary();
-            IReadOnlyList<string> files = GodotContentLoader.Discover(ContentFolder);
-            DiagnosticBag load = GodotContentLoader.LoadInto(library, files);
+            DiagnosticBag load = GodotContentLoader.LoadInto(library, files, Drafts, _cached);
 
             Content = library;
             Files = files;

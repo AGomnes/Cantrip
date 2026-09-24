@@ -70,12 +70,12 @@ namespace Cantrip.GodotAdapter
 
             // Belt and braces: the script editor only opens Script resources, so this does nothing
             // for .cantrip files today. It costs nothing and will be right the day that changes; the
-            // highlighting a designer actually sees is in the dock's own source view.
+            // highlighting a designer actually sees is in the dock's own editor.
             _highlighter = new CantripSyntaxHighlighter();
             EditorInterface.Singleton?.GetScriptEditor()?.RegisterSyntaxHighlighter(_highlighter);
 
             // A step in the trace of a running game opens the content line that caused it, in the
-            // same viewer a diagnostic or a failing test opens.
+            // same editor a diagnostic or a failing test opens.
             _debugger = new CantripDebuggerPlugin();
             _debugger.NavigateRequested += OnNavigateRequested;
             AddDebuggerPlugin(_debugger);
@@ -110,6 +110,17 @@ namespace Cantrip.GodotAdapter
                 _dock.QueueFree();   // takes the panel with it
                 _dock = null;
                 _panel = null;
+            }
+
+            // The workspace holds the dock's unsaved buffers, and it goes when the assembly does,
+            // which is on every C# build. Nothing may be written to disk without being asked, but
+            // the work must not disappear in silence either.
+            int unsaved = _workspace?.Drafts.UnsavedCount ?? 0;
+            if (unsaved > 0)
+            {
+                GD.PushWarning(
+                    $"Cantrip: the dock closed with {unsaved} unsaved content buffer(s), which are gone. " +
+                    "Building the C# project reloads the addon, so save content before you build.");
             }
 
             _workspace = null;

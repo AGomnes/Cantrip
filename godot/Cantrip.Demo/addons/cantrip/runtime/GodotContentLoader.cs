@@ -102,13 +102,44 @@ namespace Cantrip.GodotAdapter
         /// Loads the given paths into a library, ordinally sorted, and returns everything the
         /// parser had to say plus any file that could not be read.
         /// </summary>
-        public static DiagnosticBag LoadInto(ContentLibrary library, IEnumerable<string> paths)
+        public static DiagnosticBag LoadInto(ContentLibrary library, IEnumerable<string> paths) =>
+            LoadInto(library, paths, null, null);
+
+        /// <summary>
+        /// The same, with the editor's unsaved buffers standing in for their own files, and the
+        /// text of the rest remembered between checks.
+        /// </summary>
+        /// <remarks>
+        /// A game passes nothing for either: only the dock has buffers, and only while someone is
+        /// typing into one. Everything else is unchanged, load order included, so what the dock
+        /// reports is what the game will load once the file is saved. The cache is the dock's,
+        /// and the dock empties it whenever the project's files change; reading a content file
+        /// goes through its imported resource, which costs more than parsing it does.
+        /// </remarks>
+        public static DiagnosticBag LoadInto(
+            ContentLibrary library,
+            IEnumerable<string> paths,
+            CantripDrafts? drafts,
+            IDictionary<string, string>? cache)
         {
             if (library == null) throw new ArgumentNullException(nameof(library));
 
             var all = new DiagnosticBag();
             foreach (string path in ContentPaths.Ordered(paths))
             {
+                string? draft = drafts?.TextFor(path);
+                if (draft != null)
+                {
+                    all.AddRange(library.LoadText(draft, path));
+                    continue;
+                }
+
+                if (cache != null && cache.ContainsKey(path))
+                {
+                    all.AddRange(library.LoadText(cache[path], path));
+                    continue;
+                }
+
                 if (!TryRead(path, out string text))
                 {
                     all.Error(
@@ -118,6 +149,7 @@ namespace Cantrip.GodotAdapter
                     continue;
                 }
 
+                if (cache != null) cache[path] = text;
                 all.AddRange(library.LoadText(text, path));
             }
             return all;

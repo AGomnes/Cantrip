@@ -11,10 +11,17 @@ namespace Cantrip.GodotAdapter
     /// The addon's dock: one workspace, four views of it, and a button that reloads the lot.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The panel owns nothing but arrangement. Every tab is a projection of the same
     /// <see cref="CantripWorkspace"/>, and the one thing they share beyond it is this panel's
     /// <see cref="ShowSource"/>: a problem, a failing test and a definition all point at a file and
-    /// a line, and all three land in the same viewer.
+    /// a line, and all three land in the same editor.
+    /// </para>
+    /// <para>
+    /// The other way round is <see cref="RunTests"/>. The editor's Run tests button does not run
+    /// anything itself: it brings the buffers up to date and then asks the panel, which presses the
+    /// Tests tab's own runner, so there is one runner in the dock and one list of results.
+    /// </para>
     /// </remarks>
     [Tool]
     public partial class CantripPanel : VBoxContainer
@@ -69,7 +76,8 @@ namespace Cantrip.GodotAdapter
 
             _source = new CantripSourceView();
             _tabs.AddChild(_source);
-            _source.Initialize();
+            _source.Initialize(_workspace, RunTests);
+            _source.TitleChanged += MarkSourceTab;
 
             _workspace.Changed += UpdateStatus;
             UpdateStatus();
@@ -77,13 +85,46 @@ namespace Cantrip.GodotAdapter
 
         public override void _ExitTree()
         {
+            if (_source != null) _source.TitleChanged -= MarkSourceTab;
             if (_workspace != null) _workspace.Changed -= UpdateStatus;
         }
 
         /// <summary>
-        /// Shows a file at a line in the source view and brings that tab forward. Everything
-        /// clickable in the dock ends up here, because nothing else in Godot can open a
-        /// <c>.cantrip</c> file at a line.
+        /// The Source tab says so when a buffer is unsaved, because the dock is often the only part
+        /// of it on screen and a file switched away from still has to show that it is waiting.
+        /// </summary>
+        private void MarkSourceTab()
+        {
+            if (_tabs == null || _source == null) return;
+
+            int index = _tabs.GetTabIdxFromControl(_source);
+            if (index >= 0) _tabs.SetTabTitle(index, _source.Title);
+        }
+
+        /// <summary>
+        /// Runs the content's tests against what is in the editor's buffers, saved or not, and says
+        /// what happened in one line. A failure brings the Tests tab forward, where each test says
+        /// PASS or FAIL and a double-click opens the line it failed on; a clean run leaves the
+        /// designer where they were typing.
+        /// </summary>
+        private string RunTests()
+        {
+            if (_tests == null || _tabs == null) return "No test runner.";
+
+            _tests.RunAll();
+            if (_tests.Failed > 0)
+            {
+                int index = _tabs.GetTabIdxFromControl(_tests);
+                if (index >= 0) _tabs.CurrentTab = index;
+            }
+
+            return _tests.Summary;
+        }
+
+        /// <summary>
+        /// Shows a file at a line in the editor and brings that tab forward. Everything clickable
+        /// in the dock ends up here, because nothing else in Godot can open a <c>.cantrip</c> file
+        /// at a line.
         /// </summary>
         public void ShowSource(string file, int line, int column)
         {
@@ -127,8 +168,8 @@ namespace Cantrip.GodotAdapter
 
         /// <summary>
         /// Exercises every panel without a mouse: reload, list the problems, run the tests, describe
-        /// everything, and open the first file at the first problem. Clicking is what a headless
-        /// editor cannot do; this is everything underneath it.
+        /// everything, then open the first file at the first problem and edit, check and save one.
+        /// Clicking is what a headless editor cannot do; this is everything underneath it.
         /// </summary>
         public IReadOnlyList<string> SelfTest()
         {
@@ -151,7 +192,7 @@ namespace Cantrip.GodotAdapter
 
             Diagnostic? first = _problems?.First();
             string? file = first?.Span.File ?? (_workspace.Files.Count > 0 ? _workspace.Files[0] : null);
-            if (_source != null) report.Add(_source.SelfTest(file));
+            if (_source != null) report.AddRange(_source.SelfTest(file));
 
             if (first != null) ShowSource(first.Span.File, first.Span.Line, first.Span.Column);
             report.Add($"dock: {(_tabs == null ? 0 : _tabs.GetTabCount())} tab(s) built");
