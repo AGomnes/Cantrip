@@ -12,8 +12,12 @@ The [issue forms](https://github.com/AGomnes/Cantrip/issues/new/choose) ask for 
 
 ## The repository
 
+Godot is Cantrip's primary engine, so the addon comes first here even though the library under it is engine-free.
+
 | Path | Contents |
 |---|---|
+| `godot/Cantrip.Demo/addons/cantrip` | The Godot addon itself: the `CantripRuntime` node, the `.cantrip` importer, the editor dock and the debugger tabs. This copy is the one each release packages and publishes, and the demo around it uses it in place |
+| `godot/Cantrip.Demo` | The Godot project holding it: a demo battle driven from GDScript, and the headless scenes CI runs. [Working on the addon](docs/godot.md#working-on-the-addon) says how to build, run and package it |
 | `src/Cantrip.Core` | The library: parser, content loading, rules engine, interpreter, linter, rules text, test runner |
 | `src/Cantrip.Cli` | The `cantrip` tool |
 | `src/Cantrip.Sim` | What `cantrip sim` runs, as a library shipped inside the tool: the scenario runner, its bots, and the meter that records what the engine raised |
@@ -22,7 +26,6 @@ The [issue forms](https://github.com/AGomnes/Cantrip/issues/new/choose) ask for 
 | `samples/corpus` | Effects re-created from existing games |
 | `samples/slice` | The sample roguelite: a witch climbing a tower, fire against frost, with a boss that changes its moves at half health |
 | `samples/recipes` | The recipes from [docs/writing-content.md](docs/writing-content.md), with their tests |
-| `godot/Cantrip.Demo` | The Godot addon, a demo and headless tests |
 | `tests` | Unit tests for the library and for the addon's engine-free layer |
 | `tools` | Packaging the addon, and checking the quickstart and the addon install against freshly built packages |
 
@@ -36,7 +39,8 @@ Please open an issue first for anything beyond a small fix, so we can agree on t
   dotnet run --project src/Cantrip.Cli -- lint samples/basic --warnings-as-errors
   dotnet run --project src/Cantrip.Cli -- test samples/basic
   ```
-- A behaviour change comes with a test, and a language change with its entry in [docs/language.md](docs/language.md).
+- A change to the addon builds the demo and passes the headless Godot scenes, the dock's self-test and the install test in a blank project, which are the commands in [Working on the addon](docs/godot.md#working-on-the-addon) and what CI runs.
+- A behaviour change comes with a test; a language change comes with its entry in [docs/language.md](docs/language.md), and a change to the Godot node with its entry in [docs/godot.md](docs/godot.md).
 - Anything that changes results keeps determinism: no floating point, `System.Random` or hash-order dependence in the rules.
 - A change to the public C# API of Cantrip.Core is written into `src/Cantrip.Core/PublicAPI.Unshipped.txt`. The build fails until it is (error RS0016 for an addition, RS0017 for a removal), so no API change slips through unnoticed.
 - Add a line to the unreleased section of [CHANGELOG.md](CHANGELOG.md) for anything a user would notice, under **Breaking changes**, **Save format** or **Same-seed results** if it changes one of those. A change to the Godot node's methods, signals or dictionary keys counts as breaking, like one to the C# API.

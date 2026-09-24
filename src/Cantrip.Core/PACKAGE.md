@@ -1,6 +1,8 @@
 # Cantrip.Core
 
-Write cards, statuses, relics, enemies and abilities as short text files instead of code, and run them turn-based from any .NET game on .NET 5 or later, `net8.0` included. The rules engine has no engine dependencies and no third-party packages; a [Godot 4.6 addon](https://github.com/AGomnes/Cantrip/blob/main/docs/godot.md) is available separately.
+Write cards, statuses, relics, enemies and abilities as short text files instead of code, and run them turn-based from a **Godot 4.6** game — the .NET edition, in GDScript or C# — through the [Cantrip addon](https://github.com/AGomnes/Cantrip/blob/main/docs/godot.md), or from **any other .NET game** on .NET 5 or later, `net8.0` included. This package is the rules engine underneath both: it references no game engine and has no third-party dependencies.
+
+**In Godot**, put the addon in the project first, then add this package at the version in the addon's `plugin.cfg` — `dotnet add package Cantrip.Core --version <that version>` — rather than with `--prerelease`, which may fetch a newer preview than the addon you have. [The Godot addon](https://github.com/AGomnes/Cantrip/blob/main/docs/godot.md) walks through it, and your game calls the addon's node from GDScript rather than the API below.
 
 ```
 status Hex
@@ -21,7 +23,7 @@ enemy Ghoul
     deal 7 to player
 ```
 
-With that in `content/game.cantrip`:
+With that in `content/game.cantrip`, a .NET game plays it:
 
 ```csharp
 using Cantrip;
@@ -43,7 +45,8 @@ runtime.EndTurn();
 
 This is a **preview**. The API and the save format may change between previews; see [stability](https://github.com/AGomnes/Cantrip/blob/main/docs/stability.md). The linked docs describe the `main` branch, which can be ahead of this version; each release's own docs are in [its tag](https://github.com/AGomnes/Cantrip/tags).
 
-- [Quickstart](https://github.com/AGomnes/Cantrip/blob/main/docs/quickstart.md): from nothing to a playable battle in about fifteen minutes
+- [The Godot addon](https://github.com/AGomnes/Cantrip/blob/main/docs/godot.md): installing it, and a first battle from GDScript
+- [Quickstart](https://github.com/AGomnes/Cantrip/blob/main/docs/quickstart.md): from nothing to a playable battle in a terminal, for a game that is not in Godot
 - [Language reference](https://github.com/AGomnes/Cantrip/blob/main/docs/language.md)
 - The companion command-line tool, for testing and linting content: run `dotnet new tool-manifest`, then `dotnet tool install Cantrip.Cli --prerelease`, and use it as `dotnet cantrip`
 - [Source, issues and changelog](https://github.com/AGomnes/Cantrip)

@@ -8,6 +8,9 @@ It is a fuzzer and a coverage tool for your own content. It finds the run that t
 that never ends, the card that is never playable and the enemy move that never fires, none of
 which a single test would reach.
 
+`sim` has no tab in the Godot addon's editor dock, so a Godot project installs the command-line
+tool to run it; [The command](#the-command) says how, and how to point it at the game's content.
+
 ## A scenario
 
 Put this in a file beside your content. [samples/slice/sim.cantrip](../samples/slice/sim.cantrip)
@@ -281,6 +284,16 @@ is to fuzz content rather than see it played.
 
 `sim` refuses to start on a content error, the linter's errors included, so a scenario that names
 an enemy nothing defines fails in milliseconds instead of after a hundred runs.
+
+In a Godot project the addon's editor dock lints, tests and previews, but it does not simulate:
+its Tests tab runs `test` blocks only, and neither counts nor plays a `scenario`. Install the tool
+beside the game, with the two lines in [Before you start](writing-content.md#before-you-start),
+point it at the folder the game loads from — `res://content` unless the game was told
+otherwise — and run it there:
+
+```
+dotnet cantrip sim content
+```
 
 Exit codes: **0** every run finished and every checked expectation held; **1** the content has
 errors, there was no scenario to play, a run threw, a battle reached the turn limit, or an

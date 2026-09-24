@@ -1,17 +1,19 @@
 # Samples
 
-Worked `.cantrip` content, each folder with its tests. On each change, CI runs `test` over each folder in `samples`, and `lint` with `--warnings-as-errors`, so a folder must stay free of warnings as well as errors. Two of them also have a `scenario`, which CI plays with `sim`.
+Worked `.cantrip` content, each folder with its tests, and one whole Godot project. On each change, CI runs `test` over each folder in `samples`, and `lint` with `--warnings-as-errors`, so a folder must stay free of warnings as well as errors. Two of them also have a `scenario`, which CI plays with `sim`.
+
+In Godot, start with the demo project in the first row: it is the addon running, with a hand of card buttons and enemies that show their intents. The content folders under it are engine-free — the same `.cantrip` files run in the demo, in the dock, in `dotnet cantrip` and in a console app.
 
 | Folder | What it shows |
 |---|---|
+| [`godot/Cantrip.Demo`](../godot/Cantrip.Demo) | A Godot project, kept beside the addon rather than here, that plays a battle from GDScript. [`demo/battle.gd`](../godot/Cantrip.Demo/demo/battle.gd) builds a hand of card buttons and enemy panels that show their intents, tells what happened in a log at a steady pace, and answers a card's choice with its first option where a game would open a picker. It plays the content in its `content` folder, which has tests of its own. To run it, build it once with `dotnet build godot/Cantrip.Demo/Cantrip.Demo.csproj`, open the folder in the .NET edition of Godot 4.6 and press Play. CI builds it and has it play a battle by itself. [godot.md](../docs/godot.md) explains the addon it uses. |
 | [`basic`](basic) | Small examples of most features in one file, with a test for each: Fireball, Frozen and Kindling from the README, poison and other statuses, a content-defined verb, a real-time ability, and the Strike, Defend and Jaw Worm that the README's C# example and the [C# guide](../docs/csharp.md) use. |
 | [`recipes`](recipes) | The content from [Writing content](../docs/writing-content.md). [`recipes/tutorial`](recipes/tutorial) holds the tutorial's finished files, and every other file is one recipe with its tests, such as [a boss that switches moves at half health](recipes/boss-switches-at-half-health.cantrip) or [a debuff that lasts N enemy turns](recipes/debuff-for-enemy-turns.cantrip). Some recipes use the tutorial's Strike, Defend, Poison or Bog Troll, so load the whole folder. |
 | [`abilities`](abilities) | A fight with no cards in it, as a turn-based roguelike has: two abilities on cooldowns, a bleed that ticks, and an enemy whose moves change when it is wounded, with tests for each. Everything a deckbuilder uses except the cards. [`sim.cantrip`](abilities/sim.cantrip) plays that fight many times. |
 | [`slice`](slice) | A small roguelite: a witch climbing a five-floor tower, fire against frost, with 17 cards, 4 relics and 5 enemies, among them a boss, the Archmage, that changes its moves at half health. [`sim.cantrip`](slice/sim.cantrip) states the tower as a scenario, which `cantrip sim` plays hundreds of times. |
 | [`corpus`](corpus) | Effects from nine existing games, re-created under our own names, one content file and one test file per game. [Coverage](../docs/coverage.md) says which the language writes directly, which need a workaround and which it cannot express yet. |
-| [`godot/Cantrip.Demo`](../godot/Cantrip.Demo) | A Godot project, kept beside the addon rather than here, that plays a battle from GDScript. [`demo/battle.gd`](../godot/Cantrip.Demo/demo/battle.gd) builds a hand of card buttons and enemy panels that show their intents, tells what happened in a log at a steady pace, and answers a card's choice with its first option where a game would open a picker. It plays the content in its `content` folder, which has tests of its own. To run it, build it once with `dotnet build godot/Cantrip.Demo/Cantrip.Demo.csproj`, open the folder in the .NET edition of Godot 4.6 and press Play. CI builds it and has it play a battle by itself. [godot.md](../docs/godot.md) explains the addon it uses. |
 
-For a first read, start with `basic` or the recipes. For a phased enemy and the tests that pin its intents, see the recipe above or the Archmage in [`slice/enemies.cantrip`](slice/enemies.cantrip) and [`slice/tests.cantrip`](slice/tests.cantrip).
+For a first read of the content itself, start with `basic` or the recipes. For a phased enemy and the tests that pin its intents, see the recipe above or the Archmage in [`slice/enemies.cantrip`](slice/enemies.cantrip) and [`slice/tests.cantrip`](slice/tests.cantrip).
 
 ## Testing and linting a sample
 
@@ -25,6 +27,8 @@ dotnet run --project src/Cantrip.Cli -- lint samples/basic
 Put `samples/recipes`, `samples/abilities`, `samples/slice` or `samples/corpus` in place of `samples/basic` for the others. `test` runs every test and prints PASS or FAIL for each; `lint` checks the files for mistakes a test might not reach. Both end with a count, and `lint` reports notes as well as errors and warnings: a note is information, not a failure. `lint` fails only on errors unless you add `--warnings-as-errors`, as CI does.
 
 Load one folder at a time. The folders define some of the same names, such as `Strength`, so loading two together fails with error CT0110, "already defined".
+
+In Godot the dock does `test` and `lint` in the editor, on the files the project holds. To read one of these folders there, copy it into the project and set `cantrip/content/folder` to it in Project Settings, as [Before you start](../docs/writing-content.md#before-you-start) explains: the dock reads every `.cantrip` file in the project otherwise, and two sample folders together clash on the same names.
 
 In a project that has the tool installed, as the [quickstart](../docs/quickstart.md) sets up, the same commands are `dotnet cantrip test <folder>` and `dotnet cantrip lint <folder>`. `dotnet cantrip describe <folder>` prints the rules text of each definition, generated or written with `text:`, and `dotnet cantrip repl <folder>` runs single lines against a live battle. [The edit, lint and test loop](../docs/writing-content.md#5-the-edit-lint-and-test-loop) explains all four.
 

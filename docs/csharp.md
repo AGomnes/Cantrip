@@ -1,6 +1,8 @@
 # Using Cantrip from C#
 
-Everything a game does with Cantrip goes through `ContentLibrary`, which loads and checks content, and `CardRuntime`, which plays it. This page is for a game that calls the library itself, whether a console app, a MonoGame or FNA game, or an engine loop of your own, and walks through the parts such a game uses. The [quickstart](quickstart.md) puts the first few together into a playable battle, and the [Godot addon](godot.md) wraps the same calls for GDScript. The package ships its XML documentation, so your editor shows each member's notes as you type.
+> **In Godot?** You want [godot.md](godot.md), not this page. The addon's `CantripRuntime` node wraps everything below and hands it to GDScript as ids and dictionaries, so a Godot game needs none of this C#. Read on if your Godot game is in C# and would rather call the library directly, or to see what the node is doing underneath.
+
+Everything a game does with Cantrip goes through `ContentLibrary`, which loads and checks content, and `CardRuntime`, which plays it. This page is for a game that calls the library itself, whether a console app, a MonoGame or FNA game, or an engine loop of your own, and walks through the parts such a game uses. The [quickstart](quickstart.md) puts the first few together into a playable battle. The package ships its XML documentation, so your editor shows each member's notes as you type.
 
 These docs describe the `main` branch, which can be ahead of the latest release. The changelog's [Unreleased](../CHANGELOG.md#unreleased) section lists what that release lacks, and each release's own docs are in [its tag](https://github.com/AGomnes/Cantrip/tags).
 
@@ -571,6 +573,7 @@ IReadOnlyList<DslTestResult> results = new DslTestRunner(content).RunAll();
 
 ## Where next
 
+- [godot.md](godot.md) is the same ground for a Godot game: the node that wraps these calls, the dictionaries it hands GDScript, and the editor dock.
 - [language.md](language.md) describes everything content can say; its [Built-in events](language.md#built-in-events) table lists each event's fields.
 - [architecture.md](architecture.md) explains how the library fits together, and [Extending](architecture.md#extending) lists every seam a game can plug into.
 - [stability.md](stability.md) says what may change between previews, which platforms are tested, and what is known not to work yet.

@@ -2,6 +2,8 @@
 
 The `cantrip` command-line tool for [Cantrip](https://github.com/AGomnes/Cantrip) content: check it, lint it, run its tests, play it many times with a bot, print its rules text, and try statements against a live game. It is built for .NET 9 and runs on .NET 9 or later.
 
+**In Godot**, the [Cantrip addon](https://github.com/AGomnes/Cantrip/blob/main/docs/godot.md)'s editor dock already lints the content, runs its tests and previews its rules text inside the editor, so this tool is optional there. What it adds is `sim`, which plays a scenario hundreds of times with a bot, the REPL, and a single command a build server can run.
+
 Install it into your project's folder, then run it as `dotnet cantrip`:
 
 ```
@@ -34,4 +36,4 @@ Exit codes: 0 success, 1 content errors, failing tests, or a `sim` run that thre
 
 Each message starts with the file, line and column, then its level and a code such as `CT302`. [Diagnostics](https://github.com/AGomnes/Cantrip/blob/main/docs/language.md#diagnostics) in the language reference lists every code, with what it means and the usual fix. [Simulating](https://github.com/AGomnes/Cantrip/blob/main/docs/simulating.md) covers `sim`: what a scenario says, what the report measures and what it refuses to claim.
 
-This is a **preview**; see [stability](https://github.com/AGomnes/Cantrip/blob/main/docs/stability.md). Start with the [quickstart](https://github.com/AGomnes/Cantrip/blob/main/docs/quickstart.md). Writing content rather than code? Start with [Writing content](https://github.com/AGomnes/Cantrip/blob/main/docs/writing-content.md), which needs no C#.
+This is a **preview**; see [stability](https://github.com/AGomnes/Cantrip/blob/main/docs/stability.md). In Godot, start with [the Godot addon](https://github.com/AGomnes/Cantrip/blob/main/docs/godot.md); anywhere else, with the [quickstart](https://github.com/AGomnes/Cantrip/blob/main/docs/quickstart.md). Writing content rather than code? Start with [Writing content](https://github.com/AGomnes/Cantrip/blob/main/docs/writing-content.md), which needs no C#.

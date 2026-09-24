@@ -1,8 +1,10 @@
 # Quickstart
 
-In about fifteen minutes this gets you from nothing to a small card battle you can play in a terminal: three cards, a status and an enemy written in Cantrip, checked by tests, and driven from C#. It assumes you know C# and the .NET command line, and nothing about Cantrip.
+> **Using Godot?** Start at [godot.md](godot.md) instead. Godot 4.6 is the engine Cantrip is built for: its guide installs the addon and plays this same battle from GDScript, in [Your first battle](godot.md#your-first-battle), and nothing on this page has to come first.
 
-Writing cards rather than code? [writing-content.md](writing-content.md) starts from the content side. Using Godot? [godot.md](godot.md) installs the addon and plays this same content from GDScript.
+This page is the route for a game that is not in Godot. In about fifteen minutes it gets you from nothing to a small card battle you can play in a terminal: three cards, a status and an enemy written in Cantrip, checked by tests, and driven from C#. It assumes you know C# and the .NET command line, and nothing about Cantrip.
+
+Writing cards rather than code? [writing-content.md](writing-content.md) starts from the content side; it needs no C#. Steps 2 and 3 below are worth reading whichever engine you are in, because the content and the `cantrip` command-line tool are the same everywhere.
 
 ## 1. Make a project
 
@@ -69,7 +71,7 @@ enemy Ghoul
   pattern cycle Claw, Claw, Howl
 ```
 
-A few things to notice. Indentation makes the blocks. A number on a property (`cost 1`, `hp 30`) becomes a stat. `target` is the enemy the card was played on, and `target.Hex` reads that enemy's stacks of Hex. The `text` line is optional; without it Cantrip writes serviceable rules text itself.
+A few things to notice. The first line is a comment: `#` starts one, and it runs to the end of the line. Indentation makes the blocks — this is Cantrip's own syntax, not YAML, so nothing here is a key and a value. A number on a property (`cost 1`, `hp 30`) becomes a stat. `target` is the enemy the card was played on, and `target.Hex` reads that enemy's stacks of Hex. The `text` line is optional; without it Cantrip writes serviceable rules text itself. [Files](language.md#files) in the language reference states these rules exactly.
 
 ## 3. Test it
 
@@ -167,9 +169,9 @@ The whole rules engine is behind those few calls. Nothing in `Program.cs` knows 
 
 ## 5. Where next
 
+- [godot.md](godot.md) runs this same content in Godot 4.6 through the addon: a node GDScript drives, an importer that carries `.cantrip` files into exported builds, and an editor dock for problems, tests and card text.
 - [writing-content.md](writing-content.md) is for whoever writes the cards, statuses, relics and enemies: a tutorial that goes further than steps 2 and 3, the edit and test loop, and recipes for common mechanics.
 - [language.md](language.md) is the full language reference: every declaration, event, verb and modifier.
-- [godot.md](godot.md) runs the same content in Godot 4.6 through an addon, with an editor dock for problems, tests and card text.
 - [csharp.md](csharp.md) covers the rest of the C# side: showing events in a game's frame loop, player choices a UI answers, several battles in one run, saving and loading, hot reload, shipping content, and tracing why something happened.
 - [samples/slice](../samples/slice) is a bigger example, a five-floor roguelite. `dotnet cantrip sim samples/slice` plays its tower hundreds of times with two bots and reports what the content allowed: a run that threw, a fight that never ended, a card that was never playable, an enemy move that never fired — and where the hp went, which is the engine's own arithmetic rather than a judgement about play. [Simulating](simulating.md) covers it. The samples are in the repository rather than the packages, so clone it to run them; [samples/README.md](../samples/README.md) shows how, and describes the other samples.
 

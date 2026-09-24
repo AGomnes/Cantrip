@@ -11,7 +11,13 @@ When a release changes any of the following, its section says so under that name
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- **The docs treat Godot as the front door.** Cantrip is a Godot library first, and the docs now read that way. The [README](README.md) says in its opening that you use it from Godot 4.6 on Godot's .NET edition, in GDScript or C#, or from any other .NET project; the Godot route is first in **Where to start**, first under **Get started** — with a GDScript battle beside the C# one — and first in the documentation list, and its command-line table says which of those commands the dock already covers. The [quickstart](docs/quickstart.md) sends a Godot reader to [the addon guide](docs/godot.md) before its first step and says plainly that it is the route for a game that is not in Godot. [Using Cantrip from C#](docs/csharp.md) opens by saying a Godot game needs none of it. [Writing content](docs/writing-content.md), [the language reference](docs/language.md), [Simulating](docs/simulating.md) and [samples/README.md](samples/README.md) say where the editor dock does the work of a command and where it does not, both NuGet pages lead with Godot, and [CONTRIBUTING.md](CONTRIBUTING.md) maps the addon before the library, as the README now does for a contributor.
+
+  What Godot costs is said in the same breath and not softened: the .NET edition of the engine for everyone who opens the project, the .NET SDK, a C# solution even in a game written entirely in GDScript, and Godot's own limits on where a .NET game can be exported. The dock's limits are stated as plainly: it lints, tests and previews, but its Source tab is a viewer rather than an editor, and neither `sim` nor the REPL has a tab, so a Godot project still installs the tool for those. Nothing about the engine-free core changed. It still targets `netstandard2.1` and references no game engine, the console quickstart is still followed word for word against freshly packed packages before every release, and [docs/stability.md](docs/stability.md) remains the only place that says how much of any of this has been tested.
+
+- The [quickstart](docs/quickstart.md) says what a `#` line in a `.cantrip` file is, where the reader first meets one. The first content block on the page opens with a comment, and until now nothing on the page said so; [Files](docs/language.md#files) in the language reference had it, several pages later.
 
 ## [0.1.0-preview.4] - 2026-09-23
 

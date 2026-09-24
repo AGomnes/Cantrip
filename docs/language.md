@@ -40,7 +40,7 @@ Content lives in `.cantrip` files. A folder loads every `.cantrip` file under it
 - **Names** of definitions are strings (`card "Fire Bolt"`) or bare words (`status Poison`). A name with spaces, hyphens or other punctuation, such as `"Strike+"`, is written in quotes wherever it is used, after a qualifier too, as in `name:"Strike+"` (see [Qualifiers](#qualifiers)), so single-word names are easier to type.
 - **Keywords** are case-insensitive. Names are matched case-insensitively.
 - A block can be written on the same line after its colon: `if target.dead: draw 1`, `effect: deal 6 to target`.
-- **Editors.** Any text editor will do. There is no syntax-highlighting package for text editors yet; the Godot addon's editor dock shows the source highlighted.
+- **Editors.** In Godot, the addon's editor dock lints and tests content without leaving the editor, and shows a file highlighted, although it does not edit one; see [godot.md](godot.md). The files themselves are written in any text editor, there as anywhere else, and there is no syntax-highlighting package for one yet.
 
 ## Terms
 
