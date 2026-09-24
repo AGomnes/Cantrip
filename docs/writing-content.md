@@ -4,7 +4,7 @@
 
 This guide is for whoever writes a game's cards, statuses, relics and enemies. It needs no C#. It builds a card, a status, a relic and an enemy whose moves change at half health, each with a test, and explains each idea the first time it appears. Then come the commands you will use all day, a sandbox for trying single lines, and [recipes](#recipes) for common card-game mechanics.
 
-If your game is in Godot, the checking and the testing happen inside the editor: the addon's Cantrip dock lints your files, runs your tests and previews your card text, so almost nothing here needs a command line. You write the files in a text editor of your own either way, as the dock shows content but does not edit it. [7. In Godot](#7-in-godot) says what each of its tabs does, and [godot.md](godot.md) is the guide to the addon itself.
+If your game is in Godot, the checking and the testing happen inside the editor: the addon's Cantrip dock lints your files, runs your tests and previews your card text, so almost nothing here needs a command line. You write the files in the dock's Source tab, which lints them as you type and saves with Ctrl+S, or in a text editor of your own if you would rather. [7. In Godot](#7-in-godot) says what each of its tabs does, and [godot.md](godot.md) is the guide to the addon itself.
 
 - [Before you start](#before-you-start)
 - [1. A first card](#1-a-first-card)
@@ -19,7 +19,7 @@ If your game is in Godot, the checking and the testing happen inside the editor:
 
 ## Before you start
 
-**In a Godot project** with the addon enabled, you need no tool installed for the checking or the testing. The Cantrip dock at the bottom of the editor runs `lint`, `test` and `describe` over the project's `.cantrip` files, and shows them highlighted. Skip to [7. In Godot](#7-in-godot) for its tabs, and read those three commands on this page as the dock's equivalent; the content and the tests are the same either way. Two things still need the tool: the REPL in [section 6](#6-trying-lines-in-the-repl) and `sim`. The dock writes no files, so the files themselves are written in a text editor as they are anywhere else. If the addon is not installed yet, [godot.md](godot.md) installs it.
+**In a Godot project** with the addon enabled, you need no tool installed for the checking or the testing. The Cantrip dock at the bottom of the editor runs `lint`, `test` and `describe` over the project's `.cantrip` files, and shows them highlighted. Skip to [7. In Godot](#7-in-godot) for its tabs, and read those three commands on this page as the dock's equivalent; the content and the tests are the same either way. Two things still need the tool: the REPL in [section 6](#6-trying-lines-in-the-repl) and `sim`. The files themselves are written in the dock's Source tab, which saves them with Ctrl+S, or in a text editor of your own. If the addon is not installed yet, [godot.md](godot.md) installs it.
 
 **Anywhere else**, you need the `cantrip` command-line tool, installed as in [step 1 of the quickstart](quickstart.md#1-make-a-project); a programmer may already have done this for you. If you only want the tool, not the C# project, these two lines in the folder you will work in are enough, with the .NET 9 SDK installed:
 
@@ -28,7 +28,7 @@ dotnet new tool-manifest
 dotnet tool install Cantrip.Cli --prerelease
 ```
 
-Run the commands below from that folder, or any folder inside it. Any text editor will do for the files; there is no syntax-highlighting package for one yet, although the Godot dock's Source tab shows a file highlighted.
+Run the commands below from that folder, or any folder inside it. Any text editor will do for the files; there is no syntax-highlighting package for one yet. In Godot you need none: the dock's Source tab writes them, highlighted and checked as you type.
 
 Make a folder called `tutorial` with two empty files in it, `game.cantrip` and `tests.cantrip`. If you have done the quickstart, keep this folder apart from its `content` folder: a folder loads as one game, and both define a Strike.
 
@@ -352,16 +352,16 @@ The REPL has limits. It has none of the test verbs, so `enemy`, `play`, `end tur
 
 In a Godot game the files, the language and the tests are the same. Keep them where the game loads them from, which is `res://content` unless the programmer chose another folder.
 
-Once the Cantrip addon is enabled, the Godot editor has a Cantrip dock at the bottom, and the loop in [section 5](#5-the-edit-lint-and-test-loop) happens there: write a card in your text editor, save, press the dock's Reload button, read Problems, run the tests. Nothing to install, and no command line for any of that.
+Once the Cantrip addon is enabled, the Godot editor has a Cantrip dock at the bottom, and the loop in [section 5](#5-the-edit-lint-and-test-loop) happens there: write a card in its Source tab, read the problems as they appear, press **Run tests**, save with Ctrl+S. Nothing to install, and no command line for any of that.
 
 | Tab | What it shows |
 |---|---|
 | Problems | Errors and lint findings for every `.cantrip` file. Double-click one to see the line. |
 | Tests | Your `test` blocks. Its Run button runs them as `dotnet cantrip test` does. "Trace failures" is ticked to begin with, and shows the trace of each failing test. |
 | Preview | Any definition's rules text, with live values |
-| Source | The file, highlighted. It is a viewer, not an editor: its **Open externally** button opens the file in whatever your system uses for text files, and **Reread** reads it back after you have saved there. |
+| Source | The editor. Write content here, save with **Ctrl+S** or the **Save** button, and see each problem marked in the gutter and written out under the buffer a moment after you stop typing, with **Apply fix** for the ones that suggest a word. It indents with spaces at the width the file already uses, never a tab. **Run tests** runs your `test` blocks against the buffers, saved or not; **Open externally** opens the file in whatever your system uses for text files. |
 
-The dock does not notice a saved file by itself: press its **Reload** button, which reads the `cantrip/` project settings and then loads and lints every file again. A running game picks up changed files when it reloads its content, which the game's own code starts, for example from a debug key. See [The editor dock](godot.md#the-editor-dock) and [Hot reload](godot.md#hot-reload).
+A file you save in the dock is loaded and linted straight away, and so is one saved elsewhere, once Godot notices it — and a `.cantrip` file added or deleted outside the editor joins or leaves the content the same way. **Reload** re-reads the `cantrip/` project settings and reads every file again from scratch; it keeps your unsaved buffers. A running game picks up changed files when it reloads its content, which the game's own code starts, for example from a debug key. See [The editor dock](godot.md#the-editor-dock) and [Hot reload](godot.md#hot-reload).
 
 `sim` and the REPL are the two commands with no tab. To play a scenario hundreds of times with a bot, install the command-line tool beside the game as [Before you start](#before-you-start) shows, and run `dotnet cantrip sim content` in the project folder; [Simulating](simulating.md) covers it.
 
