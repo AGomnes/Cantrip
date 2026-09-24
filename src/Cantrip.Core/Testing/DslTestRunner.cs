@@ -78,8 +78,11 @@ namespace Cantrip.Testing
         /// registers in C#:
         /// <c>runner.ConfigureRuntime = runtime => runtime.RegisterVerb("corrupt", Corrupt);</c>.
         /// The runtime has no player yet. If this creates one, the test uses it; otherwise the test
-        /// creates one with 80 hp and 3 energy. The test verbs, such as <c>play</c>, are registered
-        /// afterwards, so they win over a verb of the same name. An exception from it fails that test.
+        /// creates one with 80 hp and 3 energy. The test verbs are registered afterwards, so they win
+        /// over a verb of the same name. <c>play</c> is the exception, because it is a rule verb too:
+        /// the test's wins only for the <c>play</c> statements in the test's own body, and every other
+        /// one goes to whatever was registered before — the rules', or the game's. An exception from
+        /// this fails that test.
         /// </summary>
         public Action<CardRuntime>? ConfigureRuntime { get; set; }
 
@@ -126,7 +129,7 @@ namespace Cantrip.Testing
             if (Trace)
                 runtime.Interpreter.Logged += message => runtime.State.Trace.Record(runtime.State.Clock.Now, "log", message);
 
-            var session = new Session(runtime, chooser);
+            var session = new Session(runtime, chooser, body);
             SourceSpan at = test.Syntax.Span;
 
             try
@@ -199,16 +202,46 @@ namespace Cantrip.Testing
             return null;
         }
 
+        /// <summary>
+        /// Every <c>play</c> statement written in a test's own body. Collected once per test, so the
+        /// test's verb and the rules' can be told apart by <em>where the line is written</em>.
+        /// </summary>
+        private sealed class OwnPlays : AstWalker
+        {
+            public HashSet<CommandNode> Statements { get; } = new HashSet<CommandNode>();
+
+            public override void VisitStatement(StatementNode statement)
+            {
+                if (statement is CommandNode command && string.Equals(command.Verb, "play", StringComparison.OrdinalIgnoreCase))
+                    Statements.Add(command);
+                base.VisitStatement(statement);
+            }
+        }
+
         /// <summary>One running test: its setup, and the verbs only a test has.</summary>
         private sealed class Session
         {
             private readonly CardRuntime _runtime;
             private readonly SetupSession _setup;
+            private readonly HashSet<CommandNode> _ownPlays;
+            private readonly VerbHandler? _rulePlay;
 
-            public Session(CardRuntime runtime, ScriptedChooser chooser)
+            public Session(CardRuntime runtime, ScriptedChooser chooser, BlockNode body)
             {
                 _runtime = runtime;
                 _setup = new SetupSession(runtime, chooser);
+
+                // `play` is a rule verb as well as a test verb, and one word cannot mean two things
+                // by accident. It is decided lexically: the `play` statements in this test's own body
+                // are the test's, and a `play` written anywhere else — in a card's effect, or in a
+                // content verb this test calls — is the rules', even while the test is what set it
+                // going. A content verb takes its context from its caller, so no check made while the
+                // verb runs could get that right.
+                var own = new OwnPlays();
+                own.VisitBlock(body);
+                _ownPlays = own.Statements;
+                _rulePlay = Interpreter.TryGetVerb("play", out VerbHandler rules) ? rules : null;
+
                 foreach (var (name, bind) in VerbTable) Interpreter.RegisterVerb(name, bind(this));
             }
 
@@ -246,6 +279,13 @@ namespace Cantrip.Testing
             /// <summary><c>play Strike on enemy</c>. Cards not already in hand are put there first.</summary>
             private void Play(VerbCall call)
             {
+                // Written somewhere other than this test's own body, so it is the rules' verb.
+                if (!_ownPlays.Contains(call.Node) && _rulePlay != null)
+                {
+                    _rulePlay(call);
+                    return;
+                }
+
                 ExprNode node = call.ArgumentNode(0) ?? throw Fail("`play` needs a card.", call.Span);
                 Entity? target = null;
                 if (node is BinaryExpr { Operator: BinaryOperator.On } on)

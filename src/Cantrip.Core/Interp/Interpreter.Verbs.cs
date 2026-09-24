@@ -16,6 +16,8 @@ namespace Cantrip.Runtime
             RegisterVerb("change", VerbChange);
             RegisterVerb("move", VerbMove);
             RegisterVerb("create", VerbCreate);
+            RegisterVerb("copy", VerbCopy);
+            RegisterVerb("transform", VerbTransform);
             RegisterVerb("destroy", VerbDestroy);
             RegisterVerb("apply", VerbApply);
             RegisterVerb("remove", VerbRemove);
@@ -144,6 +146,159 @@ namespace Cantrip.Runtime
             for (int i = 0; i < count; i++) created.Add(Create(definition, owner, zone, call.Context));
             call.Context.SetLocal("created", Value.FromEntities(created));
         }
+
+        /// <summary>
+        /// <c>copy target</c>, <c>copy hand.first 2 into draw</c>, or bare <c>copy</c> for itself.
+        /// Duplicates something that is in the game, as it stands now. Binds <c>copied</c>.
+        /// </summary>
+        /// <remarks>
+        /// Where <c>create Strike</c> makes a Strike as it is printed, <c>copy picked</c> makes one
+        /// as it is: upgraded, discounted, sharpened. That is the whole feature, and it is why a
+        /// definition in the argument is refused outright rather than quietly giving the printed one.
+        /// </remarks>
+        private void VerbCopy(VerbCall call)
+        {
+            Value what;
+            if (call.ArgumentCount > 0)
+            {
+                what = call.Argument(0);
+            }
+            else
+            {
+                Entity self = call.Context.Self ?? throw call.Error("there is nothing here to copy. Write `copy <who>`.");
+                what = Value.FromEntity(self);
+            }
+
+            // A quoted name evaluates to text rather than to a definition, and both read as if they
+            // would make one. Neither is something in the game, so both are refused the same way.
+            if (what.Kind == ValueKind.Definition || what.Kind == ValueKind.Text)
+            {
+                string named = what.Definition?.Name ?? what.Text!;
+                if (what.Kind == ValueKind.Text && Content.Find(named) == null)
+                    throw call.Error($"nothing named `{named}` is defined." + SuggestionText(named, Content.AllNames));
+
+                throw call.Error($"`copy` duplicates something that is in the game. Write `create {Quoted(named)}` for a fresh one.");
+            }
+
+            int count = call.Number(1, Num.One).ToInt();
+            ExprNode? zoneNode = call.Node.Clause("into") ?? call.Node.Clause("to") ?? call.Node.Clause("onto");
+            string? zone = zoneNode == null ? null : ZoneName(zoneNode, call);
+
+            var copied = new List<Entity>();
+            foreach (Entity original in what.AsEntities().ToArray())
+            {
+                // A group that has lost a member since it was read is ordinary, as it is everywhere else.
+                if (original.IsRemoved) continue;
+
+                if (original.Definition == null)
+                    throw call.Error($"`{original.Name}` was not made from content, so there is nothing to copy.");
+
+                if (original.Kind == EntityKind.Status || original.Kind == EntityKind.Keyword || original.Kind == EntityKind.Ability)
+                    throw call.Error($"`{original.Name}` is {A(original.Definition.KindName)} and belongs to whoever has it, not to a zone. Write `apply {Quoted(original.Name)} 3 to <who>` to give another one.");
+
+                for (int i = 0; i < count; i++) copied.Add(Copy(original, zone, call.Context));
+            }
+
+            call.Context.SetLocal("copied", Value.FromEntities(copied));
+        }
+
+        /// <summary>
+        /// <c>transform target into Sheepling</c>: the thing you named is still the thing you named,
+        /// now wearing another definition. Keeps its id, owner, side, zone and place in that zone.
+        /// </summary>
+        /// <remarks>
+        /// <c>into</c> takes a definition and never an entity. <c>transform a into b</c>, where
+        /// <c>b</c> is something in the game, parses and reads as if it copied it — and would give
+        /// the printed stats of whatever <c>b</c> is, which is a silent wrong answer rather than a
+        /// feature. It is refused by name; a copy of another minion's state is what <c>copy</c> is for.
+        /// </remarks>
+        private void VerbTransform(VerbCall call)
+        {
+            ExprNode intoNode = call.Node.Clause("into") ?? call.Node.Clause("to")
+                ?? throw call.Error("expected what to become, as in `transform target into Sheepling`.");
+
+            // `until` promises to put back what it did, and none of this can be put back: the stats,
+            // the statuses and the spent `once per ...` windows are gone. Refused rather than
+            // half-reverted, which is also the rule "refuse anything that cannot be saved".
+            if (call.Context.UndoScope != null)
+                throw call.Error("cannot be undone, so an `until` block cannot hold one. Transform it outside the block, or apply a status instead.");
+
+            EntityDefinition definition = RequireBecoming(call, intoNode);
+
+            IReadOnlyList<Entity> targets;
+            if (call.ArgumentCount > 0)
+            {
+                Value what = call.Argument(0);
+
+                // `transform Strike into Wound` reads as if it changed every Strike, and a definition
+                // has no entities in it, so without this it is a silent no-op. A quoted name is text
+                // and lands in the same place. Both are refused as `copy` and `play` refuse them.
+                if (what.Kind == ValueKind.Definition || what.Kind == ValueKind.Text)
+                {
+                    string named = what.Definition?.Name ?? what.Text!;
+                    if (what.Kind == ValueKind.Text && Content.Find(named) == null)
+                        throw call.Error($"nothing named `{named}` is defined." + SuggestionText(named, Content.AllNames));
+
+                    throw call.Error(
+                        $"`transform` changes something that is in the game, and `{named}` is content. " +
+                        $"Name what should change, as in `transform target into {Quoted(definition.Name)}`.");
+                }
+
+                targets = what.AsEntities();
+            }
+            else
+            {
+                targets = DefaultTargets(call);
+            }
+
+            foreach (Entity target in targets.ToArray()) Transform(target, definition, call.Context, call.Span);
+        }
+
+        /// <summary>
+        /// The definition an <c>into</c> clause names. Unlike every other definition slot, an entity
+        /// here is an error: unwrapping one to its definition would make the same clause mean two
+        /// different things depending on whether a word happens to be a local.
+        /// </summary>
+        private EntityDefinition RequireBecoming(VerbCall call, ExprNode node)
+        {
+            // A bare name prefers content, so `transform target into Sheep` finds the enemy even when
+            // a status shares the name — the same lookup `create` does.
+            string? written = node switch
+            {
+                NameExpr name when !call.Context.TryGetLocal(name.Name, out _) => name.Name,
+                StringExpr text => text.Value,
+                _ => null,
+            };
+            if (written != null && Content.FindAny(written, "card", "enemy", "actor", "relic", "item", "status", "keyword", "ability") is EntityDefinition preferred)
+                return preferred;
+
+            Value value = Evaluate(node, call.Context);
+            switch (value.Kind)
+            {
+                case ValueKind.Definition:
+                    return value.Definition!;
+
+                case ValueKind.Text:
+                    return Content.Find(value.Text!)
+                        ?? throw call.Error($"nothing named `{value.Text}` is defined." + SuggestionText(value.Text!, Content.AllNames));
+
+                case ValueKind.Entity:
+                case ValueKind.List:
+                    throw call.Error(
+                        $"`into` takes the name of something written in content, and `{AstPrinter.Print(node)}` is something in the game. " +
+                        "Write what it should become, as in `transform target into Sheepling`.");
+
+                default:
+                    throw call.Error($"expected the name of something defined in content, not {value}.");
+            }
+        }
+
+        /// <summary>"a status", "an ability".</summary>
+        private static string A(string noun) =>
+            (noun.Length > 0 && "aeiou".IndexOf(char.ToLowerInvariant(noun[0])) >= 0 ? "an " : "a ") + noun;
+
+        /// <summary>A name as content would have to write it: quoted when it has a space in it.</summary>
+        private static string Quoted(string name) => name.IndexOf(' ') >= 0 ? "\"" + name + "\"" : name;
 
         private void VerbDestroy(VerbCall call)
         {

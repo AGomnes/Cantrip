@@ -527,8 +527,9 @@ The scope is matched against the event's target, whatever the event. So `on owne
 | `drawn` | target (a card) was drawn |
 | `shuffled` | the discard pile was shuffled into the draw pile |
 | `discarded`, `exhausted`, `moved` | target (a card) changed zone. Data: `from`, `to`. A card drawn with a full hand is `discarded`. |
-| `created` | target was created |
+| `created` | target was created by `create`, `copy` or `shuffle <card>`. Data: `copy_of`, the original, when `copy` made it. |
 | `destroyed` | target was taken out of the game |
+| `transformed` | target is becoming something else and keeps its id, owner, side and place. Data: `was`, `into` (both definitions). Tags: the tags it had before. Raised once; the statuses it sheds raise nothing. |
 | `card_played` | source played card on target; `amount` is the energy paid. Tags: the card's tags. |
 | `status_applied` | a status is applied to target; `amount` is stacks. Data: `status` (the definition before it exists, the status entity afterwards), `status_name`. Tags: the status's tags. |
 | `status_resisted` | target was immune to a status |
@@ -752,20 +753,103 @@ A bare name resolves in this order: local variables (`let` bindings, `for each` 
 | `remove` | `remove Status [from who]`, `remove tag:x from who` (every status with the tag, and the tag), `remove who` (destroys it). |
 | `gain`, `lose` | `gain N Status` adjusts a status; `gain N stat` changes a stat. `[to who]`, else yourself. |
 | `change` | `change stat by N [to who]`, or `change hp -5 on target`. |
-| `create` | `create Card [N] [into zone]` (default hand), `create Relic`, `create Enemy`. Binds `created`. |
+| `create` | `create Card [N] [into zone]` (default hand), `create Relic`, `create Enemy`. Makes a fresh one from the definition, so it arrives with its printed stats. Binds `created`. |
+| `copy` | `copy [who] [N] [into zone]` duplicates something that is **in the game**, as it stands now — an upgraded card, a wounded minion, a discounted power. Defaults to itself. Binds `copied`, always a list. See below. |
 | `shuffle` | `shuffle` (discard into draw), `shuffle Card [N]` (creates copies in the draw pile), `shuffle cards into draw`. |
 | `move` | `move cards to zone [, top]` |
+| `transform` | `transform [who] into Definition` replaces what something is while it keeps its place, its id and everything holding it. Defaults to the effect's target. Binds nothing. See below. |
 | `destroy` | `destroy [who]`. Defaults to itself. |
 | `kill` | `kill [who]`. Defaults to the target. |
 | `choose` | `choose N from group [as name]`. Binds the result to `chosen`, or to the name after `as`: one entity, or a group when more than one is chosen. |
 | `discover` | `discover N <kind> [where filter] [, weighted] [as name]`. Offers N pieces of content and binds the one chosen to `discovered`, or to the name after `as`. See below. |
 | `emit` | `emit event [amount] [to who]` raises a custom event. |
 | `cancel` | In a `before_` or `instead_of_` listener, cancels the event. |
-| `replay` | `replay card [on target]` resolves a card's effect again, for free. |
+| `play` | `play card [on target] [, free]` plays a card out of a pile its controller owns, with its cost, its `card_played` and its triggers. Binds `played` to the card, or to `none` when it was not played. See below. |
+| `replay` | `replay card [on target]` resolves a card's effect again, for free. The card stays where it is, nothing is paid, and no `card_played` is raised: it is not a play. |
 | `use` | In an enemy, performs one of its moves. |
 | `log` | `log "hp is" target.hp`, with the values separated by spaces, writes them to the runtime's `Logged` event. `cantrip repl` prints it. In a test it goes into the trace, as a `[log]` line under the `log` statement, which `cantrip test --trace` prints for a failing test. A passing test shows nothing, so to see a value there, use `expect`, whose failure shows it. |
 
 **`into`** binds what a damage verb actually achieved, so an effect can act on it: `deal 4 to all enemies into dealt`, then `heal dealt`. The number is what landed, summed across the targets — after modifiers changed the amount, after block absorbed what it could, and counting only what a dying target could still take, which is rarely the number the line asked for. Available on `deal`, `damage` and `attack`.
+
+**`copy`** is the other half of `create`. `create Strike` makes a Strike as it is printed; `copy picked` makes one as it *is* — with the buff it was given this battle, the cost it was discounted to, the wound it is carrying. That is the only difference between the two verbs, and it is the whole point of this one:
+
+```
+card "Dual Wield"
+  cost 1
+  effect:
+    choose 1 from hand where tag:attack or tag:power as picked
+    copy picked into hand
+```
+
+Two rules decide what a copy is:
+
+- **Its side and owner come from the original**, never from whoever is copying. A player's card that copies an enemy's minion gives the *enemy* a second minion. Without this, an `actor` declaration summoned by an enemy would change sides the moment anything copied it.
+- **It is placed by kind, where a new one would go**: an actor on the board in the next free slot, a relic or item into `relics`, anything else into hand, and `into <zone>` overrides. A copy never inherits the original's zone — copying an active power would otherwise put a second live power into `powers` that nobody played, and copying an exhausted card would put it where nothing can reach it.
+
+Everything the original has now comes across: its live stats, its runtime tags, and a new instance of every status and keyword on it with the same `stacks`, `duration` and `expires_at`. Those arrive silently — no `status_applied` is raised and `immune` is never asked — because a copy is a snapshot of a state, not a new application.
+
+Nothing is restored. A wounded minion is copied wounded; content that wants a fresh one says so in a line of its own, which is also why there is no flag for it:
+
+```
+    copy target
+    copied.hp = copied.max_hp
+```
+
+A copy raises `created` through all three phases, with `event.copy_of` set to the original. That makes the original *involved* in the event, so `on created(self)` on the original hears its own copying. The copy is a new combatant otherwise: its `once per battle` and `once per turn` windows are unused, and an actor rolls a fresh intent.
+
+`copy` is refused, with an error that names the verb to use instead, for a definition (`copy Strike` → `create Strike`, also CT320 at lint), for a status, keyword or ability (`apply` gives another one), and for the player, which nothing in content describes. A group that happens to be empty copies nothing and binds an empty `copied`, the way `for each` over an empty group does nothing.
+
+**`transform`** replaces what something *is* while keeping who it is. `to` is a synonym for `into`.
+
+```
+card "Polymorph"
+  cost 4
+  target enemy
+  effect:
+    transform target into Sheepling
+```
+
+**What survives** is the point: the `Id`, `Owner`, `Source`, `Team`, `Sequence`, `Zone` **and the index within that zone**, the board `Position`, and the entity's history counters. Everything holding it — `event.target`, a `let`, a scheduled binding, a test's `enemy2`, a C# reference a game has cached — still holds the same object, now wearing the new name.
+
+**What goes** is everything the old definition brought, and everything the game gave it while it was that thing: its stats, its runtime tags, every status and keyword on it, its spent `once per ...` windows, its intent, its phase, and its own `next turn:` plans. The new definition's stats and tags take their place, so the new thing arrives whole. Content that wants a wound carried says so on the card, which also generalises to any other stat:
+
+```
+    let wounds = target.max_hp - target.hp
+    transform target into Beast
+    target.hp = target.max_hp - wounds
+```
+
+**Statuses go silently.** Nothing raises `status_removed` for them: one verb raising a variable number of cancellable events, each able to destroy the host half way through, is not something content could reason about. `destroy` already sheds its attachments the same way. The one event is `transformed`, raised once through all three phases, carrying the tags the entity had **before**, and `event.was` and `event.into`, the two definitions. It is **not** a `created`, a `died`, a `killed` or a `destroyed`: a Polymorph never fires a death rattle and never fires a Knife Juggler.
+
+An actor rolls a fresh intent at once, so the player is never shown a move the thing no longer has. An `enemy` may become an `actor` declaration and back — both are actors, and the side is kept, so one `actor "Sheep"` serves both sides where `create` would need two declarations.
+
+Transforming something into what it already is is not a no-op but a **reset**: printed stats back, statuses gone, limits fresh.
+
+`transform` is refused, by name, for a definition where the thing to change is meant (`transform Strike into Wound` reads as if it changed every Strike and would otherwise do nothing at all; CT320 at lint), for an entity in the `into` clause (`transform a into b` would otherwise give `b`'s *printed* stats, and mean two different things depending on whether a word happens to be a local), for a definition of a different kind, for the player, and **inside an `until` block** — `until` puts back what it did, and none of this can be put back (CT321 at lint, a runtime error at run, which is what catches a content verb holding one). Nothing remembers the old form, so content that wants a round trip stores `event.was`; a timed form change is a status with modifiers and a duration.
+
+**`play`** is "play the top card of your draw pile", and everything shaped like it. The card leaves its pile, pays, raises `card_played` with its tags, counts towards `cards_played` and `attacks`, runs its effect, and is filed afterwards by the tags it has *then* — exhaust pile, `powers`, or discard pile. It never passes through hand, so nothing is `drawn` and the hand limit is not involved.
+
+```
+card "Havoc"
+  cost 1
+  tags skill, exhaust
+  effect:
+    play draw.first, free
+    if played == none:
+      discard draw.first
+    else:
+      exhaust played
+```
+
+`, free` plays it without paying. It changes what is **paid**, never what the card **sees**: a `cost 2` card played free still has `cost 2`, and an X-cost card played free binds `x` to what the payer has and spends nothing. The `card_played` event's `amount` is what was actually paid, which is 0 for a free play, so "gain 1 hp per energy spent" stays honest. Paid is the default, because the free version already exists — `replay` — and a `play` that were always free would leave "play it and make them pay for it" unwritable.
+
+**A refusal the rules allow is not an error.** An empty pile, a Curse, a cost the payer cannot afford, no legal target, a card already in `play` or `powers`: nothing happens, `played` is `none`, and the trace says so. That is what lets "play the top card of your draw pile" be written once and not crash the first time the top card is a Curse. `played` is bound before anything else, so the name always exists.
+
+**Targeting never prompts.** `on <target>` if written, exactly as written; otherwise the effect's own target, but only where the card could legally be pointed at it — a `play` inside a listener inherits whatever that event happened to be about, which is usually the actor whose turn started or the card that was drawn, and a hint the card cannot take is dropped rather than allowed to refuse the play; otherwise, for a `target enemy` or `target ally` card, one **at random** from the legal targets, rolled from the game's own RNG — so the roll replays and saves like any other, and one candidate costs no roll. The roll goes through the `targetable` channel, so a Taunt binds an automatic play exactly as it binds a hand-played one. A `target self` card is aimed at the controller, and a card with no legal target is not played.
+
+A card played by another card's effect **extends that effect's chain**, so a `once per chain` limit counts one chain across the whole cascade rather than restarting at every play. A card that plays a card that plays a card is fine; direct recursion stops at `max_call_depth` (64) with an error that says what happened. A nested play does not drain the outer effect's queued triggers — they resolve after the outer effect, as they would without it.
+
+`play` is a test verb as well as a rule verb, and which one a line means is decided by **where it is written**: a `play` in a test's own body is the test's, and a `play` anywhere else — in a card's effect, or in a content verb a test calls — is the rules'. Inside a `scenario` it is still CT301: a scenario states the fight, and a bot plays it.
 
 **`discover`** picks from content itself rather than from what is on the board, which is what "a random spell" or "one of these afflictions" needs:
 
@@ -924,11 +1008,13 @@ test "Poison ticks and decays"
 | `answer "A, B"` | yes | Queues the answer to the next choice, by name; `"A, B"` picks both |
 | `realtime N` | yes | Uses a tick clock with N ticks per second for the whole test, wherever it is written |
 | `setup:` | yes | A block of setup statements |
-| `play Card [on who]` | no | Plays a card, adding it to the hand if needed; fails the test if it cannot be played |
+| `play Card [on who]` | no | Plays a card, adding it to the hand if needed; fails the test if it cannot be played. See the note below: `play` is a rule verb too |
 | `end turn` | no | Ends the turn, runs the enemies' turn and starts the next one |
 | `tick N` | no | Advances the tick clock |
 | `cast Ability [on who]` | no | Uses an ability |
 | `expect condition` | no | Fails the test if the condition is false |
+
+**`play` means the test's verb only where the test wrote it.** It is also a [rule verb](#built-in-verbs), and the two are told apart by where the line is: a `play` in a test's own body puts a card into hand by name and plays it from there, and a `play` written anywhere else — in a card's effect, or in a content verb the test calls — plays a card that is already in a pile. So `verb cascade(): play draw.first` does the same thing whether a card calls it or a test line does.
 
 **Setup runs before the battle starts, and the start of the first turn resets resources.** `player block 5` is wiped to 0, and `player energy 1` comes back as 3, the player's `max_energy`. A higher energy survives, because setting it also raises `max_energy`. To start a test with block or less energy, write a statement after setup: `block 5`, `player.energy = 1`. The same goes for any stat with a `reset_on turn_start` rule.
 
@@ -951,7 +1037,7 @@ test "Poison ticks and decays"
 
 **When the last enemy dies, the battle is won at once**, and winning removes the player's statuses that are not `persistent` and returns every card to the draw pile. A test that checks a status or a drawn card after a killing blow needs a second enemy to keep the battle going.
 
-To try statements one at a time, `dotnet cantrip repl <folder>` loads the content and runs each line you type as the player, with a 100 hp enemy called Dummy as the target, and prints the state after each. It prints `log` output, but has none of the test verbs above. [Trying lines in the REPL](writing-content.md#6-trying-lines-in-the-repl) shows a session and its limits.
+To try statements one at a time, `dotnet cantrip repl <folder>` loads the content and runs each line you type as the player, with a 100 hp enemy called Dummy as the target, and prints the state after each. It prints `log` output, but has none of the test verbs above — except that the rules' `play` is a verb of its own, so `play hand.first on target` works there. [Trying lines in the REPL](writing-content.md#6-trying-lines-in-the-repl) shows a session and its limits.
 
 ## Scenarios
 
@@ -1104,6 +1190,8 @@ Codes with four digits come from reading and loading the files. An error among t
 | CT317 | warning | A [scenario](#scenarios) with no `battle` line, or a `battle` that names no enemy. There is nothing to play and nothing to measure. | Name the enemies to fight: `battle "Cinder Imp"`. |
 | CT318 | note or error | A scenario's `runs` count: a note below 100, where the same content answers differently each time, and an error when it is not a whole number of one or more. | `runs 500`. |
 | CT319 | error | An `expect` a scenario cannot check: a measurement it does not take, or a condition about one game, such as `expect enemy.hp == 3`. A scenario plays hundreds of games and measures `stalls`, `errors`, `wins`, `hp_left` and `turns` over all of them. | Compare a measurement with a number: `expect wins >= 55%`, `expect no stalls`. |
+| CT320 | error | A verb that acts on something already in the game, handed a name that is content: `copy Strike`, `transform Strike into Wound`, or `play Strike` outside a test. All three are runtime errors. | Use the verb that makes one (`create Strike`, or `create Strike into hand` and then `play created.first`), or name something in the game in the slot: `transform target into Wound`. |
+| CT321 | error | A `transform` inside an `until` block. `until` puts back what it did, and the stats, statuses and used-up limits a transform replaces are gone. | Transform it outside the block, or apply a status instead. A `next turn:` block inside the `until` runs later on its own and is fine. |
 
 **Descriptions**
 

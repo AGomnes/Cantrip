@@ -1,1 +1,8 @@
 #nullable enable
+Cantrip.Runtime.GameState.Become(Cantrip.Runtime.Entity! entity, Cantrip.Content.EntityDefinition! definition) -> void
+Cantrip.Runtime.GameState.Duplicate(Cantrip.Runtime.Entity! original, Cantrip.Runtime.Entity? owner = null, Cantrip.Team team = Cantrip.Team.Neutral, string! zone = "") -> Cantrip.Runtime.Entity!
+Cantrip.Runtime.Interpreter.Copy(Cantrip.Runtime.Entity! original, string? zone, Cantrip.Runtime.EvalContext! context) -> Cantrip.Runtime.Entity!
+Cantrip.Runtime.Interpreter.Transform(Cantrip.Runtime.Entity! entity, Cantrip.Content.EntityDefinition! definition, Cantrip.Runtime.EvalContext! context, Cantrip.Diagnostics.SourceSpan span = default(Cantrip.Diagnostics.SourceSpan)) -> void
+const Cantrip.Linting.Linter.ContentWhereSomethingInPlayIsMeant = "CT320" -> string!
+const Cantrip.Linting.Linter.TransformInsideUntil = "CT321" -> string!
+const Cantrip.Runtime.BuiltinEvents.Transformed = "transformed" -> string!

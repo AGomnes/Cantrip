@@ -197,6 +197,50 @@ namespace Cantrip.Runtime
             return entity;
         }
 
+        /// <summary>
+        /// Makes a second entity from one already in the game: the same definition, but the stats and
+        /// tags it has <em>now</em> rather than the ones it was printed with, and a fresh instance of
+        /// everything attached to it. This is what <c>copy</c> is built from, and the whole difference
+        /// between it and <c>create</c>: an upgraded, discounted or poisoned thing is duplicated as it
+        /// stands.
+        /// </summary>
+        /// <remarks>
+        /// The side and the owner are the caller's to decide, because a copy takes them from the
+        /// original rather than from whoever made it: copying an enemy's minion must not hand it to
+        /// the player. Statuses come across as a snapshot of a state — no <c>status_applied</c> is
+        /// raised and <c>immune</c> is not consulted — so <c>stacks</c>, <c>duration</c> and
+        /// <c>expires_at</c> arrive exactly as they stand, because all three are ordinary stats.
+        /// </remarks>
+        public Entity Duplicate(Entity original, Entity? owner = null, Team team = Team.Neutral, string zone = Zones.None)
+        {
+            if (original == null) throw new ArgumentNullException(nameof(original));
+
+            EntityDefinition definition = original.Definition
+                ?? throw new ArgumentException($"{original} was not made from content, so there is nothing to copy it from.", nameof(original));
+
+            Entity copy = CreateBare(original.Name, original.Kind, definition, owner, team);
+            CopyStateInto(original, copy);
+            Place(copy, zone, toTop: false);
+
+            foreach (Entity attached in original.Attached.ToArray())
+            {
+                if (attached.IsRemoved || attached.Definition == null) continue;
+
+                Entity again = CreateBare(attached.Name, attached.Kind, attached.Definition, copy, Team.Neutral);
+                CopyStateInto(attached, again);
+                again.Source = attached.Source;
+                Attach(copy, again);
+            }
+
+            return copy;
+        }
+
+        private static void CopyStateInto(Entity from, Entity to)
+        {
+            foreach (string stat in from.StatNames) to.SetBase(stat, from.GetBase(stat));
+            foreach (string tag in from.Tags) to.AddTag(tag);
+        }
+
         /// <summary>Creates an entity with no definition, for players, test fixtures and host-owned objects.</summary>
         public Entity Spawn(string name, EntityKind kind, Entity? owner = null, Team team = Team.Neutral, string zone = Zones.None)
         {
@@ -235,6 +279,61 @@ namespace Cantrip.Runtime
             entity.IsRemoved = true;
             SetActive(entity, false);
             _scheduled.RemoveAll(s => s.Owner == entity && s.Timing != ScheduleTiming.Until);
+            Touch();
+        }
+
+        /// <summary>
+        /// Replaces what an entity <em>is</em> while keeping who it is. The same object keeps its id,
+        /// owner, source, side, sequence, zone and place in that zone, its board slot and its history
+        /// counters, and now wears another definition's name, stats, tags, listeners and modifiers.
+        /// This is what <c>transform</c> is built from.
+        /// </summary>
+        /// <remarks>
+        /// Everything the old definition brought goes, and goes silently. Statuses and keywords leave
+        /// through <see cref="Remove"/> rather than raising <c>status_removed</c>, because one verb
+        /// raising a variable number of cancellable events — each able to destroy the host half way
+        /// through — is not something content could reason about. <c>destroy</c> already takes its
+        /// attachments the same way. The one event is <c>transformed</c>, which the interpreter
+        /// raises around this call.
+        /// </remarks>
+        public void Become(Entity entity, EntityDefinition definition)
+        {
+            if (entity == null) throw new ArgumentNullException(nameof(entity));
+            if (definition == null) throw new ArgumentNullException(nameof(definition));
+            if (entity.IsRemoved) return;
+
+            // Deactivating first drops the Listener objects, and with them the `once per ...` windows
+            // the old definition had spent: the new thing's limits are its own.
+            SetActive(entity, false);
+
+            foreach (Entity attached in entity.Attached.ToArray()) Remove(attached);
+
+            entity.ClearStatsAndTags();
+            entity.Definition = definition;
+            entity.Name = definition.Name;
+
+            foreach (KeyValuePair<string, Num> stat in definition.Stats) entity.SetBase(stat.Key, stat.Value);
+            foreach (string tag in definition.Tags) entity.AddTag(tag);
+            if (entity.Kind == EntityKind.Actor && !entity.HasStat("block")) entity.SetBase("block", Num.Zero);
+
+            // An Ogre that scheduled 7 damage and then became a Sheep deals the Sheep's 1, and the
+            // move the player was shown is not one this thing has.
+            entity.PatternIndex = 0;
+            entity.LastMove = null;
+            entity.Intent = null;
+            entity.Phase = null;
+
+            _scheduled.RemoveAll(s => s.Owner == entity && s.Timing != ScheduleTiming.Until);
+
+            // An `until` revert aimed at a stat this entity no longer has would take a buff given to
+            // the Ogre off the Sheep, off a stat it may not even have. It goes with the definition
+            // that earned it, exactly as `Remove` drops the plans of something leaving the game.
+            foreach (ScheduledAction action in _scheduled)
+            {
+                if (action.Timing == ScheduleTiming.Until) action.Undo.RemoveAll(change => change.Entity == entity);
+            }
+
+            RefreshActivation(entity);
             Touch();
         }
 

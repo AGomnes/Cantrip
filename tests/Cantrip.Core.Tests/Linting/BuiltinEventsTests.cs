@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -50,12 +51,25 @@ namespace Cantrip.Tests.Linting
             Assert.True(unlisted.Count == 0, "registered but not in BuiltinEvents: " + string.Join(", ", unlisted));
         }
 
+        /// <summary>
+        /// Exactly one word means two things, and it is resolved by where the line is written: a
+        /// <c>play</c> in a test's own body is the test's, and a <c>play</c> anywhere else is the
+        /// rules'. The allow-list is this test, so a second overlap still fails here.
+        /// </summary>
         [Fact]
         public void Test_verbs_do_not_shadow_rule_verbs()
         {
+            var allowed = new[] { "play" };
+
             var runtime = new CardRuntime(new ContentLibrary());
-            var clashes = DslTestRunner.TestVerbs.Where(v => runtime.Interpreter.IsVerb(v)).ToList();
+            var clashes = DslTestRunner.TestVerbs
+                .Where(v => runtime.Interpreter.IsVerb(v))
+                .Where(v => !allowed.Contains(v, StringComparer.OrdinalIgnoreCase))
+                .ToList();
             Assert.True(clashes.Count == 0, "test verbs that hide real verbs: " + string.Join(", ", clashes));
+
+            // And the allowed one really is both, or the allowance is hiding nothing.
+            foreach (string verb in allowed) Assert.True(runtime.Interpreter.IsVerb(verb), verb + " is no longer a rule verb");
         }
     }
 }

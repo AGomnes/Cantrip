@@ -417,10 +417,28 @@ namespace Cantrip
                 () => Live(cardId) is Entity again ? Play(again, Live(targetId)) : PlayResult.NotACard);
         }
 
-        private PlayResult PlayCore(Entity card, Entity? target)
+        /// <summary>
+        /// The whole of playing a card. Used by <see cref="Play(Entity, Entity)"/> for a card the player
+        /// plays from hand, and by the <c>play</c> verb for a card an effect plays out of a pile.
+        /// </summary>
+        /// <param name="card">The card to play.</param>
+        /// <param name="target">Who it is aimed at, or null to settle from the card's own <c>target</c> line.</param>
+        /// <param name="from">
+        /// The zone the card must be in. <see cref="Play(Entity, Entity)"/> passes <c>hand</c>, which
+        /// is what playing a card means for a player. The <c>play</c> verb passes null, meaning any
+        /// pile the card is sitting in — the whole point of "play the top card of your draw pile" —
+        /// and a card that is already in <c>play</c> or <c>powers</c> is still refused, because a card
+        /// being played cannot be played again.
+        /// </param>
+        /// <param name="free">Skips the payment. The card still sees its own cost, and an X cost still binds what the payer has.</param>
+        /// <param name="chain">
+        /// The causal chain to continue. A nested play extends its caller's, so <c>once per chain</c>
+        /// counts one chain across a cascade rather than restarting at every play boundary.
+        /// </param>
+        private PlayResult PlayCore(Entity card, Entity? target, string? from = Zones.Hand, bool free = false, Chain? chain = null)
         {
             if (card.Kind != EntityKind.Card || card.IsRemoved) return PlayResult.NotACard;
-            if (card.Zone != Zones.Hand) return PlayResult.NotInHand;
+            if (from != null ? card.Zone != from : NotInAPile(card)) return PlayResult.NotInHand;
             if (card.HasTag("unplayable")) return PlayResult.Unplayable;
 
             Entity player = card.Controller;
@@ -428,15 +446,21 @@ namespace Cantrip
             // A card priced in something else is refused the same way, so NotEnoughEnergy now means
             // "not enough of whatever this costs".
             string resource = CostResourceOf(card);
-            if (!IsXCost(card) && player.GetInt(resource) < cost) return PlayResult.NotEnoughEnergy;
+            if (!free && !IsXCost(card) && player.GetInt(resource) < cost) return PlayResult.NotEnoughEnergy;
 
-            if (!TryResolveTarget(card, ref target)) return PlayResult.InvalidTarget;
+            if (!TryResolveTarget(card, ref target, automatic: from == null)) return PlayResult.InvalidTarget;
 
             if (_runDepth == 0) Interpreter.ResetSteps();
-            var context = new EvalContext(card) { Source = player, Target = target, Card = card, Chain = Interpreter.NewChain() };
-            if (IsXCost(card)) context.SetLocal("x", Value.FromNumber(Num.FromInt(cost)));
+            string startedIn = card.Zone;
+            var context = new EvalContext(card) { Source = player, Target = target, Card = card, Chain = chain ?? Interpreter.NewChain() };
 
-            var gameEvent = new GameEvent("card_played") { Source = player, Target = target, Card = card, Amount = cost };
+            // `, free` changes what is paid, never what the card sees: an X card played free still
+            // spends nothing but still knows how much the payer had, or it would do nothing at all.
+            if (IsXCost(card)) context.SetLocal("x", Value.FromNumber(Num.FromInt(cost)));
+            int paid = free ? 0 : cost;
+
+            // What was actually paid, so "gain 1 hp per energy spent" stays honest about a free play.
+            var gameEvent = new GameEvent("card_played") { Source = player, Target = target, Card = card, Amount = paid };
             foreach (string tag in card.Tags) gameEvent.Tags.Add(tag);
 
             _runDepth++;
@@ -452,15 +476,17 @@ namespace Cantrip
                     },
                     committed: () =>
                     {
-                        if (cost > 0) Interpreter.ChangeStat(player, resource, AssignOperator.Subtract, cost, context);
+                        if (paid > 0) Interpreter.ChangeStat(player, resource, AssignOperator.Subtract, paid, context);
                         State.MoveTo(card, Zones.Play);
                         State.RecordHistory("cards_played", player, Num.One);
                         if (card.HasTag("attack")) State.RecordHistory("attacks", player, Num.One);
                     });
 
-                if (gameEvent.Cancelled && card.Zone == Zones.Hand)
+                // Cancelled before the play committed, so the card never left the pile it was in.
+                // Cancelled in the instead phase, it is already in `play` and still has to be filed.
+                if (gameEvent.Cancelled && card.Zone == startedIn)
                 {
-                    Interpreter.Drain();
+                    if (_runDepth == 1) Interpreter.Drain();
                     return PlayResult.Cancelled;
                 }
 
@@ -475,7 +501,10 @@ namespace Cantrip
                         State.MoveTo(card, Zones.Discard);
                 }
 
-                Interpreter.Drain();
+                // Only the outermost play drains. A nested one that drained here would resolve the
+                // outer effect's already-queued after-listeners in the middle of that effect, which
+                // nothing else in the language does.
+                if (_runDepth == 1) Interpreter.Drain();
             }
             catch
             {
@@ -487,9 +516,16 @@ namespace Cantrip
                 _runDepth--;
             }
 
-            CheckBattleOver();
+            if (_runDepth == 0) CheckBattleOver();
             return PlayResult.Played;
         }
+
+        /// <summary>
+        /// Whether a card is somewhere the <c>play</c> verb cannot take it from: nowhere at all, or
+        /// mid-play already. Every other zone is a pile, including ones a game names itself.
+        /// </summary>
+        private static bool NotInAPile(Entity card) =>
+            card.Zone.Length == 0 || card.Zone == Zones.Play || card.Zone == Zones.Powers;
 
         public PlayResult Play(string cardName, Entity? target = null)
         {
@@ -543,7 +579,16 @@ namespace Cantrip
 
         private static Team Opposing(Entity actor) => actor.Team == Team.Enemy ? Team.Player : Team.Enemy;
 
-        private bool TryResolveTarget(Entity card, ref Entity? target)
+        /// <summary>Settles who a card is aimed at, and whether that target is legal.</summary>
+        /// <param name="card">The card being played.</param>
+        /// <param name="target">The target given, if any; set to the one settled on.</param>
+        /// <param name="automatic">
+        /// True when nobody is choosing: the <c>play</c> verb playing a card out of a pile. The
+        /// chooser is never consulted, because a targeting dialog in the middle of "play the top card
+        /// of your draw pile" contradicts the verb's reason for existing. A target is rolled instead,
+        /// from the game's own snapshotted RNG, so the roll replays and saves like any other.
+        /// </param>
+        private bool TryResolveTarget(Entity card, ref Entity? target, bool automatic = false)
         {
             Entity player = card.Controller;
             Team opposing = Opposing(player);
@@ -556,16 +601,27 @@ namespace Cantrip
                     {
                         IReadOnlyList<Entity> enemies = Targetable(card, player, State.Actors(opposing));
                         if (enemies.Count == 0) return false;
-                        target = enemies.Count == 1
-                            ? enemies[0]
+                        target = enemies.Count == 1 ? enemies[0]
+                            : automatic ? enemies[State.Rng.NextInt(0, enemies.Count - 1)]
                             : Chooser.Choose(new ChoiceRequest("choose a target", enemies, 1, 1, player, card.Definition!.Syntax.Span), State)?.FirstOrDefault(enemies.Contains) ?? enemies[0];
                     }
                     return target.Kind == EntityKind.Actor && target.IsAlive && target.Team == opposing && IsTargetable(card, player, target);
                 }
 
                 case "ally":
-                    target ??= player;
+                {
+                    if (target == null)
+                    {
+                        if (!automatic) target = player;
+                        else
+                        {
+                            IReadOnlyList<Entity> allies = Targetable(card, player, State.Actors(player.Team));
+                            if (allies.Count == 0) return false;
+                            target = allies.Count == 1 ? allies[0] : allies[State.Rng.NextInt(0, allies.Count - 1)];
+                        }
+                    }
                     return target.Kind == EntityKind.Actor && target.IsAlive && target.Team == player.Team && IsTargetable(card, player, target);
+                }
 
                 case "self":
                     target = player;
@@ -1270,8 +1326,14 @@ namespace Cantrip
 
         // Runtime-level verbs -----------------------------------------------------------------
 
+        private int _playDepth;
+
         private void RegisterRuntimeVerbs()
         {
+            // `play draw.first, free`: play a card out of a pile, with its cost and its triggers,
+            // without the player choosing it (Havoc, Mayhem, Monster Train's automatic plays).
+            Interpreter.RegisterVerb("play", VerbPlay);
+
             // `replay card on target`: resolve a card's effect again, for free (Burst, Echo Form).
             Interpreter.RegisterVerb("replay", call =>
             {
@@ -1309,6 +1371,108 @@ namespace Cantrip
                     throw call.Error($"`{self.Name}` has no move `{move}`.");
                 UseMove(self, move, call.Context.Target ?? State.Player);
             });
+        }
+
+        /// <summary>
+        /// <c>play draw.first</c>, <c>play chosen on enemy</c>, <c>play discard.first, free</c>:
+        /// plays a card out of a pile, with its cost, its <c>card_played</c> and its triggers.
+        /// Binds <c>played</c> to the card, or to <c>none</c> when it was not played.
+        /// </summary>
+        /// <remarks>
+        /// Where <c>replay</c> resolves an effect again for nothing, this is a real play: the card
+        /// leaves its pile, pays, counts, and is filed afterwards by its tags. A refusal the rules
+        /// allow — a Curse, an unaffordable cost, no legal target — is not an error, because "play the
+        /// top card of your draw pile" must not crash the first time the top card is a Curse.
+        /// <c>played == none</c> is the language's own way of asking.
+        /// </remarks>
+        private void VerbPlay(VerbCall call)
+        {
+            ExprNode node = call.ArgumentNode(0) ?? throw call.Error("expected a card, as in `play draw.first`.");
+            Entity? aim = null;
+            bool aimed = false;
+            if (node is BinaryExpr { Operator: BinaryOperator.On } on)
+            {
+                node = on.Left;
+                aim = Interpreter.Evaluate(on.Right, call.Context).AsEntities().FirstOrDefault();
+                aimed = true;
+            }
+
+            // The name exists whatever happens next, so `if played == none:` is always answerable.
+            call.Context.SetLocal("played", Value.None);
+
+            Value value = Interpreter.Evaluate(node, call.Context);
+
+            // A quoted name evaluates to text rather than to a definition, and both read as if they
+            // would make a card. Neither is a card in a pile, so both are refused the same way.
+            if (value.Kind == ValueKind.Definition || value.Kind == ValueKind.Text)
+            {
+                string named = value.Definition?.Name ?? value.Text!;
+                if (value.Kind == ValueKind.Text && Content.Find(named) == null)
+                    throw call.Error($"nothing named `{named}` is defined.");
+
+                string spelt = named.IndexOf(' ') >= 0 ? "\"" + named + "\"" : named;
+                throw call.Error(
+                    $"`play` plays a card that is in a pile. Write `create {spelt} into hand` first, then `play created.first`.");
+            }
+
+            Entity? card = value.Kind == ValueKind.Entity ? value.Entity : value.AsEntities().FirstOrDefault();
+
+            // An empty pile is an ordinary answer, not a mistake: `played` stays `none`.
+            if (card == null || card.IsRemoved) return;
+            if (card.Kind != EntityKind.Card) throw call.Error($"`{card.Name}` is not a card.");
+
+            if (_playDepth >= State.Rules.MaxCallDepth)
+                throw call.Error($"cards have played each other more than {State.Rules.MaxCallDepth} deep; is a card playing itself?");
+
+            Entity? target = aimed ? aim : Inherited(card, call.Context.Target);
+
+            PlayResult result;
+            _playDepth++;
+            try
+            {
+                result = PlayCore(card, target, from: null, free: call.Flag("free"), chain: call.Context.Chain);
+            }
+            finally
+            {
+                _playDepth--;
+            }
+
+            if (result == PlayResult.Played) call.Context.SetLocal("played", Value.FromEntity(card));
+        }
+
+        /// <summary>
+        /// The effect's own target, but only where the card could really be pointed at it.
+        /// </summary>
+        /// <remarks>
+        /// A target written with <c>on</c> is an instruction and is passed through as it stands, legal
+        /// or not. One taken from the running effect is a hint, and a `play` written in a listener
+        /// inherits whatever that event happened to be about — the actor whose turn started, the card
+        /// that was drawn, the player who was hit. Handing that to a <c>target enemy</c> card refuses
+        /// the play, silently, which is "play the top card of your draw pile" not working in the one
+        /// place it is most often written (Mayhem, Monster Train's automatic plays). So an inherited
+        /// target the card cannot legally take is dropped, and the target is rolled as if none had
+        /// been given.
+        /// </remarks>
+        private Entity? Inherited(Entity card, Entity? target)
+        {
+            if (target == null) return null;
+
+            switch (TargetMode(card))
+            {
+                // Settled from the controller regardless, so there is nothing to inherit.
+                case "self":
+                    return null;
+
+                case "enemy":
+                case "ally":
+                case "any":
+                    return LegalTargets(card).Contains(target) ? target : null;
+
+                // No `target` line: nothing for the inherited target to be illegal against, and the
+                // card's own effect may still read `target`, so it comes across as it always did.
+                default:
+                    return target;
+            }
         }
     }
 }

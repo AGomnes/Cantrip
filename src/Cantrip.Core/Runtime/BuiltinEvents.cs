@@ -49,6 +49,7 @@ namespace Cantrip.Runtime
         public const string Moved = "moved";
         public const string Created = "created";
         public const string Destroyed = "destroyed";
+        public const string Transformed = "transformed";
         public const string StatusApplied = "status_applied";
         public const string StatusResisted = "status_resisted";
         public const string StatusRemoved = "status_removed";
@@ -82,8 +83,9 @@ namespace Cantrip.Runtime
             new BuiltinEvent(Discarded, "target (a card) went to the discard pile, including a card drawn with a full hand; data from, to."),
             new BuiltinEvent(Exhausted, "target (a card) was exhausted; data from, to."),
             new BuiltinEvent(Moved, "target (a card) changed zone through `move` or `shuffle`; data from, to."),
-            new BuiltinEvent(Created, "target was created by `create` or `shuffle <card>`; card is set when it is a card."),
+            new BuiltinEvent(Created, "target was created by `create`, `copy` or `shuffle <card>`; card is set when it is a card; data copy_of is the original when `copy` made it."),
             new BuiltinEvent(Destroyed, "target was taken out of the game."),
+            new BuiltinEvent(Transformed, "target is becoming something else and keeps its id, owner, side and place; card is set when it is a card; data was, into (both definitions). Tags are the tags it had before. Raised once, and the statuses it sheds raise nothing."),
             new BuiltinEvent(CardPlayed, "card was played by source (the player) on target; amount is the energy paid. Tags are the card's tags."),
 
             // Statuses
@@ -117,6 +119,8 @@ namespace Cantrip.Runtime
             ["change"] = new[] { Died, Killed, StatusRemoved },
             ["move"] = new[] { Moved },
             ["create"] = new[] { Created },
+            ["copy"] = new[] { Created },
+            ["transform"] = new[] { Transformed },
             ["destroy"] = new[] { Destroyed, StatusRemoved },
             ["apply"] = new[] { StatusApplied, StatusResisted },
             ["remove"] = new[] { StatusRemoved, Destroyed },
@@ -140,8 +144,10 @@ namespace Cantrip.Runtime
             ["kill"] = new[] { Died, Killed },
             ["log"] = NoEvents,
 
-            // Runtime verbs. `replay` also raises whatever the replayed effect raises, which is
-            // not knowable from the verb alone.
+            // Runtime verbs. `play` and `replay` also raise whatever the card's own effect raises,
+            // which is not knowable from the verb alone. `play` pays as well, so it can raise
+            // `<resource>_changed`.
+            ["play"] = new[] { CardPlayed, Exhausted, Discarded, Moved },
             ["replay"] = NoEvents,
             ["use"] = new[] { Move },
         };
@@ -149,7 +155,7 @@ namespace Cantrip.Runtime
         /// <summary>Verbs that go through the stat primitive and so can raise <c>&lt;stat&gt;_changed</c>.</summary>
         private static readonly HashSet<string> StatChangingVerbs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "change", "apply", "add", "gain", "lose",
+            "change", "apply", "add", "gain", "lose", "play",
         };
 
         /// <summary>Every built-in event, grouped: combat, cards, statuses, lifecycle.</summary>

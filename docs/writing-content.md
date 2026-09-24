@@ -341,12 +341,13 @@ Useful lines:
 |---|---|
 | `apply Poison 4 to target`, `deal 6 to target` | Any statement from the language |
 | `create Whetstone`, `create Strike` | Gives the player a relic, or puts a card in the hand |
-| `replay hand.first on target` | Runs the first card in the hand's effect, for free |
+| `play hand.first on target` | Really plays that card: it pays, it raises `card_played`, and it goes to the discard pile |
+| `replay hand.first on target` | Runs the first card in the hand's effect, for free, leaving the card where it is |
 | `emit turn_end to target` | Raises `turn_end` for the Dummy, so its statuses' `on turn_end` listeners run |
 | `create "Bog Troll"` | Adds one of your enemies. It never takes a turn here. |
 | `log "text" target.Poison` | Prints values. Separate them with spaces, not commas: text after a comma is read as a flag. |
 
-The REPL has limits. It has none of the test verbs, so `enemy`, `play`, `end turn` and `expect` are unknown there, and no turns pass. `replay` is not a real play: it pays no energy and raises no `card_played`, so a listener such as `on card_played` does not hear it. Each line runs on its own, so a `let` on one line is gone on the next. A status shows its stacks, so a status that counts turns shows 1; `log target.Weak` shows the turns left. For anything that spans turns, write a test.
+The REPL has limits. It has none of the test verbs, so `enemy`, `end turn` and `expect` are unknown there, and no turns pass. The test's `play`, which puts a card into hand by name, is not there either — but the rules' `play` is, so `play hand.first on target` plays a card that is already in a pile. `replay` is not a play at all: it pays no energy and raises no `card_played`, so a listener such as `on card_played` does not hear it. Each line runs on its own, so a `let` on one line is gone on the next. A status shows its stacks, so a status that counts turns shows 1; `log target.Weak` shows the turns left. For anything that spans turns, write a test.
 
 ## 7. In Godot
 
@@ -382,6 +383,9 @@ Short answers to common questions, each with a test that passes. Every recipe is
 | an effect that heals for the damage it dealt | [Healing for the damage dealt](#healing-for-the-damage-dealt) |
 | a card that lets the player choose | [Discard, then draw](#discard-then-draw) |
 | a card that offers a pick of three | [Discover a card](#discover-a-card) |
+| a copy of a card as it is now, buffs and all | [Copy a card as it is now](#copy-a-card-as-it-is-now) |
+| a card that plays the top card of the draw pile | [Play a card the player did not choose](#play-a-card-the-player-did-not-choose) |
+| a Polymorph, or anything that becomes something else | [Turn something into something else](#turn-something-into-something-else) |
 | upgraded cards, kept out of rewards | [Card upgrades](#card-upgrades) |
 | a status that goes off when it builds up | [A status that goes off at a threshold](#a-status-that-goes-off-at-a-threshold) |
 
@@ -769,6 +773,134 @@ test "Study adds the tome the player picks"
 - The picks come from the game's seeded random numbers, so a replay offers the same cards.
 
 More in [Built-in verbs](language.md#built-in-verbs). File: [discover.cantrip](../samples/recipes/discover.cantrip).
+
+### Copy a card as it is now
+
+`create Slash` makes a Slash as it is *printed*. `copy picked` makes one as it *is* — with the buff it was given this battle, the cost it was discounted to. That is the difference between the two verbs, and it is usually the one you want:
+
+```
+status Sharpened
+  tags buff
+  stacking intensity
+  modify damage: +3
+
+card Slash
+  cost 1
+  target enemy
+  tags attack
+  effect:
+    deal 6 to target
+
+card Hone
+  cost 0
+  effect:
+    choose 1 from hand where tag:attack as picked
+    apply Sharpened 1 to picked
+
+card "Dual Wield"
+  cost 1
+  effect:
+    choose 1 from hand where tag:attack or tag:power as picked
+    copy picked into hand
+
+test "Dual Wield copies the honed Slash, not a fresh one"
+  hand Slash, Hone, "Dual Wield"
+  enemy hp 50
+  player energy 9
+  play Hone
+  play "Dual Wield"
+  expect hand.last.Sharpened == 1
+  play hand.last on enemy
+  expect enemy.hp == 41
+```
+
+- `copy` binds **`copied`**, always a list; one copy still reads through it, so `copied.hp` and `copied.first.hp` are the same.
+- The copy takes its **side and owner from the original**, so a card that copies an enemy's minion gives the *enemy* a second minion.
+- It is placed **where a new one would go** — hand for a card, the board for an actor, `relics` for a relic — never in the zone the original sits in. `into hand`, `into draw` and the rest override that.
+- Nothing is restored: a wounded minion is copied wounded. Write `copied.hp = copied.max_hp` if you want a fresh one.
+
+More in [Built-in verbs](language.md#built-in-verbs). File: [copy-a-card-in-play.cantrip](../samples/recipes/copy-a-card-in-play.cantrip).
+
+### Play a card the player did not choose
+
+`play` plays a card out of a pile, with its cost and everything that counts a play. `, free` skips the payment:
+
+```
+card Ember
+  cost 2
+  target enemy
+  tags attack
+  effect:
+    deal 9 to target
+
+card Havoc
+  cost 1
+  tags skill, exhaust
+  effect:
+    play draw.first, free
+    if played == none:
+      discard draw.first
+    else:
+      exhaust played
+
+test "Havoc plays the top card for nothing"
+  deck Ember
+  hand Havoc
+  enemy hp 50
+  play Havoc
+  expect enemy.hp == 41
+  expect player.energy == 2
+  expect exhaust.count == 2
+```
+
+- `played` is the card, or **`none`** when it was not played: an empty pile, an unplayable Curse, a cost the player cannot afford, no legal target. None of those is an error, which is what lets one line cover them all.
+- A card that needs a target and was not given one has one **rolled** for it. Nobody is ever asked, because a targeting dialog in the middle of "play the top card of your draw pile" is not what the card means.
+- `replay` is the other verb, and it is not a play: it resolves an effect again, for free, leaving the card where it is and raising no `card_played`.
+
+More in [Built-in verbs](language.md#built-in-verbs). File: [play-a-card-from-a-pile.cantrip](../samples/recipes/play-a-card-from-a-pile.cantrip).
+
+### Turn something into something else
+
+`transform` replaces what something is while it keeps its seat, its id and its side:
+
+```
+enemy Ogre
+  hp 30
+  tags big
+  move Smash:
+    deal 9 to player
+
+enemy Sheepling
+  hp 1
+  tags meek
+  move Baa:
+    deal 1 to player
+
+card Polymorph
+  cost 2
+  target enemy
+  tags spell
+  effect:
+    transform target into Sheepling
+
+test "Polymorph keeps the seat and the identity"
+  enemy Ogre hp 30
+  enemy Ogre hp 30
+  enemy Ogre hp 30
+  hand Polymorph
+  player energy 9
+  play Polymorph on enemy2
+  expect enemy2.name == "Sheepling"
+  expect enemy2.position == 1
+  expect enemy2.intent == "Baa"
+```
+
+- `enemy2` is the test's own binding to that entity, so `expect enemy2.name == "Sheepling"` is the identity claim: it is the same thing, not a replacement beside it. With `destroy` plus `create` the binding would still name the Ogre, and the Ogre would be gone.
+- Everything the old definition brought goes: stats, tags, statuses, the intent, the used-up `once per ...` limits, and its own `next turn:` plans. The new thing arrives whole. Carry a wound across with three lines: `let wounds = target.max_hp - target.hp`, the transform, then `target.hp = target.max_hp - wounds`.
+- It is **not** a death: no `died`, no `killed`, no `destroyed`, so a death rattle does not fire. The one event is `transformed`.
+- It cannot be undone, so it cannot go inside an `until` block; `lint` says so (CT321).
+
+More in [Built-in verbs](language.md#built-in-verbs). File: [transform-into-something-else.cantrip](../samples/recipes/transform-into-something-else.cantrip).
 
 ### Card upgrades
 

@@ -81,13 +81,19 @@ card "Bulwark"
 
 # --- 6. ref Throne Room: play an action twice -----------------------------------------------
 
+# The chosen card is really played — it leaves hand, raises `card_played` and is discarded
+# afterwards — and then its effect resolves a second time, which is what "play it twice" means.
+# `, free` is Throne Room paying for it. Before `play` existed, both resolutions were `replay`,
+# so the card never left hand and nothing counted it as played.
+
 card "Regent"
   cost 4 coins
   tags action
   effect:
     choose 1 from hand where tag:action as picked
-    repeat 2:
-      replay picked
+    play picked, free
+    if played != none:
+      replay played
 
 # --- 7. ref buying from the supply ----------------------------------------------------------
 # Not expressible, though no longer for want of pools: `discover` can offer cards from content (see

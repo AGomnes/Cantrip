@@ -1,0 +1,78 @@
+# Recipe: copying a card as it is now, rather than a fresh one from its definition.
+# Explained in docs/writing-content.md, "Copy a card as it is now".
+
+status Sharpened
+  tags buff
+  stacking intensity
+  modify damage: +3
+
+card Slash
+  cost 1
+  target enemy
+  tags attack
+  effect:
+    deal 6 to target
+
+card Hone
+  cost 0
+  effect:
+    choose 1 from hand where tag:attack as picked
+    apply Sharpened 1 to picked
+  text_override: "Choose an Attack in your hand. It deals 3 more damage for the rest of combat."
+
+card "Dual Wield"
+  cost 1
+  effect:
+    choose 1 from hand where tag:attack or tag:power as picked
+    copy picked into hand
+  text_override: "Choose an Attack or a Power. Add a copy of it to your hand."
+
+test "Dual Wield copies the honed Slash, not a fresh one"
+  hand Slash, Hone, "Dual Wield"
+  enemy hp 50
+  player energy 9
+  play Hone
+  play "Dual Wield"
+  expect hand.count == 2
+  expect hand.last.name == "Slash"
+  expect hand.last.Sharpened == 1
+  play hand.last on enemy
+  expect enemy.hp == 41
+
+# The same fixture with `create` in place of `copy`: two numbers change, and they are the
+# whole reason the verb exists.
+test "create makes the printed card instead"
+  hand Slash, Hone
+  enemy hp 50
+  player energy 9
+  play Hone
+  create Slash into hand
+  expect hand.last.Sharpened == 0
+  play hand.last on enemy
+  expect enemy.hp == 44
+
+# A copy takes its side from the original, so copying an enemy's minion gives the enemy a
+# second one rather than handing it to the player.
+actor Imp
+  hp 10
+
+enemy Summoner
+  hp 30
+  move Call:
+    create Imp
+
+card Mirror
+  cost 0
+  effect:
+    copy (enemies where name:Imp).first
+  text_override: "Summon a copy of an enemy Imp."
+
+test "a copy of an enemy is an enemy"
+  enemy Summoner hp 30
+  hand Mirror
+  player energy 9
+  end turn
+  expect enemies.count == 2
+  play Mirror
+  expect enemies.count == 3
+  expect allies.count == 1

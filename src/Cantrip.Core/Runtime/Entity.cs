@@ -31,7 +31,14 @@ namespace Cantrip.Runtime
         /// <summary>Stable identifier, unique within a <see cref="GameState"/> and preserved by snapshots.</summary>
         public int Id { get; }
 
-        public string Name { get; }
+        /// <summary>
+        /// What this entity is called. It is settable only within the library, and only two things
+        /// change it: <c>transform</c>, which replaces what an entity is while keeping who it is,
+        /// and restoring a snapshot into an instance the game is already holding. A game that keys
+        /// a cache on a card or actor name has to expect it to change.
+        /// </summary>
+        public string Name { get; internal set; }
+
         public EntityKind Kind { get; }
 
         /// <summary>
@@ -197,6 +204,19 @@ namespace Cantrip.Runtime
         internal void RemoveStat(string stat)
         {
             if (_base.Remove(stat)) State.Touch();
+        }
+
+        /// <summary>
+        /// Drops every stat and tag this entity has, so another definition's can take their place.
+        /// Used by <c>transform</c>: what the old definition put there, and what the game gave it
+        /// while it was that thing, both belong to the thing it no longer is.
+        /// </summary>
+        internal void ClearStatsAndTags()
+        {
+            if (_base.Count == 0 && _tags.Count == 0) return;
+            _base.Clear();
+            _tags.Clear();
+            State.Touch();
         }
 
         /// <summary>

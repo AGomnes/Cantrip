@@ -591,6 +591,39 @@ namespace Cantrip.Descriptions
                             ("zone", Text(Word("zone." + zone) ?? zone)));
                     }
 
+                    case "copy":
+                    {
+                        List<DescriptionSegment> thing = Text(Who(first ?? new NameExpr("self", SourceSpan.None)));
+                        ExprNode count = second ?? One;
+                        ExprNode? zoneNode = command.Clause("into") ?? command.Clause("to") ?? command.Clause("onto");
+
+                        // Without a zone the copy goes wherever a new one would, which depends on
+                        // what was copied — so the phrasing says "Make", not "Add ... to your hand".
+                        if (zoneNode == null)
+                            return Phrase(IsOne(count) ? "copy.one" : "copy.many",
+                                ("amount", Amount(count, "copy", "none", command)),
+                                ("thing", thing));
+
+                        string zone = FirstWord(zoneNode) ?? "hand";
+                        return Phrase(IsOne(count) ? "copy.into.one" : "copy.into.many",
+                            ("amount", Amount(count, "copy", "none", command)),
+                            ("thing", thing),
+                            ("zone", Text(Word("zone." + zone) ?? zone)));
+                    }
+
+                    case "transform":
+                    {
+                        ExprNode? into = command.Clause("into") ?? command.Clause("to");
+
+                        // The new name is content being named, printed as `create` prints a card
+                        // name, not through Reference: there is no tooltip owed for a definition
+                        // the card turns something into.
+                        string becomes = into == null ? "?" : FirstWord(into) ?? AstPrinter.Print(into);
+                        return Phrase("transform",
+                            ("thing", Text(Who(first ?? new NameExpr("target", SourceSpan.None)))),
+                            ("into", Text(becomes)));
+                    }
+
                     case "shuffle":
                         if (first == null) return Phrase("shuffle");
                         return Phrase("shuffle.cards",
@@ -624,10 +657,12 @@ namespace Cantrip.Descriptions
                     case "log":
                         return new List<DescriptionSegment>();
 
+                    case "play":
                     case "replay":
                     {
                         ExprNode? card = first is BinaryExpr { Operator: BinaryOperator.On } on ? on.Left : first;
-                        return Phrase("replay", ("card", Text(card == null ? Word("who.it") ?? "it" : Who(card))));
+                        string key = verb == "replay" ? "replay" : command.HasFlag("free") ? "play.free" : "play";
+                        return Phrase(key, ("card", Text(card == null ? Word("who.it") ?? "it" : Who(card))));
                     }
 
                     case "use":
@@ -989,8 +1024,42 @@ namespace Cantrip.Descriptions
                             _ => AstPrinter.Print(expression),
                         };
 
+                    case MemberExpr { Target: NameExpr pile } end
+                        when (end.Member.ToLowerInvariant() is "first" or "last")
+                             && PileEnd(pile.Name, end.Member.ToLowerInvariant() == "first") is string named:
+                        return named;
+
                     default:
                         return AstPrinter.Print(expression);
+                }
+            }
+
+            /// <summary>
+            /// The end of a pile in words: <c>draw.first</c> is "the top card of your draw pile".
+            /// Without this a description reads the spelling back at the player instead of the
+            /// meaning, which is what <c>replay hand.first</c> did.
+            /// </summary>
+            private string? PileEnd(string zone, bool first)
+            {
+                switch (zone.ToLowerInvariant())
+                {
+                    case "hand":
+                        return Word(first ? "who.hand.first" : "who.hand.last");
+
+                    case "draw":
+                    case "draw_pile":
+                    case "discard":
+                    case "discard_pile":
+                    case "exhaust":
+                    case "exhaust_pile":
+                    {
+                        string key = zone.ToLowerInvariant().Replace("_pile", string.Empty);
+                        string? template = Word(first ? "who.pile.top" : "who.pile.bottom");
+                        return template == null ? null : Words(template, ("zone", Word("zone." + key) ?? key));
+                    }
+
+                    default:
+                        return null;
                 }
             }
 

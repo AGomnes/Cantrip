@@ -702,10 +702,69 @@ namespace Cantrip.Runtime
         }
 
         /// <summary>Creates cards, relics or actors from a definition, per the <c>create</c> verb.</summary>
-        public Entity Create(EntityDefinition definition, Entity? owner, string? zone, EvalContext context)
+        public Entity Create(EntityDefinition definition, Entity? owner, string? zone, EvalContext context) =>
+            Materialise(
+                definition,
+                owner,
+                side: null,
+                zone,
+                context,
+                copyOf: null,
+                make: (holder, team, place) => State.Instantiate(definition, holder, team, place));
+
+        /// <summary>
+        /// Duplicates something already in the game, per the <c>copy</c> verb: the same definition,
+        /// but its live stats, tags and statuses rather than the ones it was printed with.
+        /// </summary>
+        /// <remarks>
+        /// The side and owner come from <paramref name="original"/> and never from whoever is copying,
+        /// so a player's card that copies an enemy's minion gives the enemy a second minion. The copy
+        /// is then placed by <em>kind</em>, exactly where a new one would go — never in the zone the
+        /// original happens to sit in, which would drop a copied power straight into <c>powers</c> as
+        /// a second active power nobody played, and a copied exhausted card into the exhaust pile.
+        /// </remarks>
+        public Entity Copy(Entity original, string? zone, EvalContext context)
         {
-            Entity? created = null;
+            if (original == null) throw new ArgumentNullException(nameof(original));
+
+            EntityDefinition definition = original.Definition
+                ?? throw new RuntimeError($"`{original.Name}` was not made from content, so there is nothing to copy.", SourceSpan.None);
+
+            return Materialise(
+                definition,
+                owner: original.Kind == EntityKind.Actor ? null : original.Owner,
+                side: original.RawTeam,
+                zone,
+                context,
+                copyOf: original,
+                make: (holder, team, place) => State.Duplicate(original, holder, team, place));
+        }
+
+        /// <summary>
+        /// Puts a newly made entity into the game and announces it: the placement rules by kind, then
+        /// <c>created</c> through all three phases. <paramref name="make"/> builds it once the side
+        /// and the zone are settled, which is what lets <c>create</c> and <c>copy</c> share one
+        /// placement rule and one event.
+        /// </summary>
+        /// <remarks>
+        /// <paramref name="side"/> is the side an actor joins, or null to take it from the
+        /// declaration, as <c>create</c> does; <c>copy</c> passes the original's, which is the only
+        /// difference between a copy of an enemy's minion and a gift to the player.
+        /// <paramref name="copyOf"/> is the original, for a copy: it rides along on the event as
+        /// <c>copy_of</c>.
+        /// </remarks>
+        private Entity Materialise(
+            EntityDefinition definition,
+            Entity? owner,
+            Team? side,
+            string? zone,
+            EvalContext context,
+            Entity? copyOf,
+            Func<Entity?, Team, string, Entity> make)
+        {
+            Entity? made = null;
             var gameEvent = new GameEvent("created") { Source = context.Source };
+            if (copyOf != null) gameEvent.Data["copy_of"] = Value.FromEntity(copyOf);
 
             Raise(gameEvent, context, () =>
             {
@@ -714,32 +773,93 @@ namespace Cantrip.Runtime
                     case EntityKind.Actor:
                     {
                         // An enemy always joins the enemy side; a generic actor joins whoever made it.
-                        Team team = Team.Enemy;
-                        if (definition.KindName != "enemy" && context.Controller != null && context.Controller.Team != Team.Neutral)
-                            team = context.Controller.Team;
+                        Team team = side ?? DeclaredSide(definition, context);
 
-                        created = State.Instantiate(definition, null, team, Zones.Board);
-                        if (!created.HasStat("block")) created.SetBase("block", Num.Zero);
+                        made = make(null, team, Zones.Board);
+                        if (!made.HasStat("block")) made.SetBase("block", Num.Zero);
                         break;
                     }
                     case EntityKind.Relic:
                     case EntityKind.Item:
-                        created = State.Instantiate(definition, owner, Team.Neutral, zone ?? Zones.Relics);
+                        made = make(owner, Team.Neutral, zone ?? Zones.Relics);
                         break;
                     default:
-                        created = State.Instantiate(definition, owner, Team.Neutral, zone ?? Zones.Hand);
+                        made = make(owner, Team.Neutral, zone ?? Zones.Hand);
                         break;
                 }
-                gameEvent.Target = created;
-                if (created.Kind == EntityKind.Card) gameEvent.Card = created;
+                gameEvent.Target = made;
+                if (made.Kind == EntityKind.Card) gameEvent.Card = made;
             });
 
-            if (created == null)
+            if (made == null)
                 throw new RuntimeError($"Creating {definition} was replaced, so there is nothing to return.", context.Self?.Definition?.Syntax.Span ?? SourceSpan.None);
 
             // A summon or split mid-battle acts on the next enemy turn, like any other enemy.
-            if (created.Kind == EntityKind.Actor && State.InBattle) RollIntent(created);
-            return created;
+            if (made.Kind == EntityKind.Actor && State.InBattle) RollIntent(made);
+            return made;
+        }
+
+        /// <summary>The side a freshly declared actor joins: an enemy is always an enemy, a generic actor joins its maker.</summary>
+        private static Team DeclaredSide(EntityDefinition definition, EvalContext context)
+        {
+            if (definition.KindName != "enemy" && context.Controller != null && context.Controller.Team != Team.Neutral)
+                return context.Controller.Team;
+            return Team.Enemy;
+        }
+
+        /// <summary>
+        /// Replaces an entity with another definition, per the <c>transform</c> verb: it keeps its
+        /// place, its id and everything holding it, and raises <c>transformed</c> once.
+        /// </summary>
+        /// <remarks>
+        /// The event is cancellable in the before phase and replaceable in the instead phase, and a
+        /// before listener may well destroy or kill the target — so the committed work checks again
+        /// that the entity is still here. Running <see cref="GameState.Become"/> on something that
+        /// has left the game would leave <c>transformed</c> claiming, in its after phase, that a
+        /// transform happened.
+        /// </remarks>
+        public void Transform(Entity entity, EntityDefinition definition, EvalContext context, SourceSpan span = default)
+        {
+            if (entity == null) throw new ArgumentNullException(nameof(entity));
+            if (definition == null) throw new ArgumentNullException(nameof(definition));
+            if (entity.IsRemoved) return;
+
+            EntityDefinition? was = entity.Definition;
+            if (was == null)
+                throw new RuntimeError($"`{entity.Name}` was not made from content, so there is nothing to transform it from.", span);
+
+            if (was.Kind != definition.Kind)
+                throw new RuntimeError(
+                    $"{A(was.KindName)} cannot become the {definition.KindName} `{definition.Name}`: only something of the same kind can stand in its place.",
+                    span);
+
+            var gameEvent = new GameEvent("transformed")
+            {
+                Source = context.Source,
+                Target = entity,
+                Card = entity.Kind == EntityKind.Card ? entity : null,
+            };
+            // The tags it had before, so `on transformed(tag:big)` hears what was transformed rather
+            // than what it became, which the event already names as `into`.
+            foreach (string tag in entity.Tags) gameEvent.Tags.Add(tag);
+            gameEvent.Data["was"] = Value.FromDefinition(was);
+            gameEvent.Data["into"] = Value.FromDefinition(definition);
+
+            bool became = Raise(gameEvent, context, () =>
+            {
+                // A before listener may have destroyed the target between the event and here. The
+                // transform did not happen, so the event must not go on to say that it did: marking
+                // it cancelled skips the after phase and the host notification alike.
+                if (entity.IsRemoved)
+                {
+                    gameEvent.Cancelled = true;
+                    return;
+                }
+                State.Become(entity, definition);
+            });
+
+            // A new intent at once, so the player is never shown a move the thing no longer has.
+            if (became && !entity.IsRemoved && entity.Kind == EntityKind.Actor && State.InBattle) RollIntent(entity);
         }
 
         /// <summary>Takes an entity out of the game entirely, raising <c>destroyed</c>.</summary>

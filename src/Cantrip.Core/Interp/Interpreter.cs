@@ -110,6 +110,13 @@ namespace Cantrip.Runtime
 
         public bool IsVerb(string name) => _verbs.ContainsKey(name) || Content.FindVerb(name) != null;
 
+        /// <summary>
+        /// The handler currently registered for a verb, so a later registration can keep the earlier
+        /// one and delegate to it. The test runner's <c>play</c> does exactly that: a <c>play</c> in a
+        /// test's own body is the test's, and every other one is the rules'.
+        /// </summary>
+        internal bool TryGetVerb(string name, out VerbHandler handler) => _verbs.TryGetValue(name, out handler!);
+
         public IEnumerable<string> VerbNames => _verbs.Keys.Concat(Content.Verbs.Select(v => v.Name)).Distinct(StringComparer.OrdinalIgnoreCase);
 
         public bool IsBuiltinVerb(string name) => _builtinVerbs.Contains(name);

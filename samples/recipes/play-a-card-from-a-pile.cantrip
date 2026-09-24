@@ -1,0 +1,56 @@
+# Recipe: playing a card out of a pile, without the player choosing it.
+# Explained in docs/writing-content.md, "Play a card the player did not choose".
+
+card Ember
+  cost 2
+  target enemy
+  tags attack
+  effect:
+    deal 9 to target
+
+card Havoc
+  cost 1
+  tags skill, exhaust
+  effect:
+    play draw.first, free
+    if played == none:
+      discard draw.first
+    else:
+      exhaust played
+  text_override: "Play the top card of your draw pile for free and exhaust it."
+
+relic Tally
+  counter 0
+  on card_played:
+    counter +1
+
+test "Havoc plays the top card for nothing, and it counts as a card played"
+  relic Tally
+  deck Ember
+  hand Havoc
+  enemy hp 50
+  play Havoc
+  expect enemy.hp == 41
+  # Havoc's own cost was paid; the Ember's was not.
+  expect player.energy == 2
+  expect draw.count == 0
+  expect exhaust.count == 2
+  # Two cards played, so a relic that counts plays sees both.
+  expect relics.first.counter == 2
+
+# A refusal the rules allow is not an error: an empty pile, a cost the player cannot
+# afford, an unplayable Curse. `played` is `none`, and the card says what to do then.
+card Curse
+  cost 0
+  tags unplayable
+  text_override: "Unplayable."
+
+test "an unplayable card on top is discarded instead"
+  deck Curse
+  hand Havoc
+  enemy hp 50
+  play Havoc
+  expect discard.count == 1
+  expect discard.first.name == "Curse"
+  expect exhaust.count == 1
+  expect enemy.hp == 50

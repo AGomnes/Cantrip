@@ -289,11 +289,17 @@ enemy "Slime King"
   phase Broken when hp <= max_hp / 2, retelegraph
   move "Slam" phase Whole:
     deal 8 to player
+  # The King becomes one of the halves rather than dying and being replaced by two: it keeps its
+  # slot and its id, and nothing hears a death. That is what lets a boss both split and have a
+  # death rattle, which `kill self` could never do.
   move "Split" phase Broken:
-    create Slimeling 2
-    created.max_hp = self.hp
-    created.hp = self.hp
-    kill self
+    let half = hp
+    create Slimeling
+    created.max_hp = half
+    created.hp = half
+    transform self into Slimeling
+    max_hp = half
+    hp = half
 
 enemy "Slimeling"
   hp 20

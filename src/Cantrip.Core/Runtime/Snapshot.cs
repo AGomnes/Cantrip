@@ -348,13 +348,18 @@ namespace Cantrip.Runtime
                 EntityDefinition? definition = definitions[i];
 
                 Entity entity;
-                if (previous.TryGetValue(record.Id, out Entity? existing)
-                    && existing.Kind == (EntityKind)record.Kind
-                    && string.Equals(existing.Name, record.Name, StringComparison.Ordinal))
+
+                // Id and kind identify it, and nothing else may: a name is not fixed for the life of
+                // an entity — `transform` changes it — and matching on one would quietly abandon the
+                // instance the game is holding for a new object with the saved name. That breaks the
+                // promise three lines above every time an effect transforms something and then asks
+                // the player a question, because a deferred choice restores the snapshot to roll back.
+                if (previous.TryGetValue(record.Id, out Entity? existing) && existing.Kind == (EntityKind)record.Kind)
                 {
                     entity = existing;
                     entity.ResetForRestore();
                     entity.Definition = definition;
+                    entity.Name = record.Name;
                     previous.Remove(record.Id);
                 }
                 else

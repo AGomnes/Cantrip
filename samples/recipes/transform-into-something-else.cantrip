@@ -1,0 +1,85 @@
+# Recipe: turning something into something else, in place, without losing its seat or its identity.
+# Explained in docs/writing-content.md, "Turn something into something else".
+
+enemy Ogre
+  hp 30
+  tags big
+  move Smash:
+    deal 9 to player
+
+enemy Sheepling
+  hp 1
+  tags meek
+  move Baa:
+    deal 1 to player
+
+# Nothing here hears a Polymorph: a transform is not a death, a kill or a removal.
+relic Gravekeeper
+  counter 0
+  on died:
+    counter += 1
+  on killed:
+    counter += 1
+  on destroyed:
+    counter += 1
+
+card Polymorph
+  cost 2
+  target enemy
+  tags spell
+  effect:
+    transform target into Sheepling
+  text_override: "Transform an enemy into a 1 HP Sheepling."
+
+test "Polymorph keeps the seat, the identity and the side"
+  enemy Ogre hp 30
+  enemy Ogre hp 30
+  enemy Ogre hp 30
+  relic Gravekeeper
+  hand Polymorph
+  player hp 80
+  player energy 9
+  expect enemy2.position == 1
+  play Polymorph on enemy2
+  expect enemies.count == 3
+  expect enemy2.name == "Sheepling"
+  expect enemy2.position == 1
+  expect enemy2.hp == 1
+  expect enemy2.has(tag:meek)
+  expect not enemy2.has(tag:big)
+  expect enemy2.intent == "Baa"
+  # No death rattle: the Ogre did not die, it stopped being an Ogre.
+  expect relics.first.counter == 0
+  expect player.hp == 80
+
+# The new thing arrives whole, because it is a different creature. A game that wants the
+# wounds carried says so, in three lines that read on the card.
+actor Man
+  hp 20
+  max_hp 20
+  attack 2
+
+actor Beast
+  hp 30
+  max_hp 30
+  attack 6
+
+card "Beast Within"
+  cost 1
+  target ally
+  effect:
+    let wounds = target.max_hp - target.hp
+    transform target into Beast
+    target.hp = target.max_hp - wounds
+  text_override: "An ally becomes a Beast, keeping the wounds it had."
+
+test "the Abomination keeps its wounds across the change"
+  enemy hp 50
+  hand "Beast Within"
+  player energy 9
+  create Man
+  deal 8 to allies.last
+  expect allies.last.hp == 12
+  play "Beast Within" on allies.last
+  expect allies.last.name == "Beast"
+  expect allies.last.hp == 22

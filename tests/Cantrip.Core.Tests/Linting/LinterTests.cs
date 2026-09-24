@@ -69,6 +69,11 @@ namespace Cantrip.Tests.Linting
             Assert.Equal(baseLines + 5, d.Span.Line);
         }
 
+        /// <summary>
+        /// <c>play</c> is the one word that is both a test verb and a rule verb, so it is no longer
+        /// unknown outside a test: <c>play Strike</c> in a card effect is CT320, which says the same
+        /// thing more exactly — a card cannot be played out of content, only out of a pile.
+        /// </summary>
         [Fact]
         public void Test_verbs_are_only_known_inside_tests()
         {
@@ -79,14 +84,26 @@ namespace Cantrip.Tests.Linting
                   expect enemy.hp == 4
                 """);
             None(inTest, Linter.UnknownVerb);
+            None(inTest, Linter.ContentWhereSomethingInPlayIsMeant);
 
-            Diagnostic outside = Single(Lint("""
+            IReadOnlyList<Diagnostic> inCard = Lint("""
                 card "Cheat"
                   cost 0
                   effect:
                     play Strike
+                """);
+            None(inCard, Linter.UnknownVerb);
+            Diagnostic outside = Single(inCard, Linter.ContentWhereSomethingInPlayIsMeant);
+            Assert.Contains("`play` acts on a card that is in a pile", outside.Message);
+
+            // The test verbs that are only test verbs are still unknown anywhere else.
+            Diagnostic cast = Single(Lint("""
+                card "Cheat"
+                  cost 0
+                  effect:
+                    cast Surge
                 """), Linter.UnknownVerb);
-            Assert.Contains("only exists inside `test` blocks", outside.Message);
+            Assert.Contains("only exists inside `test` blocks", cast.Message);
         }
 
         [Fact]

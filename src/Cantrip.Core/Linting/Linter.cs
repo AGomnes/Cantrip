@@ -58,6 +58,8 @@ namespace Cantrip.Linting
         public const string NothingToFight = "CT317";
         public const string RunCount = "CT318";
         public const string UnknownMeasurement = "CT319";
+        public const string ContentWhereSomethingInPlayIsMeant = "CT320";
+        public const string TransformInsideUntil = "CT321";
 
         /// <summary>Below this many runs, a scenario's numbers move about from one run to the next (CT318).</summary>
         private const int FewRuns = 100;
@@ -80,8 +82,12 @@ namespace Cantrip.Linting
             "stat", "old", "new", "base", "total", "blocked", "overkill", "status", "status_name", "from", "to", "won", "move", "ability",
         };
 
-        /// <summary>Names that verbs bind for the statements after them, and the X of X-cost cards.</summary>
-        private static readonly string[] BoundNames = { "chosen", "created", "index", "x" };
+        /// <summary>
+        /// Names that verbs bind for the statements after them, and the X of X-cost cards. Each verb
+        /// binds its own participle — <c>choose</c> binds <c>chosen</c>, <c>copy</c> binds
+        /// <c>copied</c> — so the line that reads the result says which verb produced it.
+        /// </summary>
+        private static readonly string[] BoundNames = { "chosen", "created", "copied", "discovered", "played", "index", "x" };
 
         /// <summary>Stats the runtime writes itself.</summary>
         private static readonly string[] RuntimeStats = { "expires_at", "ready_at" };
@@ -134,7 +140,17 @@ namespace Cantrip.Linting
         /// <summary>Verbs that act on the effect's target when they have no <c>to</c> clause.</summary>
         private static readonly HashSet<string> TargetingVerbs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "deal", "damage", "apply", "add", "remove", "kill", "emit", "replay",
+            "deal", "damage", "apply", "add", "remove", "kill", "emit", "replay", "play", "transform",
+        };
+
+        /// <summary>
+        /// Verbs a <c>scenario</c> must not use even though the rules know them. A scenario states the
+        /// fight and a bot plays it, so a hand-written <c>play</c> there is the documented error it has
+        /// always been — registering <c>play</c> as a rule verb would otherwise delete that diagnostic.
+        /// </summary>
+        private static readonly HashSet<string> NotInScenarios = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "play",
         };
 
         private enum BodyKind
@@ -266,6 +282,8 @@ namespace Cantrip.Linting
             foreach (Body body in _bodies)
             {
                 CheckVerbs(body);
+                CheckInPlay(body);
+                CheckUntilTransforms(body);
                 CheckScenario(body); // before CheckNames: `stalls` and `wins` are measurements, not names
                 CheckNames(body);
                 CheckTags(body);
@@ -440,10 +458,16 @@ namespace Cantrip.Linting
             foreach (CommandNode command in body.Facts.Commands)
             {
                 if (command.Verb.Length == 0) continue; // a statement with no verb: the parser has reported it (CT0010)
-                if (_verbs.Contains(command.Verb)) continue;
 
+                // A scenario's deny-list comes first: `play` is a verb the rules know, and knowing it
+                // must not quietly withdraw the diagnostic that says a scenario does not play by hand.
+                bool denied = body.Kind == BodyKind.Scenario && NotInScenarios.Contains(command.Verb);
                 IReadOnlyCollection<string> allowed = BlockVerbs(body);
-                if (allowed.Contains(command.Verb, StringComparer.OrdinalIgnoreCase)) continue;
+                if (!denied)
+                {
+                    if (_verbs.Contains(command.Verb)) continue;
+                    if (allowed.Contains(command.Verb, StringComparer.OrdinalIgnoreCase)) continue;
+                }
 
                 // `enemy Ghoul hp 12` is how a test spawns one, and it is too far from `battle` for
                 // the spelling guess to reach, so say it outright: it is the likeliest slip of all.
@@ -461,6 +485,110 @@ namespace Cantrip.Linting
                 Error(UnknownVerb, $"Unknown verb `{command.Verb}`.{elsewhere}", command.Span, suggestion);
             }
         }
+
+        /// <summary>
+        /// CT320: a verb that acts on something already in the game, handed a name that is content.
+        /// <c>copy Strike</c>, <c>play Strike</c> and <c>transform Strike into Wound</c> all read as
+        /// if they would act on every Strike, and all three are runtime errors; the fix is a different
+        /// verb or a different word in the slot, so the message says which rather than guessing at a
+        /// spelling.
+        /// </summary>
+        private void CheckInPlay(Body body)
+        {
+            foreach (CommandNode command in body.Facts.Commands)
+            {
+                string verb = command.Verb.ToLowerInvariant();
+
+                // In a test, `play` is the test's own verb and naming a card is how it is written.
+                // In a scenario it is CT301, which already says where the verb belongs.
+                bool inRules = body.Kind != BodyKind.Test && body.Kind != BodyKind.Scenario;
+                if (verb != "copy" && verb != "transform" && !(verb == "play" && inRules)) continue;
+
+                ExprNode? first = Aimed(command.Arguments.FirstOrDefault());
+                string? written = first switch
+                {
+                    NameExpr name when !IsReserved(name.Name) && !IsLocal(body, name.Name) => name.Name,
+                    StringExpr text => text.Value,
+                    _ => null,
+                };
+                if (written == null || _content.Find(written) == null) continue;
+
+                // The fix is a different verb, not a different spelling, so the message says it
+                // outright and no "did you mean" is offered to argue with it.
+                string spelt = Written(first!);
+                string becomes = (command.Clause("into") ?? command.Clause("to")) is ExprNode into ? Written(into) : "Sheepling";
+                Error(ContentWhereSomethingInPlayIsMeant, verb switch
+                {
+                    "copy" => $"`copy` acts on something in the game, and `{written}` is content. Write `create {spelt}` for a fresh one.",
+                    "transform" => $"`transform` changes something that is in the game, and `{written}` is content. Name what should change, as in `transform target into {becomes}`.",
+                    _ => $"`play` acts on a card that is in a pile, and `{written}` is content. Write `create {spelt} into hand` first, then `play created.first`.",
+                },
+                    command.Span);
+            }
+        }
+
+        /// <summary>
+        /// CT321: a <c>transform</c> written inside an <c>until</c> block. <c>until</c> promises to
+        /// put back what it did, and none of this can be put back — the stats, the statuses and the
+        /// spent <c>once per ...</c> windows are gone. The runtime refuses it too, which is what
+        /// catches a content verb containing one; this says so before the effect ever runs.
+        /// </summary>
+        private void CheckUntilTransforms(Body body)
+        {
+            if (body.Block == null) return;
+
+            var walker = new UntilTransforms();
+            walker.VisitBlock(body.Block);
+
+            foreach (CommandNode command in walker.Found)
+            {
+                Error(TransformInsideUntil,
+                    "`transform` cannot be undone, so an `until` block cannot hold one: the stats, statuses and used-up limits it replaces are gone. " +
+                    "Transform it outside the block, or apply a status instead.",
+                    command.Span);
+            }
+        }
+
+        /// <summary>
+        /// The <c>transform</c> statements lexically inside an <c>until</c> block. A <c>next turn:</c>
+        /// or <c>in N turns:</c> block written inside one runs later, on its own, with none of the
+        /// block's undo scope — so it starts clear rather than inheriting the <c>until</c>.
+        /// </summary>
+        private sealed class UntilTransforms : AstWalker
+        {
+            private int _depth;
+
+            public List<CommandNode> Found { get; } = new List<CommandNode>();
+
+            public override void VisitStatement(StatementNode statement)
+            {
+                switch (statement)
+                {
+                    case CommandNode command:
+                        if (_depth > 0 && string.Equals(command.Verb, "transform", StringComparison.OrdinalIgnoreCase)) Found.Add(command);
+                        break;
+
+                    case ScheduleNode schedule:
+                    {
+                        int outer = _depth;
+                        _depth = schedule.Kind == ScheduleKind.Until ? _depth + 1 : 0;
+                        VisitBlock(schedule.Body);
+                        _depth = outer;
+                        return;
+                    }
+                }
+
+                base.VisitStatement(statement);
+            }
+        }
+
+        /// <summary>A name spelt as content would have to write it, with the quotes it needs.</summary>
+        private static string Written(ExprNode node) => node switch
+        {
+            StringExpr text => "\"" + text.Value + "\"",
+            NameExpr name => name.Name,
+            _ => AstPrinter.Print(node),
+        };
 
         /// <summary>The verbs a body may use beyond the ones any effect can: a test's, or a scenario's.</summary>
         private static IReadOnlyCollection<string> BlockVerbs(Body body) => body.Kind switch

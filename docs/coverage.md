@@ -63,7 +63,7 @@ Content: [slay_the_spire.cantrip](../samples/corpus/slay_the_spire.cantrip). Tes
 | 19 | Cultist and Ritual | Chanter | Works | A phase for the opening and one for afterwards, so the chant is its own move and the telegraphed intent is the real one. Ritual still skips its first turn with a counter stat, which is cross-turn state rather than a temporary |
 | 20 | Louse Curl Up | Rolling Louse | Works | Blocks the first time it is attacked |
 | 21 | Gremlin Nob Enrage | Fury | Works | Gains Strength when the player uses a skill |
-| 22 | Slime Boss split | Slime King | Works | A phase gates the Split, and `retelegraph` on that phase re-rolls the intent the moment the threshold is crossed, so the player is shown the Split before it lands rather than after |
+| 22 | Slime Boss split | Slime King | Works | A phase gates the Split, and `retelegraph` on that phase re-rolls the intent the moment the threshold is crossed, so the player is shown the Split before it lands rather than after. The King becomes one of the halves with `transform self into Slimeling` rather than `kill self`, so it keeps its slot and its id and nothing hears a death — which is what lets a boss both split and have a death rattle |
 | 23 | Spore Cloud | Sporeling | Works | Debuffs the player when it dies |
 
 ## Monster Train
@@ -177,7 +177,7 @@ Content: [dominion.cantrip](../samples/corpus/dominion.cantrip). Tests: [dominio
 | 3 | Cellar | Larder | Workaround | `discard N` takes a fixed count, so "discard any number, draw that many" becomes a particular number. Which cards go is still the player's choice; how many is not |
 | 4 | Chapel | Shrine | Works | `exhaust 1` trashes a card out of the deck, resolved through the chooser |
 | 5 | Moat | Bulwark | Works | A card in hand is active, so it reacts from there without being played: `on before_damaged(target:player) once per turn: cancel` |
-| 6 | Throne Room | Regent | Works | `choose 1 from hand where tag:action as picked`, then `repeat 2: replay picked` |
+| 6 | Throne Room | Regent | Works | `choose 1 from hand where tag:action as picked`, then `play picked, free` and `replay played`. The chosen card is really played — it leaves hand, raises `card_played` and is discarded — and then resolves a second time. Before `play` existed both halves were `replay`, so the card never left hand and nothing counted it as played |
 | 7 | Buying from the supply | | Not expressible | Pools exist now (gap 7), but a supply is a pile that runs out and a definition cannot hold a count. `cost 5 coins` is already refused when unaffordable; what is missing is a buy phase — nothing in the repo ever spends `buys` — and a cost in two currencies at once (gap 15) |
 | 8 | Militia | | Not expressible | There is one player, and enemies are actors without hands or decks, so an effect reaching into another player's hand has nobody to reach |
 
@@ -204,7 +204,7 @@ What the language cannot say yet, ranked by how many rows of the tables above ea
 |---|---|---|---|
 | 12 | **Space and richer boards.** Actors have board slots, not positions in space, and each side has one row. | Dota 2 #6, #7; Monster Train #10 | Slots and `adjacent(target)`. `within` parses, and a game can give it a meaning through its host's `TryCall`. |
 | 15 | **Costs in several currencies, or paid by a sacrifice.** A cost is one amount in one resource. | Magic #7; Inscryption #6; Dominion #7 | A cost in a named resource, `cost 2 bones`. A sacrifice written into the effect, which cannot refuse the play. |
-| 5 | **Effects as values.** Nothing can copy another entity's effects, or switch them off. | Balatro #6; Hearthstone #9 | Nothing. |
+| 5 | **Effects as values.** Nothing can copy another entity's effects, or switch them off. `copy` duplicates an entity's *state* — its live stats, tags and statuses — which is a different thing. | Balatro #6; Hearthstone #9 | `copy` for an entity's state. Nothing for its effects. |
 | 17 | **A run above the battle.** A battle is the outermost thing content can see: nothing carries lives, candles or stress from one battle to the next, and `once per run` is the only nod to runs. | Inscryption #8; Darkest Dungeon #7 | The game carries hp, deck and relics between battles in its own code, as [Winning, losing and several battles](csharp.md#winning-losing-and-several-battles) shows. `cantrip sim` plays a gauntlet a `scenario` states; it does not generate one. |
 | 3 | **Target rules beyond choosing a card's target.** There is no blocking step for a rule such as Flying, and no `card:self`. Enemy moves and the `attack` verb do not ask the `targetable` channel, so a taunt does not bind them. | Magic #8; Darkest Dungeon #6 | The `targetable` channel for cards. A card that limits its own reach names itself, as in `card:Pike`. |
 | 6 | **Whether a listener should hear the event that brought it into play.** Today it does, so each listener of that shape must leave its own cause out. The sample roguelite's Chill relies on the current behaviour, so changing it is a decision rather than a fix. | Slay the Spire #10; Hearthstone #6 | A filter: `not target:self`, `not card:Reverb`. |
@@ -215,6 +215,8 @@ What the language cannot say yet, ranked by how many rows of the tables above ea
 | 4 | **Verbs that return values.** A verb cannot hand a result to an expression, as `let x = shatter target` would need. | None | `into` binds what a damage verb landed. |
 
 The other workarounds are explained in their rows: Heavy Blade (Slay the Spire #4), Multistrike (Monster Train #4), Abstract Joker (Balatro #2) and Cellar (Dominion #3). Militia (Dominion #8) needs a second player with a hand, which Cantrip does not have by design.
+
+**`copy`, `play` and `transform` do not move this table.** They are three verbs content kept working around, and what they change is stated in the rows above: `play` makes Dominion #6 Throne Room actually play a card, and `transform` lets Slay the Spire #22's Slime King split without `kill self`. None of them closes gap 5: `copy` duplicates an entity's state, not another entity's effects, so Silence (Hearthstone #9) and Blueprint (Balatro #6) stay exactly where they are. No row moves from *Not expressible* or *Workaround* to *Works* because of them, and the summary counts are unchanged.
 
 ## Closed gaps
 
@@ -233,6 +235,7 @@ The other workarounds are explained in their rows: Heavy Blade (Slay the Spire #
 
 Rules that are stated in the language reference but still catch authors out, most of them found while building this corpus. Each links to where the reference states it.
 
+- **`copy` of an actor that has been killed but not yet cleared away brings it back at full health,** because `kill` marks it dead without changing its hp and a copy takes the stats as they stand. Selectors skip dead actors, so only a name you bound yourself reaches one: `on killed: copy event.target` is an enemy that never stops. See [Built-in verbs](language.md#built-in-verbs).
 - **A listener hears the event that brought it into play.** A status applied by a card hears that card's `card_played`, and a minion hears its own creation. See Joining mid-event under [Listeners](language.md#listeners).
 - **Block granted on `battle_start` is gone by the first turn,** because the first turn start resets block. Grant it `on turn_start once per battle`. See [Relics](language.md#relics-items-and-keywords).
 - **A modifier without `of` applies to what it is written on:** on a card, to that card's own damage. See [Modifiers](language.md#modifiers).
@@ -250,5 +253,8 @@ Rules that are stated in the language reference but still catch authors out, mos
 - **A tag works only on the `tags` line.** Under a card, `exhaust` on a line of its own is a property that nothing reads, and the card is discarded as usual; `lint` warns about it (CT316). See [Cards](language.md#cards).
 - **`damage` is what an entity deals and `damage_taken` what it receives,** so a Vulnerable is `modify damage_taken: x1.5`; written with `damage`, it makes its host hit harder. See [Modifiers](language.md#modifiers).
 - **A status is read through the entity that has it,** as in `owner.Weak` or `target.Weak`. There is no name `host`. See [Statuses](language.md#statuses).
+- **`copy` fires `on created(self)` on the original,** because the event carries `copy_of` and that makes the original involved in it. A minion that reacts to being created also reacts to being copied. See [Built-in verbs](language.md#built-in-verbs).
+- **A copied status raises no `status_applied` and skips `immune`,** because a copy is a snapshot of a state rather than a new application. A poison-immune thing copied while poisoned arrives poisoned. See [Built-in verbs](language.md#built-in-verbs).
+- **A `play` in a test's own body is the test's verb, and a `play` anywhere else is the rules'.** The test's puts a card into hand by name and plays it from there; the rules' plays a card that is already in a pile. A content verb containing `play` is the rules' even when a test line calls it. See [Built-in verbs](language.md#built-in-verbs) and [Tests](language.md#tests).
 
 The summary counts the rows of the per-game tables. If the two ever disagree, the rows are right.
