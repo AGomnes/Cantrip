@@ -797,7 +797,7 @@ Nothing is restored. A wounded minion is copied wounded; content that wants a fr
 
 A copy raises `created` through all three phases, with `event.copy_of` set to the original. That makes the original *involved* in the event, so `on created(self)` on the original hears its own copying. The copy is a new combatant otherwise: its `once per battle` and `once per turn` windows are unused, and an actor rolls a fresh intent.
 
-`copy` is refused, with an error that names the verb to use instead, for a definition (`copy Strike` → `create Strike`, also CT320 at lint), for a status, keyword or ability (`apply` gives another one), and for the player, which nothing in content describes. A group that happens to be empty copies nothing and binds an empty `copied`, the way `for each` over an empty group does nothing.
+`copy` is refused, with an error that names the verb to use instead, for a definition (`copy Strike` → `create Strike`, also CT320 at lint), for a status, keyword or ability (`apply` gives another one), and for the player, which nothing in content describes. A group that happens to be empty copies nothing and binds an empty `copied`, the way `for each` over an empty group does nothing. An actor that has died is skipped in the same way, even when you name it yourself: `kill` leaves its hp as it was, so a copy would arrive alive and whole, and `on killed: copy event.target` would never run out of enemies.
 
 **`transform`** replaces what something *is* while keeping who it is. `to` is a synonym for `into`.
 
@@ -1172,7 +1172,7 @@ Codes with four digits come from reading and loading the files. An error among t
 | Code | Level | Meaning | Typical fix |
 |---|---|---|---|
 | CT301 | error | An unknown verb, or one written in the wrong kind of block: a test verb such as `play` outside a test, or a scenario verb such as `battle` outside a scenario. | Fix the spelling, or move the line. For a verb the game registers in C#, run with `--suppress CT301`. |
-| CT302 | error or warning | An unknown name. It is an error where a definition must be named (`apply Posion`, `card:Strke`, or a test or scenario line such as `hand Strik` or `battle Ghol`) or a status is read (`target.Posion`), and a warning for other names, which the game may supply at runtime. | Fix the spelling, or define it. |
+| CT302 | error or warning | An unknown name. It is an error where a definition must be named (`apply Posion`, `create Wond`, `transform target into Sheeplng`, `card:Strke`, or a test or scenario line such as `hand Strik` or `battle Ghol`) or a status is read (`target.Posion`), and a warning for other names, which the game may supply at runtime. | Fix the spelling, or define it. |
 | CT303 | warning | A `tag:` test for a tag no definition has, so it never matches. | Fix the spelling, or give the tag to what should match. |
 | CT304 | warning | A listener on an event that nothing raises: it is not [built in](#built-in-events) and no content emits it, or it is `<stat>_changed` for a stat nothing in the content has. | Fix the event or stat name. The message suggests the nearest event, such as `turn_start` for `start_of_turn`. |
 | CT305 | note | An event is emitted but no content listens for it. | Nothing, if the game listens in its own code. Otherwise check the name. |

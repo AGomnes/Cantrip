@@ -768,6 +768,12 @@ namespace Cantrip.Linting
                         if (command.Arguments.FirstOrDefault() is NameExpr shuffled && !IsReserved(shuffled.Name) && !IsLocal(body, shuffled.Name))
                             RequireDefinition(body, shuffled, "card");
                         break;
+                    // What a transform becomes is a definition, as `create`'s argument is. A name
+                    // bound by a verb, such as `transform target into discovered`, is a local and
+                    // RequireDefinition leaves it alone.
+                    case "transform":
+                        RequireDefinition(body, command.Clause("into") ?? command.Clause("to"), "card", "enemy", "actor", "relic", "item", "status", "keyword", "ability");
+                        break;
                     case "add":
                         if (command.Arguments.FirstOrDefault() is NameExpr)
                             RequireDefinition(body, command.Arguments[0], "status", "keyword");

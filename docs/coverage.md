@@ -235,7 +235,6 @@ The other workarounds are explained in their rows: Heavy Blade (Slay the Spire #
 
 Rules that are stated in the language reference but still catch authors out, most of them found while building this corpus. Each links to where the reference states it.
 
-- **`copy` of an actor that has been killed but not yet cleared away brings it back at full health,** because `kill` marks it dead without changing its hp and a copy takes the stats as they stand. Selectors skip dead actors, so only a name you bound yourself reaches one: `on killed: copy event.target` is an enemy that never stops. See [Built-in verbs](language.md#built-in-verbs).
 - **A listener hears the event that brought it into play.** A status applied by a card hears that card's `card_played`, and a minion hears its own creation. See Joining mid-event under [Listeners](language.md#listeners).
 - **Block granted on `battle_start` is gone by the first turn,** because the first turn start resets block. Grant it `on turn_start once per battle`. See [Relics](language.md#relics-items-and-keywords).
 - **A modifier without `of` applies to what it is written on:** on a card, to that card's own damage. See [Modifiers](language.md#modifiers).

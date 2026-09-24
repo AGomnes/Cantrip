@@ -594,6 +594,28 @@ namespace Cantrip.Tests.Runtime
             Assert.Equal(2, runtime.State.Find(copy.Id)!.StacksOf("Sharpened"));
         }
 
+        [Fact]
+        [Trait("Regression", "copy-revives-the-dead")]
+        public void A_dead_actor_is_skipped_the_way_a_removed_one_is()
+        {
+            // `kill` marks an actor dead without touching its hp, so copying one would put it back
+            // on the board alive and whole, and `on killed: copy event.target` would never stop.
+            Passes("""
+                card "Necromancy"
+                  cost 0
+                  target enemy
+                  effect:
+                    let doomed = target
+                    kill doomed
+                    copy doomed
+
+                test "a killed enemy cannot be copied back"
+                  enemy "Ghoul" hp 30
+                  play "Necromancy" on enemy
+                  expect count(enemies) == 0
+                """);
+        }
+
         // Helpers ----------------------------------------------------------------------------
 
         private static void Passes(string dsl)

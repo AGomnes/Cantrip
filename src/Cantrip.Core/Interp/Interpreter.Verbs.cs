@@ -188,7 +188,10 @@ namespace Cantrip.Runtime
             foreach (Entity original in what.AsEntities().ToArray())
             {
                 // A group that has lost a member since it was read is ordinary, as it is everywhere else.
-                if (original.IsRemoved) continue;
+                // A dead actor is skipped the same way: `kill` leaves its hp alone, so copying one
+                // would put a live enemy on the board at full health, and `on killed: copy
+                // event.target` would never stop.
+                if (original.IsRemoved || original.IsDead) continue;
 
                 if (original.Definition == null)
                     throw call.Error($"`{original.Name}` was not made from content, so there is nothing to copy.");
