@@ -4,7 +4,7 @@
 #   pwsh tools/package-addon.ps1 [-OutputDirectory <path>] [-Ref <tag>]
 #
 # The version comes from plugin.cfg, so the zip and the plugin can never disagree about it.
-# Given a ref, a tag such as v0.1.0-preview.4, the addon README's links into the main branch of
+# Given a ref, a tag such as v0.1.0-preview.5, the addon README's links into the main branch of
 # github.com/AGomnes/Cantrip point at that ref instead, so a user reads the docs of the version they
 # installed. Without one, the README goes in as it is.
 

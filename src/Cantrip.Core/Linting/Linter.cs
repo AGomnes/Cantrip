@@ -504,6 +504,11 @@ namespace Cantrip.Linting
                 bool inRules = body.Kind != BodyKind.Test && body.Kind != BodyKind.Scenario;
                 if (verb != "copy" && verb != "transform" && !(verb == "play" && inRules)) continue;
 
+                // A game may have had a verb of its own by one of these names before they were
+                // built in, in content or registered in C#. That one still runs, so this check has
+                // nothing true to say about the line.
+                if (_content.FindVerb(verb) != null || _options.HostVerbs.Contains(verb)) continue;
+
                 ExprNode? first = Aimed(command.Arguments.FirstOrDefault());
                 string? written = first switch
                 {
@@ -536,6 +541,10 @@ namespace Cantrip.Linting
         private void CheckUntilTransforms(Body body)
         {
             if (body.Block == null) return;
+
+            // A game whose own `transform` predates the built-in one runs that instead, and it may
+            // well be undoable. Nothing here is true of it.
+            if (_content.FindVerb("transform") != null || _options.HostVerbs.Contains("transform")) return;
 
             var walker = new UntilTransforms();
             walker.VisitBlock(body.Block);

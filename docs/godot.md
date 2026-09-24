@@ -50,7 +50,7 @@ What a GDScript project takes on by using it:
 2. **Add the rules engine** from NuGet, in the folder with your `.csproj`, at the same version as
    the addon (the addon's is in its `plugin.cfg`):
    ```
-   dotnet add package Cantrip.Core --version 0.1.0-preview.4
+   dotnet add package Cantrip.Core --version 0.1.0-preview.5
    ```
    `--prerelease` alone would install the newest preview, which may not match the addon you have.
 
@@ -1181,8 +1181,8 @@ It takes the version from `plugin.cfg`, so the two cannot disagree. Each release
 and copies the addon to AGomnes/cantrip-godot, whose README is `tools/addon-repo/README.md`.
 
 Both READMEs link this guide on `main`. Given a tag or branch as well, such as
-`bash tools/package-addon.sh artifacts v0.1.0-preview.4` or
-`pwsh tools/package-addon.ps1 -Ref v0.1.0-preview.4`, the script points the addon README's links
+`bash tools/package-addon.sh artifacts v0.1.0-preview.5` or
+`pwsh tools/package-addon.ps1 -Ref v0.1.0-preview.5`, the script points the addon README's links
 into this repository at that tag instead, and the release workflow does the same to the
 cantrip-godot README, so a user reads the guide for the version they installed. Without one, the
 links are left as they are.

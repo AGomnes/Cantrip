@@ -1407,3 +1407,10 @@ static Cantrip.Content.Scenario.Metrics.get -> System.Collections.Generic.IReadO
 static Cantrip.Content.Scenario.SetupVerbs.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
 static Cantrip.Content.Scenario.Verbs.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
 static Cantrip.Testing.SetupSession.Names(Cantrip.Runtime.VerbCall! call) -> System.Collections.Generic.IReadOnlyList<string!>!
+Cantrip.Runtime.GameState.Become(Cantrip.Runtime.Entity! entity, Cantrip.Content.EntityDefinition! definition) -> void
+Cantrip.Runtime.GameState.Duplicate(Cantrip.Runtime.Entity! original, Cantrip.Runtime.Entity? owner = null, Cantrip.Team team = Cantrip.Team.Neutral, string! zone = "") -> Cantrip.Runtime.Entity!
+Cantrip.Runtime.Interpreter.Copy(Cantrip.Runtime.Entity! original, string? zone, Cantrip.Runtime.EvalContext! context) -> Cantrip.Runtime.Entity!
+Cantrip.Runtime.Interpreter.Transform(Cantrip.Runtime.Entity! entity, Cantrip.Content.EntityDefinition! definition, Cantrip.Runtime.EvalContext! context, Cantrip.Diagnostics.SourceSpan span = default(Cantrip.Diagnostics.SourceSpan)) -> void
+const Cantrip.Linting.Linter.ContentWhereSomethingInPlayIsMeant = "CT320" -> string!
+const Cantrip.Linting.Linter.TransformInsideUntil = "CT321" -> string!
+const Cantrip.Runtime.BuiltinEvents.Transformed = "transformed" -> string!

@@ -207,6 +207,43 @@ namespace Cantrip.Tests.Linting
             Assert.Contains("A `scenario` states the fight; a bot plays it.", error.Message);
         }
 
+        [Fact]
+        [Trait("Regression", "own-verb-of-the-same-name")]
+        public void A_game_with_its_own_verb_of_that_name_is_left_alone()
+        {
+            // These names were free before this release, so content may have a verb of its own by
+            // one of them. That verb is what runs, and CT320 would be a false alarm about it.
+            None(Lint("""
+                verb copy(what):
+                  deal 1 to what
+
+                card "Old Ways"
+                  cost 1
+                  target enemy
+                  effect:
+                    copy Strike
+                """));
+        }
+
+        [Fact]
+        [Trait("Regression", "own-verb-of-the-same-name")]
+        public void A_transform_of_its_own_inside_until_is_left_alone()
+        {
+            IReadOnlyList<Diagnostic> diagnostics = Lint("""
+                verb transform(who):
+                  deal 2 to who
+
+                card "Old Ways"
+                  cost 1
+                  target enemy
+                  effect:
+                    until turn_end:
+                      transform target
+                """);
+
+            Assert.DoesNotContain(diagnostics, d => d.Code == Linter.TransformInsideUntil);
+        }
+
         // Helpers ----------------------------------------------------------------------------
 
         private static IReadOnlyList<Diagnostic> Lint(string dsl) =>
