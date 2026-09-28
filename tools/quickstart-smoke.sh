@@ -39,6 +39,10 @@ export NUGET_PACKAGES="$work/packages"
 # Local tools are found through a resolver cache under the .NET home folder; a stale entry from an
 # earlier run, pointing into a package folder since deleted, would make `dotnet cantrip` fail.
 export DOTNET_CLI_HOME="$work/home"
+# A fresh home means a first run, and a first run offers to put its tools folder on the PATH. On
+# Windows that writes to the user's environment, so a script run often enough leaves a trail of
+# dead temporary folders in it.
+export DOTNET_ADD_GLOBAL_TOOLS_TO_PATH=false
 export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
 
 script="$work/quickstart.sh"

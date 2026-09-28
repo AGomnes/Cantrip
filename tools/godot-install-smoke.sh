@@ -40,7 +40,9 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 project="$work/BlankGame"
 mkdir -p "$project"
-export NUGET_PACKAGES="$work/packages" DOTNET_CLI_HOME="$work/home" DOTNET_NOLOGO=1 DOTNET_CLI_TELEMETRY_OPTOUT=1
+# DOTNET_ADD_GLOBAL_TOOLS_TO_PATH: a fresh DOTNET_CLI_HOME is a first run, and a first run offers
+# to put its tools folder on the PATH, which on Windows writes to the user's environment.
+export NUGET_PACKAGES="$work/packages" DOTNET_CLI_HOME="$work/home" DOTNET_NOLOGO=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_ADD_GLOBAL_TOOLS_TO_PATH=false
 
 # What Godot writes for a new C# project, plus the plugin switched on, which step 4 of the guide
 # does by hand in Project Settings.
