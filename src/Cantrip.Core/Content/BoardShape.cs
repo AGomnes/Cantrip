@@ -125,6 +125,41 @@ namespace Cantrip.Content
         public bool Holds(int lane, int rank) => HasLane(lane) && HasRank(rank);
 
         /// <summary>
+        /// The greatest number of steps this board can put between two actors, or null when the
+        /// ranks are unbounded and there is no such number. A reach of this much or more reaches
+        /// everybody, which is what CT332 says out loud.
+        /// </summary>
+        /// <remarks>
+        /// On a <c>facing</c> board the two sides are mirrored and the rank term across them is
+        /// <c>a.rank + b.rank + 1</c>, so the deepest pair is the two back ranks facing each other:
+        /// <c>2 * (Ranks - 1) + 1</c>. On a <c>shared</c> board a rank is one place for everybody,
+        /// so it is <c>Ranks - 1</c>.
+        /// </remarks>
+        public int? MaxDistance
+        {
+            get
+            {
+                if (RanksAreUnbounded) return null;
+                int lanes = Lanes - 1;
+                int ranks = Sides == BoardSides.Facing ? (2 * (Ranks - 1)) + 1 : Ranks - 1;
+                return Metric == BoardMetric.Chebyshev ? Math.Max(lanes, ranks) : lanes + ranks;
+            }
+        }
+
+        /// <summary>
+        /// Whether a lane on this board holds one actor at most, which is true of a board one rank
+        /// deep: <c>lane(who)</c> is then <c>who</c> alone, however it is written.
+        /// </summary>
+        public bool LaneHoldsOne => Ranks == 1;
+
+        /// <summary>
+        /// Whether a rank on this board holds one actor at most, which is true of a board one lane
+        /// wide — today's board, and so worth saying out loud when content writes <c>rank(who)</c>
+        /// on it and gets a group of one.
+        /// </summary>
+        public bool RankHoldsOne => Lanes == 1;
+
+        /// <summary>
         /// Whether this is the same board as <paramref name="other"/>, by everything that changes a
         /// result. The two words are left out: renaming a lane changes rules text, never a slot.
         /// </summary>

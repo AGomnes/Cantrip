@@ -408,6 +408,25 @@ namespace Cantrip.Runtime
                     return;
                 }
 
+                // Movement, which is a member write and not a verb: `target.rank = 0`,
+                // `self.lane += 1`, `a.rank = b.rank`. It is checked before statuses and stats so
+                // that a place always means a place, whatever a game has named a status.
+                case MemberExpr member when IsPlaceAxis(member.Member):
+                {
+                    if (string.Equals(member.Member, "position", StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new RuntimeError(
+                            "`position` is the older name for `rank` and reads the same number, but it cannot be written: " +
+                            "it names one axis of a place that now has two. Write `rank`.",
+                            assign.Span);
+                    }
+
+                    bool lane = string.Equals(member.Member, "lane", StringComparison.OrdinalIgnoreCase);
+                    foreach (Entity entity in Evaluate(member.Target, context).AsEntities().ToArray())
+                        MoveOnBoard(entity, lane, assign.Operator, amount, context, assign.Span);
+                    return;
+                }
+
                 case MemberExpr member:
                 {
                     foreach (Entity entity in Evaluate(member.Target, context).AsEntities())
@@ -424,6 +443,12 @@ namespace Cantrip.Runtime
                     throw new RuntimeError("Only names and properties can be assigned to.", assign.Span);
             }
         }
+
+        /// <summary>Whether a member name is one of the two axes of a place on the board.</summary>
+        private static bool IsPlaceAxis(string member) =>
+            string.Equals(member, "lane", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(member, "rank", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(member, "position", StringComparison.OrdinalIgnoreCase);
 
         private bool IsStatusName(string name, Entity host) =>
             host.FindAttached(name) != null || Content.Find(name, "status") != null || Content.Find(name, "keyword") != null;
@@ -616,6 +641,13 @@ namespace Cantrip.Runtime
                 case "cost":
                     if (anchor.Kind == EntityKind.Card) return query.Subject == anchor;
                     return query.Subject != null && query.Subject.Controller == anchor.Controller;
+
+                case RangeChannel:
+                    // Reach belongs to whoever is reaching. Written on a card or an ability it
+                    // governs that one; written on a status or a relic it governs everything its
+                    // holder points at, which is the whole of "everything you do is melee now".
+                    if (owner.Kind == EntityKind.Card || owner.Kind == EntityKind.Ability) return query.Subject == owner;
+                    return query.Source != null && query.Source.Controller == anchor.Controller;
 
                 case "cooldown":
                     // The same division as `cost`: written on the ability it governs that ability,

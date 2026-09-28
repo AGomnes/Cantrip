@@ -344,6 +344,15 @@ namespace Cantrip.Descriptions
             public IReadOnlyList<EntityDefinition> References => _references;
 
             private ContentLibrary Content => _builder._content;
+
+            /// <summary>
+            /// The board this text is about: the one being played on when there is a live game, and
+            /// otherwise the one a battle would start on. It supplies <c>lane_word</c> and
+            /// <c>rank_word</c>, which is what lets a train read "on this floor" and a grid "in this
+            /// column" without either of them writing <c>text_override</c> on every card.
+            /// </summary>
+            private BoardShape Board => _live?.Runtime.State.Board ?? Content.DefaultBoard;
+
             private bool IsStatus => _definition.Kind == EntityKind.Status || _definition.Kind == EntityKind.Keyword;
             private bool IsCard => _definition.Kind == EntityKind.Card;
             private bool IsEnemy => _definition.Kind == EntityKind.Actor;
@@ -382,6 +391,12 @@ namespace Cantrip.Descriptions
                 if (Cost() is DescriptionSegment cost) Values["cost"] = cost;
 
                 var sentences = new List<List<DescriptionSegment>>();
+
+                // Reach and the `target` line's own filter come first, because they are what the
+                // rest of the text is about: a card that says "Deal 5 damage" and nothing about the
+                // front rank has not said what it does. The filter used to be dropped entirely.
+                if (Reach() is List<DescriptionSegment> reach) sentences.Add(reach);
+                if (TargetFilter() is List<DescriptionSegment> aim) sentences.Add(aim);
 
                 foreach (MemberNode member in _definition.Syntax.Members)
                 {
@@ -434,6 +449,155 @@ namespace Cantrip.Descriptions
                 }
 
                 return Join(sentences);
+            }
+
+            // Reach, and what a `target` line says may be pointed at ---------------------------
+
+            /// <summary>
+            /// The <c>range</c> line in words: "Melee." for one step, "Range 3." for a limit and
+            /// "Range 2–3." for a span. Null when the definition prints no range, which is most of
+            /// them and reads as no sentence at all rather than as "Range unlimited".
+            /// </summary>
+            private List<DescriptionSegment>? Reach()
+            {
+                if (_definition.Range is not Reach range) return null;
+
+                if (range.Min == 0 && range.Max == 1) return Phrase("range.melee");
+                if (range.Min == 0) return Phrase("range.at_most", ("amount", Number(Num.FromInt(range.Max), null)));
+                return Phrase("range.span",
+                    ("low", Number(Num.FromInt(range.Min), null)),
+                    ("high", Number(Num.FromInt(range.Max), null)));
+            }
+
+            /// <summary>
+            /// The <c>where</c> on a <c>target</c> line in words: "Targets an enemy in the front
+            /// slot." Null when the line names a side and nothing more, which needs no sentence
+            /// because the effect already says who it hits.
+            /// </summary>
+            /// <remarks>
+            /// This used to be dropped in silence. Darkest Dungeon's Pike printed "Deal 5 damage"
+            /// and said nothing at all about the half of the card that decides what it may be
+            /// pointed at — which is the rule a player most needs to read.
+            /// </remarks>
+            private List<DescriptionSegment>? TargetFilter()
+            {
+                TargetRule rule = TargetRule.Of(_definition);
+                if (rule.Filters.Count == 0) return null;
+
+                string? who = rule.Mode switch
+                {
+                    "enemy" => Word("who.an_enemy") ?? "an enemy",
+                    "ally" => Word("who.an_ally") ?? "an ally",
+                    "any" => Word("who.anyone") ?? "anyone",
+                    _ => null,
+                };
+                if (who == null) return null;
+
+                string? clauses = null;
+                foreach (ExprNode filter in rule.Filters)
+                {
+                    string one = Reaches(filter);
+                    clauses = clauses == null
+                        ? one
+                        : Words(Word("target.and") ?? "{first}, {second}", ("first", clauses), ("second", one));
+                }
+
+                return Phrase("target.rule",
+                    ("who", Text(who)),
+                    ("where", Text(Words(Word("target.where") ?? " {where}", ("where", clauses!)))));
+            }
+
+            /// <summary>
+            /// One predicate of a <c>target … where</c> in words. A comparison against a place is
+            /// said as a place — "in the front 2 ranks" — because that is the rule the player is
+            /// being told; anything else is printed as it was written, which is at least true.
+            /// </summary>
+            private string Reaches(ExprNode filter)
+            {
+                if (filter is BinaryExpr comparison)
+                {
+                    if (PlaceComparison(comparison) is (string Axis, BinaryOperator Op, int Value) place)
+                    {
+                        if (place.Axis == "lane")
+                        {
+                            return place.Op == BinaryOperator.Equal
+                                ? Words(Word("target.at_lane") ?? "in {lane_word} {amount}",
+                                    ("lane_word", Board.LaneWord), ("amount", place.Value.ToString(CultureInfo.InvariantCulture)))
+                                : Other(filter);
+                        }
+
+                        switch (place.Op)
+                        {
+                            case BinaryOperator.Equal when place.Value == 0:
+                            case BinaryOperator.LessOrEqual when place.Value == 0:
+                            case BinaryOperator.Less when place.Value == 1:
+                                return Front(1);
+                            case BinaryOperator.Equal:
+                                return Words(Word("target.at_rank") ?? "in {rank_word} {amount}",
+                                    ("rank_word", Board.RankWord), ("amount", place.Value.ToString(CultureInfo.InvariantCulture)));
+                            case BinaryOperator.LessOrEqual:
+                                return Front(place.Value + 1);
+                            case BinaryOperator.Less:
+                                return Front(place.Value);
+                            case BinaryOperator.GreaterOrEqual:
+                                return Behind(place.Value);
+                            case BinaryOperator.Greater:
+                                return Behind(place.Value + 1);
+                        }
+                    }
+
+                    // `it.lane == self.lane`: the same lane as whoever is using it, which is the one
+                    // comparison against something other than a number worth saying in words —
+                    // a whole genre of card is built on it.
+                    if (comparison.Operator == BinaryOperator.Equal && IsAxis(comparison.Left, "lane") && IsAxis(comparison.Right, "lane"))
+                        return Words(Word("target.same_lane") ?? "on this {lane_word}", ("lane_word", Board.LaneWord));
+                }
+
+                return Other(filter);
+
+                string Front(int count) => count <= 1
+                    ? Words(Word("target.front.one") ?? "in the front {rank_word}", ("rank_word", Board.RankWord))
+                    : Words(Word("target.front.many") ?? "in the front {amount} {rank_word}s",
+                        ("amount", count.ToString(CultureInfo.InvariantCulture)), ("rank_word", Board.RankWord));
+
+                string Behind(int count) => Words(Word("target.behind") ?? "behind the front {amount} {rank_word}s",
+                    ("amount", count.ToString(CultureInfo.InvariantCulture)), ("rank_word", Board.RankWord));
+
+                string Other(ExprNode expression) =>
+                    Words(Word("target.other") ?? "where {condition}", ("condition", Condition(expression)));
+            }
+
+            private static bool IsAxis(ExprNode node, string axis) =>
+                node is MemberExpr member && string.Equals(member.Member, axis, StringComparison.OrdinalIgnoreCase);
+
+            /// <summary>A comparison of a place against a whole number, with the operator the way round it reads.</summary>
+            private static (string Axis, BinaryOperator Op, int Value)? PlaceComparison(BinaryExpr comparison)
+            {
+                if (Axis(comparison.Left) is string left && Whole(comparison.Right) is int right)
+                    return (left, comparison.Operator, right);
+
+                if (Axis(comparison.Right) is string other && Whole(comparison.Left) is int value)
+                    return (other, Mirror(comparison.Operator), value);
+
+                return null;
+
+                static string? Axis(ExprNode node) => node is MemberExpr member
+                    ? member.Member.ToLowerInvariant() switch { "lane" => "lane", "rank" => "rank", "position" => "rank", _ => null }
+                    : null;
+
+                static int? Whole(ExprNode node) =>
+                    node is NumberExpr number && number.Unit == null && number.Value == number.Value.Floor() && !number.Value.IsNegative
+                        ? number.Value.ToInt()
+                        : null;
+
+                static BinaryOperator Mirror(BinaryOperator op) => op switch
+                {
+                    BinaryOperator.Less => BinaryOperator.Greater,
+                    BinaryOperator.LessOrEqual => BinaryOperator.GreaterOrEqual,
+                    BinaryOperator.Greater => BinaryOperator.Less,
+                    BinaryOperator.GreaterOrEqual => BinaryOperator.LessOrEqual,
+                    _ => op,
+                };
             }
 
             // Statements ---------------------------------------------------------------------
@@ -698,6 +862,12 @@ namespace Cantrip.Descriptions
                     _ => AstPrinter.Print(assign.Target),
                 };
 
+                // Movement is a member write, so it arrives here rather than as a verb, and it has
+                // to be said as a move: "Set rank to 0" is a sentence about a stat that does not
+                // exist, where "Pull the target to the front" is what the card does.
+                if (assign.Target is MemberExpr place && PlaceAxis(place.Member) is string axis)
+                    return Move(assign, place, axis);
+
                 bool ownStacks = IsStatus && assign.Target is NameExpr { Name: "stacks" };
 
                 switch (assign.Operator)
@@ -713,6 +883,79 @@ namespace Cantrip.Descriptions
                     default:
                         return Phrase("stat.set", ("thing", Text(thing)), ("amount", Amount(assign.Value, thing, "none", null)));
                 }
+            }
+
+            private static string? PlaceAxis(string member) => member.ToLowerInvariant() switch
+            {
+                "lane" => "lane",
+                "rank" => "rank",
+                "position" => "rank",
+                _ => null,
+            };
+
+            /// <summary>
+            /// A move in words. <c>target.rank = 0</c> is "Pull the target to the front";
+            /// <c>self.lane += 1</c> is "Move up one floor" on a board that calls a lane a floor.
+            /// </summary>
+            private List<DescriptionSegment> Move(AssignNode assign, MemberExpr place, string axis)
+            {
+                bool lane = axis == "lane";
+                string word = lane ? Board.LaneWord : Board.RankWord;
+                string who = Who(place.Target);
+                Num? amount = Literal(assign.Value, out _);
+
+                // `a.rank = b.rank` is a swap into somebody else's slot, which is a place the other
+                // one is standing on rather than a number anybody could read off the card.
+                if (assign.Operator == AssignOperator.Set && assign.Value is MemberExpr other && PlaceAxis(other.Member) == axis)
+                {
+                    return Fill(Word(lane ? "place.match_lane" : "place.match_rank") ?? "{who}",
+                        slot => slot switch
+                        {
+                            "who" => Text(who),
+                            "other" => Text(Who(other.Target)),
+                            "lane_word" or "rank_word" => Text(word),
+                            _ => Empty(),
+                        },
+                        keepUnknown: false);
+                }
+
+                // Moving whatever the text is written on reads without naming it: "Move up one
+                // floor", where "Move you up one floor" is a sentence nobody writes.
+                string p = IsSelf(place.Target) ? "place.self." : "place.";
+
+                string key;
+                Num steps = amount ?? Num.One;
+                switch (assign.Operator)
+                {
+                    case AssignOperator.Set when !lane && amount == Num.Zero:
+                        return Fill(Word(p + "front") ?? "{who}", Slot, keepUnknown: false);
+                    case AssignOperator.Set:
+                        key = p + (lane ? "to_lane" : "to_rank");
+                        break;
+                    case AssignOperator.Add:
+                        key = p + (lane
+                            ? steps == Num.One ? "up.one" : "up.many"
+                            : steps == Num.One ? "back.one" : "back.many");
+                        break;
+                    case AssignOperator.Subtract:
+                        key = p + (lane
+                            ? steps == Num.One ? "down.one" : "down.many"
+                            : steps == Num.One ? "forward.one" : "forward.many");
+                        break;
+                    default:
+                        key = p + (lane ? "to_lane" : "to_rank");
+                        break;
+                }
+
+                return Fill(Word(key) ?? "{who}", Slot, keepUnknown: false);
+
+                List<DescriptionSegment>? Slot(string slot) => slot switch
+                {
+                    "who" => Text(who),
+                    "amount" => Amount(assign.Value, axis, "none", null),
+                    "lane_word" or "rank_word" => Text(word),
+                    _ => Empty(),
+                };
             }
 
             // Listeners and modifiers -------------------------------------------------------
@@ -1038,8 +1281,38 @@ namespace Cantrip.Descriptions
                             ("group", Who(sorted.Source)),
                             ("stat", sorted.Key ?? "hp"));
 
-                    case CallExpr { Name: "adjacent" }:
-                        return Word("who.adjacent") ?? "adjacent enemies";
+                    // `adjacent(x)` is one step from x *on x's own side*, so which side the group is
+                    // on follows the anchor and cannot be baked into one phrase. Printing "adjacent
+                    // enemies" whatever the anchor described a self-buff as a gift to the enemy.
+                    case CallExpr { Name: "adjacent" } beside when beside.Arguments.Count == 1:
+                    {
+                        string? key = SideOf(beside.Arguments[0]) switch
+                        {
+                            true => "who.adjacent.allies",
+                            false => "who.adjacent.enemies",
+                            _ => "who.adjacent",
+                        };
+                        return Words(Word(key) ?? "the ones beside {who}", ("who", Who(beside.Arguments[0])));
+                    }
+
+                    case CallExpr { Name: "lane" or "rank" } row when row.Arguments.Count == 1:
+                        return Words(
+                            Word(row.Name == "lane" ? "who.lane" : "who.rank") ?? "{who}",
+                            ("who", Who(row.Arguments[0])),
+                            ("lane_word", Board.LaneWord),
+                            ("rank_word", Board.RankWord));
+
+                    case CallExpr { Name: "within" } near when near.Arguments.Count == 2:
+                        return Within(near, group: null);
+
+                    case BinaryExpr { Operator: BinaryOperator.In, Right: CallExpr { Name: "within" } near } intersect
+                        when near.Arguments.Count == 2:
+                        return Within(near, intersect.Left);
+
+                    case CallExpr { Name: "distance" } apart when apart.Arguments.Count == 2:
+                        return Words(Word("who.distance") ?? "{who}",
+                            ("who", Who(apart.Arguments[0])),
+                            ("other", Who(apart.Arguments[1])));
 
                     case MemberExpr { Target: NameExpr { Name: "event" } } member:
                         return member.Member.ToLowerInvariant() switch
@@ -1058,6 +1331,86 @@ namespace Cantrip.Descriptions
                     default:
                         return AstPrinter.Print(expression);
                 }
+            }
+
+            /// <summary>
+            /// "everything within 2 steps of the target", or "every enemy within 2 steps of the
+            /// target" when a group narrows it. Steps, rather than lanes or ranks, because a
+            /// distance crosses both axes and belongs to neither.
+            /// </summary>
+            private string Within(CallExpr call, ExprNode? group)
+            {
+                string amount = AstPrinter.Print(call.Arguments[1]);
+                bool one = IsOne(call.Arguments[1]);
+                string key = group == null
+                    ? one ? "who.within.one" : "who.within.many"
+                    : one ? "who.within.group.one" : "who.within.group.many";
+
+                return Words(Word(key) ?? "{group} within {amount} of {who}",
+                    ("group", group == null ? string.Empty : Each(group)),
+                    ("amount", amount),
+                    ("who", Who(call.Arguments[0])));
+            }
+
+            /// <summary>
+            /// A group as the thing an area effect covers one of: "every enemy", not "ALL enemies",
+            /// because it is about to be qualified by a reach and reads as one phrase with it.
+            /// </summary>
+            private string Each(ExprNode group) => group switch
+            {
+                NameExpr { Name: "enemies" } => Word("who.each_enemy") ?? "every enemy",
+                NameExpr { Name: "allies" } => Word("who.each_ally") ?? "every ally",
+                _ => Who(group),
+            };
+
+            /// <summary>
+            /// Which side an anchor stands on from the reader's point of view: true for the
+            /// reader's own side, false for the other, null when it cannot be told. A card's
+            /// <c>target</c> reads from the card's own <c>target</c> line, which is the one place
+            /// that says which side the word means.
+            /// </summary>
+            private bool? SideOf(ExprNode expression)
+            {
+                // Which side a word names is knowable only when the declaration has one: a card, a
+                // relic or an `actor` is the reader's, an `enemy` is the other, and a status is
+                // whoever happens to be holding it and so is left unsaid.
+                bool? own = _definition.KindName.ToLowerInvariant() switch
+                {
+                    "enemy" => false,
+                    "status" or "keyword" => null,
+                    _ => true,
+                };
+
+                switch (expression)
+                {
+                    case NameExpr name:
+                        switch (name.Name.ToLowerInvariant())
+                        {
+                            case "self": return IsEnemy ? own : null;
+                            case "owner":
+                            case "controller":
+                            case "player":
+                            case "allies":
+                            case "ally": return own;
+                            case "enemies":
+                            case "enemy": return own == null ? null : !own;
+                            case "target": return TargetSide();
+                            default: return null;
+                        }
+
+                    case SelectorExpr selector: return SideOf(selector.Source);
+                    case WhereExpr where: return SideOf(where.Source);
+                    case MemberExpr { Target: var inner, Member: "first" or "last" }: return SideOf(inner);
+                    default: return null;
+                }
+
+                bool? TargetSide() => own == null ? null : TargetRule.Of(_definition).Mode switch
+                {
+                    "ally" => own,
+                    "self" => own,
+                    "enemy" => !own,
+                    _ => null,
+                };
             }
 
             /// <summary>

@@ -1,6 +1,27 @@
 # Coverage corpus: Dota 2 style effects, mostly on the real-time tick clock.
 # Names are our own. Classification and notes: docs/coverage.md.   Tests: dota2.tests.cantrip.
 
+# The corpus is one library, so the first board declared here is the one every file in it is
+# played on. That one is written out to be exactly the board content gets when it declares none —
+# one lane, no floor — so nothing else in the corpus moves. The arena below is the second, and
+# only the tests that name it are fought on it.
+
+board "Open ground"
+  lanes 1
+  ranks unbounded
+
+# A small tactical grid, for the two effects that need real space. `shared` is one grid for
+# everybody rather than two mirrored ones, so a rank is the same place whoever is standing on it
+# and nothing is measured across a gap; `chebyshev` makes a diagonal step one rather than two.
+
+board Arena
+  lanes 5
+  ranks 5
+  shared
+  metric chebyshev
+  lane_word "column"
+  rank_word "row"
+
 status "Stun"
   tags debuff, control
   on before_move(source:owner):
@@ -63,11 +84,33 @@ relic "Arcane Vestments"
   modify cooldown: x0.5
 
 # --- 6. ref Crystal Nova: damage in an area ----------------------------------------------------
-# Not expressible: `within` parses, but its meaning has to come from a host that knows about space,
-# and a DSL test has none.
+# Works, for a fight that happens on a board. `range 3` is how far it may be thrown, measured in
+# slots from whoever throws it; `within(target, 1)` is the square around where it lands, and `in`
+# narrows that to the other side. A blast is not pointed at anybody, so it is not filtered: it
+# reaches a stealthed unit and a shielded one, which is the rule these games have.
+#
+# A game whose fight happens in continuous space writes `within(target, 5m)` instead, with the
+# unit, and its own host answers that — unchanged, and the reason both spellings live under one
+# word.
+
+ability "Crystal Nova"
+  cooldown 8s
+  range 3
+  target enemy
+  effect:
+    deal 6 to enemies in within(target, 1)
 
 # --- 7. ref Blink: move somewhere else ---------------------------------------------------------
-# Not expressible: actors have a board slot, not a position in space. The same gap as 6.
+# Works, in slots. A move is a member write, and it is instantaneous in the rules on both clocks:
+# the engine never owns travel time, because the moment it does it owns collision during travel,
+# interruption and a movement speed, and that is a pathfinder. A game that wants the unit to walk
+# writes `in 1s: owner.rank -2`, or animates it in its own frame loop while the rules have
+# already moved it.
+
+ability "Blink"
+  cooldown 6s
+  effect:
+    owner.rank -2
 
 # --- 8. ref Mana regeneration: mana trickles back every second ----------------------------
 

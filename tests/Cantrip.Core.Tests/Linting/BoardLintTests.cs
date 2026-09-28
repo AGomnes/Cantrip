@@ -141,7 +141,7 @@ namespace Cantrip.Tests.Linting
 
             Assert.NotNull(found);
             Assert.Equal(DiagnosticSeverity.Error, found!.Severity);
-            Assert.Contains("writes a stat nothing reads", found.Message);
+            Assert.Contains("cannot be written", found.Message);
             Assert.Contains("Write `rank`", found.Message);
         }
 
@@ -161,23 +161,232 @@ namespace Cantrip.Tests.Linting
             Assert.Null(Find(found, Linter.PositionIsNowRank));
         }
 
+        /// <summary>
+        /// Assigning a lane or a rank used to be CT328 as well, because it wrote a stat nothing
+        /// read. It is a move now, so refusing it would be refusing the feature.
+        /// </summary>
         [Fact]
-        public void Assigning_a_lane_or_a_rank_says_a_place_is_not_a_stat()
+        public void Assigning_a_lane_or_a_rank_is_a_move_and_not_a_mistake()
         {
             foreach (string axis in new[] { "lane", "rank" })
             {
-                Diagnostic? found = Find(Lint($"""
+                IReadOnlyList<Diagnostic> found = Lint($"""
+                    board Train
+                      lanes 3
+                      ranks 3
+
                     card "Shove"
                       cost 1
                       target enemy
                       effect:
                         target.{axis} = 2
-                    """), Linter.PlaceAssigned);
+                    """);
 
-                Assert.NotNull(found);
-                Assert.Contains("is not a stat", found!.Message);
-                Assert.Contains($"`{axis}`", found.Message);
+                Assert.Null(Find(found, Linter.PlaceAssigned));
+                Assert.DoesNotContain(found, d => d.Severity != DiagnosticSeverity.Info);
             }
+        }
+
+        /// <summary>
+        /// CT327 again, for a move rather than a comparison. The move stops at the edge of the
+        /// board rather than failing, so a slot the board does not have reads as "to the back" and
+        /// means something else.
+        /// </summary>
+        [Fact]
+        public void Moving_to_a_slot_no_board_has_says_where_it_stops()
+        {
+            Diagnostic? found = Find(Lint("""
+                board Small
+                  lanes 2
+                  ranks 2
+
+                card "Shove"
+                  cost 1
+                  target enemy
+                  effect:
+                    target.rank = 4
+                """), Linter.OffTheBoard);
+
+            Assert.NotNull(found);
+            Assert.Contains("no rank 4", found!.Message);
+            Assert.Contains("stops at the edge", found.Message);
+        }
+
+        // CT330 -----------------------------------------------------------------------------
+
+        [Fact]
+        public void Within_with_a_plain_number_and_no_board_is_a_warning()
+        {
+            Diagnostic? found = Find(Lint("""
+                card "Blast"
+                  cost 1
+                  target enemy
+                  effect:
+                    deal 3 to enemies in within(target, 2)
+                """), Linter.SpatialSelector);
+
+            Assert.NotNull(found);
+            Assert.Equal(DiagnosticSeverity.Warning, found!.Severity);
+            Assert.Contains("declares none", found.Message);
+        }
+
+        /// <summary>A board makes the same line a measurement it can make, so it says nothing.</summary>
+        [Fact]
+        public void Within_with_a_plain_number_and_a_board_is_silent()
+        {
+            Assert.Null(Find(Lint("""
+                board Arena
+                  lanes 3
+                  ranks 3
+
+                card "Blast"
+                  cost 1
+                  target enemy
+                  effect:
+                    deal 3 to enemies in within(target, 2)
+                """), Linter.SpatialSelector));
+        }
+
+        /// <summary>A length is the game's question, and stays the game's: a note, never a warning.</summary>
+        [Fact]
+        public void Within_with_a_unit_is_a_note_that_names_the_host()
+        {
+            Diagnostic? found = Find(Lint("""
+                card "Blast"
+                  cost 1
+                  target enemy
+                  effect:
+                    deal 3 to within(target, 5m)
+                """), Linter.SpatialSelector);
+
+            Assert.NotNull(found);
+            Assert.Equal(DiagnosticSeverity.Info, found!.Severity);
+            Assert.Contains("IEffectHost.TryCall", found.Message);
+        }
+
+        // CT331 and CT332 -------------------------------------------------------------------
+
+        [Fact]
+        public void A_range_on_something_that_points_at_nobody_is_never_read()
+        {
+            Diagnostic? found = Find(Lint("""
+                card "Far"
+                  cost 1
+                  range 2
+                  effect:
+                    deal 3 to enemies
+                """), Linter.ReachWithoutATarget);
+
+            Assert.NotNull(found);
+            Assert.Contains("points at nobody", found!.Message);
+        }
+
+        [Fact]
+        public void A_range_as_wide_as_the_board_limits_nothing()
+        {
+            Diagnostic? found = Find(Lint("""
+                board Small
+                  lanes 2
+                  ranks 2
+
+                card "Wide"
+                  cost 1
+                  range 4
+                  target enemy
+                  effect:
+                    deal 3 to target
+                """), Linter.ReachLimitsNothing);
+
+            Assert.NotNull(found);
+            Assert.Contains("limits nothing", found!.Message);
+        }
+
+        [Fact]
+        public void A_range_written_backwards_reaches_nobody()
+        {
+            Diagnostic? found = Find(Lint("""
+                card "Backwards"
+                  cost 1
+                  range 3..1
+                  target enemy
+                  effect:
+                    deal 3 to target
+                """), Linter.ReachLimitsNothing);
+
+            Assert.NotNull(found);
+            Assert.Contains("starts further away than it ends", found!.Message);
+        }
+
+        /// <summary>
+        /// On a facing board the two sides never stand on one slot, so `range 0` at an enemy is a
+        /// card that can be pointed at nobody — and `range 1` is the spelling that was meant.
+        /// </summary>
+        [Fact]
+        public void A_range_of_nought_at_an_enemy_reaches_nobody()
+        {
+            Diagnostic? found = Find(Lint("""
+                card "Nought"
+                  cost 1
+                  range 0
+                  target enemy
+                  effect:
+                    deal 3 to target
+                """), Linter.ReachLimitsNothing);
+
+            Assert.NotNull(found);
+            Assert.Contains("`range 1` is what melee is written as", found!.Message);
+        }
+
+        // CT333 -----------------------------------------------------------------------------
+
+        [Fact]
+        public void A_rank_on_a_one_lane_board_is_a_group_of_one()
+        {
+            Diagnostic? found = Find(Lint("""
+                card "Sweep"
+                  cost 1
+                  target enemy
+                  effect:
+                    deal 3 to rank(target)
+                """), Linter.RowOfOne);
+
+            Assert.NotNull(found);
+            Assert.Contains("that one actor and nobody else", found!.Message);
+        }
+
+        [Fact]
+        public void A_lane_on_a_board_one_rank_deep_is_a_group_of_one()
+        {
+            Diagnostic? found = Find(Lint("""
+                board Line
+                  lanes 4
+                  ranks 1
+
+                card "Sweep"
+                  cost 1
+                  target enemy
+                  effect:
+                    deal 3 to lane(target)
+                """), Linter.RowOfOne);
+
+            Assert.NotNull(found);
+            Assert.Contains("that one actor and nobody else", found!.Message);
+        }
+
+        [Fact]
+        public void A_rank_on_a_board_with_lanes_is_silent()
+        {
+            Assert.Null(Find(Lint("""
+                board Train
+                  lanes 3
+                  ranks 3
+
+                card "Sweep"
+                  cost 1
+                  target enemy
+                  effect:
+                    deal 3 to rank(target)
+                """), Linter.RowOfOne));
         }
 
         // CT329 -----------------------------------------------------------------------------

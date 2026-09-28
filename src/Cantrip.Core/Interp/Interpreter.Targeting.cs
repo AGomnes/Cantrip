@@ -19,19 +19,20 @@ namespace Cantrip.Runtime
         private static readonly ExprNode[] NoFilters = new ExprNode[0];
 
         /// <summary>No <c>target</c> line: the action settles its own target, or wants none.</summary>
-        internal static readonly TargetRule None = new TargetRule("none", NoFilters);
+        internal static readonly TargetRule None = new TargetRule("none", NoFilters, null);
 
         /// <summary>
         /// Anybody living, either side, with no filter of its own. What an enemy move and the
         /// <c>attack</c> verb point at: they are handed their candidates and only ask whether each
         /// one may be aimed at.
         /// </summary>
-        internal static readonly TargetRule Any = new TargetRule("any", NoFilters);
+        internal static readonly TargetRule Any = new TargetRule("any", NoFilters, null);
 
-        private TargetRule(string mode, IReadOnlyList<ExprNode> filters)
+        private TargetRule(string mode, IReadOnlyList<ExprNode> filters, Reach? range)
         {
             Mode = mode;
             Filters = filters;
+            Range = range;
         }
 
         /// <summary><c>enemy</c>, <c>ally</c>, <c>self</c>, <c>any</c>, or <c>none</c>.</summary>
@@ -42,6 +43,14 @@ namespace Cantrip.Runtime
         /// the <c>target</c> line names a side and nothing more, which is the usual case.
         /// </summary>
         internal IReadOnlyList<ExprNode> Filters { get; }
+
+        /// <summary>
+        /// The printed reach of the action, from its <c>range</c> line, or null when it prints none
+        /// and reaches as far as the board is wide. It is the <em>base</em> of the <c>range</c>
+        /// channel and never the last word: a status that shortens reach applies to an action that
+        /// printed nothing just as much as to one that printed a number.
+        /// </summary>
+        internal Reach? Range { get; }
 
         /// <summary>
         /// True for the modes that need somebody: a card whose every candidate is out cannot be
@@ -61,6 +70,7 @@ namespace Cantrip.Runtime
             PropertyNode? property = definition?.Property("target");
             if (property == null || property.Values.Count == 0) return None;
 
+            Reach? range = definition!.Range;
             ExprNode value = property.Values[0];
 
             // `a where b where c` nests, so unwrap to the word and keep every predicate.
@@ -75,10 +85,19 @@ namespace Cantrip.Runtime
             if (mode == null) return None;
             mode = mode.ToLowerInvariant();
 
-            return filters == null && mode == "none"
+            return filters == null && mode == "none" && range == null
                 ? None
-                : new TargetRule(mode, (IReadOnlyList<ExprNode>?)filters ?? NoFilters);
+                : new TargetRule(mode, (IReadOnlyList<ExprNode>?)filters ?? NoFilters, range);
         }
+
+        /// <summary>
+        /// What an enemy move points at: anybody living, with the move's own <c>range</c>. A move
+        /// has no <c>target</c> line — the enemy is handed somebody and the rule only decides
+        /// whether that somebody is still legal — so this differs from <see cref="Any"/> in reach
+        /// and nothing else.
+        /// </summary>
+        internal static TargetRule OfMove(MoveDefinition? move) =>
+            move?.Range == null ? Any : new TargetRule("any", NoFilters, move.Range);
     }
 
     public sealed partial class Interpreter
@@ -184,25 +203,67 @@ namespace Cantrip.Runtime
         /// </summary>
         /// <remarks>
         /// <para>
-        /// <b>This is the extension point for <c>range</c>, and it is empty on purpose.</b> Nothing
-        /// in the language yet has a place: there are no lanes, no ranks and no
-        /// <c>distance(user, candidate)</c> to measure, so there is no question to ask and every
-        /// candidate is in reach. It does not approximate an answer and content cannot make it
-        /// answer anything else; it is a named hole with the shape of the thing that goes in it.
+        /// The action's printed <c>range</c> is the <em>base</em> of the <c>range</c> modifier
+        /// channel, never the last word: <c>modify range: set 1</c> on a status makes everything its
+        /// holder does melee, including an action that printed no range at all. The channel computes
+        /// the far end; the near end of a span follows it down, so shortening a longbow makes it a
+        /// melee weapon rather than something that can reach nothing.
         /// </para>
         /// <para>
-        /// When the board lands, this is the whole of what changes: read the action's <c>range</c>,
-        /// run it through the <c>range</c> modifier channel with <paramref name="action"/> as the
-        /// subject and <paramref name="user"/> as the source, and compare the result against the
-        /// distance between the two places. Nothing else in targeting moves, because every site
-        /// that aims at somebody already comes through here.
+        /// An action that prints no range, in a game with nothing on the <c>range</c> channel, asks
+        /// nothing and reaches everybody — which is what every game did before this existed, and is
+        /// why adding reach moved no sample's numbers.
         /// </para>
         /// <para>
         /// Nobody may reach around it. Reach is decided here and nowhere else, so that a reach rule
         /// cannot mean one thing for a card and another for an enemy's move.
         /// </para>
         /// </remarks>
-        private bool InReach(TargetRule rule, Entity user, Entity? action, Entity candidate) => true;
+        private bool InReach(TargetRule rule, Entity user, Entity? action, Entity candidate)
+        {
+            // Nothing printed and nothing on the channel: there is no reach rule in this game, so
+            // there is no question to ask.
+            if (rule.Range == null && !State.Modifiers.HasChannel(RangeChannel)) return true;
+
+            Reach reach = ReachOf(rule, user, action);
+
+            int distance = State.Distance(user, candidate);
+
+            // Either of them is off the board — a summon that has not landed, an actor a game keeps
+            // outside the rules. There is no place to measure between, so reach says nothing.
+            return distance == int.MaxValue || reach.Reaches(distance);
+        }
+
+        internal const string RangeChannel = "range";
+
+        /// <summary>
+        /// A reach with no printed number, as the <c>range</c> channel sees it. Far larger than any
+        /// board, so <c>+1</c> on an unprinted range still reaches everybody and only <c>set</c>
+        /// actually shortens anything.
+        /// </summary>
+        private const int Unreached = 100_000;
+
+        /// <summary>The action's reach right now, printed range through the <c>range</c> channel.</summary>
+        private Reach ReachOf(TargetRule rule, Entity user, Entity? action)
+        {
+            Reach printed = rule.Range ?? new Reach(0, Unreached);
+            if (!State.Modifiers.HasChannel(RangeChannel)) return printed;
+
+            var query = new ModifierQuery(RangeChannel)
+            {
+                Subject = action ?? user,
+                Source = user,
+                Card = action != null && action.Kind == EntityKind.Card ? action : null,
+                Tags = action != null ? action.Tags.ToArray() : user.Tags.ToArray(),
+            };
+
+            int max = State.Modifiers.Compute(query, Num.FromInt(printed.Max)).Floor().ToInt();
+            if (max < 0) max = 0;
+
+            // The near end follows the far end down: a longbow told to be melee becomes melee rather
+            // than something that can no longer reach anything at all.
+            return new Reach(Math.Min(printed.Min, max), max);
+        }
 
         // The action's own filter ----------------------------------------------------------------
 

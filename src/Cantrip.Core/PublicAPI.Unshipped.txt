@@ -196,3 +196,30 @@ Cantrip.Content.EntityDefinition.IsThing.get -> bool
 const Cantrip.Linting.Linter.OffTheBoard = "CT327" -> string!
 const Cantrip.Linting.Linter.PlaceAssigned = "CT328" -> string!
 const Cantrip.Linting.Linter.PositionIsNowRank = "CT329" -> string!
+Cantrip.Content.BoardShape.LaneHoldsOne.get -> bool
+Cantrip.Content.BoardShape.MaxDistance.get -> int?
+Cantrip.Content.BoardShape.RankHoldsOne.get -> bool
+Cantrip.Content.EntityDefinition.Range.get -> Cantrip.Content.Reach?
+Cantrip.Content.MoveDefinition.Range.get -> Cantrip.Content.Reach?
+Cantrip.Content.Reach
+Cantrip.Content.Reach.Equals(Cantrip.Content.Reach other) -> bool
+Cantrip.Content.Reach.Max.get -> int
+Cantrip.Content.Reach.Min.get -> int
+Cantrip.Content.Reach.Reach() -> void
+Cantrip.Content.Reach.Reach(int min, int max) -> void
+Cantrip.Content.Reach.Reaches(int distance) -> bool
+Cantrip.Runtime.Interpreter.MoveActor(Cantrip.Runtime.Entity! actor, int lane, int rank, Cantrip.Runtime.EvalContext! context, Cantrip.Diagnostics.SourceSpan span = default(Cantrip.Diagnostics.SourceSpan)) -> bool
+Cantrip.Runtime.Interpreter.MoveOnBoard(Cantrip.Runtime.Entity! actor, bool lane, Cantrip.Syntax.AssignOperator op, Cantrip.Num amount, Cantrip.Runtime.EvalContext! context, Cantrip.Diagnostics.SourceSpan span = default(Cantrip.Diagnostics.SourceSpan)) -> bool
+Cantrip.Runtime.TemporaryChange.Slot.get -> (int Lane, int Rank)?
+Cantrip.Runtime.TemporaryChange.TemporaryChange(Cantrip.Runtime.Entity! entity, (int Lane, int Rank) slot) -> void
+Cantrip.Runtime.UndoSnapshot.Lane.get -> int?
+Cantrip.Runtime.UndoSnapshot.Lane.set -> void
+Cantrip.Runtime.UndoSnapshot.Rank.get -> int?
+Cantrip.Runtime.UndoSnapshot.Rank.set -> void
+override Cantrip.Content.Reach.Equals(object? obj) -> bool
+override Cantrip.Content.Reach.GetHashCode() -> int
+override Cantrip.Content.Reach.ToString() -> string!
+const Cantrip.Linting.Linter.ReachLimitsNothing = "CT332" -> string!
+const Cantrip.Linting.Linter.ReachWithoutATarget = "CT331" -> string!
+const Cantrip.Linting.Linter.RowOfOne = "CT333" -> string!
+const Cantrip.Linting.Linter.SpatialSelector = "CT330" -> string!

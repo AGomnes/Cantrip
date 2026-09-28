@@ -751,7 +751,7 @@ namespace Cantrip
             MoveDefinition? move = enemy.Definition?.Moves.FirstOrDefault(m => string.Equals(m.Name, moveName, StringComparison.OrdinalIgnoreCase));
             if (move == null) return;
 
-            target = MoveTarget(enemy, target);
+            target = MoveTarget(enemy, target, move);
 
             Run(enemy, context =>
             {
@@ -763,9 +763,9 @@ namespace Cantrip
         }
 
         /// <summary>
-        /// Who a move is really aimed at, after content's <c>targetable</c> rules. A move points at
-        /// somebody the way a card does, so a taunt that takes the player off the table sends the
-        /// move to whoever is left — which is the whole of what a taunt is.
+        /// Who a move is really aimed at, after its own <c>range</c> and content's <c>targetable</c>
+        /// rules. A move points at somebody the way a card does, so a taunt that takes the player off
+        /// the table sends the move to whoever is left — which is the whole of what a taunt is.
         /// </summary>
         /// <remarks>
         /// The move keeps the target it was given whenever that target is still legal, and falls
@@ -774,11 +774,12 @@ namespace Cantrip
         /// moves; a <c>deal 5 to all enemies</c> inside the move reaches whoever it reaches, as an
         /// area effect does everywhere else.
         /// </remarks>
-        private Entity? MoveTarget(Entity enemy, Entity? target)
+        private Entity? MoveTarget(Entity enemy, Entity? target, MoveDefinition? move)
         {
-            if (target == null || Interpreter.IsLegalTarget(TargetRule.Any, enemy, null, target)) return target;
+            TargetRule rule = TargetRule.OfMove(move);
+            if (target == null || Interpreter.IsLegalTarget(rule, enemy, null, target)) return target;
 
-            IReadOnlyList<Entity> side = Interpreter.LegalTargets(TargetRule.Any, enemy, null, State.Actors(target.Team));
+            IReadOnlyList<Entity> side = Interpreter.LegalTargets(rule, enemy, null, State.Actors(target.Team));
             return side.Count > 0 ? side[0] : target;
         }
 

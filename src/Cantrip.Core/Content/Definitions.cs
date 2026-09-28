@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Cantrip.Diagnostics;
 using Cantrip.Syntax;
@@ -67,6 +68,43 @@ namespace Cantrip.Content
         public override string ToString() => Name;
     }
 
+    /// <summary>
+    /// How far an action reaches, in slots on the board: <c>range 1</c> is everything up to one
+    /// step away — melee — and <c>range 2..3</c> is a bow that cannot shoot point blank.
+    /// </summary>
+    /// <remarks>
+    /// A reach is measured with <see cref="Runtime.GameState.Distance"/> between whoever is using
+    /// the action and the candidate, and it is the only thing the <c>range</c> modifier channel
+    /// changes: the channel computes <see cref="Max"/> and <see cref="Min"/> follows it down, so
+    /// <c>modify range: set 1</c> makes a longbow melee rather than leaving it unable to reach
+    /// anything at all.
+    /// </remarks>
+    public readonly struct Reach : IEquatable<Reach>
+    {
+        public Reach(int min, int max)
+        {
+            Min = min < 0 ? 0 : min;
+            Max = max;
+        }
+
+        /// <summary>The nearest slot this reaches. Zero unless content wrote <c>range 2..3</c>.</summary>
+        public int Min { get; }
+
+        /// <summary>The furthest slot this reaches.</summary>
+        public int Max { get; }
+
+        /// <summary>Whether something that many steps away is within this reach.</summary>
+        public bool Reaches(int distance) => distance >= Min && distance <= Max;
+
+        public bool Equals(Reach other) => Min == other.Min && Max == other.Max;
+
+        public override bool Equals(object? obj) => obj is Reach other && Equals(other);
+
+        public override int GetHashCode() => (Min * 397) ^ Max;
+
+        public override string ToString() => Min == 0 ? Max.ToString(CultureInfo.InvariantCulture) : $"{Min}..{Max}";
+    }
+
     /// <summary>A named enemy move: <c>move "Chomp": deal 11 to player</c>.</summary>
     public sealed class MoveDefinition
     {
@@ -84,6 +122,12 @@ namespace Cantrip.Content
 
         /// <summary>The phase this move belongs to, or null when it is available in every phase.</summary>
         public string? Phase { get; }
+
+        /// <summary>
+        /// How far this move reaches, from <c>move "Swing" range 1:</c>, or null when it says
+        /// nothing and reaches as far as the board is wide.
+        /// </summary>
+        public Reach? Range { get; internal set; }
     }
 
     /// <summary>
@@ -166,6 +210,12 @@ namespace Cantrip.Content
             // An enemy's hp doubles as its max_hp unless both are given.
             if (_stats.ContainsKey("hp") && !_stats.ContainsKey("max_hp")) _stats["max_hp"] = _stats["hp"];
 
+            if (Property("range") is PropertyNode reach)
+            {
+                if (reach.Values.Count == 1) Range = ReadReach(reach.Values[0], ToString(), reach.Span, diagnostics);
+                else BadReach(ToString(), reach.Span, diagnostics);
+            }
+
             ReadCost(diagnostics);
             ReadStatusConfig(diagnostics);
             ReadPattern(diagnostics);
@@ -198,6 +248,14 @@ namespace Cantrip.Content
         public IReadOnlyDictionary<string, Num> Stats => _stats;
 
         public BlockNode? Effect => Blocks.TryGetValue("effect", out BlockMemberNode? block) ? block.Body : null;
+
+        /// <summary>
+        /// How far this reaches, from its <c>range</c> line, or null when it says nothing and
+        /// reaches as far as the board is wide. Read by targeting through the <c>range</c> modifier
+        /// channel; a card's own <c>target … where</c> filter is a separate rule and is not a
+        /// channel, because a card's printed reach is its own and not a stranger's to rewrite.
+        /// </summary>
+        public Reach? Range { get; private set; }
 
         // Status configuration ------------------------------------------------------------
 
@@ -281,8 +339,42 @@ namespace Cantrip.Content
             "decay" => true,
             "priority" => true,
             "weight" => true,
+
+            // Reach is a rule about an action, not a number on the thing using it. Left out of the
+            // stat table so that `range` is read in exactly one place — Interpreter.InReach — and
+            // cannot also arrive through the stat pipeline under the same name.
+            "range" => true,
             _ => false,
         };
+
+        /// <summary>
+        /// Reads a <c>range</c> line: <c>range 1</c> is everything up to one step away and
+        /// <c>range 2..3</c> is a span. Anything else is refused by name rather than ignored.
+        /// </summary>
+        internal static Reach? ReadReach(ExprNode value, string what, SourceSpan span, DiagnosticBag diagnostics)
+        {
+            switch (value)
+            {
+                case NumberExpr number when number.Unit == null && number.Value == number.Value.Floor() && !number.Value.IsNegative:
+                    return new Reach(0, number.Value.ToInt());
+
+                case RangeExpr range
+                    when range.Low is NumberExpr low && low.Unit == null && low.Value == low.Value.Floor() && !low.Value.IsNegative
+                      && range.High is NumberExpr high && high.Unit == null && high.Value == high.Value.Floor() && !high.Value.IsNegative:
+                    return new Reach(low.Value.ToInt(), high.Value.ToInt());
+
+                default:
+                    BadReach(what, span, diagnostics);
+                    return null;
+            }
+        }
+
+        private static void BadReach(string what, SourceSpan span, DiagnosticBag diagnostics) =>
+            diagnostics.Error(
+                "CT0115",
+                $"`range` on {what} is a whole number of slots, as in `range 1`, or a span, as in `range 2..3`. " +
+                "A length with a unit, such as `5m`, is a question about the world and belongs to the game rather than to the board.",
+                span);
 
         /// <summary>Reads bare identifiers out of an expression, flattening <c>a, b</c> juxtapositions.</summary>
         internal static IEnumerable<string> ReadWords(ExprNode value)
@@ -317,15 +409,18 @@ namespace Cantrip.Content
                 diagnostics.Error("CT0102", $"`move` in `{Name}` needs a name, as in `move \"Chomp\":`.", block.Span);
             }
 
-            // Optional header pairs: `move "Chomp" weight 2:` for random patterns, and
-            // `move "Split" phase Broken:` to limit a move to one phase.
+            // Optional header pairs: `move "Chomp" weight 2:` for random patterns,
+            // `move "Split" phase Broken:` to limit a move to one phase, and `move "Swing" range 1:`
+            // for a move that only reaches what is one step away.
+            Reach? range = null;
             for (int i = 1; i + 1 < block.Arguments.Count; i++)
             {
                 if (block.Arguments[i] is NameExpr { Name: "weight" } && block.Arguments[i + 1] is NumberExpr w) weight = w.Value;
                 else if (block.Arguments[i] is NameExpr { Name: "phase" }) phase = ReadWords(block.Arguments[i + 1]).FirstOrDefault();
+                else if (block.Arguments[i] is NameExpr { Name: "range" }) range = ReadReach(block.Arguments[i + 1], $"move \"{name}\" in `{Name}`", block.Span, diagnostics);
             }
 
-            return new MoveDefinition(name, block.Body, weight, phase);
+            return new MoveDefinition(name, block.Body, weight, phase) { Range = range };
         }
 
         private void ReadStatusConfig(DiagnosticBag diagnostics)

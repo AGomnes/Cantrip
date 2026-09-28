@@ -362,6 +362,16 @@ namespace Cantrip.Runtime
                 case "last": return Value.FromEntity(list.Count > 0 ? list[list.Count - 1] : null);
                 case "empty": return Value.FromBool(list.Count == 0);
                 case "any": return Value.FromBool(list.Count > 0);
+
+                // Where a group stands is where the first of them stands, in board order — so a
+                // group of one answers like the one it holds. Without this the place fell through
+                // to the stat table, where nothing has a `rank`, and `created.rank` read 0 while
+                // `created.first.rank` read 2: the same actor, two answers, no message.
+                case "lane":
+                    return list.Count == 0 ? Value.None : Value.FromNumber(Num.FromInt(list[0].Lane));
+                case "rank":
+                case "position":
+                    return list.Count == 0 ? Value.None : Value.FromNumber(Num.FromInt(list[0].Rank));
             }
 
             // Anything else sums the stat across the group: `enemies.hp` is their total hp.
@@ -445,6 +455,59 @@ namespace Cantrip.Runtime
                         EvaluateNumber(call.Arguments[0], context).ToInt(),
                         EvaluateNumber(call.Arguments[1], context).ToInt())));
 
+                // The board's selectors. Each one is a question about where actors stand, answered
+                // by GameState against the board this battle is being fought on, so a game that
+                // declares no board gets the same answers it always did on its single lane.
+                case "lane":
+                case "rank":
+                {
+                    RequireArguments(call, 1);
+                    bool byLane = name == "lane";
+                    var row = new List<Entity>();
+                    foreach (Entity centre in Evaluate(call.Arguments[0], context).AsEntities())
+                    {
+                        if (centre.Kind != EntityKind.Actor || centre.Zone != Zones.Board || centre.IsRemoved) continue;
+                        foreach (Entity actor in State.Actors(centre.Team))
+                        {
+                            if (byLane ? actor.Lane != centre.Lane : actor.Rank != centre.Rank) continue;
+                            if (!row.Contains(actor)) row.Add(actor);
+                        }
+                    }
+                    return Value.FromEntities(row);
+                }
+
+                case "distance":
+                {
+                    RequireArguments(call, 2);
+                    Entity? from = Evaluate(call.Arguments[0], context).AsEntities().FirstOrDefault();
+                    Entity? to = Evaluate(call.Arguments[1], context).AsEntities().FirstOrDefault();
+
+                    // Anything not standing on the board is further away than any board is wide,
+                    // which is the same answer GameState.Distance gives and the one that makes
+                    // `distance(a, b) <= 2` false rather than accidentally true.
+                    int steps = from == null || to == null ? int.MaxValue : State.Distance(from, to);
+                    return Value.FromNumber(Num.FromInt(steps));
+                }
+
+                case "within" when WithinIsInSlots(call, context, out Num slots):
+                {
+                    int reach = slots.Floor().ToInt();
+                    var near = new List<Entity>();
+                    foreach (Entity centre in Evaluate(call.Arguments[0], context).AsEntities())
+                    {
+                        if (centre.Kind != EntityKind.Actor || centre.Zone != Zones.Board || centre.IsRemoved) continue;
+
+                        // Either side: `within` is the honest name for the cross-board question that
+                        // `adjacent` deliberately is not.
+                        foreach (Entity actor in State.Actors())
+                        {
+                            if (State.Distance(centre, actor) > reach) continue;
+                            if (!near.Contains(actor)) near.Add(actor);
+                        }
+                    }
+                    return Value.FromEntities(near);
+                }
+
                 case "adjacent":
                 {
                     RequireArguments(call, 1);
@@ -481,12 +544,35 @@ namespace Cantrip.Runtime
             if (Host.TryCall(call.Name, arguments, context, out Value hosted)) return hosted;
 
             if (name == "within")
-                throw new RuntimeError("Spatial selectors like `within` need a host that implements them (IEffectHost.TryCall).", call.Span);
+            {
+                throw new RuntimeError(
+                    "`within` with a length — `within(target, 5m)` — is a question about the world, and needs a host that answers it " +
+                    "(IEffectHost.TryCall). `within(target, 2)`, with a plain number, counts slots on the board and is answered here.",
+                    call.Span);
+            }
 
             throw new RuntimeError(
                 $"Unknown function `{call.Name}`." +
-                SuggestionText(call.Name, new[] { "min", "max", "abs", "floor", "ceil", "round", "clamp", "count", "random", "adjacent", "has", "stacks" }),
+                SuggestionText(call.Name, new[] { "min", "max", "abs", "floor", "ceil", "round", "clamp", "count", "random", "adjacent", "within", "lane", "rank", "distance", "has", "stacks" }),
                 call.Span);
+        }
+
+        /// <summary>
+        /// Whether a <c>within</c> is the board's question or the world's. A plain number counts
+        /// slots and the engine answers it; a length with a unit — <c>5m</c>, <c>250px</c> — is
+        /// about a space the engine knows nothing about and goes to the host, exactly as it always
+        /// has. That split is the whole of why both spellings can live under one word.
+        /// </summary>
+        private bool WithinIsInSlots(CallExpr call, EvalContext context, out Num slots)
+        {
+            slots = Num.Zero;
+            if (call.Arguments.Count != 2) return false;
+
+            Value radius = Evaluate(call.Arguments[1], context);
+            if (radius.Kind != ValueKind.Number || radius.Unit != null) return false;
+
+            slots = radius.Number;
+            return !slots.IsNegative;
         }
 
         private static void RequireArguments(CallExpr call, int count)

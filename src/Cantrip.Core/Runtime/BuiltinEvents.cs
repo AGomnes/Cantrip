@@ -82,7 +82,7 @@ namespace Cantrip.Runtime
             new BuiltinEvent(Shuffled, "target's discard pile was shuffled into the draw pile."),
             new BuiltinEvent(Discarded, "target (a card) went to the discard pile, including a card drawn with a full hand; data from, to."),
             new BuiltinEvent(Exhausted, "target (a card) was exhausted; data from, to."),
-            new BuiltinEvent(Moved, "target (a card) changed zone through `move` or `shuffle`; data from, to."),
+            new BuiltinEvent(Moved, "target changed where it is. A card changed zone through `move` or `shuffle`: data kind \"card\", from, to (zone names). An actor changed slot through `who.rank = ...` or `who.lane = ...`, or because `on_vacated close_ranks` closed the row in front of it: data kind \"actor\", from, to (the places in words), from_lane, from_rank, to_lane, to_rank. `before_moved` refuses an actor's move; a row closing is reported once it has closed, so there is nothing left there to refuse."),
             new BuiltinEvent(Created, "target was created by `create`, `copy` or `shuffle <card>`; card is set when it is a card; data copy_of is the original when `copy` made it."),
             new BuiltinEvent(Destroyed, "target was taken out of the game."),
             new BuiltinEvent(Transformed, "target is becoming something else and keeps its id, owner, side and place; card is set when it is a card; data was, into (both definitions). Tags are the tags it had before. Raised once, and the statuses it sheds raise nothing."),

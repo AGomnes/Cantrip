@@ -79,7 +79,6 @@ card "Post a Sentinel"
 card "Pike"
   cost 1
   target enemy where it.rank <= 0
-  text: "Deal 6 to an enemy in the front slot."
   effect:
     deal 6 to target
 
@@ -108,3 +107,113 @@ enemy "Brood Mother"
     create Crawler
   move "Lash":
     deal attack to player
+
+# --- reach, written on the card ------------------------------------------------------------
+#
+# `range` says how far something may be pointed, in slots, measured by the board. On a `facing`
+# board the two sides are mirrored, so across them the slot term is `a + b + 1`: the unit at the
+# front of the floor you are standing on is one step away, the one behind it two, and a unit on
+# the next floor along one further again. That is what makes `range 1` mean melee without anybody
+# writing a number that depends on how deep the train is.
+#
+# A card's printed reach is its own rule. It is the *base* of the `range` modifier channel, so a
+# status can shorten it, but no stranger's modifier writes the card's own `target ... where`.
+
+card "Lunge"
+  cost 1
+  range 1
+  target enemy
+  effect:
+    deal 6 to target
+
+card "Longbow"
+  cost 1
+  range 2..3
+  target enemy
+  effect:
+    deal 4 to target
+
+# Everything its holder points at becomes melee, whatever the card printed. The channel computes
+# the far end of the reach and the near end follows it down, so a longbow becomes a melee weapon
+# rather than something that can no longer reach anything at all.
+status "Crippled"
+  stacking none
+  buff false
+  modify range: set 1
+
+# --- moving, which is a member write and not a verb ------------------------------------------
+#
+# `target.lane += 1` is the whole of "send this unit up a floor". It raises `moved`, it can be
+# refused by `before_moved`, it reverts inside `until`, and a step that would leave the board
+# stops at the edge of it. A slot somebody else is standing on swaps the two.
+
+# A unit that fights the floor it is standing on, which is the whole of Monster Train in one
+# selector: `lowest rank enemies` is the front of the enemy side, and `where it.lane == self.lane`
+# narrows it to this unit's own floor. Move the unit and it fights somewhere else.
+actor "Gunner"
+  hp 7
+  attack 4
+  tags summoned
+  on turn_end:
+    deal attack to lowest rank enemies where it.lane == self.lane
+
+card "Post a Gunner"
+  cost 2
+  text: "Summon a Gunner on your floor. It fires along the floor it stands on."
+  effect:
+    create Gunner
+
+card "Reassign"
+  cost 0
+  target ally
+  effect:
+    target.lane += 1
+
+card "Haul"
+  cost 1
+  target enemy
+  effect:
+    target.rank = 0
+
+# `until` puts a place back exactly, because a place is two integers and its inverse is a swap.
+# This is where a slot differs from a `transform`, which `until` refuses (CT321) because nothing
+# remembers an old form.
+card "Lure"
+  cost 1
+  target enemy
+  effect:
+    until turn_end:
+      target.rank = 0
+
+# There is no permission system and no "immovable" flag: a unit that must not be pushed refuses
+# the event, which is knockback immunity written on the day movement ships.
+status "Braced"
+  stacking none
+  on before_moved(target:owner):
+    cancel
+
+# --- the shapes an area effect takes ---------------------------------------------------------
+#
+# Three, and nothing else. `adjacent(x)` is one step from x on x's own side; `lane(x)` is the
+# floor x stands on; `within(x, n)` is everything on either side within n steps. Anything else is
+# an ordinary `where` over `it.lane` and `it.rank`, which needs no new word.
+
+card "Firebomb"
+  cost 2
+  target enemy
+  effect:
+    deal 3 to enemies in within(target, 1)
+
+card "Clear the Floor"
+  cost 2
+  target enemy
+  effect:
+    deal 3 to lane(target)
+
+# A move reaches as far as it says, and an enemy whose target has walked out of reach swings at
+# whoever it can still get to. That is the same `LegalTargets` a card asks, from the other side.
+enemy "Reaver"
+  hp 26
+  attack 5
+  move "Swing" range 1:
+    deal attack to target

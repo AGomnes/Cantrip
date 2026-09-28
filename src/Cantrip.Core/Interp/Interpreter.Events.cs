@@ -113,6 +113,10 @@ namespace Cantrip.Runtime
 
                 if (Rules.AfterEvents) Dispatch(gameEvent, EventPhase.After, context);
 
+                // A death may have closed the row behind it. That is a move, and it is said out
+                // loud here, once the thing that caused it has finished resolving.
+                AnnounceShuffles();
+
                 QueueDecay(gameEvent);
                 ProcessDeadlines(gameEvent);
                 NotifyHost(gameEvent);
@@ -420,6 +424,10 @@ namespace Cantrip.Runtime
             _draining = true;
             try
             {
+                // A game that takes something off the board through GameState directly closes the
+                // row without ever raising an event; the moves are reported here instead.
+                AnnounceShuffles();
+
                 while (_queue.Count > 0)
                 {
                     // Breakpoints cost a peek per entry, and only once something has set one.

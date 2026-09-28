@@ -146,3 +146,192 @@ test "board sweeping hits the units beside the front one"
   expect enemy1.hp == 20
   expect enemy2.hp == 17
   expect enemy3.hp == 17
+
+# --- reach ------------------------------------------------------------------------------------
+
+# The player stands on floor 1, so the Crawler on floor 1 is one step away and the one on floor 0
+# is two. A melee card is pointed at the near one even though the far one comes first in slot
+# order, which is the only way a Cantrip test can show a targeting rule: play the card with no
+# `on` and check what it picked.
+test "board a melee card reaches only what is one step away"
+  player hp 40
+  player energy 9
+  player lane 1 rank 0
+  enemy Crawler lane 0 rank 0 hp 20
+  enemy Crawler lane 1 rank 0 hp 20
+  hand Lunge
+  play Lunge
+  expect enemy1.hp == 20
+  expect enemy2.hp == 14
+
+# And a bow cannot shoot point blank: the front of the player's own floor is one step away and out
+# of a 2..3 span, so the shot goes past it.
+test "board a bow cannot shoot point blank"
+  player hp 40
+  player energy 9
+  enemy Crawler lane 0 rank 0 hp 20
+  enemy Crawler lane 0 rank 1 hp 20
+  hand Longbow
+  play Longbow
+  expect enemy1.hp == 20
+  expect enemy2.hp == 16
+
+# `range` is a modifier channel with the printed range as its base, so a status shortens a card
+# that was written years earlier and never heard of it.
+test "board a status makes everything melee"
+  player hp 40
+  player energy 9
+  enemy Crawler lane 0 rank 0 hp 20
+  enemy Crawler lane 0 rank 1 hp 20
+  hand Longbow, Longbow
+  play Longbow
+  expect enemy2.hp == 16
+  expect enemy1.hp == 20
+  apply Crippled to player
+  play Longbow
+  expect enemy1.hp == 16
+  expect enemy2.hp == 16
+
+# An enemy move reaches as far as it says. The player is two steps from the Reaver and the Imp on
+# the front slot is one, so the swing goes at the Imp — the same reach rule the card asked, from
+# the other side of the board.
+test "board a move swings at whoever it can reach"
+  player hp 40
+  player energy 9
+  player lane 0 rank 1
+  enemy Reaver lane 0 rank 0
+  hand "Summon Imp"
+  play "Summon Imp"
+  let imp = (allies where name:Imp).first
+  expect imp.rank == 0
+  expect distance(player, enemy1) == 2
+  expect distance(imp, enemy1) == 1
+  end turn
+  expect player.hp == 40
+  expect imp.hp == 1
+
+# --- the shapes ---------------------------------------------------------------------------------
+
+test "board a firebomb covers everything within a step of where it lands"
+  player hp 40
+  player energy 9
+  enemy Crawler lane 0 rank 0 hp 20
+  enemy Crawler lane 0 rank 1 hp 20
+  enemy Crawler lane 2 rank 0 hp 20
+  hand Firebomb
+  play Firebomb on enemy1
+  expect enemy1.hp == 17
+  expect enemy2.hp == 17
+  expect enemy3.hp == 20
+
+test "board clearing a floor reaches everyone standing on it"
+  player hp 40
+  player energy 9
+  enemy Crawler lane 0 rank 0 hp 20
+  enemy Crawler lane 0 rank 1 hp 20
+  enemy Crawler lane 1 rank 0 hp 20
+  hand "Clear the Floor"
+  play "Clear the Floor" on enemy1
+  expect enemy1.hp == 17
+  expect enemy2.hp == 17
+  expect enemy3.hp == 20
+
+test "board distance is slots apart, and across the sides it walks to the front and over"
+  player hp 40
+  enemy Crawler lane 0 rank 0
+  enemy Crawler lane 0 rank 1
+  enemy Crawler lane 2 rank 2
+  expect distance(player, enemy1) == 1
+  expect distance(player, enemy2) == 2
+  expect distance(player, enemy3) == 5
+  expect distance(enemy1, enemy2) == 1
+
+# --- moving -------------------------------------------------------------------------------------
+
+# A card that moves a unit between floors, which is the whole of Monster Train's "put this
+# somewhere else" with no new word: `lane` is a member and `+= 1` is an assignment.
+test "board a unit can be sent up a floor and fights there instead"
+  player hp 40
+  player energy 9
+  enemy Crawler lane 0 rank 0 hp 20
+  enemy Crawler lane 1 rank 0 hp 20
+  hand "Post a Gunner", Reassign
+  play "Post a Gunner"
+  let gunner = (allies where name:Gunner).first
+  expect gunner.lane == 0
+  play Reassign on gunner
+  expect gunner.lane == 1
+
+  # A lane change is one axis: the unit keeps the slot it was standing on, and swaps with
+  # whoever is already there.
+  expect gunner.rank == 1
+  end turn
+  expect enemy1.hp == 20
+  expect enemy2.hp == 16
+
+test "board hauling something to the front swaps it with whoever was there"
+  player hp 40
+  player energy 9
+  enemy Crawler lane 0 rank 0
+  enemy Crawler lane 0 rank 1
+  hand Haul
+  play Haul on enemy2
+  expect enemy2.rank == 0
+  expect enemy1.rank == 1
+
+# A step that would leave the board stops at the edge of it, so a shove against the back wall
+# leaves the unit against the back wall instead of failing.
+test "board a move stops at the edge of the board"
+  player hp 40
+  player energy 9
+  player lane 2 rank 0
+  hand "Summon Imp", Reassign
+  play "Summon Imp"
+  let imp = (allies where name:Imp).first
+  expect imp.lane == 2
+  play Reassign on imp
+  expect imp.lane == 2
+
+# `until` puts a place back exactly, whoever is standing there by then.
+test "board a lure lasts until the end of the turn"
+  player hp 40
+  player energy 9
+  enemy Crawler lane 0 rank 0
+  enemy Crawler lane 0 rank 1
+  hand Lure
+  play Lure on enemy2
+  expect enemy2.rank == 0
+  expect enemy1.rank == 1
+  end turn
+  expect enemy2.rank == 1
+  expect enemy1.rank == 0
+
+# There is no permission system: a unit that must not be moved cancels `before_moved`. The second
+# haul is what says the first one was refused rather than movement not working.
+test "board a braced unit refuses to be moved"
+  player hp 40
+  player energy 9
+  enemy Crawler lane 0 rank 0
+  enemy Crawler lane 0 rank 1
+  enemy Crawler lane 0 rank 2
+  apply Braced to enemy2
+  hand Haul, Haul
+  play Haul on enemy2
+  expect enemy2.rank == 1
+  expect enemy1.rank == 0
+  play Haul on enemy3
+  expect enemy3.rank == 0
+  expect enemy1.rank == 2
+
+# A group of one answers where it stands like the one it holds. `created.rank` used to read 0
+# while `created.first.rank` read 2 — the same actor, two answers, and no message about it.
+test "board a group of one says where it stands"
+  player hp 40
+  player energy 9
+  hand "Summon Imp"
+  play "Summon Imp"
+  let made = allies where name:Imp
+  expect made.count == 1
+  expect made.rank == 1
+  expect made.lane == 0
+  expect made.rank == made.first.rank

@@ -191,6 +191,56 @@ namespace Cantrip.Tests.Snapshots
             Assert.Equal(3, GameSnapshot.ReaderNeededBy(runtime.Capture()));
         }
 
+        /// <summary>
+        /// A move made inside an `until` block is state like any other, so it survives a save and
+        /// the deadline still puts the actor back in the restored game. The slot travels with the
+        /// waiting action, next to the stat changes it already carried.
+        /// </summary>
+        private const string Lure = """
+            board Floor
+              lanes 3
+              ranks 3
+
+            enemy "Grunt"
+              hp 10
+
+            card "Lure"
+              cost 0
+              target enemy
+              effect:
+                until turn_end:
+                  target.rank = 0
+            """;
+
+        [Fact]
+        public void A_place_an_until_block_has_to_put_back_survives_a_save()
+        {
+            CardRuntime runtime = Fresh(Lure);
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false, board: "Floor");
+
+            Entity front = runtime.SpawnEnemy("Grunt");
+            Entity behind = runtime.SpawnEnemy("Grunt");
+            Assert.Equal(new[] { 0, 1 }, new[] { front.Rank, behind.Rank });
+
+            runtime.Play(runtime.AddCard("Lure", Zones.Hand), behind);
+            Assert.Equal(0, behind.Rank);
+            Assert.Equal(1, front.Rank);
+
+            // The slot travels with the waiting action, beside the stat changes it already carried.
+            GameSnapshot save = Roundtrip(runtime.Capture());
+            UndoSnapshot undone = save.Scheduled.Single().Undo.Single();
+            Assert.Equal(0, undone.Lane);
+            Assert.Equal(1, undone.Rank);
+
+            CardRuntime restored = Fresh(Lure);
+            restored.Restore(save);
+            Assert.Equal(0, restored.State.Find(behind.Id)!.Rank);
+
+            restored.EndTurn();
+            Assert.Equal(1, restored.State.Find(behind.Id)!.Rank);
+            Assert.Equal(0, restored.State.Find(front.Id)!.Rank);
+        }
+
         private static CardRuntime Fresh(string content)
         {
             CardRuntime runtime = CardRuntime.FromText(content, new RuntimeOptions { Seed = 7 });

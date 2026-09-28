@@ -70,6 +70,10 @@ namespace Cantrip.Linting
         public const string OffTheBoard = "CT327";
         public const string PlaceAssigned = "CT328";
         public const string PositionIsNowRank = "CT329";
+        public const string SpatialSelector = "CT330";
+        public const string ReachWithoutATarget = "CT331";
+        public const string ReachLimitsNothing = "CT332";
+        public const string RowOfOne = "CT333";
 
         /// <summary>Below this many runs, a scenario's numbers move about from one run to the next (CT318).</summary>
         private const int FewRuns = 100;
@@ -328,7 +332,11 @@ namespace Cantrip.Linting
                 CheckPlaces(body);
                 CheckPlaceAssignments(body);
                 CheckPositionReads(body);
+                CheckSpatialSelectors(body);
+                CheckRowSelectors(body);
             }
+
+            foreach (EntityDefinition definition in _content.Definitions) CheckReach(definition);
 
             CheckBlocks();
             CheckClock();
@@ -826,11 +834,15 @@ namespace Cantrip.Linting
         };
 
         /// <summary>
-        /// CT328: a place written to as if it were a stat. <c>who.position = 2</c> wrote a stat
-        /// called <c>position</c> that nothing ever read, because reading <c>who.position</c> goes to
-        /// the slot the actor is standing on and shadows it — the line looked like a move, did
-        /// nothing at all, and said nothing about it.
+        /// CT328: <c>position</c> written to. <c>lane</c> and <c>rank</c> are now real moves, so
+        /// only the alias is left here: <c>position</c> names one axis of a place that has two, and
+        /// writing it would have to guess which. Reading it still works and always will.
         /// </summary>
+        /// <remarks>
+        /// This used to refuse <c>lane</c> and <c>rank</c> as well, because assigning either wrote a
+        /// stat that the slot shadowed and nothing ever read — a line that looked like a move and
+        /// was none. Now that the write moves the actor, refusing it would be refusing the feature.
+        /// </remarks>
         private void CheckPlaceAssignments(Body body)
         {
             foreach (AssignNode assign in body.Facts.Assigns)
@@ -841,16 +853,173 @@ namespace Cantrip.Linting
                     NameExpr name => name.Name,
                     _ => null,
                 };
-                if (written == null || PlaceWord(written) == null) continue;
+                if (written == null || !string.Equals(written, "position", StringComparison.OrdinalIgnoreCase)) continue;
 
-                bool isPosition = string.Equals(written, "position", StringComparison.OrdinalIgnoreCase);
                 Error(PlaceAssigned,
-                    isPosition
-                        ? "`position` is the old name for `rank`, and assigning it writes a stat nothing reads: " +
-                          "the slot shadows it, so this line does nothing. Write `rank`."
-                        : $"Where an actor stands is not a stat, so assigning `{written.ToLowerInvariant()}` writes a value nothing reads and moves nobody. " +
-                          "A game moves an actor with `GameState.Assign`.",
+                    "`position` is the older name for `rank` and reads the same number, but it cannot be written: " +
+                    "it names one axis of a place that now has two, and a move has to say which. Write `rank`.",
                     assign.Span);
+            }
+
+            CheckPlaceAssignmentBounds(body);
+        }
+
+        /// <summary>
+        /// CT327 again, for a move rather than a comparison: <c>target.rank = 4</c> on a three-rank
+        /// board names a slot the board does not have. The move stops at the board's edge rather
+        /// than failing, so without this the line reads as "to the back" and means "to rank 2".
+        /// </summary>
+        private void CheckPlaceAssignmentBounds(Body body)
+        {
+            foreach (AssignNode assign in body.Facts.Assigns)
+            {
+                if (assign.Operator != AssignOperator.Set) continue;
+                if (assign.Target is not MemberExpr member || PlaceWord(member.Member) is not string axis) continue;
+                if (string.Equals(member.Member, "position", StringComparison.OrdinalIgnoreCase)) continue;
+
+                if (assign.Value is not NumberExpr number || number.Unit != null || number.Value != number.Value.Floor()) continue;
+                int slot = number.Value.ToInt();
+
+                bool beyond = true;
+                foreach (BoardShape board in PossibleBoards)
+                {
+                    beyond &= axis == "lane" ? !board.HasLane(slot) : !board.HasRank(slot);
+                }
+                if (!beyond) continue;
+
+                string word = axis == "lane" ? PossibleBoards[0].LaneWord : PossibleBoards[0].RankWord;
+                Warn(OffTheBoard,
+                    $"There is no {word} {slot} to move to, so this stops at the edge of the board instead. " +
+                    (PossibleBoards.Count == 1
+                        ? $"This game's board is {PossibleBoards[0].Describe()}, and {word}s count from 0."
+                        : $"Every board this game declares is smaller than that, and {word}s count from 0."),
+                    assign.Span);
+            }
+        }
+
+        /// <summary>
+        /// CT330: a <c>within</c> the engine will not answer the way it reads. A plain number counts
+        /// slots on the board, so writing one in a game that declares no board asks about a single
+        /// lane; a length with a unit is a question about the world and goes to the game's host,
+        /// which a game without one discovers at runtime rather than here.
+        /// </summary>
+        private void CheckSpatialSelectors(Body body)
+        {
+            foreach (CallExpr call in body.Facts.Calls)
+            {
+                if (!string.Equals(call.Name, "within", StringComparison.OrdinalIgnoreCase)) continue;
+
+                if (call.Arguments.Count != 2)
+                {
+                    Warn(SpatialSelector,
+                        "`within` takes what to measure from and how far, as in `within(target, 2)` for slots on the board " +
+                        "or `within(target, 5m)` for a length only the game can answer.",
+                        call.Span);
+                    continue;
+                }
+
+                ExprNode radius = call.Arguments[1];
+                if (radius is NumberExpr { Unit: not null })
+                {
+                    Info(SpatialSelector,
+                        "`within` with a length is a question about the world, not about the board: the engine hands it to the game " +
+                        "(`IEffectHost.TryCall`) and a game that does not answer it gets an error when the line runs. " +
+                        "`within(x, 2)`, with a plain number, counts slots and is answered here.",
+                        call.Span);
+                    continue;
+                }
+
+                if (radius is NumberExpr && _content.Boards.Count == 0)
+                {
+                    Warn(SpatialSelector,
+                        "`within` with a plain number counts slots on the board, and this game declares none, so it is measuring " +
+                        "across one lane with everything in a line. Declare a `board`, or write a length such as `5m` if this is a " +
+                        "distance in the world for the game to answer.",
+                        call.Span);
+                }
+            }
+        }
+
+        /// <summary>
+        /// CT331 and CT332: a <c>range</c> that decides nothing. Reach narrows what an action may be
+        /// <em>pointed at</em>, so one on something that points at nobody is never consulted, and one
+        /// as wide as the board limits nothing it is consulted about.
+        /// </summary>
+        private void CheckReach(EntityDefinition definition)
+        {
+            PropertyNode? property = definition.Property("range");
+            if (property == null || definition.Range is not Reach range) return;
+
+            if (definition.Property("target") == null || TargetRule.Of(definition).Mode == "none")
+            {
+                Warn(ReachWithoutATarget,
+                    $"`range` says how far {definition} may be pointed, and it points at nobody, so nothing ever reads it. " +
+                    "Add a `target` line — `target enemy` — or take the `range` off.",
+                    property.Span);
+                return;
+            }
+
+            if (range.Min > range.Max)
+            {
+                Warn(ReachLimitsNothing,
+                    $"`range {range.Min}..{range.Max}` starts further away than it ends, so nothing is ever in reach of {definition}.",
+                    property.Span);
+                return;
+            }
+
+            bool everybody = true, nobody = true;
+            foreach (BoardShape board in PossibleBoards)
+            {
+                int? furthest = board.MaxDistance;
+                everybody &= range.Min == 0 && furthest.HasValue && range.Max >= furthest.Value;
+
+                // On a facing board the two sides are never on the same slot, so a reach that stops
+                // short of one step reaches nobody on the other side.
+                nobody &= range.Max == 0 && TargetRule.Of(definition).Mode == "enemy";
+            }
+
+            if (nobody)
+            {
+                Warn(ReachLimitsNothing,
+                    $"`range 0` reaches only the slot {definition} is used from, and an enemy is never standing on it, so this can be pointed at nobody. " +
+                    "`range 1` is what melee is written as.",
+                    property.Span);
+            }
+            else if (everybody)
+            {
+                Warn(ReachLimitsNothing,
+                    $"Every actor is within `range {range.Max}` on every board this game declares, so this limits nothing. " +
+                    (PossibleBoards.Count == 1
+                        ? $"The board is {PossibleBoards[0].Describe()}, and nothing on it is more than {PossibleBoards[0].MaxDistance} step(s) away."
+                        : "Give the narrowest board a reach it can actually narrow, or take the line off."),
+                    property.Span);
+            }
+        }
+
+        /// <summary>
+        /// CT333: a row selector on a board with only one actor in a row. <c>rank(who)</c> on a
+        /// one-lane board is <c>who</c> and nobody else, because one actor stands on a slot — so
+        /// "deal 4 to the target's rank" quietly hits the target alone.
+        /// </summary>
+        private void CheckRowSelectors(Body body)
+        {
+            foreach (CallExpr call in body.Facts.Calls)
+            {
+                bool lane = string.Equals(call.Name, "lane", StringComparison.OrdinalIgnoreCase);
+                bool rank = string.Equals(call.Name, "rank", StringComparison.OrdinalIgnoreCase);
+                if ((!lane && !rank) || call.Arguments.Count != 1) continue;
+
+                bool alone = true;
+                foreach (BoardShape board in PossibleBoards) alone &= lane ? board.LaneHoldsOne : board.RankHoldsOne;
+                if (!alone) continue;
+
+                BoardShape shape = PossibleBoards[0];
+                string word = lane ? shape.LaneWord : shape.RankWord;
+                string across = lane ? $"{shape.Ranks} deep" : $"{shape.Lanes} wide";
+                Warn(RowOfOne,
+                    $"One actor stands on a slot, and a {word} on this board is one slot ({across}), so `{call.Name}(...)` is that one actor and nobody else. " +
+                    $"Write the actor itself, or give the board more than one {(lane ? shape.RankWord : shape.LaneWord)}.",
+                    call.Span);
             }
         }
 

@@ -68,3 +68,45 @@ test "dota Arcane Vestments halves what an ability waits"
   tick 20
   cast "Chain Bolt"
   expect enemy.hp == 24
+
+# --- 6 and 7: a fight with space in it -----------------------------------------------------------
+
+test "dota Crystal Nova hits the square around where it lands"
+  board Arena
+  realtime 10
+  player hp 60 lane 0 rank 0
+  enemy hp 30 lane 1 rank 1
+  enemy hp 30 lane 2 rank 2
+  enemy hp 30 lane 4 rank 4
+  grant "Crystal Nova"
+  cast "Crystal Nova" on enemy1
+  expect enemy1.hp == 24
+  expect enemy2.hp == 24
+  expect enemy3.hp == 30
+
+# `range 3` is measured from the caster, so the one in the far corner cannot be nova'd at all and
+# the cast goes at the only one it can reach. A reach rule narrows what may be pointed at; it
+# never makes the ability fail while there is somebody legal left.
+test "dota Crystal Nova cannot be thrown further than its range"
+  board Arena
+  realtime 10
+  player hp 60 lane 0 rank 0
+  enemy hp 30 lane 4 rank 4
+  enemy hp 30 lane 1 rank 0
+  expect distance(player, enemy1) == 4
+  expect distance(player, enemy2) == 1
+  grant "Crystal Nova"
+  cast "Crystal Nova"
+  expect enemy1.hp == 30
+  expect enemy2.hp == 24
+
+test "dota Blink carries a unit two rows forward"
+  board Arena
+  realtime 10
+  player hp 60 lane 2 rank 4
+  enemy hp 30 lane 2 rank 0
+  expect distance(player, enemy1) == 4
+  grant Blink
+  cast Blink
+  expect player.rank == 2
+  expect distance(player, enemy1) == 2

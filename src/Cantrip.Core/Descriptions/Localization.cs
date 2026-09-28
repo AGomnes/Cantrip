@@ -173,7 +173,24 @@ namespace Cantrip.Descriptions
             ["who.all_allies"] = "ALL allies",
             ["who.everyone"] = "everyone",
             ["who.an_enemy"] = "an enemy",
-            ["who.adjacent"] = "adjacent enemies",
+            ["who.an_ally"] = "an ally",
+            ["who.each_enemy"] = "every enemy",
+            ["who.each_ally"] = "every ally",
+
+            // The board. `adjacent` is one step away *on the anchor's own side*, so which side that
+            // is depends on the anchor and cannot be printed into the phrase: "adjacent enemies"
+            // described `modify attack of adjacent(self): +1` as a buff for the enemy, which is the
+            // wrong side of the board and the wrong card.
+            ["who.adjacent.allies"] = "the allies beside {who}",
+            ["who.adjacent.enemies"] = "the enemies beside {who}",
+            ["who.adjacent"] = "the ones beside {who}",
+            ["who.lane"] = "{who}'s {lane_word}",
+            ["who.rank"] = "{who}'s {rank_word}",
+            ["who.within.one"] = "everything within 1 step of {who}",
+            ["who.within.many"] = "everything within {amount} steps of {who}",
+            ["who.within.group.one"] = "{group} within 1 step of {who}",
+            ["who.within.group.many"] = "{group} within {amount} steps of {who}",
+            ["who.distance"] = "the steps between {who} and {other}",
             ["who.random"] = "{amount} random {group}",
             ["who.lowest"] = "the one of {group} with the lowest {stat}",
             ["who.highest"] = "the one of {group} with the highest {stat}",
@@ -199,6 +216,52 @@ namespace Cantrip.Descriptions
             ["channel.heal_taken"] = "Healing received",
             ["channel.cost"] = "Cost",
             ["channel.draw"] = "Cards drawn",
+            ["channel.range"] = "Range",
+
+            // Reach, and what an action's own `target` line says it may be pointed at. A card's
+            // printed reach is its own rule and not a channel, so it is described on the card.
+            ["range.melee"] = "Melee.",
+            ["range.at_most"] = "Range {amount}.",
+            ["range.span"] = "Range {low}–{high}.",
+            ["target.rule"] = "Targets {who}{where}.",
+            ["target.where"] = " {where}",
+            ["target.and"] = "{first}, {second}",
+            ["target.front.one"] = "in the front {rank_word}",
+            ["target.front.many"] = "in the front {amount} {rank_word}s",
+            ["target.behind"] = "behind the front {amount} {rank_word}s",
+            ["target.at_rank"] = "in {rank_word} {amount}",
+            ["target.at_lane"] = "in {lane_word} {amount}",
+            ["target.same_lane"] = "on this {lane_word}",
+            ["target.other"] = "where {condition}",
+
+            // Movement, which is a member write: `target.rank = 0`, `self.lane += 1`.
+            ["place.front"] = "Pull {who} to the front.",
+            ["place.to_rank"] = "Move {who} to {rank_word} {amount}.",
+            ["place.to_lane"] = "Move {who} to {lane_word} {amount}.",
+            ["place.forward.one"] = "Move {who} forward one {rank_word}.",
+            ["place.forward.many"] = "Move {who} forward {amount} {rank_word}s.",
+            ["place.back.one"] = "Move {who} back one {rank_word}.",
+            ["place.back.many"] = "Move {who} back {amount} {rank_word}s.",
+            ["place.up.one"] = "Move {who} up one {lane_word}.",
+            ["place.up.many"] = "Move {who} up {amount} {lane_word}s.",
+            ["place.down.one"] = "Move {who} down one {lane_word}.",
+            ["place.down.many"] = "Move {who} down {amount} {lane_word}s.",
+            ["place.match_rank"] = "Move {who} to {other}'s {rank_word}.",
+            ["place.match_lane"] = "Move {who} to {other}'s {lane_word}.",
+
+            // The same, for whatever the text is written on. "Move forward one slot", not "Move
+            // you forward one slot", which is what naming the mover reads like when it is you.
+            ["place.self.front"] = "Move to the front.",
+            ["place.self.to_rank"] = "Move to {rank_word} {amount}.",
+            ["place.self.to_lane"] = "Move to {lane_word} {amount}.",
+            ["place.self.forward.one"] = "Move forward one {rank_word}.",
+            ["place.self.forward.many"] = "Move forward {amount} {rank_word}s.",
+            ["place.self.back.one"] = "Move back one {rank_word}.",
+            ["place.self.back.many"] = "Move back {amount} {rank_word}s.",
+            ["place.self.up.one"] = "Move up one {lane_word}.",
+            ["place.self.up.many"] = "Move up {amount} {lane_word}s.",
+            ["place.self.down.one"] = "Move down one {lane_word}.",
+            ["place.self.down.many"] = "Move down {amount} {lane_word}s.",
 
             // Definitions
             ["decay"] = "Loses {amount} at the end of its holder's turn.",

@@ -24,15 +24,15 @@ The tables say what each effect needs. [What cannot be expressed yet](#open-gaps
 | Game | Effects | Works | Workaround | Not expressible |
 |---|---|---|---|---|
 | Slay the Spire | 23 | 21 | 2 | 0 |
-| Monster Train | 10 | 8 | 1 | 1 |
+| Monster Train | 10 | 9 | 1 | 0 |
 | Hearthstone | 11 | 9 | 1 | 1 |
 | Balatro | 7 | 3 | 1 | 3 |
-| Dota 2 (real time) | 8 | 6 | 0 | 2 |
+| Dota 2 (real time) | 8 | 8 | 0 | 0 |
 | Magic | 10 | 7 | 1 | 2 |
 | Inscryption | 8 | 6 | 1 | 1 |
 | Dominion | 8 | 5 | 1 | 2 |
 | Darkest Dungeon | 8 | 7 | 0 | 1 |
-| **Total** | **93** | **72** | **8** | **13** |
+| **Total** | **93** | **75** | **8** | **10** |
 
 Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics. Inscryption models creatures the same way, with sigils as `keyword` definitions applied to them and bones as a declared `resource`. Dominion is treasure and victory cards as cards, with actions, buys and coins as declared resources that establish and refresh themselves each turn. Darkest Dungeon has heroes as actors, stress as a declared resource with bounds and no reset, and trinkets as `item` definitions.
 
@@ -81,7 +81,7 @@ Content: [monster_train.cantrip](../samples/corpus/monster_train.cantrip). Tests
 | 7 | Summon | Recruiter's Bell | Works | `on created(kind:actor)` |
 | 8 | Incant | Acolyte | Works | `on card_played(tag:spell)` |
 | 9 | Burnout | Burnout | Works | Decays each turn and kills its host after the last one |
-| 10 | Floors and capacity | | Not expressible | Floors and per-floor capacity are expressible since 1.0: a `board` with `lanes 3, ranks 3`, where a summon lands on its summoner's floor and a full floor turns one away, as [`samples/board`](../samples/board) does. What is still missing is moving a unit from one floor to another, which is the third of the three things this row asks for, so it stays here until that lands. The corpus file is written against the default board |
+| 10 | Floors and capacity | Reassign, Gunner | Works | A `board` with `lanes 3, ranks 3`: a summon lands on its summoner's floor, a full floor turns one away, `target.lane += 1` sends a unit to another floor, and `lowest rank enemies where it.lane == self.lane` is the whole of "this unit fights the floor it stands on". Worked in [`samples/board`](../samples/board); the corpus file here is written against the default board |
 
 ## Hearthstone
 
@@ -130,8 +130,8 @@ Content: [dota2.cantrip](../samples/corpus/dota2.cantrip). Tests: [dota2.tests.c
 | 3 | Skull Basher | Skull Basher | Works | Stun cancels its host's move in the before phase — `on before_move(source:owner): cancel` — so a stunned unit really does lose its turn |
 | 4 | Vladmir's Offering | War Banner | Works | `modify damage of everyone where source:allies: x1.25` |
 | 5 | Cooldown reduction | Arcane Vestments | Works | `modify cooldown: x0.5` on a relic shortens every ability its holder has; on an ability it shortens only that one. Modifiers see the duration already in clock units, so a multiplier reads the same on either clock |
-| 6 | Crystal Nova (area) | | Not expressible | `within` is parsed but its meaning must come from a host; DSL tests have none |
-| 7 | Blink | | Not expressible | Actors have board slots, not positions in space |
+| 6 | Crystal Nova (area) | Crystal Nova | Works | `range 3` from the caster and `deal 6 to enemies in within(target, 1)` for the square it covers, on a declared `shared` board with a `chebyshev` metric. `within` with a *unit* — `5m` — still goes to the host, unchanged, for a game whose fight is in continuous space |
+| 7 | Blink | Blink | Works | `owner.rank -2` on a declared board. A move is instantaneous in the rules on both clocks; the engine never owns travel time. Still slots and never metres |
 | 8 | Mana regeneration | Mana Font | Works | `on every 1s: gain 1 mana to player` on a relic |
 
 ## Magic
@@ -202,7 +202,6 @@ What the language cannot say yet, ranked by how many rows of the tables above ea
 
 | Gap | What is missing | Rows | What works today |
 |---|---|---|---|
-| 12 | **Space, and reaching across a board.** A board is a rectangle of lanes and ranks since 1.0, so floors and capacity are expressible; what is missing is the words content uses to reach across one — `within`, `lane(...)`, `rank(...)`, `distance(...)` and a `range` on an action — and any way for content to move an actor. Nothing here is ever positions in space. | Dota 2 #6, #7; Monster Train #10 | A declared [`board`](language.md#boards) of any size, `it.lane` and `it.rank`, `lowest rank enemies`, `adjacent(target)` and per-lane capacity. `within` parses, and a game can give it a meaning through its host's `TryCall`. |
 | 15 | **Costs in several currencies, or paid by a sacrifice.** A cost is one amount in one resource. | Magic #7; Inscryption #6; Dominion #7 | A cost in a named resource, `cost 2 bones`. A sacrifice written into the effect, which cannot refuse the play. |
 | 5 | **Effects as values.** Nothing can copy another entity's effects, or switch them off. `copy` duplicates an entity's *state* — its live stats, tags and statuses — which is a different thing. | Balatro #6; Hearthstone #9 | `copy` for an entity's state. Nothing for its effects. |
 | 17 | **A run above the battle.** A battle is the outermost thing content can see: nothing carries lives, candles or stress from one battle to the next, and `once per run` is the only nod to runs. | Inscryption #8; Darkest Dungeon #7 | The game carries hp, deck and relics between battles in its own code, as [Winning, losing and several battles](csharp.md#winning-losing-and-several-battles) shows. `cantrip sim` plays a gauntlet a `scenario` states; it does not generate one. |
@@ -225,6 +224,7 @@ The other workarounds are explained in their rows: Heavy Blade (Slay the Spire #
 - **7, in part. Definition pools.** `discover` offers content that nothing has been made from yet (Hearthstone #10, Darkest Dungeon #8). Since 0.1.0-preview.2 the player can answer the offer in a game, as with any other choice. The rest is open above.
 - **10. Cancellable resets.** `event.reset` marks a reset, so `if event.reset: cancel` keeps block across turns (Slay the Spire #9).
 - **11. Cooldown as a modifier channel.** `modify cooldown: x0.5` (Dota 2 #5).
+- **12. Space, and reaching across a board.** A [`board`](language.md#boards) is a rectangle of lanes and ranks, and content reads it with `it.lane`, `it.rank`, `adjacent(who)`, `within(who, n)`, `lane(who)`, `rank(who)` and `distance(a, b)`; narrows what an action may be pointed at with `range 1` or `range 2..3`, which is also a modifier channel; and moves an actor by writing a place, `target.rank = 0` or `self.lane += 1` (Monster Train #10, Dota 2 #6 and #7). It is slots throughout and never metres: `within(x, 5m)`, with a unit, still goes to the game's host exactly as it always did.
 - **13. Not a gap: the modifier anchor.** A modifier without `of` applies to what it is written on, and naming a scope reaches past that (Slay the Spire #7, Hearthstone #4).
 - **14. `draw` for someone else.** `draw 1 to player` lets a creature draw for the player (Inscryption #7).
 - **6. Whether a listener hears the event that brought it into play.** It is a ruleset setting, `new_listeners`, defaulting to `hear_the_event` — today's behaviour, which the sample roguelite's Chill and Slay the Spire #10's Echo are written against. Content that wants the other rule writes `new_listeners: miss_the_event` and drops the `not target:self` filter (Hearthstone #6). The default can move in a later release without breaking anyone, because content that cares now says which it means.

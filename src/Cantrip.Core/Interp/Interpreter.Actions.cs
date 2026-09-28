@@ -691,6 +691,7 @@ namespace Cantrip.Runtime
 
             var gameEvent = new GameEvent(eventName) { Source = context.Source?.Controller, Target = card, Card = card };
             foreach (string tag in card.Tags) gameEvent.Tags.Add(tag);
+            gameEvent.Data["kind"] = Value.FromText("card");
             gameEvent.Data["from"] = Value.FromText(card.Zone);
             gameEvent.Data["to"] = Value.FromText(zone);
 
@@ -699,6 +700,126 @@ namespace Cantrip.Runtime
                 State.MoveTo(card, zone, toTop);
                 if (eventName != "moved") State.RecordHistory("cards_" + eventName, card.Controller, Num.One);
             });
+        }
+
+        // Moving on the board --------------------------------------------------------------
+        //
+        // Movement is a member write and not a verb: `target.rank = 0`, `self.lane += 1`,
+        // `a.rank = b.rank`. `move` is taken by card zones, and an assignment arrives with four
+        // things already built — the `moved` event, `before_moved` cancellation, `until` reversion
+        // and rollback — which a new verb would have had to be given one at a time.
+
+        /// <summary>
+        /// Moves an actor along one axis, which is what <c>target.rank = 0</c> and
+        /// <c>self.lane += 1</c> do. Returns whether it actually moved.
+        /// </summary>
+        /// <param name="actor">The actor to move. Anything that is not an actor is refused by name.</param>
+        /// <param name="lane">True for the lane axis, false for the rank axis.</param>
+        /// <param name="op">How <paramref name="amount"/> combines with where the actor stands now.</param>
+        /// <param name="amount">The operand: a slot to move to, or a number of slots to move by.</param>
+        /// <param name="context">Who is moving it, for the <c>moved</c> event and any <c>until</c> scope.</param>
+        /// <param name="span">Where in content the move was written, for traces and errors.</param>
+        /// <remarks>
+        /// A step that would leave the board stops at its edge rather than failing: a shove against
+        /// the back wall leaves the actor against the back wall, which is what every game that has
+        /// ranks means by it, and it keeps <c>self.rank -1</c> at the front a no-op instead of an
+        /// error. A whole number is written to a whole slot, so a fractional amount rounds.
+        /// </remarks>
+        public bool MoveOnBoard(Entity actor, bool lane, AssignOperator op, Num amount, EvalContext context, SourceSpan span = default)
+        {
+            if (actor == null) throw new ArgumentNullException(nameof(actor));
+            if (actor.Kind != EntityKind.Actor)
+            {
+                throw new RuntimeError(
+                    $"{actor} is not an actor, so it does not stand anywhere: only an actor on the board has a {State.Board.LaneWord} and a {State.Board.RankWord}.",
+                    span);
+            }
+
+            // A corpse waiting to be buried still holds its slot, but only the living move.
+            if (actor.IsRemoved || !actor.IsAlive || actor.Zone != Zones.Board) return false;
+
+            int from = lane ? actor.Lane : actor.Rank;
+            int wanted = Combine(Num.FromInt(from), op, amount).Round().ToInt();
+            return MoveActor(actor, lane ? wanted : actor.Lane, lane ? actor.Rank : wanted, context, span);
+        }
+
+        /// <summary>
+        /// Puts an actor on a slot, raising <c>moved</c> around it. A slot somebody else holds
+        /// swaps the two; a slot off the board is taken as far as the board goes.
+        /// </summary>
+        /// <returns>Whether the actor ended up somewhere new.</returns>
+        public bool MoveActor(Entity actor, int lane, int rank, EvalContext context, SourceSpan span = default)
+        {
+            if (actor == null) throw new ArgumentNullException(nameof(actor));
+            if (actor.IsRemoved || actor.Kind != EntityKind.Actor || actor.Zone != Zones.Board) return false;
+
+            BoardShape board = State.Board;
+            int toLane = Math.Min(Math.Max(lane, 0), board.Lanes - 1);
+            int toRank = Math.Max(rank, 0);
+            if (!board.RanksAreUnbounded) toRank = Math.Min(toRank, board.Ranks - 1);
+
+            (int Lane, int Rank) from = (actor.Lane, actor.Rank);
+            if (toLane == from.Lane && toRank == from.Rank) return false;
+
+            var gameEvent = new GameEvent(BuiltinEvents.Moved) { Source = context.Source ?? actor, Target = actor };
+            foreach (string tag in actor.Tags) gameEvent.Tags.Add(tag);
+            Describe(gameEvent, from.Lane, from.Rank, toLane, toRank);
+
+            bool moved = Raise(gameEvent, context, () => State.Assign(actor, toLane, toRank));
+
+            // Recorded only once the move has really happened, so a cancelled knockback leaves
+            // nothing for the deadline to put back.
+            if (moved) context.UndoScope?.Undo.Add(new TemporaryChange(actor, from));
+            return moved;
+        }
+
+        /// <summary>
+        /// The places on a <c>moved</c> event. <c>from</c> and <c>to</c> read as text, the way they
+        /// do when a card changes zone, so one event says where something went whatever it is; the
+        /// four numbers beside them are for content that wants to do arithmetic on a slot.
+        /// </summary>
+        private void Describe(GameEvent gameEvent, int fromLane, int fromRank, int toLane, int toRank)
+        {
+            BoardShape board = State.Board;
+
+            // What moved, because `moved` is also what a card raises when it changes zone. A
+            // listener on an `actor` declaration can say `kind:actor`; one that has to hear an
+            // `enemy` as well reads this, which answers for the thing rather than for its keyword.
+            gameEvent.Data["kind"] = Value.FromText("actor");
+            gameEvent.Data["from"] = Value.FromText(Place(fromLane, fromRank));
+            gameEvent.Data["to"] = Value.FromText(Place(toLane, toRank));
+            gameEvent.Data["from_lane"] = Value.FromNumber(Num.FromInt(fromLane));
+            gameEvent.Data["from_rank"] = Value.FromNumber(Num.FromInt(fromRank));
+            gameEvent.Data["to_lane"] = Value.FromNumber(Num.FromInt(toLane));
+            gameEvent.Data["to_rank"] = Value.FromNumber(Num.FromInt(toRank));
+
+            string Place(int lane, int rank) => $"{board.LaneWord} {lane}, {board.RankWord} {rank}";
+        }
+
+        /// <summary>
+        /// Announces the moves the board made on its own — a <c>close_ranks</c> shuffle behind a
+        /// death — as <c>moved</c>, one for each survivor that stepped forward.
+        /// </summary>
+        /// <remarks>
+        /// After the fact, because the row closes inside the death that caused it and half a closed
+        /// row is not a board. So these are reports rather than requests: <c>before_moved</c> is
+        /// where a unit refuses to be pushed, and a unit is never pushed by the row closing — it
+        /// steps forward because the slot in front of it stopped existing.
+        /// </remarks>
+        private void AnnounceShuffles()
+        {
+            IReadOnlyList<(Entity Actor, int Lane, int Rank)> shuffled = State.TakeShuffled();
+            if (shuffled.Count == 0) return;
+
+            foreach ((Entity actor, int lane, int rank) in shuffled)
+            {
+                if (actor.IsRemoved || actor.Zone != Zones.Board) continue;
+
+                var gameEvent = new GameEvent(BuiltinEvents.Moved) { Source = actor, Target = actor };
+                foreach (string tag in actor.Tags) gameEvent.Tags.Add(tag);
+                Describe(gameEvent, lane, rank, actor.Lane, actor.Rank);
+                Raise(gameEvent, SystemContext(actor));
+            }
         }
 
         /// <summary>Creates cards, relics or actors from a definition, per the <c>create</c> verb.</summary>
@@ -1070,6 +1191,14 @@ namespace Cantrip.Runtime
                 else if (change.Tag != null)
                 {
                     change.Entity.RemoveTag(change.Tag);
+                }
+                else if (change.Slot is (int Lane, int Rank) slot)
+                {
+                    // A place is two integers, so its inverse is exact: putting the actor back is
+                    // the same swap that brought it here, and whoever took its slot meanwhile goes
+                    // where it came from. This is why `until` reverts a move where it refuses a
+                    // `transform` (CT321) — nothing remembers an old form, but a slot is remembered.
+                    MoveActor(change.Entity, slot.Lane, slot.Rank, context);
                 }
                 else if (change.Stat != null && !change.Entity.IsRemoved)
                 {

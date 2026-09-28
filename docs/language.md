@@ -145,6 +145,8 @@ card "Whirlwind"
 | `target self` | Targets the player. Not a choice, so nothing is asked about it. |
 | `target any` | Any living actor, or none. |
 | `target <side> where <filter>` | The same, narrowed to the candidates the filter accepts. See [Targets](#targets). |
+| `range N` | How far it reaches, in slots on the [board](#boards): `range 1` is melee. Goes through the `range` modifier channel. |
+| `range A..B` | A span, for something that cannot be used point blank: `range 2..3`. |
 | (none) | No target. |
 
 ### Targets
@@ -152,22 +154,34 @@ card "Whirlwind"
 Everything that is pointed at somebody settles who that is the same way: a card, an [ability](#abilities-and-real-time), an enemy's move, and the [`attack`](#built-in-verbs) verb. A candidate has to pass all four of these, in this order:
 
 1. **Side, and alive.** What the `target` word names: `enemy`, `ally`, `self` or `any`.
-2. **Reach.** Nothing narrows a target by distance yet; this is where that will go.
+2. **Reach.** The action's `range`, through the `range` modifier channel, measured against the [distance](#boards) between whoever is using it and the candidate. An action that prints no `range`, in a game with nothing on the channel, asks nothing and reaches everybody.
 3. **The action's own `where` filter**, if it has one.
 4. **The [`targetable`](#modifiers) channel**, which is how content adds rules from somewhere other than the action itself: a taunt, a stealth.
 
 ```
 card "Pike"
   cost 1
-  target enemy where it.position <= 1
+  target enemy where it.rank <= 1
   tags attack
   effect:
     deal 5 to target
 ```
 
-`it` is the candidate, so `it.position`, `it.hp` and `it.has(Burn)` all read the one being considered. It is an ordinary [`where`](#expressions), so a bare qualifier such as `tag:undead` tests the candidate too — unlike the same words inside a `targetable` modifier, where a bare qualifier tests the card being played. `self` is the card or ability; `source` is whoever is using it.
+`it` is the candidate, so `it.rank`, `it.hp` and `it.has(Burn)` all read the one being considered. It is an ordinary [`where`](#expressions), so a bare qualifier such as `tag:undead` tests the candidate too — unlike the same words inside a `targetable` modifier, where a bare qualifier tests the card being played. `self` is the card or ability; `source` is whoever is using it.
 
-This is how a card states a rule about its own reach. The alternative was a `targetable` modifier that had to name its own card, because a modifier written on a card in hand otherwise binds every card played while it sits there, and there is no `card:self`.
+This is how a card states a rule about its own reach, and it is deliberately **not** a modifier channel: a card's printed reach is its own rule, and a stranger's modifier should not rewrite it. The alternative was a `targetable` modifier that had to name its own card, because a modifier written on a card in hand otherwise binds every card played while it sits there, and there is no `card:self`.
+
+The generated rules text says the filter out loud — "Targets an enemy in the front 2 ranks." — in the board's own [`rank_word`](#boards), so a train reads "in the front 2 slots" without writing `text_override` on every card.
+
+**`range` is a channel**, with the printed range as its base, so a status shortens everything its holder points at, including a card that printed no range at all:
+
+```
+status "Crippled"
+  stacking none
+  modify range: set 1
+```
+
+The channel computes the far end of the reach and the near end follows it down, so a longbow told to be melee becomes a melee weapon rather than something that can no longer reach anything. An enemy's move takes a reach in its header the same way: `move "Swing" range 1:`.
 
 An action whose filter leaves nobody has no legal target, which means what it always meant: the card cannot be played, and the ability is refused.
 
@@ -489,7 +503,43 @@ board "Train"
 
 **A freed slot is reusable.** A dead actor leaves the board for the `dead` zone, so its slot is free and a later summon fills the hole rather than landing past it. That is what keeps an adjacency aura working across a death. Survivors still never shift unless the board says `close_ranks`.
 
-**Reading a place.** `it.lane` and `it.rank` are ordinary members, so `target enemy where it.rank <= 1` is a card whose reach is the front two ranks. `lowest rank enemies` and `highest rank enemies` sort by rank. `adjacent(x)` is the actors one step from `x` **on its own side**. `position` is what `rank` was called before a board had two axes: it reads the same number and keeps working for the whole of the 1.x line, with a note (CT329) suggesting the newer word. Assigning `lane`, `rank` or `position` is error CT328, because where an actor stands is a place and not a stat.
+**Reading a place.** `it.lane` and `it.rank` are ordinary members, so `target enemy where it.rank <= 1` is a card whose reach is the front two ranks. `lowest rank enemies` and `highest rank enemies` sort by rank. A group of one answers `.lane` and `.rank` like the one it holds. `position` is what `rank` was called before a board had two axes: it reads the same number and keeps working for the whole of the 1.x line, with a note (CT329) suggesting the newer word. It cannot be *written*, because it names one axis of a place that has two (CT328).
+
+**Selectors over the board.** Five, and nothing else:
+
+| Written | Means |
+|---|---|
+| `adjacent(who)` | live actors **on who's own side** at distance 1. Deliberately not cross-side: on a facing board the two front ranks are one step apart, so a cross-side `adjacent` would turn an adjacency aura into a gift to the enemy |
+| `within(who, N)` | live actors on **either** side at distance N or less, including `who` |
+| `within(who, 5m)` | unchanged: a length with a unit is a question about a world the engine knows nothing about, and goes to the game's `IEffectHost.TryCall` |
+| `lane(who)`, `rank(who)` | live actors sharing who's lane or rank, on who's side, including `who` |
+| `distance(a, b)` | how many steps apart they are, by the board's metric. Anything not on the board is further away than any board is wide |
+
+`group in group` intersects, so `enemies in within(target, 2)` is the splash of a blast. Everything else is an ordinary `where` over `it.lane` and `it.rank`: a spear that hits the one behind is `enemies where it.lane == target.lane and it.rank == target.rank + 1`. There is no cone, no beam and no template, because a lane *is* the beam on a facing board.
+
+**Reach.** `range 1` on a card, an ability or an enemy's move (`move "Swing" range 1:`) is melee; `range 2..3` is a bow that cannot shoot point blank. It is measured with `distance` between whoever is using the action and the candidate, and it is decided in exactly one place, so a reach rule means the same thing for a card and for an enemy's move. See [Targets](#targets).
+
+**Moving.** Movement is a member write, and there is no movement verb:
+
+```
+target.rank = 0            # pull to the front
+target.rank -1             # one step forward
+self.lane += 1             # up a floor
+a.rank = b.rank            # swap them, because the slot is taken
+```
+
+Assigning a slot somebody else is standing on **swaps** the two, which is total, deterministic and its own inverse. A step that would leave the board stops at the edge of it, so a shove against the back wall leaves the unit against the back wall; CT327 says so when the number written could never have been a slot. A move along one axis keeps the other, so `self.lane += 1` carries the unit to the same rank of the next lane.
+
+Any living actor on the board may be moved, by its own effect, a move, a listener or a card aimed at it. There is no permission system: a unit that must not be moved cancels [`before_moved`](#built-in-events).
+
+```
+status "Braced"
+  stacking none
+  on before_moved(target:owner):
+    cancel
+```
+
+A move raises [`moved`](#built-in-events) with `kind` `"actor"`, `from` and `to` in words, and `from_lane`, `from_rank`, `to_lane`, `to_rank` as numbers. It reverts inside `until`, because a place is two integers and its inverse is exact — which is where a slot differs from a `transform`, refused inside `until` (CT321) because nothing remembers an old form. `on_vacated close_ranks` raises `moved` for each survivor that steps forward, after the row has closed: `before_moved` is not asked there, because refusing half a closed row would put two actors on one slot.
 
 **Picking one.** Content may declare any number of boards by name, and a game picks one per battle with `StartBattle(board: "Train")`; a `test` picks one with `board "Train"` in its setup, and with no board named a battle is fought on the first one declared. A name no `board` declares is refused rather than invented, because the linter has to know how deep a board is to say that `it.rank <= 3` on a two-rank board reaches everybody (CT327). Changing board mid-run keeps everyone who still fits exactly where they are and gives the rest the lowest free slot.
 
@@ -584,7 +634,7 @@ The scope is matched against the event's target, whatever the event. So `on owne
 
 **Ordering.** Listeners for the same event run by priority (higher first), then play order (the order their entities became active), then the active side first, then registration order. The ruleset can reorder the first three.
 
-**One is a group of one.** `.count`, `.size`, `.length`, `.first`, `.last`, `.empty` and `.any` work on a single entity as they do on a group: the count is 1, `.first` and `.last` are the entity itself. That is what makes `choose` safe to read either way — `choose 1 from hand as picked` binds an entity while `choose 2` binds a group, and `picked.first` used to fall through to "a stat nothing has" and read 0 on the one-card path.
+**One is a group of one.** `.count`, `.size`, `.length`, `.first`, `.last`, `.empty` and `.any` work on a single entity as they do on a group: the count is 1, `.first` and `.last` are the entity itself. It reads the other way too: a group answers `.lane` and `.rank` for the first of them, so a group of one says where its one actor stands. That is what makes `choose` safe to read either way — `choose 1 from hand as picked` binds an entity while `choose 2` binds a group, and `picked.first` used to fall through to "a stat nothing has" and read 0 on the one-card path.
 
 **Joining mid-event.** A listener that becomes active while an event is being handled hears that event's after timing. A status applied by a card's effect hears the `card_played` of that same card, and a minion listening `on created(kind:actor)` hears its own creation. Where that is not wanted, leave the listener's own cause out with a filter: `on created(kind:actor, not target:self):`, or `not card:Reverb` for the card that applied the status. A `power` card is the exception, since it only becomes active after its `card_played` has finished.
 
@@ -607,7 +657,8 @@ The scope is matched against the event's target, whatever the event. So `on owne
 | `gained_block` | target gained `amount` block |
 | `drawn` | target (a card) was drawn |
 | `shuffled` | the discard pile was shuffled into the draw pile |
-| `discarded`, `exhausted`, `moved` | target (a card) changed zone. Data: `from`, `to`. A card drawn with a full hand is `discarded`. |
+| `discarded`, `exhausted` | target (a card) changed zone. Data: `kind` `"card"`, `from`, `to`. A card drawn with a full hand is `discarded`. |
+| `moved` | target changed where it is. A card changed zone: data `kind` `"card"`, `from`, `to` (zone names). An actor changed slot: data `kind` `"actor"`, `from`, `to` (places in words), `from_lane`, `from_rank`, `to_lane`, `to_rank`. `before_moved` refuses an actor's move; a row closing under `on_vacated close_ranks` is reported once it has closed. |
 | `created` | target was created by `create`, `copy` or `shuffle <card>`. Data: `copy_of`, the original, when `copy` made it. |
 | `destroyed` | target was taken out of the game |
 | `transformed` | target is becoming something else and keeps its id, owner, side and place. Data: `was`, `into` (both definitions). Tags: the tags it had before. Raised once; the statuses it sheds raise nothing. |
@@ -645,7 +696,7 @@ relic "Siege Engine"
 
 **Amounts** pick the layer: `+N` or `-N` (add), `xN` or `*N` (multiply; `x50%` is half), `clamp A..B` or `clamp N` (clamp; a single number is a ceiling), `=N` or `set N` (override). Values pass through the layers in ruleset order, add, multiply, clamp, override by default. Within the override layer the most recently created source wins. Damage, block and healing are rounded down after modifiers.
 
-**Channels** are `damage`, `damage_taken`, `block`, `block_taken`, `heal`, `heal_taken`, `cost`, `draw`, `targetable`, `cooldown`, or any stat name (`max_hp`, `armor`...).
+**Channels** are `damage`, `damage_taken`, `block`, `block_taken`, `heal`, `heal_taken`, `cost`, `draw`, `targetable`, `range`, `cooldown`, or any stat name (`max_hp`, `armor`...).
 
 **Default scope.** Without `of`, a modifier applies relative to its **anchor**: a status's host, a relic's holder, or the card itself for a modifier written on a card.
 
@@ -654,6 +705,7 @@ relic "Siege Engine"
 | `damage`, `block`, `heal`, `draw` | what the anchor's controller deals, gains, heals or draws (or what the card itself does, when anchored to a card) |
 | `damage_taken`, `block_taken`, `heal_taken` | what the anchor's controller receives |
 | `cost` | the card itself, when anchored to a card; otherwise all of the controller's cards |
+| `range` | the card or ability itself, when written on one; otherwise everything its controller points at |
 | any stat | that stat on the anchor |
 
 **`of` scope** replaces the default: the modifier applies when the value being computed belongs to someone in the group. The group is read from the modifier owner's side, so `of enemies` on the player's relic always means the player's enemies. A `where` on the group reads stats from the candidate (`hp > 20`) but tests qualifiers such as `tag:` and `source:` against the value being computed, like a `where` on the modifier.
@@ -787,15 +839,15 @@ A percentage is a **fraction to multiply by**, not a number of its own: `target.
 
 Percent values multiply as fractions: `10 * 50%` is 5. Division by zero gives 0.
 
-**Selectors.** `random N group` shuffles with the game's RNG and takes N. `lowest <stat> group` and `highest <stat> group` take the first by that stat, breaking ties by where an actor stands — lane, then rank — and then by id; with a single name (`lowest enemies`) the stat is `hp`. `other group` leaves out the running entity itself, and also the target when the target is in the group, or else the running entity's controller. In a modifier's `of` scope the running entity is the one the modifier is written on, so `modify attack of other allies where it.has(tag:goblin): +1` on a goblin leader buffs every other goblin but not the leader. A prefix word followed by nothing selectable (as in `pattern random`) is an ordinary name. `within` is passed to the host's `TryCall`; without a host that implements it, it is a runtime error.
+**Selectors.** `random N group` shuffles with the game's RNG and takes N. `lowest <stat> group` and `highest <stat> group` take the first by that stat, breaking ties by where an actor stands — lane, then rank — and then by id; with a single name (`lowest enemies`) the stat is `hp`. `other group` leaves out the running entity itself, and also the target when the target is in the group, or else the running entity's controller. In a modifier's `of` scope the running entity is the one the modifier is written on, so `modify attack of other allies where it.has(tag:goblin): +1` on a goblin leader buffs every other goblin but not the leader. A prefix word followed by nothing selectable (as in `pattern random`) is an ordinary name. `within` with a plain number counts slots on the [board](#boards); with a unit (`5m`, `250px`) it is passed to the host's `TryCall`, and without a host that implements it, that is a runtime error. CT330 says which of the two a line is asking for.
 
-**Functions**: `min(a, b, ...)`, `max(...)`, `abs(n)`, `floor(n)`, `ceil(n)`, `round(n)`, `clamp(n, lo, hi)`, `count(group)`, `random(lo, hi)`, `adjacent(who)`, `has(who, predicate)`, `stacks(Status[, who])`. Methods: `who.has(predicate)`, `who.stacks(Status)`.
+**Functions**: `min(a, b, ...)`, `max(...)`, `abs(n)`, `floor(n)`, `ceil(n)`, `round(n)`, `clamp(n, lo, hi)`, `count(group)`, `random(lo, hi)`, `adjacent(who)`, `within(who, n)`, `lane(who)`, `rank(who)`, `distance(a, b)`, `has(who, predicate)`, `stacks(Status[, who])`. Methods: `who.has(predicate)`, `who.stacks(Status)`. The five board ones are described under [Boards](#boards).
 
 `has` is true when the entity has the tag (directly or on an attached status), has a status of that name, or is that entity.
 
 **Members of an entity**: `dead`, `alive`, `removed`, `name`, `id`, `owner`, `source`, `controller`, `team`, `zone`, `lane`, `rank`, `position`, `intent`, `phase`, `statuses`, `kind`, a status name (its counter), a history name (`damage_taken_this_turn`), or any stat. Stats that nothing has set read as 0. `lane` and `rank` are where the entity stands on the [board](#boards), both counting from 0, so the front two ranks are `rank <= 1`; `position` is the older name for `rank` and reads the same number. `intent` and `phase` are text, or `none`; compare them with a quoted string, as in `enemy.intent == "Chomp"`, or with `none` unquoted. `enemy.phase == "none"` is never true.
 
-**Members of a group**: `count`, `size`, `length`, `first`, `last`, `empty`, `any`, or a stat, which sums it across the group (`enemies.hp`).
+**Members of a group**: `count`, `size`, `length`, `first`, `last`, `empty`, `any`, `lane` and `rank` — where the first of them stands, so a group of one answers like the one it holds — or a stat, which sums it across the group (`enemies.hp`).
 
 **Members of `event`**: `source`, `target`, `card`, `amount`, `name`, `cancelled`, and anything in its data. Using `event` outside a listener is an error.
 
@@ -1314,6 +1366,7 @@ Codes with four digits come from reading and loading the files. An error among t
 | CT0112 | warning | More than one `ruleset` is loaded. The last one loaded is used. | Keep one. |
 | CT0113 | error | An `event` or `encounter` declaration. Both words are reserved and do nothing yet. | Remove it. Encounters are the game's code for now. |
 | CT0114 | error | A `board` line the declaration cannot mean: a lane count of 0, an unknown `metric` or `on_vacated`, a word after `facing`, or a property no board reads. | Use a property from [Boards](#boards); the message says what that one takes and suggests the closest name. |
+| CT0115 | error | A `range` line that is not a whole number of slots or a span of them, such as `range 5m`. | `range 1`, or `range 2..3`. A length with a unit is a question about the world and belongs to the game, not to the board. |
 | CT0201 | warning | An unknown ruleset setting. It is ignored. | Use a setting from [Rulesets](#rulesets); the message suggests the closest. |
 | CT0202 | error | An unknown value in `ordering` or `modifier_layers`. | Use the values listed under [Rulesets](#rulesets). |
 
@@ -1346,9 +1399,13 @@ Codes with four digits come from reading and loading the files. An error among t
 | CT323 | error | A named clause a built-in verb does not read, such as `block 8 for 2 turns`, `apply Poison 3 at target` or `deal 5 against enemy2`. The clause was dropped in silence, so the line read as one thing and did another. It is a runtime error too. A flag after a comma is not a clause and is never reported, and neither is a verb content declares or a game registers. | Write the clause the verb reads — the message names it, and [Built-in verbs](#built-in-verbs) has the table — or drop the clause. Some of them are not a spelling at all: block is not timed, and a heal happens once. `--suppress CT323`, or `LintOptions.HostVerbs`, for content that reaches a verb of that name another way. |
 | CT324 | error | A bare percentage where a built-in verb counts whole things, such as `apply Slow 40%`. The unit was dropped, so forty stacks were applied while the card's generated text said "Apply 40% Slow". It is a runtime error too. | Write the number (`apply Slow 40`), or a share of something (`deal target.max_hp * 40% to target`), which is what a percentage is for. |
 | CT325 | error | A length in units the game's clock cannot measure: `on every 1s:` or `for 3s` where the ruleset says `clock turns`, or `2 turns` where it says `clock ticks`. Only content that states its clock is checked. | Write the length in the units that clock measures, or change the `clock` setting. The message says which units the stated clock takes. |
-| CT327 | warning | A lane or rank compared against a number no [board](#boards) this game declares can hold, so the comparison is the same for every actor before the game runs: `it.lane == 4` on a three-lane board matches nobody, and `it.rank <= 3` on a three-rank board matches everybody and limits nothing. | Compare against a place the board has, counting from 0, or declare the board the rule is written for. |
-| CT328 | error | `lane`, `rank` or `position` assigned as if it were a stat. It wrote a stat nothing reads — the slot the actor stands on shadows it — so the line did nothing at all and said nothing about it. | Where an actor stands is a place, not a stat. Read it with `it.rank`; a game moves an actor with `GameState.Assign`. |
+| CT327 | warning | A lane or rank no [board](#boards) this game declares can hold. Compared against one, the comparison is the same for every actor before the game runs: `it.lane == 4` on a three-lane board matches nobody, and `it.rank <= 3` on a three-rank board matches everybody and limits nothing. Moved to one, the move stops at the edge of the board instead. | Use a place the board has, counting from 0, or declare the board the rule is written for. |
+| CT328 | error | `position` assigned. It reads a rank and always will, but it names one axis of a place that has two, so a move written with it would have to guess which. | Write `rank`. `who.rank = 0` and `who.lane += 1` are moves; see [Boards](#boards). |
 | CT329 | note | `position` read, which is the older name for `rank`. | Nothing is wrong: it reads the same number and keeps working for the whole 1.x line. Write `rank` when you next touch the line. |
+| CT330 | warning / note | A `within` the engine will not answer the way it reads: a plain number, which counts slots, in a game that declares no [board](#boards) (warning); or a length with a unit, which is a question about the world and goes to the game's `IEffectHost.TryCall` (note). | Declare a `board` for slots, or keep the unit and implement `TryCall`. Both spellings are legal; the unit is what tells them apart. |
+| CT331 | warning | `range` on something that points at nobody, so nothing ever reads it. | Add a `target` line, or take the `range` off. |
+| CT332 | warning | A `range` that decides nothing: as wide as the widest board this game declares, written backwards (`range 3..1`), or `range 0` at an enemy, which on a facing board is a slot no enemy ever stands on. | Give it a reach the board can narrow. `range 1` is what melee is written as. |
+| CT333 | warning | `lane(...)` on a board one rank deep, or `rank(...)` on a board one lane wide. One actor stands on a slot, so the row is that actor and nobody else. | Write the actor itself, or give the board a second rank or lane. |
 
 **Descriptions**
 
@@ -1361,8 +1418,8 @@ Codes with four digits come from reading and loading the files. An error among t
 ## Implementation notes
 
 - **Integration.** The library owns the rules for damage, drawing and the rest itself, so a game's host only supplies names, functions and presentation: `TryResolveName`, `TryCall` and `OnEvent`.
-- **Spatial selectors** (`within`) parse, but their meaning comes from the host.
-- **`deal 2 to adjacent(target)`** uses board positions: actors on the same side one slot apart.
+- **Spatial selectors** with a unit (`within(x, 5m)`) parse, and their meaning comes from the host. With a plain number they count slots on the board and the engine answers them.
+- **`deal 2 to adjacent(target)`** uses the board: actors on the same side one step apart.
 - **Pending choices** are answered by an `IChoiceProvider`. A UI that cannot answer on the spot uses `DeferredChooser`: the action rolls back to a snapshot, reports the choice, and replays deterministically once answered, so a saved game is never mid-choice.
 - **Backends.** Only the tree-walking interpreter exists; `ExecutionMode` is recorded but does not change pacing yet.
 - **Descriptions** come at three levels, automatic, custom and override (see [Descriptions](#descriptions)). Automatic text is serviceable English, meant as a starting point that designers override with `text:`.

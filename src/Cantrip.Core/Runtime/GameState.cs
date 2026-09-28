@@ -69,11 +69,27 @@ namespace Cantrip.Runtime
             Delta = delta;
         }
 
+        /// <summary>A move made inside an <c>until</c> block, with the slot to put the actor back on.</summary>
+        public TemporaryChange(Entity entity, (int Lane, int Rank) slot)
+        {
+            Entity = entity;
+            Slot = slot;
+        }
+
         public Entity Entity { get; }
         public string? Tag { get; }
         public Entity? Attached { get; }
         public string? Stat { get; }
         public Num Delta { get; }
+
+        /// <summary>
+        /// The slot the actor stood on before an <c>until</c> block moved it, or null for a change
+        /// that is not a move. This is where a place differs from a <c>transform</c>, which
+        /// <c>until</c> refuses (CT321) because nothing remembers the old form: a place is two
+        /// integers, its inverse is exact, and putting the actor back is the same swap that brought
+        /// it here.
+        /// </summary>
+        public (int Lane, int Rank)? Slot { get; }
     }
 
     /// <summary>Deferred work from <c>next turn:</c>, <c>in 2 turns:</c> and <c>until turn_end:</c>.</summary>
@@ -709,10 +725,32 @@ namespace Cantrip.Runtime
             int next = vacated;
             foreach (Entity actor in behind)
             {
+                _shuffled.Add((actor, actor.Lane, actor.Rank));
                 actor.Rank = next++;
                 _slots[(side, lane, actor.Rank)] = actor;
             }
             Touch();
+        }
+
+        private readonly List<(Entity Actor, int Lane, int Rank)> _shuffled = new List<(Entity, int, int)>();
+
+        /// <summary>
+        /// Actors the board itself has moved since this was last asked, each with the slot it stepped
+        /// out of. Asking clears the list, and only <see cref="CloseRanks"/> fills it.
+        /// </summary>
+        /// <remarks>
+        /// The board closes inside <see cref="TakeFromZone"/>, which runs in the middle of a death
+        /// and has no interpreter to raise an event with. So the moves are recorded here and the
+        /// interpreter announces them as <c>moved</c> once the thing that caused them has finished.
+        /// That is also why a <c>close_ranks</c> shuffle is never offered to <c>before_moved</c>:
+        /// the row has already closed, and refusing half of it would put two actors on one slot.
+        /// </remarks>
+        internal IReadOnlyList<(Entity Actor, int Lane, int Rank)> TakeShuffled()
+        {
+            if (_shuffled.Count == 0) return Array.Empty<(Entity, int, int)>();
+            var taken = _shuffled.ToArray();
+            _shuffled.Clear();
+            return taken;
         }
 
         /// <summary>

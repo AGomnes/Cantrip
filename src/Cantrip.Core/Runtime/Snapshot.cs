@@ -376,6 +376,15 @@ namespace Cantrip.Runtime
         public int AttachedId { get; set; }
         public string? Stat { get; set; }
         public long Delta { get; set; }
+
+        /// <summary>
+        /// The slot the actor stood on before an <c>until</c> block moved it. Both are set together
+        /// or neither is, and neither is what says this change is not a move.
+        /// </summary>
+        public int? Lane { get; set; }
+
+        /// <inheritdoc cref="Lane"/>
+        public int? Rank { get; set; }
     }
 
     /// <summary>A <c>once per ...</c> window already used by one listener of one entity.</summary>
@@ -503,6 +512,8 @@ namespace Cantrip.Runtime
                         AttachedId = change.Attached?.Id ?? 0,
                         Stat = change.Stat,
                         Delta = change.Delta.Raw,
+                        Lane = change.Slot?.Lane,
+                        Rank = change.Slot?.Rank,
                     });
                 }
                 snapshot.Scheduled.Add(record);
@@ -706,12 +717,10 @@ namespace Cantrip.Runtime
                 foreach (var binding in record.Bindings) action.Bindings[binding.Key] = FromSnapshot(binding.Value);
                 foreach (UndoSnapshot change in record.Undo)
                 {
-                    action.Undo.Add(new TemporaryChange(
-                        Lookup(change.EntityId) ?? throw Missing(change.EntityId),
-                        change.Tag,
-                        Lookup(change.AttachedId),
-                        change.Stat,
-                        Num.FromRaw(change.Delta)));
+                    Entity subject = Lookup(change.EntityId) ?? throw Missing(change.EntityId);
+                    action.Undo.Add(change.Lane is int lane && change.Rank is int rank
+                        ? new TemporaryChange(subject, (lane, rank))
+                        : new TemporaryChange(subject, change.Tag, Lookup(change.AttachedId), change.Stat, Num.FromRaw(change.Delta)));
                 }
                 _scheduled.Add(action);
             }
