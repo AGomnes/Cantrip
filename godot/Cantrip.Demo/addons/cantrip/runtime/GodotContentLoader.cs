@@ -35,6 +35,32 @@ namespace Cantrip.GodotAdapter
         public const string UnreadableCode = "CT0901";
 
         /// <summary>
+        /// The project setting that says where a project keeps its content. The editor dock reads
+        /// it, and so does <c>CantripRuntime.ContentFolder</c> when that is left empty, so a project
+        /// that moves its content moves it for the dock and for the running game at once. The two
+        /// used to be read from different places, and a dock linting one folder while the game
+        /// loaded another is a mistake neither of them could report.
+        /// </summary>
+        public const string FolderSetting = "cantrip/content/folder";
+
+        /// <summary>Where content lives in a project that says nothing at all.</summary>
+        public const string DefaultFolder = "res://content";
+
+        /// <summary>
+        /// The folder to load: the one asked for, else the <see cref="FolderSetting"/> project
+        /// setting, else <see cref="DefaultFolder"/>.
+        /// </summary>
+        public static string ResolveFolder(string? asked)
+        {
+            if (!string.IsNullOrEmpty(asked)) return asked!;
+
+            string setting = ProjectSettings.HasSetting(FolderSetting)
+                ? ProjectSettings.GetSetting(FolderSetting).AsString()
+                : string.Empty;
+            return string.IsNullOrEmpty(setting) ? DefaultFolder : setting;
+        }
+
+        /// <summary>
         /// Deep enough for any content tree, shallow enough that a cyclic link cannot hang the
         /// game on startup.
         /// </summary>

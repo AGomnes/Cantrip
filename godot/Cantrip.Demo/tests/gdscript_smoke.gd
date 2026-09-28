@@ -29,20 +29,22 @@ func _run() -> void:
 
 	# Named exactly as C# declares them: there is no snake_case alias.
 	_check("the node answers its C# method names", rules.has_method("LoadContent") and not rules.has_method("load_content"))
+	_check_surface(rules)
 
-	var problems: Array = rules.LoadContent("res://content")
-	_check("content loaded without errors", _errors(problems) == 0, str(problems))
+	var report: Dictionary = rules.LoadContent("res://content")
+	_check("content loaded without errors", report["ok"] and report["errors"] == 0, str(report))
+	_check("and the report carries the problems themselves", _errors(report["diagnostics"]) == 0, str(report["diagnostics"]))
 
 	rules.EffectEvent.connect(_on_effect_event)
 
 	var player: int = rules.CreatePlayer("Player", 80, 3)
-	var slime: int = rules.SpawnEnemy("Slime", 0)
+	var slime: int = rules.SpawnEnemy("Slime", -1)
 	rules.StartBattle(false, false)
 	_check("the battle is running", rules.IsInBattle())
 	_check("and is neither won nor lost: GetWon() is null", rules.GetWon() == null, str(rules.GetWon()))
 
 	var ember: int = rules.AddCard("Ember", "hand")
-	_check("the hand came back as an array of ids", rules.GetHand().has(ember))
+	_check("the hand came back as an array of ids", rules.GetZone(player, "hand").has(ember))
 
 	var result: String = rules.Play(ember, slime)
 	_check("playing a card answers with a word", result == "played", result)
@@ -60,10 +62,69 @@ func _run() -> void:
 	_check("so does an intent", intent.get("name", "") == "Swipe", str(intent.get("name")))
 
 	_check_callbacks(rules, slime)
+	_check_refusals(rules, player, slime)
+	_check_saving(rules)
 	_check_answers(rules)
 	_check_between_battles(rules)
 
 	_finish()
+
+# What the node does and does not publish. GDScript compiles nothing until the line runs, so a
+# method that went away at 1.0 must be gone from has_method too, and a method that was never meant
+# for script must never have been there: Godot publishes every C# method of a [GlobalClass],
+# private ones included, so these are the ones that had to be moved off the node.
+func _check_surface(rules: CantripRuntime) -> void:
+	_check("GetHand is gone, so a party game cannot read one hero's hand by accident",
+		not rules.has_method("GetHand"))
+
+	var internals := ["Guard", "AfterAction", "SyncChoice", "Word", "Refused"]
+	var published: Array[String] = []
+	for name in internals:
+		if rules.has_method(name):
+			published.append(name)
+	_check("the node's own loop is not callable from script", published.is_empty(), ", ".join(published))
+
+	var presenter := BattlePresenter.new()
+	_check("nor the presenter's", not presenter.has_method("Pump"))
+	presenter.free()
+
+# Every answer a game reads rather than a value it asked for: a word, a number, or a key that is
+# always there. Each of these used to be a silence or a stack trace.
+func _check_refusals(rules: CantripRuntime, player: int, slime: int) -> void:
+	_check("an id that names nothing has no target mode, which is not the same as needing none",
+		rules.GetTargetMode(999999) == "" and rules.GetTargetMode(rules.AddCard("Guard", "hand")) == "none",
+		rules.GetTargetMode(999999))
+
+	print("GDSCRIPT: two calls with names no content defines follow; what they report is expected.")
+	_check("a status no content defines answers 0, as an unknown target does",
+		rules.ApplyStatus("Nothing", slime, 1) == 0 and rules.ApplyStatus("Burn", 999999, 1) == 0)
+	_check("and so does an ability", rules.GrantAbility("Nothing", player) == 0)
+
+	print("GDSCRIPT: an enemy asked for with 0 health follows; the error it reports is expected.")
+	var nothing = rules.SpawnEnemy("Slime", 0)  # untyped: a refused call answers null
+	_check("an enemy with 0 health is refused rather than quietly given the content's", nothing == null, str(nothing))
+
+	var described: Dictionary = rules.Describe(slime, 0)
+	_check("a description always has a cost key, null when there is none",
+		described.has("cost") and described["cost"] == null, str(described.get("cost")))
+
+	var ability: Dictionary = rules.Describe(rules.GetZone(player, "hand")[0], 0)
+	_check("and a segment for a card that has one", ability.has("cost") and ability["cost"] != null, str(ability.get("cost")))
+
+	_check("UseAbility answers a word, not a bool", rules.UseAbility(999999, 0) == "not_a_card", str(rules.UseAbility(999999, 0)))
+
+# Save answers the same dictionary LoadSave does, so a save button can say why it did nothing.
+func _check_saving(rules: CantripRuntime) -> void:
+	var saved: Dictionary = rules.Save()
+	_check("a save comes back accepted, with the game under save", saved["accepted"] and saved["save"].length() > 0, str(saved.get("reason")))
+	_check("and its reason is none", saved["reason"] == "none" and saved["message"] == "", str(saved))
+
+	var loaded: Dictionary = rules.LoadSave(saved["save"])
+	_check("which loads again", loaded["accepted"], str(loaded))
+
+	var nonsense: Dictionary = rules.LoadSave("{ not a save")
+	_check("while text that is not a save is refused as wrong_format",
+		not nonsense["accepted"] and nonsense["reason"] == "wrong_format" and nonsense["message"].length() > 0, str(nonsense))
 
 # What a run needs between battles, through the GDScript call path: names come back as an array of
 # strings, a definition's text as the dictionary Describe gives, a removed card as a bool, and a new
@@ -84,7 +145,7 @@ func _check_between_battles(rules: CantripRuntime) -> void:
 	rules.Seed = 3
 	rules.NewRun()
 	_check("a new run has no player and no battle", rules.PlayerId() == 0 and not rules.IsInBattle() and rules.GetWon() == null)
-	_check("and sets up again", rules.CreatePlayer("Player", 80, 3) != 0 and rules.SpawnEnemy("Slime", 0) != 0)
+	_check("and sets up again", rules.CreatePlayer("Player", 80, 3) != 0 and rules.SpawnEnemy("Slime", -1) != 0)
 
 # An answer that is turned away says why in a snake_case word, like every other word the node gives.
 func _check_answers(rules: CantripRuntime) -> void:
@@ -98,9 +159,12 @@ func _check_answers(rules: CantripRuntime) -> void:
 	rules.CancelChoice()
 	rules.Play(sort, 0)
 	var request: Dictionary = rules.GetPendingChoice()
+	_check("a request says which kind of question it is under mode, not kind",
+		request["mode"] == "entities" and not request.has("kind"), str(request.keys()))
 
 	var late: Dictionary = rules.AnswerChoice(first, [spare])
 	_check("an answer to a request already dealt with is stale_request", late["reason"] == "stale_request", str(late))
+	_check("and a refused answer still carries a result key, empty", late.get("result", null) == "", str(late))
 	var twice: Dictionary = rules.AnswerChoice(request["id"], [spare, spare])
 	_check("the same pick twice is duplicate_option", twice["reason"] == "duplicate_option", str(twice))
 	var none: Dictionary = rules.AnswerChoice(request["id"], [])

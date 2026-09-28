@@ -54,14 +54,14 @@ namespace Cantrip.GodotAdapter
 
             ListenerNode syntax = listener.Syntax;
             string filter = syntax.Filter == null ? string.Empty : "(" + AstPrinter.Print(syntax.Filter) + ")";
-            string limit = syntax.Limit.ToString().ToLowerInvariant();
+            string limit = Words.LimitName(syntax.Limit);
             string once = syntax.Limit == LimitScope.None ? string.Empty : " once per " + limit;
 
             return new ListenerView(
                 listener.Id,
                 listener.EventName,
                 listener.Scope ?? string.Empty,
-                listener.Phase.ToString().ToLowerInvariant(),
+                Words.PhaseName(listener.Phase),
                 limit,
                 listener.Priority,
                 "on " + syntax.EventName + filter + once,
@@ -123,7 +123,7 @@ namespace Cantrip.GodotAdapter
             return new ModifierView(
                 modifier.Id,
                 modifier.Channel,
-                modifier.Layer.ToString().ToLowerInvariant(),
+                Words.LayerName(modifier.Layer),
                 scope,
                 amount,
                 "modify " + modifier.Channel + (scope.Length == 0 ? string.Empty : " of " + scope) + filter + ": " + amount,

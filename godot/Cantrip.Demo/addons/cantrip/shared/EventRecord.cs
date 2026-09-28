@@ -74,7 +74,7 @@ namespace Cantrip.GodotAdapter
         public EventPhase Phase { get; }
 
         /// <summary>Lower-case phase name, for the dictionary that crosses into GDScript.</summary>
-        public string PhaseName => Phase.ToString().ToLowerInvariant();
+        public string PhaseName => Words.PhaseName(Phase);
 
         /// <summary>The clock when the event resolved: turns for a turn game, ticks for a real-time one.</summary>
         public long Time { get; }

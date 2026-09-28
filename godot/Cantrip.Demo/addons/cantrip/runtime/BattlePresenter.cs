@@ -26,16 +26,19 @@ namespace Cantrip.GodotAdapter
     {
         /// <summary>One resolved event, in the dictionary shape the addon uses across the boundary.</summary>
         [Signal]
-        public delegate void PresentEventHandler(Godot.Collections.Dictionary evt);
+        public delegate void PresentEventHandler(Godot.Collections.Dictionary effect_event);
 
         /// <summary>Everything queued has been presented; the game is idle again.</summary>
         [Signal]
         public delegate void SettledEventHandler();
 
         private readonly Queue<EventRecord> _queue = new Queue<EventRecord>();
+        private readonly Pacing _pacing;
         private EventRecord? _current;
         private bool _pumping;
         private bool _active;
+
+        public BattlePresenter() => _pacing = new Pacing(this);
 
         /// <summary>
         /// Turns a record into the dictionary <c>Present</c> carries. The runtime node sets this so
@@ -71,7 +74,7 @@ namespace Cantrip.GodotAdapter
                 taken++;
             });
 
-            Pump();
+            _pacing.Pump();
             return taken;
         }
 
@@ -82,7 +85,7 @@ namespace Cantrip.GodotAdapter
 
             _queue.Enqueue(record);
             _active = true;
-            Pump();
+            _pacing.Pump();
         }
 
         /// <summary>
@@ -99,7 +102,7 @@ namespace Cantrip.GodotAdapter
             }
 
             _current = null;
-            Pump();
+            _pacing.Pump();
         }
 
         /// <summary>
@@ -117,71 +120,57 @@ namespace Cantrip.GodotAdapter
         }
 
         /// <summary>The dictionary shape of an event, per the addon's contract.</summary>
-        public static Godot.Collections.Dictionary DefaultFormat(EventRecord record)
-        {
-            if (record == null) throw new ArgumentNullException(nameof(record));
-
-            var map = new Godot.Collections.Dictionary();
-            map["seq"] = record.Sequence;
-            map["name"] = record.Name;
-            map["phase"] = record.PhaseName;
-            map["time"] = record.Time;
-            map["source"] = record.Source;
-            map["target"] = record.Target;
-            map["card"] = record.Card;
-            map["amount"] = record.AmountInt;
-            map["amount_raw"] = record.AmountRaw;
-            map["replaced"] = record.Replaced;
-
-            var tags = new Godot.Collections.Array();
-            foreach (string tag in record.Tags) tags.Add(tag);
-            map["tags"] = tags;
-
-            var values = new Godot.Collections.Dictionary();
-            foreach (KeyValuePair<string, Value> value in record.Values)
-            {
-                values[value.Key] = GodotEffectHost.DefaultMarshal.ToVariant(value.Value);
-            }
-            map["values"] = values;
-
-            var after = new Godot.Collections.Dictionary();
-            foreach (KeyValuePair<int, IReadOnlyDictionary<string, int>> entity in record.After)
-            {
-                var stats = new Godot.Collections.Dictionary();
-                foreach (KeyValuePair<string, int> stat in entity.Value) stats[stat.Key] = stat.Value;
-                after[entity.Key] = stats;
-            }
-            map["after"] = after;
-
-            return map;
-        }
+        /// <remarks>
+        /// One line, because it used to be all thirteen keys written out a second time. The runtime
+        /// node always installs <see cref="VariantMap.Event"/> as the <see cref="Formatter"/>, so
+        /// the copy only ran for a presenter used on its own — exactly where a key that had drifted
+        /// apart from the real one would go unnoticed.
+        /// </remarks>
+        public static Godot.Collections.Dictionary DefaultFormat(EventRecord record) => VariantMap.Event(record);
 
         /// <summary>
-        /// Presents until something is in flight or the queue runs dry. The loop is iterative on
-        /// purpose: a game with no animation calls <c>Done</c> straight out of the handler, and
-        /// recursing there would put the whole battle on the stack.
+        /// The presenter's own loop, off the node.
         /// </summary>
-        private void Pump()
+        /// <remarks>
+        /// Godot's source generator publishes every ordinary method of a <c>[GlobalClass]</c> to
+        /// script whatever its C# accessibility says, so as a member of the presenter this was
+        /// callable from GDScript and, at 1.0, promised. A script calling it could emit a second
+        /// <c>Settled</c> for one batch, or start the next event over the top of the one playing.
+        /// </remarks>
+        private sealed class Pacing
         {
-            if (_pumping) return;
+            private readonly BattlePresenter _presenter;
 
-            _pumping = true;
-            try
+            public Pacing(BattlePresenter presenter) => _presenter = presenter;
+
+            /// <summary>
+            /// Presents until something is in flight or the queue runs dry. The loop is iterative
+            /// on purpose: a game with no animation calls <c>Done</c> straight out of the handler,
+            /// and recursing there would put the whole battle on the stack.
+            /// </summary>
+            public void Pump()
             {
-                while (_current == null && _queue.Count > 0)
+                BattlePresenter presenter = _presenter;
+                if (presenter._pumping) return;
+
+                presenter._pumping = true;
+                try
                 {
-                    _current = _queue.Dequeue();
-                    EmitSignal(SignalName.Present, Format(_current));
+                    while (presenter._current == null && presenter._queue.Count > 0)
+                    {
+                        presenter._current = presenter._queue.Dequeue();
+                        presenter.EmitSignal(SignalName.Present, presenter.Format(presenter._current));
+                    }
                 }
-            }
-            finally
-            {
-                _pumping = false;
-            }
+                finally
+                {
+                    presenter._pumping = false;
+                }
 
-            if (!_active || _current != null || _queue.Count > 0) return;
-            _active = false;
-            EmitSignal(SignalName.Settled);
+                if (!presenter._active || presenter._current != null || presenter._queue.Count > 0) return;
+                presenter._active = false;
+                presenter.EmitSignal(SignalName.Settled);
+            }
         }
 
         private Godot.Collections.Dictionary Format(EventRecord record)

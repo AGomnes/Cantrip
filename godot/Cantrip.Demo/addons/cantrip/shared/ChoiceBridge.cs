@@ -106,6 +106,20 @@ namespace Cantrip.GodotAdapter
         public IReadOnlyList<int> OptionIds => _optionOrder;
 
         /// <summary>
+        /// The option id of the candidate at <paramref name="position"/> in an offer: its place,
+        /// counted from 1.
+        /// </summary>
+        /// <remarks>
+        /// From 1 and not from 0 because 0 is "no entity" everywhere else an id crosses. Answer
+        /// code that filters 0 out, which is the obvious thing to write, used to drop the first
+        /// candidate of every offer and say nothing.
+        /// </remarks>
+        public static int OfferId(int position) => position + 1;
+
+        /// <summary>The place in <c>PendingChoice.Definitions</c> that an offer's option id names.</summary>
+        public static int OfferPosition(int optionId) => optionId - 1;
+
+        /// <summary>
         /// Gives a pending choice its id, or returns the id it already has. Re-opening the same
         /// choice is deliberately free, so a node may call this after every action without churning
         /// ids the UI is holding.
@@ -122,12 +136,12 @@ namespace Cantrip.GodotAdapter
             _optionOrder.Clear();
             if (choice.IsOffer)
             {
-                // An offer of content has no entities yet: its options are the positions of the
-                // candidates in the offer, and the UI answers with the position it picked.
+                // An offer of content has no entities yet: its options are the candidates' places in
+                // the offer, counted from 1, and the UI answers with the one it picked.
                 for (int i = 0; i < choice.Definitions.Count; i++)
                 {
-                    _options.Add(i);
-                    _optionOrder.Add(i);
+                    _options.Add(OfferId(i));
+                    _optionOrder.Add(OfferId(i));
                 }
             }
             else

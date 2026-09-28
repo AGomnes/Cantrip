@@ -150,6 +150,9 @@ func _names(ids: Array) -> Array:
 	names.sort()
 	return names
 
+func hand() -> Array:
+	return rules.GetZone(rules.PlayerId(), "hand")
+
 func _first_in_deck(card_name: String) -> int:
 	for id in deck():
 		if rules.GetEntity(id)["name"] == card_name:
@@ -160,8 +163,8 @@ func _run() -> void:
 	rules = CantripRuntime.new()
 	rules.AutoLoad = false
 	add_child(rules)
-	var problems: Array = rules.LoadContent("res://content")
-	_check("content loads", problems.is_empty(), str(problems))
+	var report: Dictionary = rules.LoadContent("res://content")
+	_check("content loads", report["ok"] and report["diagnostics"].is_empty(), str(report))
 
 	new_run(5)
 	_check("a run starts with its deck", deck().size() == 8, str(_names(deck())))
@@ -191,7 +194,7 @@ func _run() -> void:
 	var next_ghoul: int = spawn("Ghoul")
 	rules.StartBattle(true, true)
 	_check("the next battle is dealt from the deck as it now is",
-		rules.GetHand().size() + deck().size() == 8, str(_names(rules.GetHand())))
+		hand().size() + deck().size() == 8, str(_names(hand())))
 
 	print("BETWEEN: playing a card whose content fails; the error it reports next is expected.")
 	var result: String = rules.Play(rules.AddCard("Broken", "hand"), next_ghoul)
@@ -257,11 +260,11 @@ func _run() -> void:
 	rules.AutoLoad = false
 	add_child(rules)
 
-	var problems: Array = rules.LoadContent("res://content")
-	_check("content loads", problems.is_empty(), str(problems))
+	var report: Dictionary = rules.LoadContent("res://content")
+	_check("content loads", report["ok"] and report["diagnostics"].is_empty(), str(report))
 
 	rules.CreatePlayer("Player", 40, 3)
-	var ghoul: int = rules.SpawnEnemy("Ghoul", 0)
+	var ghoul: int = rules.SpawnEnemy("Ghoul", -1)
 	rules.StartBattle(false, false)
 
 	var strike: int = rules.AddCard("Strike", "hand")
@@ -278,15 +281,17 @@ func _run() -> void:
 	var scholar: int = rules.AddCard("Scholar", "hand")
 	_check("discover asks the player", rules.Play(scholar, 0) == "pending")
 	var choice: Dictionary = rules.GetPendingChoice()
-	_check("as an offer of three cards", choice.get("kind") == "offer" and choice.get("options", []).size() == 3, str(choice))
-	var outside: Dictionary = rules.AnswerChoice(choice["id"], [3])
-	_check("a position the offer does not have is turned away as unknown_option",
+	_check("as an offer of three cards", choice.get("mode") == "offer" and choice.get("options", []).size() == 3, str(choice))
+	_check("whose option_ids count from 1, so 0 is no answer", choice["option_ids"] == [1, 2, 3], str(choice["option_ids"]))
+	var outside: Dictionary = rules.AnswerChoice(choice["id"], [0])
+	_check("a number the offer does not have is turned away as unknown_option",
 		not outside["accepted"] and outside["reason"] == "unknown_option", str(outside))
+	_check("and a refusal still carries a result key, empty", outside.get("result", null) == "", str(outside))
 	var picked: String = choice["options"][1]["name"]
-	var answer: Dictionary = rules.AnswerChoice(choice["id"], [1])
-	_check("answering by position finishes the card", answer.get("result") == "played", str(answer))
+	var answer: Dictionary = rules.AnswerChoice(choice["id"], [2])
+	_check("answering by number finishes the card", answer.get("result") == "played", str(answer))
 	var names: Array = []
-	for id in rules.GetHand():
+	for id in rules.GetZone(rules.PlayerId(), "hand"):
 		names.append(rules.GetEntity(id)["name"])
 	_check("and creates the card picked", names == [picked], str(names))
 

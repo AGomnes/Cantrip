@@ -98,5 +98,23 @@ namespace Cantrip.Tests.Runtime
             Assert.True(runtime.CanCapture);
             runtime.Capture();   // the promise CanCapture makes
         }
+
+        /// <summary>
+        /// An adapter needs the vocabulary to tell a misspelt zone from one a game invented, since
+        /// the rules take both: "hnd" makes a real card in a pile nothing will ever draw from.
+        /// </summary>
+        [Fact]
+        public void The_well_known_zones_are_listed_and_anything_else_is_not_one()
+        {
+            Assert.Equal(
+                new[] { "", "board", "hand", "draw", "discard", "exhaust", "play", "powers", "relics", "attached", "dead" },
+                Zones.WellKnown);
+
+            foreach (string zone in Zones.WellKnown) Assert.True(Zones.IsWellKnown(zone), zone);
+
+            Assert.False(Zones.IsWellKnown("hnd"));
+            Assert.False(Zones.IsWellKnown("Hand"));   // zones are compared ordinally
+            Assert.False(Zones.IsWellKnown(null));
+        }
     }
 }

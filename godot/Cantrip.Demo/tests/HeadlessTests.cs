@@ -63,6 +63,11 @@ namespace Cantrip.GodotAdapter.Demo
                 ACallbackMustBeCallable();
                 WonIsNullUntilABattleEnds();
                 AnAutomaticLoadReportsItsProblems();
+                NothingButTheSurfaceIsPublishedToScript();
+                ASaveIsCheckedBeforeItsGameIsRead();
+                UseAbilitySaysWhyItDidNotFire();
+                AZoneTheRulesDoNotKnowIsSaidOutLoud();
+                TrackedStatsAreReadLiveWhereverTheyShow();
                 TheDebugChannelAnswersTheEditor();
                 DefaultInterfaceMembersDispatchInThisEngine();
 
@@ -88,8 +93,10 @@ namespace Cantrip.GodotAdapter.Demo
         {
             CantripRuntime rules = NewRuntime();
 
-            Godot.Collections.Array problems = rules.LoadContent(ContentFolder);
+            Godot.Collections.Dictionary report = rules.LoadContent(ContentFolder);
+            Godot.Collections.Array problems = report["diagnostics"].AsGodotArray();
             Check("content loads with no errors", Errors(problems) == 0, Describe(problems));
+            Check("and the report says so without the caller counting", report["ok"].AsBool() && report["errors"].AsInt32() == 0, Describe(problems));
             Check("content has the demo's definitions", rules.Content.Find("Ember", "card") != null && rules.Content.Find("Slime", "enemy") != null);
             Check("test blocks came with it", rules.Content.Tests.Count >= 3, rules.Content.Tests.Count + " test block(s)");
 
@@ -254,7 +261,7 @@ namespace Cantrip.GodotAdapter.Demo
             Check("a card needing a decision reports it", pending == "pending", pending);
             Check("the game was told what to ask", _lastChoice.Count > 0 && _lastChoice["prompt"].AsString().Length > 0);
             Check("with the cards to choose from", _lastChoice["option_ids"].AsGodotArray().Contains(keep));
-            Check("and nothing happened yet", rules.GetHand().Contains(sort) && rules.GetZone(0, "exhaust").Count == 0);
+            Check("and nothing happened yet", Hand(rules).Contains(sort) && rules.GetZone(0, "exhaust").Count == 0);
 
             int requestId = _lastChoice["id"].AsInt32();
             Godot.Collections.Dictionary answered = rules.AnswerChoice(requestId, new Godot.Collections.Array { spare });
@@ -319,7 +326,7 @@ namespace Cantrip.GodotAdapter.Demo
             int ember = rules.AddCard("Ember", "hand");
 
             Check("a game between actions can be saved", rules.CanSave());
-            string save = rules.Save();
+            string save = Saved(rules);
             string before = rules.StateHash();
 
             rules.Play(ember, slime);
@@ -358,7 +365,7 @@ namespace Cantrip.GodotAdapter.Demo
             before.SpawnEnemy("Slime");
             before.StartBattle(false, false);
             int ember = before.AddCard("Ember", "hand");
-            string save = before.Save();
+            string save = Saved(before);
             string saved = before.StateHash();
 
             CantripRuntime patched = Loaded();
@@ -392,7 +399,7 @@ namespace Cantrip.GodotAdapter.Demo
             before.SpawnEnemy("Slime");
             before.StartBattle(false, false);
             before.AddCard("Keepsake", "hand");
-            string save = before.Save();
+            string save = Saved(before);
 
             CantripRuntime patched = Loaded();
             patched.CreatePlayer();
@@ -441,7 +448,7 @@ namespace Cantrip.GodotAdapter.Demo
                 rules.StartBattle(false, false);
                 rules.Play(rules.AddCard("Later", "hand"));
                 Check("a block waiting from content can be saved", rules.CanSave());
-                string save = rules.Save();
+                string save = Saved(rules);
 
                 Patch(rules, path, Later(9));
                 Check("once a reload has changed the waiting block, a save cannot hold it", !rules.CanSave());
@@ -521,7 +528,7 @@ namespace Cantrip.GodotAdapter.Demo
             rules.SpawnEnemy("Slime");
             rules.StartBattle(false, true);
             Check("and the next battle is dealt from the deck as it now is",
-                rules.GetHand().Count == 2 && rules.GetHand().Contains(better) && rules.GetHand().Contains(ember), Names(rules, rules.GetHand()));
+                Hand(rules).Count == 2 && Hand(rules).Contains(better) && Hand(rules).Contains(ember), Names(rules, Hand(rules)));
 
             rules.EffectEvent -= OnEffectEvent;
             rules.QueueFree();
@@ -645,7 +652,7 @@ namespace Cantrip.GodotAdapter.Demo
                 rules.AddDeck(deck);
                 rules.SpawnEnemy("Slime");
                 rules.StartBattle(false, true);
-                Check("the default ruleset deals five cards", rules.GetHand().Count == 5, rules.GetHand().Count.ToString());
+                Check("the default ruleset deals five cards", Hand(rules).Count == 5, Hand(rules).Count.ToString());
 
                 using (FileAccess file = FileAccess.Open(path, FileAccess.ModeFlags.Write)) file.StoreString("ruleset\n  hand_size 2\n");
                 Godot.Collections.Dictionary report = rules.ReloadContent(new Godot.Collections.Array { path });
@@ -656,7 +663,7 @@ namespace Cantrip.GodotAdapter.Demo
                 rules.AddDeck(deck);
                 rules.SpawnEnemy("Slime");
                 rules.StartBattle(false, true);
-                Check("and a new run plays by it", rules.GetHand().Count == 2, rules.GetHand().Count.ToString());
+                Check("and a new run plays by it", Hand(rules).Count == 2, Hand(rules).Count.ToString());
             }
             finally
             {
@@ -861,7 +868,7 @@ namespace Cantrip.GodotAdapter.Demo
             rules.SpawnEnemy("Slime");
             rules.StartBattle(false, false);
             int card = rules.AddCard("Priced", "hand");
-            string save = rules.Save();
+            string save = Saved(rules);
 
             var refused = new List<string>();
             var allowed = new List<string>();
@@ -906,7 +913,7 @@ namespace Cantrip.GodotAdapter.Demo
                 allowed.Count == 0 && new HashSet<string>(refused).Count == 9 && cost == 1, $"cost {cost}, allowed: " + string.Join(", ", allowed));
 
             Check("so the game was not set up behind the rules' back",
-                rules.GetHand().Count == 1 && rules.GetZone(0, "draw").Count == 0 && rules.GetEnemies().Count == 1);
+                Hand(rules).Count == 1 && rules.GetZone(0, "draw").Count == 0 && rules.GetEnemies().Count == 1);
 
             rules.QueueFree();
         }
@@ -982,6 +989,190 @@ namespace Cantrip.GodotAdapter.Demo
             Check("an automatic load reports each error on one line, as the importer words it",
                 heard.Errors.Exists(line => line.StartsWith(expected, StringComparison.Ordinal)), string.Join(" | ", heard.Errors));
 
+            rules.QueueFree();
+        }
+
+        /// <summary>
+        /// Godot's source generator publishes every ordinary method of a <c>[GlobalClass]</c> to
+        /// script whatever its C# accessibility says, and at 1.0 whatever is published is promised.
+        /// So the node's own loop must not be a method of the node, and <c>GetHand</c>, which could
+        /// only ever have answered for one hero, must be gone rather than deprecated: GDScript
+        /// compiles nothing until the line runs, so the only way to say so is to fail on the call.
+        /// </summary>
+        private void NothingButTheSurfaceIsPublishedToScript()
+        {
+            CantripRuntime rules = NewRuntime();
+            var presenter = new BattlePresenter();
+            AddChild(presenter);
+
+            Check("GetHand is gone from the node", !rules.HasMethod("GetHand"));
+            Check("and from the method list script reads", !Published(rules).Contains("GetHand"));
+
+            var loop = new List<string>();
+            foreach (string name in new[] { "Guard", "AfterAction", "SyncChoice", "Word", "Refused" })
+            {
+                if (rules.HasMethod(name) || Published(rules).Contains(name)) loop.Add(name);
+            }
+            Check("the node's own loop is not callable from script", loop.Count == 0, string.Join(", ", loop));
+            Check("nor the presenter's", !presenter.HasMethod("Pump") && !Published(presenter).Contains("Pump"));
+
+            // What the surface is for: the calls a game makes are all still there.
+            Check("while the calls a game makes are published",
+                rules.HasMethod("GetZone") && rules.HasMethod("Play") && rules.HasMethod("UseAbility") && rules.HasMethod("Save"));
+
+            presenter.QueueFree();
+            rules.QueueFree();
+        }
+
+        /// <summary>
+        /// The envelope around a save is checked before the game inside it is read at all, and the
+        /// answer is the same dictionary every other refusal uses. A save written by a newer addon
+        /// cannot be understood, so it is turned away; nothing about the running game changes.
+        /// </summary>
+        private void ASaveIsCheckedBeforeItsGameIsRead()
+        {
+            CantripRuntime rules = Loaded();
+            rules.CreatePlayer();
+            rules.SpawnEnemy("Slime");
+            rules.StartBattle(false, false);
+            rules.AddCard("Ember", "hand");
+
+            string good = Saved(rules);
+            string before = rules.StateHash();
+            Check("a save was made", good.Length > 0);
+
+            Godot.Collections.Dictionary fromTheFuture = LoadOrThrown(rules, WithFormat(good, 99));
+            Check("a save from a newer addon is refused as wrong_format",
+                !fromTheFuture["accepted"].AsBool() && fromTheFuture["reason"].AsString() == "wrong_format", Say(fromTheFuture));
+
+            Godot.Collections.Dictionary empty = LoadOrThrown(rules, "{\"format\":1,\"fingerprint\":\"\",\"snapshot\":\"\"}");
+            Check("one carrying no game is refused as no_payload",
+                !empty["accepted"].AsBool() && empty["reason"].AsString() == "no_payload", Say(empty));
+
+            Godot.Collections.Dictionary nonsense = LoadOrThrown(rules, "{ not a save at all");
+            Check("and text that is not a save file at all is wrong_format, not a stack trace",
+                !nonsense["accepted"].AsBool() && nonsense["reason"].AsString() == "wrong_format", Say(nonsense));
+
+            Check("every refusal says why in a sentence as well as a word",
+                fromTheFuture["message"].AsString().Length > 0 && empty["message"].AsString().Length > 0 && nonsense["message"].AsString().Length > 0);
+            Check("and none of them touched the game", rules.StateHash() == before);
+
+            Check("while the save this addon wrote still loads", LoadOrThrown(rules, good)["accepted"].AsBool());
+            rules.QueueFree();
+        }
+
+        /// <summary>
+        /// <c>UseAbility</c> answered one bool for a cooldown, a question the rules stopped to ask
+        /// and an id naming nothing, so a real-time game could not tell the player why the ability
+        /// did not fire. It answers the same words <c>Play</c> does.
+        /// </summary>
+        private void UseAbilitySaysWhyItDidNotFire()
+        {
+            CantripRuntime rules = Loaded();
+            DiagnosticBag abilities = rules.Content.LoadText(
+                "ability \"Brace\"\n  cooldown 2 turns\n  effect:\n    block 3\n", "res://tests/brace.cantrip");
+            Check("an ability loads", !abilities.HasErrors, abilities.ToString());
+
+            int player = rules.CreatePlayer();
+            rules.SpawnEnemy("Slime");
+            rules.StartBattle(false, false);
+
+            int brace = rules.GrantAbility("Brace", player);
+            Check("an ability is granted", brace != 0);
+
+            Check("using it answers played", rules.UseAbility(brace) == "played", rules.UseAbility(brace));
+            Check("and again, on cooldown, not_ready rather than the same false",
+                rules.UseAbility(brace) == "not_ready", rules.UseAbility(brace));
+            Check("an id that is no ability answers not_a_card", rules.UseAbility(999999) == "not_a_card", rules.UseAbility(999999));
+            Check("an ability nothing defines is 0, not a stack trace", rules.GrantAbility("Nothing", player) == 0);
+
+            rules.QueueFree();
+        }
+
+        /// <summary>
+        /// The rules take any string as a zone on purpose, so a game can invent one. That also means
+        /// nothing catches a typo: AddCard("Guard", "hnd") makes a real card in a pile the game will
+        /// never draw from. A warning is the only thing that tells the two apart.
+        /// </summary>
+        private void AZoneTheRulesDoNotKnowIsSaidOutLoud()
+        {
+            CantripRuntime rules = Loaded();
+            rules.CreatePlayer();
+
+            GD.Print("HEADLESS: a misspelt zone follows; the warning it reports next is expected.");
+            var heard = new WarningLog();
+            OS.AddLogger(heard);
+            int card;
+            try
+            {
+                card = rules.AddCard("Guard", "hnd");
+                rules.GetZone(0, "hnd");
+                rules.AddCard("Guard", "hand");   // a zone the rules know says nothing
+            }
+            finally
+            {
+                OS.RemoveLogger(heard);
+            }
+
+            Check("a misspelt zone is warned about, once per call that took it",
+                heard.Warnings.FindAll(line => line.Contains("\"hnd\"")).Count == 2, string.Join(" | ", heard.Warnings));
+            Check("the warning names the zones the rules do know",
+                heard.Warnings.Exists(line => line.Contains("hand") && line.Contains("discard")), string.Join(" | ", heard.Warnings));
+            Check("a zone the rules know is not warned about",
+                !heard.Warnings.Exists(line => line.Contains("\"hand\"")), string.Join(" | ", heard.Warnings));
+            Check("and the card was still made, because a game may invent a zone of its own", card != 0);
+
+            rules.QueueFree();
+        }
+
+        /// <summary>
+        /// TrackedStats used to be captured when the rules came into being for an event's stats and
+        /// read live for a choice's options, so setting it afterwards changed one of the two
+        /// dictionaries it names and not the other.
+        /// </summary>
+        private void TrackedStatsAreReadLiveWhereverTheyShow()
+        {
+            CantripRuntime rules = Loaded();
+            var carried = new List<string>();
+            void OnEvent(Godot.Collections.Dictionary raised)
+            {
+                Godot.Collections.Dictionary after = raised["after"].AsGodotDictionary();
+                foreach (Variant who in after.Keys)
+                {
+                    foreach (Variant stat in after[who].AsGodotDictionary().Keys) carried.Add(stat.AsString());
+                }
+            }
+
+            rules.EffectEvent += OnEvent;
+            rules.ChoiceRequested += OnChoiceRequested;
+
+            rules.CreatePlayer();
+            int slime = rules.SpawnEnemy("Slime");
+            rules.StartBattle(false, false);
+
+            // The first action brings the rules into being, which is where the list used to be read
+            // once and kept.
+            Check("a card plays", rules.Play(rules.AddCard("Ember", "hand"), slime) == "played");
+            Check("its events carry the stats the export names", carried.Contains("hp"), string.Join(", ", carried));
+
+            carried.Clear();
+            rules.TrackedStats = new[] { "block" };
+            rules.Play(rules.AddCard("Ember", "hand"), slime);
+            Check("a list set after the rules exist is the one the next events carry",
+                carried.Contains("block") && !carried.Contains("hp"), string.Join(", ", carried));
+
+            // A choice's options are cards here, so the list is named after something a card has.
+            // A spare beside it too: a choice with one candidate is taken without asking.
+            rules.TrackedStats = new[] { "cost" };
+            rules.AddCard("Guard", "hand");
+            Check("a card that asks stops", rules.Play(rules.AddCard("Sort", "hand")) == "pending");
+            Godot.Collections.Dictionary stats = _lastChoice["options"].AsGodotArray()[0].AsGodotDictionary()["stats"].AsGodotDictionary();
+            Check("and a choice's options carry the list set afterwards too, as they always read it live",
+                stats.ContainsKey("cost"), string.Join(", ", Keys(stats)));
+            rules.CancelChoice();
+
+            rules.ChoiceRequested -= OnChoiceRequested;
+            rules.EffectEvent -= OnEvent;
             rules.QueueFree();
         }
 
@@ -1108,18 +1299,44 @@ namespace Cantrip.GodotAdapter.Demo
             return rules.ReloadContent(new Godot.Collections.Array { path })["diagnostics"].AsGodotArray();
         }
 
-        /// <summary>What Save says when it cannot save, or "saved".</summary>
+        /// <summary>The cards in the player's hand, which is what GetHand used to answer.</summary>
+        private static Godot.Collections.Array Hand(CantripRuntime rules) => rules.GetZone(rules.PlayerId(), "hand");
+
+        /// <summary>
+        /// Every method name a script can see on an object, which for a C# type is not the same
+        /// question as what C# calls public.
+        /// </summary>
+        private static List<string> Published(GodotObject subject)
+        {
+            var names = new List<string>();
+            foreach (Godot.Collections.Dictionary method in subject.GetMethodList()) names.Add(method["name"].AsString());
+            return names;
+        }
+
+        /// <summary>A refusal on one line, for the detail beside a failed check.</summary>
+        private static string Say(Godot.Collections.Dictionary answer) =>
+            answer["reason"].AsString() + ": " + answer["message"].AsString();
+
+        /// <summary>The same save, claiming to have been written by another version of the addon.</summary>
+        private static string WithFormat(string save, int format)
+        {
+            Godot.Collections.Dictionary file = Json.ParseString(save).AsGodotDictionary();
+            file["Format"] = format;
+            return Json.Stringify(file);
+        }
+
+        /// <summary>The save itself, or an empty string when it was refused.</summary>
+        private static string Saved(CantripRuntime rules)
+        {
+            Godot.Collections.Dictionary saved = rules.Save();
+            return saved["accepted"].AsBool() ? saved["save"].AsString() : string.Empty;
+        }
+
+        /// <summary>What Save says when it cannot save, as "reason: message", or "saved".</summary>
         private static string SaveError(CantripRuntime rules)
         {
-            try
-            {
-                rules.Save();
-                return "saved";
-            }
-            catch (InvalidOperationException error)
-            {
-                return error.Message;
-            }
+            Godot.Collections.Dictionary saved = rules.Save();
+            return saved["accepted"].AsBool() ? "saved" : saved["reason"].AsString() + ": " + saved["message"].AsString();
         }
 
         /// <summary>
@@ -1310,6 +1527,22 @@ namespace Cantrip.GodotAdapter.Demo
                 // explains it in rationale.
                 if (errorType != (int)ErrorType.Error) return;
                 lock (Errors) Errors.Add(string.IsNullOrEmpty(rationale) ? code : rationale);
+            }
+        }
+
+        /// <summary>
+        /// What the Output panel was told to warn about. A warning is the addon's answer where the
+        /// rules allow something a game probably did not mean, so it has to be checkable too.
+        /// </summary>
+        private sealed partial class WarningLog : Logger
+        {
+            public List<string> Warnings { get; } = new List<string>();
+
+            public override void _LogError(string function, string file, int line, string code, string rationale,
+                bool editorNotify, int errorType, Godot.Collections.Array<ScriptBacktrace> scriptBacktraces)
+            {
+                if (errorType != (int)ErrorType.Warning) return;
+                lock (Warnings) Warnings.Add(string.IsNullOrEmpty(rationale) ? code : rationale);
             }
         }
     }

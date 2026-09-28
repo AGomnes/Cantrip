@@ -39,7 +39,7 @@ namespace Cantrip.GodotAdapter
     public sealed class CantripWorkspace
     {
         /// <summary>Where content lives, so a project can keep <c>.cantrip</c> files in one folder.</summary>
-        public const string ContentFolderSetting = "cantrip/content/folder";
+        public const string ContentFolderSetting = GodotContentLoader.FolderSetting;
 
         /// <summary>Verbs a game registers from C#, so CT301 does not fire on every one of them.</summary>
         public const string HostVerbsSetting = "cantrip/lint/host_verbs";

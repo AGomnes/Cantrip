@@ -50,6 +50,8 @@ namespace Cantrip.GodotAdapter
 
         public override void _EnterTree()
         {
+            DeclareSettings();
+
             _importPlugin = new CantripImportPlugin();
             AddImportPlugin(_importPlugin);
 
@@ -139,6 +141,37 @@ namespace Cantrip.GodotAdapter
         }
 
         private void OnNavigateRequested(string file, int line, int column) => _panel?.ShowSource(file, line, column);
+
+        /// <summary>
+        /// Puts the <c>cantrip/</c> settings in Project Settings, so they can be found and edited
+        /// rather than typed in from the documentation by someone who knows they exist.
+        /// </summary>
+        /// <remarks>
+        /// Each is declared with its default, which is what makes it appear at all, and then given
+        /// its type; the value of one already set is left alone. They stay under Advanced Settings,
+        /// where a project's own settings belong.
+        /// </remarks>
+        private static void DeclareSettings()
+        {
+            Declare(CantripWorkspace.ContentFolderSetting, GodotContentLoader.DefaultFolder, Variant.Type.String, PropertyHint.Dir);
+            Declare(CantripWorkspace.HostNamesSetting, string.Empty, Variant.Type.String);
+            Declare(CantripWorkspace.HostEventsSetting, string.Empty, Variant.Type.String);
+            Declare(CantripWorkspace.HostVerbsSetting, string.Empty, Variant.Type.String);
+        }
+
+        private static void Declare(string key, Variant fallback, Variant.Type type, PropertyHint hint = PropertyHint.None)
+        {
+            if (!ProjectSettings.HasSetting(key)) ProjectSettings.SetSetting(key, fallback);
+
+            ProjectSettings.SetInitialValue(key, fallback);
+            ProjectSettings.AddPropertyInfo(new Godot.Collections.Dictionary
+            {
+                ["name"] = key,
+                ["type"] = (int)type,
+                ["hint"] = (int)hint,
+                ["hint_string"] = string.Empty,
+            });
+        }
 
         private static bool SelfTestRequested()
         {

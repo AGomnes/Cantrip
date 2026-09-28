@@ -160,10 +160,10 @@ func _ready() -> void:
 	rules.AutoLoad = false  # load by hand below, to see what the parser found
 	add_child(rules)
 
-	var problems: Array = rules.LoadContent("res://content")
-	for problem in problems:
+	var report: Dictionary = rules.LoadContent("res://content")
+	for problem in report["diagnostics"]:
 		print("%s:%d %s %s" % [problem["file"], problem["line"], problem["code"], problem["message"]])
-	if problems.any(func(problem): return problem["severity"] == "error"):
+	if not report["ok"]:
 		return
 
 	rules.EffectEvent.connect(_on_effect_event)
@@ -172,7 +172,7 @@ func _ready() -> void:
 
 	rules.CreatePlayer("Player", 40, 3)  # name, hp, energy each turn
 	rules.AddDeck(["Strike", "Strike", "Strike", "Defend", "Defend", "Curse", "Curse", "Sift"])
-	ghoul = rules.SpawnEnemy("Ghoul", 0)  # 0: the hp its content gives it, 30
+	ghoul = rules.SpawnEnemy("Ghoul", -1)  # -1: the hp its content gives it, 30
 	rules.StartBattle(true, true)  # shuffle the draw pile, draw the opening hand
 
 	# There is no UI yet, so the script plays for you, for at most 20 turns.
@@ -187,7 +187,7 @@ func _take_turn() -> void:
 	print("Turn %d. You have %d hp. The Ghoul has %d hp and intends: %s" % [rules.GetTurn(),
 		rules.GetStat(rules.PlayerId(), "hp"), rules.GetStat(ghoul, "hp"), rules.DescribeIntent(ghoul)["plain"]])
 
-	for card in rules.GetHand():
+	for card in rules.GetZone(rules.PlayerId(), "hand"):
 		if not rules.CanPlay(card):
 			continue
 		var target := ghoul if rules.GetTargetMode(card) == "enemy" else 0
@@ -254,13 +254,16 @@ The same seed plays the same battle, so yours reads the same. What the script re
   it enters the tree. Nothing hands your script what the parser found, so the node reports each
   error and warning in the Output panel, one line each, in the form `dotnet cantrip lint` uses:
   `res://content/game.cantrip:12:3: warning CT0101: ...`. Loading does not lint; the dock shows
-  the linter's findings. This script turns `AutoLoad` off and calls `LoadContent`, which returns
-  the parser's problems instead. Load before anything else: once a player, a card or a query has
-  brought the rules into being, `LoadContent` fails and [`ReloadContent`](#hot-reload) is the
-  way to change content.
-- **Every argument is passed.** `SpawnEnemy("Ghoul", 0)` passes 0 for the hp, which means the hp
-  its content gives it; any other number overrides that. `StartBattle(true, true)` shuffles the
-  draw pile and then draws the opening hand.
+  the linter's findings. This script turns `AutoLoad` off and calls `LoadContent`, which returns a
+  report instead: `ok`, how many `errors` and `warnings` there were, and the `diagnostics`
+  themselves. Load before anything else: once a player, a card or a query has brought the rules
+  into being, `LoadContent` fails and [`ReloadContent`](#hot-reload) is the way to change content.
+- **Every argument is passed.** `SpawnEnemy("Ghoul", -1)` passes -1 for the hp, which means the hp
+  its content gives it; any number from 1 up overrides that, and 0 is refused, because an enemy
+  with no health is not something to guess at. `StartBattle(true, true)` shuffles the draw pile and
+  then draws the opening hand.
+- **The player's hand is `GetZone(PlayerId(), "hand")`.** There is no `GetHand`: a zone belongs to
+  whoever owns it, and a game with more than one hero has more than one hand.
 - **`Play` answers with a word**: `played`, or why not (`not_enough_energy`, `invalid_target` and
   the others under [The node](#the-node)). `pending` means the card stopped for a choice. The
   `ChoiceRequested` signal has fired before `Play` returns, and because this stand-in answers at
@@ -285,25 +288,29 @@ the rest of this page assume `rules` is such a node, with its content loaded.
 ## The node
 
 `CantripRuntime` is the only surface a script touches. Entities cross as `int` ids, and 0 means
-none. Everything else crosses as strings, numbers, arrays and dictionaries with snake_case keys.
+none — except for the two arguments that name whose side a call acts on, `GetZone`'s `ownerId` and
+`Execute`'s `selfId`, where 0 means the player. Everywhere a call takes a target, 0 means nobody.
+Pass `PlayerId()` wherever the id is worked out rather than written down, so an id that comes out 0
+cannot read someone else's pile. Everything else crosses as strings, numbers, arrays and
+dictionaries with snake_case keys.
 
 ### Exports
 
 | Export | Default | What it does |
 |---|---|---|
-| `ContentFolder` | `"res://content"` | Where `.cantrip` files are found, including every folder below it |
+| `ContentFolder` | `""` | Where `.cantrip` files are found, including every folder below it. Empty reads the `cantrip/content/folder` project setting, and `res://content` when that is unset. |
 | `AutoLoad` | `true` | Loads `ContentFolder` when the node enters the tree, reporting its errors and warnings in the Output panel |
-| `Seed` | `1` | Every random roll comes from it: the same seed and the same calls play the same game |
+| `Seed` | `1` | Every random roll comes from it: the same seed and the same calls play the same game. Any 64-bit number is a seed of its own, 0 and negative ones included. |
 | `Trace` | `false` | Records why things happened, for the debugger. It costs time. |
 | `RealTime` | `false` | Runs on a tick clock instead of turns; see [Real time](#real-time) |
-| `TicksPerSecond` | `60` | The tick clock's rate, which `cooldown 8s` in content converts through |
-| `TrackedStats` | `["hp", "block", "energy"]` | The stats each event records as they were at that moment |
+| `TicksPerSecond` | `60` | The tick clock's rate, which `cooldown 8s` in content converts through. A `Driver` is put on this rate as the node enters the tree, with a warning if it disagreed. |
+| `TrackedStats` | `["hp", "block", "energy"]` | The stats each event records as they were at that moment, and the stats a choice's options carry. Read live: set it again and the next event and the next question both follow. |
 | `Presenter` | none | A `BattlePresenter` that paces events; see [Pacing events](#pacing-events-with-a-battlepresenter) |
 | `Driver` | none | A `TickDriver` for a real-time game |
 
-`Seed`, `Trace`, `RealTime`, `TicksPerSecond` and `TrackedStats` are read when the first call
-that sets up, plays or reads the game brings the rules into being, so set them before that, and
-again by `NewRun`. `Driver` is read when the node enters the tree.
+`Seed`, `Trace`, `RealTime` and `TicksPerSecond` are read when the first call that sets up, plays
+or reads the game brings the rules into being, so set them before that, and again by `NewRun`.
+`Driver` is read when the node enters the tree. `TrackedStats` is read each time it is used.
 
 ### Signals
 
@@ -313,7 +320,7 @@ again by `NewRun`. `Driver` is read when the node enters the tree.
 | `ChoiceRequested(request: Dictionary)` | The rules are waiting for the player to choose. Emitted after the action's events. |
 | `BattleStarted()` | `StartBattle` has started a battle |
 | `BattleEnded(won: bool)` | The action that won or lost the battle has finished |
-| `ContentReloaded(diagnostics: Array)` | `ReloadContent` has run |
+| `ContentReloaded(report: Dictionary)` | `ReloadContent` has run, and carries the same report it returned |
 
 ### Methods
 
@@ -324,53 +331,56 @@ that is the value to pass if you have no other in mind.
 
 | Method | |
 |---|---|
-| `LoadContent(folder: String) -> Array` | Loads every `.cantrip` file under `folder` (`""` means `ContentFolder`) and returns the problems found. Only before any other call. |
-| `ReloadContent(paths: Array) -> Dictionary` | Reloads the given `res://` files into a running game, or for `[]` every file under `ContentFolder`, even if `LoadContent` was given another folder. See [Hot reload](#hot-reload). |
+| `LoadContent(folder: String) -> Dictionary` | Loads every `.cantrip` file under `folder` (`""` means `ContentFolder`) and returns a report: `ok`, `errors`, `warnings`, `diagnostics`. Only before any other call. |
+| `ReloadContent(paths: Array) -> Dictionary` | Reloads the given `res://` files into a running game, or for `[]` every file under `ContentFolder`, even if `LoadContent` was given another folder. The same report, plus `rebound`, `missing` and `ruleset_changed`. See [Hot reload](#hot-reload). |
 | `GetDefinitions(kind: String, tag: String) -> Array` | The names of every loaded definition of one kind, such as `"card"`, `"relic"` or `"enemy"`, that has `tag` among its tags, or of every one for `""`. Sorted by name, for a reward screen or a shop. Default tag: `""`. |
 
 **Setting a game up**
 
 | Method | |
 |---|---|
-| `CreatePlayer(name: String, hp: int, maxEnergy: int) -> int` | Creates the player, once per run. `maxEnergy` is the energy each turn starts with. Defaults: `"Player", 80, 3`. |
-| `AddCard(name: String, zone: String) -> int` | Adds a card to one of the player's zones. Default zone: `"draw"`. |
+| `CreatePlayer(name: String, hp: int, max_energy: int) -> int` | Creates the player, once per run. `max_energy` is the energy each turn starts with. Defaults: `"Player", 80, 3`. |
+| `AddCard(name: String, zone: String) -> int` | Adds a card to one of the player's zones. Default zone: `"draw"`. A zone outside [the list below](#zones) still works, but says so in the Output panel. |
 | `AddDeck(names: Array) -> Array` | Adds cards to the draw pile, returning their ids |
 | `AddRelic(name: String) -> int` | Gives the player a relic |
-| `SpawnEnemy(name: String, hp: int) -> int` | Adds an enemy. An `hp` of 0 uses the content's. Default: `0`. |
-| `ApplyStatus(status: String, targetId: int, stacks: int) -> int` | Applies a status, as the player. Returns the status's id, or 0. Default stacks: `1`. |
-| `GrantAbility(name: String, ownerId: int) -> int` | Attaches an ability to an actor. Returns its id, or 0 when `ownerId` is unknown. |
-| `RemoveCard(cardId: int) -> bool` | Takes a card out of the game for good, as `destroy` does in content, which hears it as `destroyed`. False, having changed nothing, when the id is not a card still in the game. |
+| `SpawnEnemy(name: String, hp: int) -> int` | Adds an enemy. A negative `hp` uses the content's; 0 is refused. Default: `-1`. |
+| `ApplyStatus(status: String, target_id: int, stacks: int) -> int` | Applies a status, as the player. Returns the status's id, or 0 when the target is unknown or nothing of that name is loaded. Default stacks: `1`. |
+| `GrantAbility(name: String, owner_id: int) -> int` | Attaches an ability to an actor. Returns its id, or 0 when the owner is unknown or nothing of that name is loaded. |
+| `RemoveCard(card_id: int) -> bool` | Takes a card out of the game for good, as `destroy` does in content, which hears it as `destroyed`. False, having changed nothing, when the id is not a card still in the game. |
 | `NewRun() -> void` | Starts a new run: the rules begin again from the loaded content, with no player, cards or enemies, and read `Seed` and the other exports again. See [Between battles](#between-battles). |
 
 **Playing**
 
 | Method | |
 |---|---|
-| `StartBattle(shuffle: bool, drawOpeningHand: bool) -> void` | Starts a battle. Defaults: `true, true`. |
-| `Play(cardId: int, targetId: int) -> String` | Plays a card from the hand, aimed at `targetId`, or 0 for none. Default target: `0`. |
-| `PlayNamed(cardName: String, targetId: int) -> String` | Plays the first card of that name in the hand |
+| `StartBattle(shuffle: bool, draw_opening_hand: bool) -> void` | Starts a battle. Defaults: `true, true`. |
+| `Play(card_id: int, target_id: int) -> String` | Plays a card from the hand, aimed at `target_id`, or 0 for none. Default target: `0`. |
+| `PlayNamed(card_name: String, target_id: int) -> String` | Plays the first card of that name in the hand |
 | `EndTurn() -> void` | Ends the player's turn; the enemies act, and the next turn starts |
-| `Tick(count: int) -> void` | Advances a real-time clock by `count` ticks. Default: `1`. |
-| `UseAbility(abilityId: int, targetId: int) -> bool` | Uses an ability; false when it was not used, as when it is not ready. Default target: `0`. |
-| `Execute(statements: String, selfId: int, targetId: int) -> void` | Runs statements as content would, for a console, a cheat key or a heal between battles. `selfId` 0 runs them as the player. Defaults: `0, 0`. |
+| `Tick(count: int) -> void` | Advances a real-time clock by `count` ticks. Default: `1`. In a turn game it fails with an error saying the runtime uses turns. |
+| `UseAbility(ability_id: int, target_id: int) -> String` | Uses an ability, answering with the same words `Play` does. Default target: `0`. |
+| `Execute(statements: String, self_id: int, target_id: int) -> void` | Runs statements as content would, for a console, a cheat key or a heal between battles. `self_id` 0 runs them as the player; `target_id` 0 means nobody. Defaults: `0, 0`. |
 
-`Play` and `PlayNamed` answer `played`, `pending` (see [Choices](#choices-the-player-makes)),
-`not_a_card`, `not_in_hand`, `unplayable`, `not_enough_energy`, `invalid_target` or `cancelled`.
+`Play`, `PlayNamed` and `UseAbility` answer `played`, `pending`
+(see [Choices](#choices-the-player-makes)), `not_a_card`, `not_in_hand`, `unplayable`,
+`not_enough_energy`, `invalid_target`, `cancelled` or `not_ready`. For an ability, `not_a_card`
+means the id is not an ability that can be used — gone, or on a dead owner — and `not_ready` means
+it is still on cooldown. `not_ready` never comes back from `Play`, and `not_in_hand` never from
+`UseAbility`; the one table is shared so that one ending always has one word.
 
 **Reading the game**
 
 | Method | |
 |---|---|
 | `PlayerId() -> int` | The player's id, or 0 before `CreatePlayer` |
-| `GetHand() -> Array` | Ids of the cards in the player's hand |
-| `GetZone(ownerId: int, zone: String) -> Array` | Ids in one of an owner's zones; `ownerId` 0 means the player |
+| `GetZone(owner_id: int, zone: String) -> Array` | Ids in one of an owner's zones; `owner_id` 0 means the player. The player's hand is `GetZone(PlayerId(), "hand")`. |
 | `GetEnemies() -> Array`, `GetAllies() -> Array`, `GetActors() -> Array` | Ids of the living enemies, the living actors on the player's side, or both |
-| `GetEntity(entityId: int) -> Dictionary` | Everything a UI shows about one entity; empty for an unknown id |
-| `GetStat(entityId: int, stat: String) -> int` | One stat after modifiers, which is the number the rules would use now; 0 when unknown |
-| `CostOf(cardId: int) -> int` | What the card costs now |
-| `CanPlay(cardId: int) -> bool` | Whether `Play` would accept it: in hand, affordable, with a legal target if it needs one |
-| `GetTargetMode(cardId: int) -> String` | What the card is aimed at: `"enemy"`, `"ally"`, `"self"`, `"any"` or `"none"` |
-| `GetLegalTargets(cardId: int) -> Array` | The ids it may be aimed at, for highlighting |
+| `GetEntity(entity_id: int) -> Dictionary` | Everything a UI shows about one entity; empty for an unknown id |
+| `GetStat(entity_id: int, stat: String) -> int` | One stat after modifiers, which is the number the rules would use now; 0 both when the id is unknown and when the entity has no such stat |
+| `CostOf(card_id: int) -> int` | What the card costs now; 0 for an unknown id |
+| `CanPlay(card_id: int) -> bool` | Whether `Play` would accept it: in hand, affordable, with a legal target if it needs one |
+| `GetTargetMode(card_id: int) -> String` | What the card is aimed at: whatever word content wrote after `target`, usually `"enemy"`, `"ally"`, `"self"`, `"any"` or `"none"`. `""` for an id that names nothing, which is how a stale id is told from a card needing no target. |
+| `GetLegalTargets(card_id: int) -> Array` | The ids it may be aimed at, for highlighting. Empty for a `target` word the rules do not recognise. |
 | `IsInBattle() -> bool` | Whether a battle is running |
 | `GetTurn() -> int` | The turn number, counted from 1 in each battle |
 | `GetWon() -> Variant` | How the last battle ended: `true` if the player won it, `false` if not, and `null` while a battle runs and before the first has ended |
@@ -380,9 +390,17 @@ that is the value to pass if you have no other in mind.
 
 | Method | |
 |---|---|
-| `Describe(entityId: int, targetId: int) -> Dictionary` | Rules text with live values, for a card frame or a tooltip. `targetId` counts that target's statuses, or 0 for none. |
-| `DescribeIntent(enemyId: int) -> Dictionary` | What an enemy will do next, with live values. Until the battle has started, its `empty` is true and its text is `""`. |
+| `Describe(entity_id: int, target_id: int) -> Dictionary` | Rules text with live values, for a card frame or a tooltip. `target_id` counts that target's statuses, or 0 for none. |
+| `DescribeIntent(enemy_id: int) -> Dictionary` | What an enemy will do next, with live values. Until intents have been rolled, its `empty` is true, its text is `""`, and its `name` is the enemy's own name rather than a move's. |
 | `DescribeDefinition(name: String, kind: String) -> Dictionary` | A definition's rules text with its printed values, for something not in play, such as a reward. `kind` `""` takes the first definition of that name. Empty when none is loaded. Default kind: `""`. |
+
+**Two vocabularies called kind.** `GetDefinitions` and `DescribeDefinition` take the keyword that
+*declares* a definition in content — `"card"`, `"relic"`, `"enemy"`, `"status"`, `"ability"`. An
+entity's `kind`, in the dictionary `GetEntity` gives, says what it *is* in the rules — `"actor"`,
+`"card"`, `"status"`, and so on. They overlap but are not the same list: a Slime declared with
+`enemy Slime` is an `"actor"` once it is in play, so `DescribeDefinition(name, "actor")` and
+`GetDefinitions("actor")` find nothing at all. Pass an entity's `kind` to either of them and the
+answer is empty, with no error.
 
 **Choices**
 
@@ -390,16 +408,16 @@ that is the value to pass if you have no other in mind.
 |---|---|
 | `HasPendingChoice() -> bool` | Whether the rules are waiting for an answer |
 | `GetPendingChoice() -> Dictionary` | The same dictionary `ChoiceRequested` carried; empty when nothing is waiting |
-| `AnswerChoice(requestId: int, chosen: Array) -> Dictionary` | Answers it with option ids, then finishes the action |
+| `AnswerChoice(request_id: int, chosen: Array) -> Dictionary` | Answers it with option ids, then finishes the action |
 | `CancelChoice() -> void` | Abandons the action that asked, leaving the game as it was before it |
 
 **Saving**
 
 | Method | |
 |---|---|
-| `CanSave() -> bool` | Whether `Save` would succeed now |
-| `Save() -> String` | The whole game as a string |
-| `LoadSave(json: String) -> Dictionary` | Restores a saved game, or says why not |
+| `CanSave() -> bool` | Whether `Save` would succeed now, for greying out a button |
+| `Save() -> Dictionary` | The whole game under `save`, or `accepted` false with a `reason` and a `message` saying why not |
+| `LoadSave(json: String) -> Dictionary` | Restores a saved game, or says why not, in the same shape |
 
 **Callbacks**
 
@@ -428,6 +446,11 @@ A zone is a string. The ones a card can be in, for `AddCard` and `GetZone`:
 The player's relics are in `"relics"`. The `zone` in an entity's dictionary can also be `"board"`
 for an actor in the battle, `"attached"` for a status, keyword or ability, `"dead"` for an enemy
 that died, until the next battle starts, or `""`.
+
+Those eleven are the whole list. The rules take any other string as a zone too, so a game can
+invent one, but `AddCard` and `GetZone` say so in the Output panel when they are given a name that
+is not one of them — because `AddCard("Guard", "hnd")` otherwise makes a real card in a pile
+nothing will ever draw from, and answers no differently from the zone you meant.
 
 ### Dictionaries
 
@@ -460,8 +483,8 @@ leaves out.
 | `bbcode` | The same, with a changed value struck through and coloured: `"Deal [s]6[/s] [color=#6fcf6f]9[/color] damage."` |
 | `segments` | The text in runs, for drawing it yourself; each as below |
 | `tooltips` | The statuses and keywords it mentions, explained, each with `name`, `plain` and `bbcode` |
-| `cost` | The card's cost as a segment. Missing when the entity has no cost. |
-| `name` | The definition's name, or for an intent the move's name |
+| `cost` | The card's cost as a segment, or `null` when the entity has no cost. Always present. |
+| `name` | The definition's name, or for an intent the move's name once intents have been rolled |
 | `flavour` | The flavour line, never mixed into the rules text; `""` when there is none |
 | `level` | Where the words came from: `"auto"`, `"custom"` (a `text:` line) or `"override"` (a `text_override:` line, shown as written, without live values) |
 | `empty` | True when there is nothing to show, as for an intent before the battle starts |
@@ -476,17 +499,21 @@ the live number), `base_text` (the printed number as text), `changed`, `trend` (
 | Key | |
 |---|---|
 | `id` | The request's number, to answer with. Never reused. |
-| `kind` | `"entities"` to choose among things in play; `"offer"` for `discover` |
+| `mode` | `"entities"` to choose among things in play; `"offer"` for `discover` |
 | `prompt` | What content asked, such as `"discard 1"` |
 | `min`, `max` | How many options to pick |
-| `option_ids` | What to answer with: entity ids, or for an offer the positions `0, 1, 2...` |
-| `options` | For `"entities"`, one entity dictionary for each option, with only the `TrackedStats`. For `"offer"`, the candidates' `name`, `kind`, `tags` and rules `text`. |
+| `option_ids` | What to answer with: entity ids, or for an offer the candidates' places, `1, 2, 3...` |
+| `options` | For `"entities"`, one entity dictionary for each option, carrying only the `TrackedStats` rather than every stat `GetEntity` gives. For `"offer"`, the candidates' `name`, `kind`, `tags` and rules `text`. |
 | `chooser` | The id of the one choosing, usually the player |
 | `file`, `line` | The line of content that asked |
 
-**The answer**, from `AnswerChoice`: `accepted`, `reason`, `message`, and when it was accepted,
-`result`, which is the same word `Play` gives. `message` says in a sentence what `reason` says in a
-word:
+The request says `mode`, not `kind`, because `kind` already means three other things in these
+dictionaries: what an entity is, what keyword declared an offered definition, and whether a segment
+is text or a value. So `options[i]["kind"]` speaks a different vocabulary depending on `mode`.
+
+**The answer**, from `AnswerChoice`: `accepted`, `reason`, `message` and `result`. `result` is the
+same word `Play` gives when the answer was accepted, and `""` when it was refused; it is always
+there. `message` says in a sentence what `reason` says in a word:
 
 | `reason` | |
 |---|---|
@@ -498,13 +525,21 @@ word:
 | `"too_few"` | Fewer picks than `min` |
 | `"too_many"` | More picks than `max` |
 
-**A problem**, in the arrays from `LoadContent`, `ReloadContent` and `ContentReloaded`:
-`severity` (`"error"`, `"warning"` or `"info"`), `code` (such as `"CT0101"`), `message`,
-`suggestion`, `file`, `line` and `column`.
+**A content report**, from `LoadContent`, `ReloadContent` and `ContentReloaded`: `ok` (true when
+nothing was an error), `errors` and `warnings` (how many of each), and `diagnostics`. `ok` is there
+so that no caller has to scan the array to find out whether its game has content to play.
 
-**A reload**, from `ReloadContent`: `rebound` (how many entities were rebound to their new
-definitions), `missing` (names of definitions that have gone), `ruleset_changed` and
-`diagnostics` (the problems found).
+**A problem**, in that `diagnostics` array: `severity` (`"error"`, `"warning"` or `"info"`), `code`
+(such as `"CT0101"`), `message`, `suggestion`, `file`, `line` and `column`.
+
+**A reload**, from `ReloadContent` and `ContentReloaded`: the content report above, plus `rebound`
+(how many entities were rebound to their new definitions), `missing` (names of definitions that have
+gone) and `ruleset_changed`.
+
+**A save**, from `Save`: `accepted`, `reason`, `message` and `save`, the whole game as a string.
+`reason` is `"none"`, `"resolving"` (effects are still running, which only a
+[callback](#callbacks-from-content) sees) or `"reload_pending"` (a waiting block a reload has
+changed; see [Saving](#saving)). `save` is `""` when it was refused.
 
 **A load**, from `LoadSave`: `accepted`, `reason` and `message`. `reason` is `"none"`,
 `"wrong_format"` (not a save, a damaged one, or one from a version of the addon or of Cantrip.Core
@@ -642,17 +677,19 @@ leaving the game as it was.
 Listen for the signal rather than checking what `Play` returned, because more than `Play` can
 stop. A relic that asks for a choice at the start of a turn stops `EndTurn`; one that asks at the
 start of a battle stops `StartBattle`. `Execute`, `UseAbility` and `AnswerChoice` itself can stop
-too. `AddRelic`, `ApplyStatus` and `Tick` never do: a choice they raise takes the first option.
+too; `UseAbility` says so with the same `pending` word `Play` uses. `AddRelic`, `ApplyStatus` and
+`Tick` never do: a choice they raise takes the first option.
 
 Most choices are between things already in play, and `option_ids` are their entity ids. `discover`
-offers content that does not exist yet, so its request has `"kind": "offer"`: each of `options` is a
-candidate's `name`, `kind`, `tags` and rules `text`, and `option_ids` are simply their positions,
-`[0, 1, 2]`. Answer with the position of the one the player picked:
+offers content that does not exist yet, so its request has `"mode": "offer"`: each of `options` is a
+candidate's `name`, `kind`, `tags` and rules `text`, and `option_ids` are their places in the offer,
+`[1, 2, 3]`, counted from 1 so that 0 goes on meaning "no entity" as it does everywhere else.
+Answer with the place of the one the player picked, which is its index in `options` plus one:
 
 ```gdscript
-func _on_offer(request: Dictionary, picked_position: int) -> void:
-	if request["kind"] == "offer":
-		rules.AnswerChoice(request["id"], [picked_position])
+func _on_offer(request: Dictionary, picked_index: int) -> void:
+	if request["mode"] == "offer":
+		rules.AnswerChoice(request["id"], [request["option_ids"][picked_index]])
 ```
 
 ## Between battles
@@ -681,7 +718,7 @@ func start_next_battle() -> void:  # when the reward screen closes
 	rules.AddCard("Curse", "draw")  # a reward
 	rules.AddRelic("Lantern")  # any relic your content defines
 	rules.Execute("heal 12", 0, 0)  # a rest: statements run as the player
-	rules.SpawnEnemy("Ghoul", 0)  # the next encounter
+	rules.SpawnEnemy("Ghoul", -1)  # the next encounter, at the hp its content gives it
 	rules.StartBattle(true, true)
 ```
 
@@ -800,8 +837,11 @@ decides, and prints lines such as `Cleave: Deal 8 damage to ALL enemies.` and
 
 ```gdscript
 func save_game() -> void:
-	if rules.CanSave():
-		FileAccess.open("user://slot1.json", FileAccess.WRITE).store_string(rules.Save())
+	var saved: Dictionary = rules.Save()
+	if saved["accepted"]:
+		FileAccess.open("user://slot1.json", FileAccess.WRITE).store_string(saved["save"])
+	else:
+		print(saved["message"])  # reason "resolving" or "reload_pending"
 
 func load_game() -> void:
 	var result: Dictionary = rules.LoadSave(FileAccess.get_file_as_string("user://slot1.json"))
@@ -809,11 +849,17 @@ func load_game() -> void:
 		print(result["message"])  # reason "content_changed": the save needs content a patch removed
 ```
 
-`CanSave()` is false while effects are resolving, which only a callback sees. It is also false
-after `ReloadContent` has changed a waiting `next turn:` or `in N turns:` block, until that block
-has run: the block runs the statements it was scheduled with, and a save can only name statements
-the loaded content still has. `Save()` fails at such a time, and the error in the Output panel says
-which of the two stopped it.
+`Save()` answers the same `accepted`, `reason`, `message` dictionary `LoadSave` does, with the game
+itself under `save`, so a save button can tell the player why it did nothing. `CanSave()` answers
+the same question as a bool, for greying that button out; it cannot say which of the two refusals
+applies, and its answer can be stale by the time you act on it, so check what `Save()` returns
+rather than calling `CanSave()` first.
+
+A save is refused while effects are resolving, which only a [callback](#callbacks-from-content)
+sees, with the reason `"resolving"`. It is also refused after `ReloadContent` has changed a waiting
+`next turn:` or `in N turns:` block, until that block has run, with the reason `"reload_pending"`:
+the block runs the statements it was scheduled with, and a save can only name statements the loaded
+content still has. The message names the definition the block belongs to.
 
 A save holds the whole game, the player, the piles and the enemies included, so it loads into a
 node that has only loaded its content: there is no need to create a player first.
@@ -849,16 +895,21 @@ should check them first, for example with a signature.
 ```gdscript
 func reload_content() -> void:  # call it from a debug key, for example
 	var report: Dictionary = rules.ReloadContent([])  # [] reloads every file under ContentFolder
+	if not report["ok"]:
+		print("%d error(s); the game is running on what loaded" % report["errors"])
 	for problem in report["diagnostics"]:
 		print(problem["message"])
 ```
 
 Stats the game has changed keep their values, while a card still at its printed cost takes the new
 one. A `once per` listener that has fired stays used, and an `on every` listener stays on its
-interval, unless the reload changed its `on` line. The report says how many entities rebound,
-which definitions have gone, and whether the ruleset changed: a running game keeps the rules it
-started with until `NewRun`. Wire it to a debug key, and a designer can change a number, save,
-press the key and play on.
+interval, unless the reload changed its `on` line. The report is `LoadContent`'s, so `ok` says
+whether anything was an error, and it also says how many entities rebound, which definitions have
+gone, and whether the ruleset changed: a running game keeps the rules it started with until
+`NewRun`. A reload with errors in it is still applied — what parsed is in, and `ok` is false — so
+check it before telling a designer the change went through. The `ContentReloaded` signal carries
+the same dictionary, so a game that watches it sees everything the caller does. Wire it to a debug
+key, and a designer can change a number, save, press the key and play on.
 
 ## Callbacks from content
 
@@ -920,6 +971,12 @@ panel with the C# exception's message and returns null, even where the method is
 return an `int`.
 Your script carries on, so watch the Output panel.
 
+That is for a call the rules cannot carry out at all. The answers a game reads are not like this:
+`Play` and `UseAbility` answer a word, `Save`, `LoadSave`, `LoadContent`, `ReloadContent` and
+`AnswerChoice` a dictionary that says whether it worked, and `ApplyStatus` and `GrantAbility` 0 for
+a name nothing defines as well as for an id nothing names. None of those is a failure to watch the
+console for.
+
 A typed variable does not catch that null. Stored in one, as in
 `var result: String = rules.Play(card, target)`, it raises no second error, and `result == null`
 is false there, so that check misses the failure. To check a call that can fail, keep its result
@@ -928,7 +985,7 @@ in an untyped variable and compare that with `null`:
 <!-- smoke: file spawn.gd -->
 ```gdscript
 func spawn(enemy_name: String) -> int:
-	var spawned = rules.SpawnEnemy(enemy_name, 0)  # untyped, so a failure can be seen
+	var spawned = rules.SpawnEnemy(enemy_name, -1)  # untyped, so a failure can be seen
 	if spawned == null:
 		return 0  # no enemy: the Output panel says why
 	return spawned
@@ -942,9 +999,11 @@ dock's Tests tab catch most of them before the game runs.
 
 Set `RealTime`, and add a `TickDriver` as the node's `Driver` before the node enters the tree, for
 example in the Inspector. The driver advances the clock from `_PhysicsProcess` only, in whole ticks,
-because the length of a rendered frame is not an input a deterministic game can use. Give it the
-same `TicksPerSecond` as the `CantripRuntime`, whose rate `cooldown 8s` in content converts
-through; any rate works against any physics rate. Its `Running` pauses the clock, and its
+because the length of a rendered frame is not an input a deterministic game can use. Both nodes
+have a `TicksPerSecond`, and the runtime's is the one `cooldown 8s` in content converts through: as
+the runtime enters the tree it puts its driver on that rate, warning in the Output panel if the two
+disagreed, so a driver left at another rate can no longer make a cooldown mean two different lengths
+of time. Any rate works against any physics rate. Its `Running` pauses the clock, and its
 `MaxCatchUp` caps how many ticks one frame may run after a stall. A game can also call
 `Tick(count)` itself.
 
@@ -1118,11 +1177,11 @@ do the check off the editor's thread so that a big project does not wait for it.
 ### Settings
 
 The dock reads every `.cantrip` file in the project. These project settings change what it does;
-add them under Project Settings with Advanced Settings switched on:
+the plugin puts them in Project Settings itself, under Advanced Settings:
 
 | Setting | |
 |---|---|
-| `cantrip/content/folder` | Read only this folder, such as `res://content` |
+| `cantrip/content/folder` | Read only this folder, such as `res://content`. A `CantripRuntime` whose `ContentFolder` is empty loads this folder too, so the dock and the game cannot end up reading different ones. |
 | `cantrip/lint/host_names` | Names your callbacks answer, so that the linter does not report them as unknown (CT302) |
 | `cantrip/lint/host_events` | Events your game's C# raises |
 | `cantrip/lint/host_verbs` | Verbs your game's C# registers |

@@ -23,6 +23,24 @@ namespace Cantrip.Runtime
         public const string Relics = "relics";
         public const string Attached = "attached";
         public const string Dead = "dead";
+
+        /// <summary>
+        /// The names above, in the order they are declared, so a tool can list them and a message
+        /// about a misspelt one can name them all.
+        /// </summary>
+        public static IReadOnlyList<string> WellKnown { get; } = new[]
+        {
+            None, Board, Hand, Draw, Discard, Exhaust, Play, Powers, Relics, Attached, Dead,
+        };
+
+        /// <summary>
+        /// Whether a name is one of the zones above. A game may still use any other string, so this
+        /// asks about the vocabulary, not about what is allowed: it is what lets a tool say that
+        /// "hnd" is probably a typo without refusing a zone a game invented.
+        /// </summary>
+        public static bool IsWellKnown(string? zone) => zone != null && Known.Contains(zone);
+
+        private static readonly HashSet<string> Known = new HashSet<string>(WellKnown, StringComparer.Ordinal);
     }
 
     public enum ScheduleTiming

@@ -67,13 +67,16 @@ card ""Scholar""
             CardRuntime runtime = Offering(out ChoiceBridge bridge);
 
             Assert.True(bridge.Current!.IsOffer);
-            Assert.Equal(new[] { 0, 1, 2 }, bridge.OptionIds);
 
-            ChoiceAnswer answer = bridge.Validate(bridge.CurrentId, new[] { 2 });
+            // Counted from 1, so that 0 goes on meaning "no entity" wherever an id crosses.
+            Assert.Equal(new[] { 1, 2, 3 }, bridge.OptionIds);
+
+            ChoiceAnswer answer = bridge.Validate(bridge.CurrentId, new[] { 3 });
             Assert.True(answer.Accepted, answer.Message);
 
-            string picked = runtime.Pending!.Definitions[answer.EntityIds[0]].Name;
-            Assert.Equal(ActionResult.Played, runtime.Answer(runtime.Pending.Definitions[answer.EntityIds[0]]));
+            int position = ChoiceBridge.OfferPosition(answer.EntityIds[0]);
+            string picked = runtime.Pending!.Definitions[position].Name;
+            Assert.Equal(ActionResult.Played, runtime.Answer(runtime.Pending.Definitions[position]));
             Assert.Equal(picked, runtime.State.ZoneOf(runtime.Player, Zones.Hand).Single().Name);
         }
 
@@ -82,11 +85,14 @@ card ""Scholar""
         {
             Offering(out ChoiceBridge bridge);
 
-            ChoiceAnswer outside = bridge.Validate(bridge.CurrentId, new[] { 3 });
+            ChoiceAnswer outside = bridge.Validate(bridge.CurrentId, new[] { 4 });
             Assert.Equal(ChoiceRejection.UnknownOption, outside.Reason);
-            Assert.StartsWith("Offer 3", outside.Message);
+            Assert.StartsWith("Offer 4", outside.Message);
 
-            Assert.Equal(ChoiceRejection.TooMany, bridge.Validate(bridge.CurrentId, new[] { 0, 1 }).Reason);
+            // 0 was the first candidate while offers counted from 0; now it is no option at all,
+            // which is the point: answer code that drops 0 as "no entity" drops nothing real.
+            Assert.Equal(ChoiceRejection.UnknownOption, bridge.Validate(bridge.CurrentId, new[] { 0 }).Reason);
+            Assert.Equal(ChoiceRejection.TooMany, bridge.Validate(bridge.CurrentId, new[] { 1, 2 }).Reason);
             Assert.Equal(ChoiceRejection.TooFew, bridge.Validate(bridge.CurrentId, new int[0]).Reason);
         }
 

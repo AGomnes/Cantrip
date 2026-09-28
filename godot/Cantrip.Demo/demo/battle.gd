@@ -39,11 +39,12 @@ func _build_game() -> void:
 	rules.Seed = 7
 	add_child(rules)
 
-	var problems: Array = rules.LoadContent(CONTENT)
-	for problem in problems:
-		if problem["severity"] == "error":
-			_load_errors += 1
-			push_error("%s:%d %s %s" % [problem["file"], problem["line"], problem["code"], problem["message"]])
+	var report: Dictionary = rules.LoadContent(CONTENT)
+	_load_errors = report["errors"]
+	if not report["ok"]:
+		for problem in report["diagnostics"]:
+			if problem["severity"] == "error":
+				push_error("%s:%d %s %s" % [problem["file"], problem["line"], problem["code"], problem["message"]])
 
 	# Without a presenter the node emits every event at once; with one, events arrive one at a
 	# time and wait for Done(), which is what lets an instant action animate as a sequence.
@@ -61,7 +62,7 @@ func _build_game() -> void:
 	_player = rules.CreatePlayer("Player", 80, 3)
 	for card in DECK:
 		rules.AddCard(card, "draw")
-	rules.SpawnEnemy("Slime", 0)
+	rules.SpawnEnemy("Slime", -1)  # -1: the health its content declares
 	rules.SpawnEnemy("Slime", 20)
 	rules.StartBattle(true, true)
 
@@ -166,7 +167,7 @@ func _refresh() -> void:
 
 	for child in _hand_box.get_children():
 		child.queue_free()
-	for card_id in rules.GetHand():
+	for card_id in _hand():
 		var described: Dictionary = rules.Describe(card_id, 0)
 		var button := Button.new()
 		button.text = "%s (%d)" % [described["name"], rules.CostOf(card_id)]
@@ -189,6 +190,10 @@ func _statuses_of(view: Dictionary) -> String:
 func _name_of(entity_id: int) -> String:
 	var view: Dictionary = rules.GetEntity(entity_id)
 	return view.get("name", "something")
+
+func _hand() -> Array:
+	# GetHand is gone: it was GetZone(PlayerId(), "hand") and could only ever answer for one hero.
+	return rules.GetZone(_player, "hand")
 
 func _first_enemy() -> int:
 	var enemies: Array = rules.GetEnemies()
@@ -240,8 +245,8 @@ func _play_itself() -> void:
 	# The check that makes this worth running against an exported build: a packaged game whose
 	# content did not travel starts with an empty library and an empty hand, and would otherwise
 	# "play" a battle of nothing and report success.
-	if _load_errors > 0 or rules.GetHand().is_empty():
-		print("DEMO: content did not load (%d error(s), %d card(s) in hand)" % [_load_errors, rules.GetHand().size()])
+	if _load_errors > 0 or _hand().is_empty():
+		print("DEMO: content did not load (%d error(s), %d card(s) in hand)" % [_load_errors, _hand().size()])
 		get_tree().quit(1)
 		return
 
@@ -261,7 +266,7 @@ func _play_itself() -> void:
 	get_tree().quit(0)
 
 func _playable() -> int:
-	for card_id in rules.GetHand():
+	for card_id in _hand():
 		if rules.CanPlay(card_id):
 			return card_id
 	return 0

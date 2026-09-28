@@ -121,3 +121,5 @@ Cantrip.Rng.SetState(ulong[]! state) -> void
 const Cantrip.Rng.StateWords = 4 -> int
 *REMOVED*static Cantrip.Runtime.Chain.NewRoot(long rootId) -> Cantrip.Runtime.Chain!
 Cantrip.CardRuntime.Dispose() -> void
+static Cantrip.Runtime.Zones.IsWellKnown(string? zone) -> bool
+static Cantrip.Runtime.Zones.WellKnown.get -> System.Collections.Generic.IReadOnlyList<string!>!

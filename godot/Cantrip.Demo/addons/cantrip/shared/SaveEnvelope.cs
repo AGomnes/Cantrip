@@ -23,6 +23,19 @@ namespace Cantrip.GodotAdapter
         /// has gone.
         /// </summary>
         ContentChanged,
+
+        /// <summary>
+        /// Effects are still resolving, so a snapshot would hold half an action. Only
+        /// <c>CantripRuntime.Save</c> answers with this; nothing loads a save in that moment.
+        /// </summary>
+        Resolving,
+
+        /// <summary>
+        /// A <c>next turn:</c> or <c>in N turns:</c> block whose statements a reload has changed is
+        /// still waiting to run, and a save can only name statements the loaded content still has.
+        /// It passes once that block has run. Only <c>CantripRuntime.Save</c> answers with this.
+        /// </summary>
+        ReloadPending,
     }
 
     /// <summary>The verdict on one save file.</summary>
@@ -54,6 +67,8 @@ namespace Cantrip.GodotAdapter
             SaveRejection.WrongFormat => "wrong_format",
             SaveRejection.NoPayload => "no_payload",
             SaveRejection.ContentChanged => "content_changed",
+            SaveRejection.Resolving => "resolving",
+            SaveRejection.ReloadPending => "reload_pending",
             _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, "This rejection has no word for script yet."),
         };
 

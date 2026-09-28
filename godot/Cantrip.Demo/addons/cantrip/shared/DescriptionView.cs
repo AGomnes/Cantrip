@@ -208,7 +208,7 @@ namespace Cantrip.GodotAdapter
 
             return new DescriptionView(
                 description.Name,
-                description.Level.ToString().ToLowerInvariant(),
+                Words.LevelName(description.Level),
                 description.ToPlainText(),
                 ToBBCode(source, forOpponent),
                 description.Flavour ?? string.Empty,

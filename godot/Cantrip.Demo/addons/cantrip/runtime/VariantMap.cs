@@ -133,8 +133,11 @@ namespace Cantrip.GodotAdapter
                 });
             }
 
+            // "cost" is always here, null for an entity that has none. It used to be left out, so a
+            // reader who never thought to call has() read a missing key as an empty dictionary.
             var description = new Godot.Collections.Dictionary
             {
+                ["cost"] = view.Cost == null ? default(Variant) : Segment(view.Cost),
                 ["name"] = view.Name,
                 ["level"] = view.Level,
                 ["plain"] = view.Plain,
@@ -145,7 +148,6 @@ namespace Cantrip.GodotAdapter
                 ["tooltips"] = tooltips,
             };
 
-            if (view.Cost != null) description["cost"] = Segment(view.Cost);
             return description;
         }
 
@@ -180,7 +182,7 @@ namespace Cantrip.GodotAdapter
 
             return new Godot.Collections.Dictionary
             {
-                ["severity"] = diagnostic.Severity.ToString().ToLowerInvariant(),
+                ["severity"] = Words.SeverityName(diagnostic.Severity),
                 ["code"] = diagnostic.Code ?? string.Empty,
                 ["message"] = diagnostic.Message ?? string.Empty,
                 ["suggestion"] = diagnostic.Suggestion ?? string.Empty,
@@ -199,15 +201,108 @@ namespace Cantrip.GodotAdapter
             return array;
         }
 
+        /// <summary>
+        /// What loading or reloading content came to: <c>ok</c>, the number of <c>errors</c> and
+        /// <c>warnings</c>, and the <c>diagnostics</c> themselves.
+        /// </summary>
+        /// <remarks>
+        /// <c>ok</c> is here because every caller of a bare diagnostics array had to write the same
+        /// scan for a severity of "error" before it knew whether its game had content to play, and
+        /// the addon's own debugger channel already answered the question with a flag.
+        /// </remarks>
+        public static Godot.Collections.Dictionary ContentReport(IEnumerable<Diagnostic> diagnostics)
+        {
+            int errors = 0;
+            int warnings = 0;
+            var array = new Godot.Collections.Array();
+            if (diagnostics != null)
+            {
+                foreach (Diagnostic diagnostic in diagnostics)
+                {
+                    if (diagnostic.Severity == DiagnosticSeverity.Error) errors++;
+                    else if (diagnostic.Severity == DiagnosticSeverity.Warning) warnings++;
+                    array.Add(Diagnostic(diagnostic));
+                }
+            }
+
+            return new Godot.Collections.Dictionary
+            {
+                ["ok"] = errors == 0,
+                ["errors"] = errors,
+                ["warnings"] = warnings,
+                ["diagnostics"] = array,
+            };
+        }
+
+        // Refusals -------------------------------------------------------------------------------
+
+        /// <summary>
+        /// The shape every refusal crosses in: <c>accepted</c> false, a snake_case <c>reason</c> and
+        /// a <c>message</c> to show. A refusing call that also answers something when it succeeds
+        /// passes that key and its empty value, so the key is never simply absent.
+        /// </summary>
+        public static Godot.Collections.Dictionary Refused(string reason, string message, string alsoKey = "", Variant alsoValue = default)
+        {
+            var refusal = new Godot.Collections.Dictionary
+            {
+                ["accepted"] = false,
+                ["reason"] = reason,
+                ["message"] = message,
+            };
+
+            if (!string.IsNullOrEmpty(alsoKey)) refusal[alsoKey] = alsoValue;
+            return refusal;
+        }
+
+        // Zones ----------------------------------------------------------------------------------
+
+        /// <summary>
+        /// Says so in the Output panel when a zone is not one the rules know.
+        /// </summary>
+        /// <remarks>
+        /// A warning and not a refusal: the core lets a game invent zones of its own, and that is
+        /// deliberate. But nothing catches a typo either — <c>AddCard("Guard", "hnd")</c> makes a
+        /// real card in a pile nothing will ever draw from — and a warning is the only thing that
+        /// tells the two apart without taking the ability away.
+        /// </remarks>
+        public static void WarnUnknownZone(string zone, string calledFrom)
+        {
+            if (Zones.IsWellKnown(zone)) return;
+
+            GD.PushWarning(
+                "Cantrip: " + calledFrom + " was given the zone \"" + zone + "\", which the rules do not know. "
+                + "A zone of your own works, but a misspelt one is a pile nothing will ever draw from. The known zones are "
+                + KnownZones + ".");
+        }
+
+        /// <summary>The well-known zones for a message; the empty one is named rather than shown.</summary>
+        private static readonly string KnownZones = BuildKnownZones();
+
+        private static string BuildKnownZones()
+        {
+            var named = new List<string>();
+            foreach (string zone in Zones.WellKnown)
+            {
+                if (zone.Length > 0) named.Add(zone);
+            }
+            return string.Join(", ", named) + ", and \"\" for none";
+        }
+
         // Choices --------------------------------------------------------------------------------
 
         /// <summary>
         /// A decision the rules are waiting on. The options are entity ids and views both: a UI
         /// needs the names to show, and the ids to answer with. An offer of content that does not
-        /// exist yet, as <c>discover</c> makes, has <c>kind</c> "offer": its <c>option_ids</c> are
-        /// the positions 0, 1, 2... and each option is the candidate's name, kind, tags and rules
+        /// exist yet, as <c>discover</c> makes, has <c>mode</c> "offer": its <c>option_ids</c> are
+        /// the numbers 1, 2, 3... and each option is the candidate's name, kind, tags and rules
         /// text, which <paramref name="describe"/> supplies.
         /// </summary>
+        /// <remarks>
+        /// The request says <c>mode</c> rather than <c>kind</c> because <c>kind</c> already means
+        /// three other things inside this one dictionary — what an entity is, what keyword declared
+        /// an offered definition, and whether a segment is text or a value — and the vocabulary of
+        /// <c>options[i]["kind"]</c> changes with it.
+        /// </remarks>
         public static Godot.Collections.Dictionary Choice(
             int requestId,
             PendingChoice choice,
@@ -230,7 +325,7 @@ namespace Cantrip.GodotAdapter
                         ["tags"] = Strings(offered.Tags),
                         ["text"] = describe?.Invoke(offered) ?? string.Empty,
                     });
-                    ids.Add(i);
+                    ids.Add(ChoiceBridge.OfferId(i));
                 }
             }
             else
@@ -245,7 +340,7 @@ namespace Cantrip.GodotAdapter
             return new Godot.Collections.Dictionary
             {
                 ["id"] = requestId,
-                ["kind"] = choice.IsOffer ? "offer" : "entities",
+                ["mode"] = choice.IsOffer ? "offer" : "entities",
                 ["prompt"] = choice.Prompt,
                 ["min"] = choice.Min,
                 ["max"] = choice.Max,

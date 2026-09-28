@@ -160,7 +160,7 @@ namespace Cantrip.GodotAdapter
         /// <summary>Lower-case side: neutral, player or enemy.</summary>
         public string Team { get; }
 
-        /// <summary>Where it lives: hand, draw, discard, board, relics, attached, or empty.</summary>
+        /// <summary>Where it lives: board, hand, draw, discard, exhaust, play, powers, relics, attached, dead, or empty.</summary>
         public string Zone { get; }
 
         /// <summary>Board slot, which is what adjacency reads. Zero for anything not on the board.</summary>
@@ -211,8 +211,8 @@ namespace Cantrip.GodotAdapter
             return new EntityView(
                 entity.Id,
                 entity.Name,
-                entity.Kind.ToString().ToLowerInvariant(),
-                entity.Team.ToString().ToLowerInvariant(),
+                Words.KindName(entity.Kind),
+                Words.TeamName(entity.Team),
                 entity.Zone,
                 entity.Position,
                 entity.IsAlive,
