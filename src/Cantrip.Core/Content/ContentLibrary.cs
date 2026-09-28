@@ -148,7 +148,7 @@ namespace Cantrip.Content
         public Ruleset BuildRuleset(DiagnosticBag? diagnostics = null)
         {
             RulesetDeclNode? syntax = RulesetSyntax;
-            return syntax == null ? Ruleset.Default : Ruleset.FromSyntax(syntax, diagnostics ?? new DiagnosticBag());
+            return syntax == null ? Ruleset.CreateDefault() : Ruleset.FromSyntax(syntax, diagnostics ?? new DiagnosticBag());
         }
 
         // Loading ------------------------------------------------------------------------------

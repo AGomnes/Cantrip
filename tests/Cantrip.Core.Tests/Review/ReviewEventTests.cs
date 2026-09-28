@@ -63,13 +63,13 @@ relic ""Tally""
 
             Entity first = Enemy(runtime);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
-            Assert.Equal(PlayResult.Played, runtime.Play(runtime.AddCard("Jab", Zones.Hand), first));
+            Assert.Equal(ActionResult.Played, runtime.Play(runtime.AddCard("Jab", Zones.Hand), first));
             Assert.True(runtime.Won == true);
             Assert.Equal(1, player.GetInt("gold"));
 
             Entity second = Enemy(runtime);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
-            Assert.Equal(PlayResult.Played, runtime.Play(runtime.AddCard("Jab", Zones.Hand), second));
+            Assert.Equal(ActionResult.Played, runtime.Play(runtime.AddCard("Jab", Zones.Hand), second));
 
             Assert.Equal(2, player.GetInt("gold"));
         }
@@ -146,7 +146,7 @@ relic ""Mourner""
             Entity enemy = Enemy(runtime, 10);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Played, runtime.Play(runtime.AddCard("Finisher", Zones.Hand), enemy));
+            Assert.Equal(ActionResult.Played, runtime.Play(runtime.AddCard("Finisher", Zones.Hand), enemy));
             Assert.True(runtime.Won == true);
             Assert.Equal(0, player.StacksOf("Rage"));
 

@@ -10,7 +10,7 @@ namespace Cantrip.Content
     /// runs a scenario registers the same verbs, so a word cannot be legal in one place and unknown
     /// in the other.
     /// </summary>
-    public static class Scenario
+    internal static class Scenario
     {
         /// <summary>
         /// Verbs a scenario shares with a <c>test</c>, which set the game up and mean the same thing

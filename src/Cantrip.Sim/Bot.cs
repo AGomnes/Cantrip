@@ -38,9 +38,9 @@ namespace Cantrip.Sim
         void PlayTurn(CardRuntime runtime, Trials trials, Action<string>? log);
 
         /// <summary>
-        /// Answers a choice content asks for mid-effect, when no <c>answer</c> is queued. Give one
-        /// that is an <see cref="IDefinitionChooser"/> as well, as <see cref="RandomChooser"/> is,
-        /// or a <c>discover</c> takes the first option it is offered.
+        /// Answers a choice content asks for mid-effect, when no <c>answer</c> is queued. A chooser
+        /// that does not override <see cref="IChoiceProvider.ChooseDefinition"/>, as
+        /// <see cref="RandomChooser"/> does, lets a <c>discover</c> take the first option offered.
         /// </summary>
         IChoiceProvider Chooser { get; }
     }
@@ -203,9 +203,9 @@ namespace Cantrip.Sim
             if (source == null) return false;
 
             Entity? target = option.Target == 0 ? null : runtime.State.Find(option.Target);
-            return option.Ability
+            return (option.Ability
                 ? runtime.UseAbility(source, target)
-                : runtime.Play(source, target) == PlayResult.Played;
+                : runtime.Play(source, target)) == ActionResult.Played;
         }
 
         public static string Describe(CardRuntime runtime, Option option)

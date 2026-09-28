@@ -153,7 +153,7 @@ namespace Cantrip.Runtime
             !(bound is NameExpr name) || entity.HasStat(name.Name);
 
         /// <summary>Restores the resources an actor holds that reset on <paramref name="trigger"/>.</summary>
-        public void ResetResources(Entity actor, string trigger)
+        internal void ResetResources(Entity actor, string trigger)
         {
             // Sorted, so the order of the resulting `<stat>_changed` events never depends on load order.
             foreach (ResourceRule rule in Content.Resources.Values.OrderBy(r => r.Stat, StringComparer.Ordinal))
@@ -352,7 +352,7 @@ namespace Cantrip.Runtime
         /// applying the status when it is absent. This is what <c>target.Poison -1</c> and
         /// <c>gain 2 Strength</c> do.
         /// </summary>
-        public void AdjustStatusStacks(Entity host, string statusName, AssignOperator op, Num amount, EvalContext context, SourceSpan span = default)
+        internal void AdjustStatusStacks(Entity host, string statusName, AssignOperator op, Num amount, EvalContext context, SourceSpan span = default)
         {
             Entity? existing = host.FindAttached(statusName);
             if (existing != null)
@@ -432,7 +432,7 @@ namespace Cantrip.Runtime
         }
 
         /// <summary>Removes statuses whose <c>for</c> duration has run out on the clock.</summary>
-        public void ExpireTimedStatuses()
+        internal void ExpireTimedStatuses()
         {
             foreach (Entity status in State.Entities.Where(e => !e.IsRemoved && e.HasStat("expires_at")).ToArray())
             {
@@ -668,7 +668,7 @@ namespace Cantrip.Runtime
             return drawn;
         }
 
-        public void ShuffleDiscardIntoDraw(Entity actor, EvalContext context)
+        internal void ShuffleDiscardIntoDraw(Entity actor, EvalContext context)
         {
             var gameEvent = new GameEvent("shuffled") { Source = actor, Target = actor };
             Raise(gameEvent, context, () =>
@@ -678,7 +678,7 @@ namespace Cantrip.Runtime
             });
         }
 
-        public void ShuffleZone(Entity actor, string zone)
+        internal void ShuffleZone(Entity actor, string zone)
         {
             State.Rng.Shuffle(State.MutableZone(actor, zone));
             State.Touch();

@@ -98,14 +98,14 @@ namespace Cantrip.Tests.Runtime
         [Fact]
         public void The_setting_reads_back_off_the_ruleset()
         {
-            Assert.Equal(NewListeners.HearTheEvent, Ruleset.Default.NewListeners);
+            Assert.Equal(NewListeners.HearTheEvent, Ruleset.CreateDefault().NewListeners);
 
             ContentLibrary content = ContentLibrary.FromText("ruleset\n  new_listeners: miss_the_event\n", "ruleset.cantrip");
             Assert.Equal(NewListeners.MissTheEvent, content.BuildRuleset().NewListeners);
 
             // Two rulesets that differ here are not the same ruleset, which is what a hot reload
             // needs in order to say that a running game is resolving against the old rules.
-            Assert.False(Ruleset.Default.SameAs(content.BuildRuleset()));
+            Assert.False(Ruleset.CreateDefault().SameAs(content.BuildRuleset()));
         }
 
         [Fact]

@@ -102,7 +102,7 @@ namespace Cantrip.Tests.Battle
             runtime.AddCard("Rite", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Played, runtime.Play("Rite"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Rite"));
 
             // Dread and Panic both match; Dread's weight is 0, so the draw can only land on Panic.
             Assert.NotNull(player.FindAttached("Panic"));
@@ -118,7 +118,7 @@ namespace Cantrip.Tests.Battle
             runtime.AddCard("Rite", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Played, runtime.Play("Rite"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Rite"));
 
             // A random pick is a choice with nothing to decide, so no request is made at all.
             Assert.Empty(chooser.Requests);
@@ -133,7 +133,7 @@ namespace Cantrip.Tests.Battle
             runtime.AddCard("Insight", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Played, runtime.Play("Insight"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Insight"));
 
             // All three spells are offered, so the answer decides regardless of the roll.
             Assert.Contains("Frost", BattleKit.Zone(runtime, Zones.Hand).Select(c => c.Name));
@@ -146,7 +146,7 @@ namespace Cantrip.Tests.Battle
             runtime.AddCard("Thrift", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Played, runtime.Play("Thrift"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Thrift"));
 
             // Only Spark is a spell costing 1 or less; Anvil is cheap but not a spell.
             Assert.Equal(new[] { "Spark" }, BattleKit.Zone(runtime, Zones.Hand).Select(c => c.Name).ToArray());
@@ -170,6 +170,74 @@ namespace Cantrip.Tests.Battle
                 runtime.StartBattle(shuffle: false, drawOpeningHand: false);
                 runtime.Play("Insight");
                 return BattleKit.Zone(runtime, Zones.Hand).Select(c => c.Name).ToArray();
+            }
+        }
+
+        /// <summary>
+        /// A game's own chooser is a single interface. Before <c>ChooseDefinition</c> moved onto
+        /// <see cref="IChoiceProvider"/> it lived on a second one, so a chooser that wrote the method
+        /// without also naming that interface compiled, ran, and was never asked: every
+        /// <c>discover</c> silently took option one.
+        /// </summary>
+        [Fact]
+        public void A_chooser_that_only_implements_IChoiceProvider_is_asked_about_an_offer()
+        {
+            var chooser = new LastOfferChooser();
+            CardRuntime runtime = Setup(out _, chooser);
+            runtime.AddCard("Insight", Zones.Hand);
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+
+            Assert.Equal(ActionResult.Played, runtime.Play("Insight"));
+
+            Assert.Equal(1, chooser.Offers);
+            Assert.Equal(chooser.Picked, BattleKit.Zone(runtime, Zones.Hand).Single().Name);
+        }
+
+        /// <summary>
+        /// The other half: a chooser written before the member existed, which answers entity choices
+        /// and nothing else, still runs, and still gets the first candidate — now from the interface's
+        /// own default rather than from a type test that could not see it.
+        /// </summary>
+        [Fact]
+        public void A_chooser_with_only_Choose_takes_the_first_offer_through_the_default()
+        {
+            Assert.Equal(Discovered(new ChooseOnlyChooser()), Discovered(new FirstOptionChooser()));
+
+            static string Discovered(IChoiceProvider chooser)
+            {
+                CardRuntime runtime = BattleKit.Create(Content, seed: 7, chooser: chooser);
+                runtime.CreatePlayer();
+                runtime.SpawnEnemy("Dummy");
+                runtime.AddCard("Insight", Zones.Hand);
+                runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+                Assert.Equal(ActionResult.Played, runtime.Play("Insight"));
+                return BattleKit.Zone(runtime, Zones.Hand).Single().Name;
+            }
+        }
+
+        /// <summary>Implements the one member every chooser has had since 0.1.0-preview.1, and no more.</summary>
+        private sealed class ChooseOnlyChooser : IChoiceProvider
+        {
+            public System.Collections.Generic.IReadOnlyList<Entity> Choose(ChoiceRequest request, GameState state) =>
+                request.Options.Take(request.Max).ToList();
+        }
+
+        /// <summary>Answers offers without naming any interface but <see cref="IChoiceProvider"/>.</summary>
+        private sealed class LastOfferChooser : IChoiceProvider
+        {
+            public int Offers { get; private set; }
+
+            public string? Picked { get; private set; }
+
+            public System.Collections.Generic.IReadOnlyList<Entity> Choose(ChoiceRequest request, GameState state) =>
+                request.Options.Take(request.Max).ToList();
+
+            public Content.EntityDefinition? ChooseDefinition(DefinitionChoice request, GameState state)
+            {
+                Offers++;
+                Content.EntityDefinition last = request.Options[request.Options.Count - 1];
+                Picked = last.Name;
+                return last;
             }
         }
 

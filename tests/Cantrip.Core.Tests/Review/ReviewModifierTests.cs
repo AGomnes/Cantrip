@@ -46,7 +46,7 @@ relic ""Codex""
             Entity enemy = Enemy(runtime, 50);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Played, runtime.Play(runtime.AddCard("Fireball", Zones.Hand), enemy));
+            Assert.Equal(ActionResult.Played, runtime.Play(runtime.AddCard("Fireball", Zones.Hand), enemy));
 
             Assert.Equal(2, runtime.Player!.GetInt("energy"));
         }
@@ -116,7 +116,7 @@ card ""Filler""
             runtime.AddDeck("Filler", "Filler", "Filler");
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Played, runtime.Play(runtime.AddCard("Pull", Zones.Hand)));
+            Assert.Equal(ActionResult.Played, runtime.Play(runtime.AddCard("Pull", Zones.Hand)));
 
             Assert.Equal(2, HandCount(runtime));
         }

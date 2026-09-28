@@ -671,8 +671,7 @@ namespace Cantrip.Runtime
             Mix(InBattle ? 1 : 0);
             Mix(Player?.Id ?? 0);
             Mix(Clock.Now);
-            var (s0, s1, s2, s3) = Rng.GetState();
-            Mix((long)s0); Mix((long)s1); Mix((long)s2); Mix((long)s3);
+            foreach (ulong word in Rng.GetState()) Mix((long)word);
 
             foreach (Entity entity in _entities)
             {

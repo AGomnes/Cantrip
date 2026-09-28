@@ -17,7 +17,7 @@ namespace Cantrip.GodotAdapter.Tests.Shared
         private static CardRuntime Asking(out ChoiceBridge bridge, params string[] hand)
         {
             CardRuntime runtime = AdapterTestKit.Start(null, new DeferredChooser(), hand);
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play(hand[0]));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play(hand[0]));
 
             bridge = new ChoiceBridge();
             bridge.Sync(runtime.Pending);
@@ -54,7 +54,7 @@ card ""Scholar""
             runtime.SpawnEnemy("Dummy");
             runtime.AddCard("Scholar", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Scholar"));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play("Scholar"));
 
             bridge = new ChoiceBridge();
             bridge.Sync(runtime.Pending);
@@ -73,7 +73,7 @@ card ""Scholar""
             Assert.True(answer.Accepted, answer.Message);
 
             string picked = runtime.Pending!.Definitions[answer.EntityIds[0]].Name;
-            Assert.Equal(PlayResult.Played, runtime.Answer(runtime.Pending.Definitions[answer.EntityIds[0]]));
+            Assert.Equal(ActionResult.Played, runtime.Answer(runtime.Pending.Definitions[answer.EntityIds[0]]));
             Assert.Equal(picked, runtime.State.ZoneOf(runtime.Player, Zones.Hand).Single().Name);
         }
 
@@ -112,7 +112,7 @@ card ""Scholar""
 
             ChoiceAnswer answer = bridge.Validate(first, new[] { bridge.OptionIds[0] });
             Assert.True(answer.Accepted);
-            Assert.Equal(PlayResult.ChoicePending, runtime.Answer(answer.EntityIds));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Answer(answer.EntityIds));
             bridge.Sync(runtime.Pending);
 
             // Answering replayed the action, which asked its second question: a new number for it.
@@ -211,7 +211,7 @@ card ""Scholar""
             Assert.Equal(new[] { second }, answer.EntityIds);
 
             // And it is an answer the runtime accepts: the chosen card is the one that went.
-            Assert.Equal(PlayResult.Played, runtime.Answer(answer.EntityIds));
+            Assert.Equal(ActionResult.Played, runtime.Answer(answer.EntityIds));
             Assert.Equal(Zones.Exhaust, runtime.State.Find(second)!.Zone);
         }
 

@@ -307,8 +307,8 @@ namespace Cantrip.Testing
                     card = Interpreter.Evaluate(node, call.Context).Entity ?? throw Fail($"`{AstPrinter.Print(node)}` is not a card.", call.Span);
                 }
 
-                PlayResult result = _runtime.Play(card, target);
-                if (result != PlayResult.Played) throw Fail($"could not play {card.Name}: {result}.", call.Span);
+                ActionResult result = _runtime.Play(card, target);
+                if (result != ActionResult.Played) throw Fail($"could not play {card.Name}: {result}.", call.Span);
             }
 
             private void EndTurn(VerbCall call)
@@ -331,7 +331,9 @@ namespace Cantrip.Testing
                 string name = node is NameExpr n ? n.Name : node is StringExpr s ? s.Value : throw Fail("expected an ability name.", call.Span);
                 Entity ability = State.Player!.FindAttached(name)
                     ?? throw Fail($"the player has no ability `{Defined(name, call, "ability", "ability")}`; use `grant` first.", call.Span);
-                if (!_runtime.UseAbility(ability, target)) throw Fail($"{name} is not ready.", call.Span);
+                ActionResult cast = _runtime.UseAbility(ability, target);
+                if (cast == ActionResult.NotReady) throw Fail($"{name} is not ready.", call.Span);
+                if (cast != ActionResult.Played) throw Fail($"{name} could not be used: {cast}.", call.Span);
             }
 
             private void Expect(VerbCall call)

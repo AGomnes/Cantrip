@@ -64,6 +64,7 @@ namespace Cantrip.GodotAdapter.Demo
                 WonIsNullUntilABattleEnds();
                 AnAutomaticLoadReportsItsProblems();
                 TheDebugChannelAnswersTheEditor();
+                DefaultInterfaceMembersDispatchInThisEngine();
 
                 code = _failures.Count == 0 ? 0 : 1;
             }
@@ -1145,6 +1146,82 @@ namespace Cantrip.GodotAdapter.Demo
         private void OnEffectEvent(Godot.Collections.Dictionary effectEvent) => _events.Add(effectEvent["name"].AsString());
 
         private void OnChoiceRequested(Godot.Collections.Dictionary request) => _lastChoice = request;
+
+        /// <summary>
+        /// The library's four extension seams give their members default implementations, so a game
+        /// can implement only what it has an opinion about and a member added in a later release
+        /// does not break one written today. That rests on the runtime dispatching a default
+        /// interface member, which the unit tests prove on .NET 9 and this proves inside the engine
+        /// a game actually ships on — Godot's own .NET runtime, on net8.0.
+        /// </summary>
+        private void DefaultInterfaceMembersDispatchInThisEngine()
+        {
+            Cantrip.Runtime.IEffectHost host = new NothingHost();
+            Check("a host that implements nothing answers no to a name",
+                !host.TryResolveName("anything", new Cantrip.Runtime.EvalContext(null), out Cantrip.Runtime.Value _));
+            Check("a host that implements nothing answers no to a call",
+                !host.TryCall("within", new List<Cantrip.Runtime.Value>(), new Cantrip.Runtime.EvalContext(null), out Cantrip.Runtime.Value _));
+            host.OnEvent(new Cantrip.Runtime.GameEvent("damaged"));
+            Check("a host that implements nothing takes an event without throwing", true);
+
+            var library = new Cantrip.Content.ContentLibrary();
+            GodotContentLoader.LoadFolder(library, ContentFolder);
+
+            Cantrip.Descriptions.IDescriptionLocalizer localizer = new NothingLocalizer();
+            Cantrip.Content.EntityDefinition ember = library.Find("Ember", "card")!;
+            Check("a localizer that implements nothing translates nothing",
+                localizer.Name(ember) == null && localizer.Text(ember) == null
+                && localizer.Flavour(ember) == null && localizer.Phrase("deal") == null);
+
+            Cantrip.Runtime.IGameClock clock = new BareClock();
+            bool bare = clock.TryConvert(Num.FromInt(3), null, out long units);
+            Check("a clock's default conversion takes its own unit", bare && units == 3, units.ToString());
+            Check("and refuses a named one", !clock.TryConvert(Num.FromInt(3), "s", out long _));
+
+            // The one that is not academic: a chooser that names only Choose still answers an offer,
+            // and the discover takes the first candidate rather than throwing at a missing method.
+            var core = new CardRuntime(library, new RuntimeOptions { Seed = 7, Chooser = new ChooseOnlyChooser() });
+            Cantrip.Runtime.Entity player = core.CreatePlayer();
+            core.SpawnEnemy("Slime");
+            core.StartBattle(false, false);
+            core.Execute("discover 2 cards as found\ncreate found into hand");
+            Check("a chooser with only Choose is answered by the interface's own default",
+                core.State.ZoneOf(player, Cantrip.Runtime.Zones.Hand).Count == 1,
+                core.State.ZoneOf(player, Cantrip.Runtime.Zones.Hand).Count.ToString());
+        }
+
+        private sealed class NothingHost : Cantrip.Runtime.IEffectHost
+        {
+        }
+
+        private sealed class NothingLocalizer : Cantrip.Descriptions.IDescriptionLocalizer
+        {
+        }
+
+        private sealed class BareClock : Cantrip.Runtime.IGameClock
+        {
+            public long Now { get; private set; }
+
+            public event Action<long>? Advanced;
+
+            public void Advance()
+            {
+                Now++;
+                Advanced?.Invoke(Now);
+            }
+
+            public void Restore(long now) => Now = now;
+        }
+
+        private sealed class ChooseOnlyChooser : Cantrip.Runtime.IChoiceProvider
+        {
+            public IReadOnlyList<Cantrip.Runtime.Entity> Choose(Cantrip.Runtime.ChoiceRequest request, Cantrip.Runtime.GameState state)
+            {
+                var chosen = new List<Cantrip.Runtime.Entity>();
+                for (int i = 0; i < request.Options.Count && chosen.Count < request.Max; i++) chosen.Add(request.Options[i]);
+                return chosen;
+            }
+        }
 
         private void Check(string what, bool passed, string detail = "")
         {

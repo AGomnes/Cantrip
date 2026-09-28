@@ -159,7 +159,7 @@ runtime.AddRelic("Kindling");
 Entity worm = runtime.SpawnEnemy("Jaw Worm");
 
 runtime.StartBattle();
-PlayResult result = runtime.Play("Fireball", worm);   // Played, NotEnoughEnergy, InvalidTarget...
+ActionResult result = runtime.Play("Fireball", worm);   // Played, NotEnoughEnergy, InvalidTarget...
 runtime.EndTurn();
 ```
 

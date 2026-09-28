@@ -86,7 +86,11 @@ namespace Cantrip.Runtime
     /// </summary>
     public sealed class Ruleset
     {
-        public static Ruleset Default => new Ruleset();
+        /// <summary>
+        /// A new ruleset with every default in place. It is a method rather than a property because
+        /// each call allocates: setting a property on one changes that one and nothing else.
+        /// </summary>
+        public static Ruleset CreateDefault() => new Ruleset();
 
         public bool BeforeEvents { get; set; } = true;
         public bool InsteadEvents { get; set; } = true;

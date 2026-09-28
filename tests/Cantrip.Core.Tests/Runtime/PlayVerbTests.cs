@@ -441,9 +441,9 @@ namespace Cantrip.Tests.Runtime
             var chooser = new DeferredChooser();
             CardRuntime runtime = Aimed(chooser, seed: 1);
 
-            PlayResult result = runtime.Play("Roll");
+            ActionResult result = runtime.Play("Roll");
 
-            Assert.Equal(PlayResult.Played, result);
+            Assert.Equal(ActionResult.Played, result);
             Assert.Null(runtime.Pending);
             Assert.Equal(95, runtime.State.Actors(Team.Enemy).Sum(e => Hp(e)));
         }
@@ -455,7 +455,7 @@ namespace Cantrip.Tests.Runtime
             int Aim(ulong seed)
             {
                 CardRuntime runtime = Aimed(new FirstOptionChooser(), seed);
-                Assert.Equal(PlayResult.Played, runtime.Play("Roll"));
+                Assert.Equal(ActionResult.Played, runtime.Play("Roll"));
                 return runtime.State.Actors(Team.Enemy).First(e => Hp(e) == 45).Id;
             }
 
@@ -464,11 +464,11 @@ namespace Cantrip.Tests.Runtime
             // And the same again across a save taken before the play.
             CardRuntime saved = Aimed(new FirstOptionChooser(), seed: 7);
             GameSnapshot before = saved.Capture();
-            Assert.Equal(PlayResult.Played, saved.Play("Roll"));
+            Assert.Equal(ActionResult.Played, saved.Play("Roll"));
             int hit = saved.State.Actors(Team.Enemy).First(e => Hp(e) == 45).Id;
 
             saved.Restore(before);
-            Assert.Equal(PlayResult.Played, saved.Play("Roll"));
+            Assert.Equal(ActionResult.Played, saved.Play("Roll"));
             Assert.Equal(hit, saved.State.Actors(Team.Enemy).First(e => Hp(e) == 45).Id);
         }
 
@@ -588,7 +588,7 @@ namespace Cantrip.Tests.Runtime
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
             ulong before = runtime.State.ComputeHash();
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play(outer, null));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play(outer, null));
 
             // Nothing of the outer action survived the rollback, the nested play included.
             Assert.Equal(before, runtime.State.ComputeHash());
@@ -596,7 +596,7 @@ namespace Cantrip.Tests.Runtime
             Assert.Single(runtime.State.ZoneOf(runtime.Player, Zones.Draw));
 
             Entity picked = runtime.Pending!.Options.First(o => o.Name == "Filler");
-            Assert.Equal(PlayResult.Played, runtime.Answer(picked.Id));
+            Assert.Equal(ActionResult.Played, runtime.Answer(picked.Id));
 
             Assert.Single(runtime.State.ZoneOf(runtime.Player, Zones.Exhaust));
             Assert.Equal(3, runtime.Player!.GetInt("block"));
@@ -639,7 +639,7 @@ namespace Cantrip.Tests.Runtime
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
             host.Runtime = runtime;
-            Assert.Equal(PlayResult.Played, runtime.Play(signal, null));
+            Assert.Equal(ActionResult.Played, runtime.Play(signal, null));
 
             Assert.True(runtime.Won);
             Assert.False(runtime.State.InBattle);

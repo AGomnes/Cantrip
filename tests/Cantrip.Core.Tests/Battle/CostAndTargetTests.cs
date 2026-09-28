@@ -127,7 +127,7 @@ namespace Cantrip.Tests.Battle
             Assert.Equal(1, runtime.CostOf(fire));
             Assert.Equal(2, runtime.CostOf(plain));
 
-            Assert.Equal(PlayResult.Played, runtime.Play(fire, alpha));
+            Assert.Equal(ActionResult.Played, runtime.Play(fire, alpha));
             Assert.Equal(2, player.GetInt("energy"));
         }
 
@@ -172,7 +172,7 @@ namespace Cantrip.Tests.Battle
             runtime.ApplyStatus("Discount", player, 3);
 
             Assert.Equal(0, runtime.CostOf(freebie));
-            Assert.Equal(PlayResult.Played, runtime.Play(freebie));
+            Assert.Equal(ActionResult.Played, runtime.Play(freebie));
             Assert.Equal(3, player.GetInt("energy"));
         }
 
@@ -189,7 +189,7 @@ namespace Cantrip.Tests.Battle
 
             Assert.True(runtime.IsXCost(whirlwind));
             Assert.Equal(3, runtime.CostOf(whirlwind));
-            Assert.Equal(PlayResult.Played, runtime.Play(whirlwind));
+            Assert.Equal(ActionResult.Played, runtime.Play(whirlwind));
 
             Assert.Equal(0, player.GetInt("energy"));
             Assert.Equal(15, alpha.GetInt("hp"));
@@ -206,7 +206,7 @@ namespace Cantrip.Tests.Battle
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
             player.SetBase("energy", 0);
 
-            Assert.Equal(PlayResult.Played, runtime.Play(whirlwind));
+            Assert.Equal(ActionResult.Played, runtime.Play(whirlwind));
             Assert.Equal(30, alpha.GetInt("hp"));
             Assert.Equal(Zones.Discard, whirlwind.Zone);
         }
@@ -234,7 +234,7 @@ namespace Cantrip.Tests.Battle
             runtime.AddCard("Jab", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Played, runtime.Play("Jab"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Jab"));
 
             Assert.Equal(27, alpha.GetInt("hp"));
             Assert.Empty(chooser.Requests);
@@ -250,7 +250,7 @@ namespace Cantrip.Tests.Battle
             runtime.AddCard("Jab", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Played, runtime.Play("Jab"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Jab"));
 
             Assert.Equal(30, alpha.GetInt("hp"));
             Assert.Equal(27, beta.GetInt("hp"));
@@ -272,7 +272,7 @@ namespace Cantrip.Tests.Battle
             runtime.AddCard("Jab", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Played, runtime.Play("Jab"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Jab"));
 
             Assert.Equal(27, alpha.GetInt("hp"));
             Assert.Equal(30, beta.GetInt("hp"));
@@ -289,7 +289,7 @@ namespace Cantrip.Tests.Battle
             runtime.AddCard("Jab", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Played, runtime.Play("Jab", beta));
+            Assert.Equal(ActionResult.Played, runtime.Play("Jab", beta));
 
             Assert.Equal(27, beta.GetInt("hp"));
             Assert.Empty(chooser.Requests);
@@ -305,10 +305,10 @@ namespace Cantrip.Tests.Battle
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
             player.SetBase("hp", 70);
 
-            Assert.Equal(PlayResult.InvalidTarget, runtime.Play("Mend", alpha));
-            Assert.Equal(PlayResult.Played, runtime.Play("Mend"));
+            Assert.Equal(ActionResult.InvalidTarget, runtime.Play("Mend", alpha));
+            Assert.Equal(ActionResult.Played, runtime.Play("Mend"));
             Assert.Equal(74, player.GetInt("hp"));
-            Assert.Equal(PlayResult.Played, runtime.Play("Mend", player));
+            Assert.Equal(ActionResult.Played, runtime.Play("Mend", player));
             Assert.Equal(78, player.GetInt("hp"));
         }
 
@@ -325,8 +325,8 @@ namespace Cantrip.Tests.Battle
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
             runtime.ApplyStatus("Taunt", beta);
 
-            Assert.Equal(PlayResult.InvalidTarget, runtime.Play("Jab", alpha));
-            Assert.Equal(PlayResult.Played, runtime.Play("Jab", beta));
+            Assert.Equal(ActionResult.InvalidTarget, runtime.Play("Jab", alpha));
+            Assert.Equal(ActionResult.Played, runtime.Play("Jab", beta));
 
             Assert.Equal(30, alpha.GetInt("hp"));
             Assert.Equal(27, beta.GetInt("hp"));
@@ -345,7 +345,7 @@ namespace Cantrip.Tests.Battle
             runtime.ApplyStatus("Taunt", beta);
             runtime.ApplyStatus("Taunt", gamma);
 
-            Assert.Equal(PlayResult.Played, runtime.Play("Jab"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Jab"));
 
             // Each Taunt leaves the other in: the rule is "must have Taunt", not "must be me".
             ChoiceRequest request = Assert.Single(chooser.Requests);
@@ -365,7 +365,7 @@ namespace Cantrip.Tests.Battle
             runtime.ApplyStatus("Taunt", player);
 
             // `source:enemies` is what keeps a taunting entity from blocking its own side's cards.
-            Assert.Equal(PlayResult.Played, runtime.Play("Mend", player));
+            Assert.Equal(ActionResult.Played, runtime.Play("Mend", player));
             Assert.Equal(74, player.GetInt("hp"));
             Assert.Equal(30, alpha.GetInt("hp"));
         }
@@ -381,11 +381,11 @@ namespace Cantrip.Tests.Battle
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
             runtime.ApplyStatus("Stealth", alpha);
 
-            Assert.Equal(PlayResult.InvalidTarget, runtime.Play("Jab", alpha));
-            Assert.Equal(PlayResult.Played, runtime.Play("Jab", beta));
+            Assert.Equal(ActionResult.InvalidTarget, runtime.Play("Jab", alpha));
+            Assert.Equal(ActionResult.Played, runtime.Play("Jab", beta));
 
             // An area effect is not target selection, so it reaches the hidden one anyway.
-            Assert.Equal(PlayResult.Played, runtime.Play("Whirlwind"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Whirlwind"));
             Assert.Equal(15, alpha.GetInt("hp"));
         }
 
@@ -398,7 +398,7 @@ namespace Cantrip.Tests.Battle
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
             runtime.ApplyStatus("Stealth", alpha);
 
-            Assert.Equal(PlayResult.InvalidTarget, runtime.Play("Jab"));
+            Assert.Equal(ActionResult.InvalidTarget, runtime.Play("Jab"));
             Assert.Equal(30, alpha.GetInt("hp"));
             Assert.Equal(3, player.GetInt("energy"));
         }
@@ -420,7 +420,7 @@ namespace Cantrip.Tests.Battle
             runtime.ApplyStatus("Taunt", beta);
 
             Assert.Equal(new[] { beta }, runtime.LegalTargets(jab));
-            Assert.Equal(PlayResult.InvalidTarget, runtime.Play(jab, alpha));
+            Assert.Equal(ActionResult.InvalidTarget, runtime.Play(jab, alpha));
         }
 
         [Fact]
@@ -435,7 +435,7 @@ namespace Cantrip.Tests.Battle
 
             Assert.Empty(runtime.LegalTargets(jab));
             Assert.False(runtime.CanPlay(jab));
-            Assert.Equal(PlayResult.InvalidTarget, runtime.Play(jab));
+            Assert.Equal(ActionResult.InvalidTarget, runtime.Play(jab));
 
             // An untargeted card needs no one.
             Assert.True(runtime.CanPlay(shout));
@@ -495,10 +495,10 @@ namespace Cantrip.Tests.Battle
 
             // Positions count from zero, so Gamma is the third rank and out of the pike's reach.
             Assert.Equal(2, gamma.Position);
-            Assert.Equal(PlayResult.InvalidTarget, runtime.Play(pike, gamma));
+            Assert.Equal(ActionResult.InvalidTarget, runtime.Play(pike, gamma));
 
             // `card:Pike` is what keeps the limit on its own card while the pike waits in hand.
-            Assert.Equal(PlayResult.Played, runtime.Play("Jab", gamma));
+            Assert.Equal(ActionResult.Played, runtime.Play("Jab", gamma));
             Assert.Equal(27, gamma.GetInt("hp"));
             Assert.Equal(Zones.Hand, pike.Zone);
         }
@@ -511,7 +511,7 @@ namespace Cantrip.Tests.Battle
             runtime.AddCard("Self Harm", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Played, runtime.Play("Self Harm", alpha));
+            Assert.Equal(ActionResult.Played, runtime.Play("Self Harm", alpha));
 
             Assert.Equal(77, player.GetInt("hp"));
             Assert.Equal(30, alpha.GetInt("hp"));
@@ -529,11 +529,11 @@ namespace Cantrip.Tests.Battle
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
             runtime.Execute("deal 100 to target", target: beta);
 
-            Assert.Equal(PlayResult.Played, runtime.Play(zaps[0], alpha));
-            Assert.Equal(PlayResult.Played, runtime.Play(zaps[1], player));
-            Assert.Equal(PlayResult.Played, runtime.Play(zaps[2]));
-            Assert.Equal(PlayResult.InvalidTarget, runtime.Play(zaps[3], beta));
-            Assert.Equal(PlayResult.InvalidTarget, runtime.Play(zaps[3], shout));
+            Assert.Equal(ActionResult.Played, runtime.Play(zaps[0], alpha));
+            Assert.Equal(ActionResult.Played, runtime.Play(zaps[1], player));
+            Assert.Equal(ActionResult.Played, runtime.Play(zaps[2]));
+            Assert.Equal(ActionResult.InvalidTarget, runtime.Play(zaps[3], beta));
+            Assert.Equal(ActionResult.InvalidTarget, runtime.Play(zaps[3], shout));
 
             Assert.Equal(28, alpha.GetInt("hp"));
             Assert.Equal(78, player.GetInt("hp"));
@@ -550,7 +550,7 @@ namespace Cantrip.Tests.Battle
             runtime.AddCard("Shout", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Played, runtime.Play("Shout"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Shout"));
 
             Assert.Equal(2, player.GetInt("block"));
             Assert.Null(Assert.Single(recorder.Named("card_played")).Target);

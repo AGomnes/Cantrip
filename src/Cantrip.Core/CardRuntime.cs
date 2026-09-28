@@ -9,10 +9,23 @@ using Cantrip.Syntax;
 
 namespace Cantrip
 {
-    public enum PlayResult
+    /// <summary>
+    /// What a top-level action did. Every call that can stop for a choice reports it here:
+    /// <see cref="CardRuntime.Play(Entity, Entity)"/>, <see cref="CardRuntime.StartBattle"/>,
+    /// <see cref="CardRuntime.EndTurn"/>, <see cref="CardRuntime.Execute"/>,
+    /// <see cref="CardRuntime.UseAbility"/> and <see cref="CardRuntime.Answer(int[])"/>.
+    /// </summary>
+    public enum ActionResult
     {
+        /// <summary>The action ran to the end. For <see cref="CardRuntime.Play(Entity, Entity)"/>, the card was played.</summary>
         Played,
+
+        /// <summary>
+        /// There is nothing to act on: the entity is not a card, or not an ability, or it has been
+        /// removed, or the actor it belongs to is dead.
+        /// </summary>
         NotACard,
+
         NotInHand,
         Unplayable,
         NotEnoughEnergy,
@@ -24,6 +37,9 @@ namespace Cantrip
         /// was; see <see cref="CardRuntime.Pending"/> and answer with <see cref="CardRuntime.Answer(int[])"/>.
         /// </summary>
         ChoicePending,
+
+        /// <summary>An ability that is still on cooldown. See <see cref="CardRuntime.IsReady"/>.</summary>
+        NotReady,
     }
 
     public sealed class RuntimeOptions
@@ -49,7 +65,7 @@ namespace Cantrip
     /// battles through <see cref="StartBattle"/>, <see cref="Play(Entity, Entity)"/> and <see cref="EndTurn"/>, or
     /// real-time play through <see cref="Tick"/> and <see cref="UseAbility"/>.
     /// </summary>
-    public sealed class CardRuntime
+    public sealed class CardRuntime : IDisposable
     {
         public CardRuntime(ContentLibrary content, RuntimeOptions? options = null)
         {
@@ -77,6 +93,29 @@ namespace Cantrip
             clock.Advanced += OnClockAdvanced;
         }
 
+        private bool _detached;
+
+        /// <summary>
+        /// Lets go of the clock. A runtime listens to <see cref="IGameClock.Advanced"/> from the
+        /// moment it is built, which is how scheduled work, periodic triggers and timed statuses
+        /// run; until it lets go, the clock holds it alive and keeps driving it.
+        /// </summary>
+        /// <remarks>
+        /// It only matters when a game passes its own clock in <see cref="RuntimeOptions.Clock"/> and
+        /// outlives a runtime that used it — two runtimes sharing one clock both keep running, and
+        /// the one nobody uses any more goes on resolving effects on a game that has been replaced.
+        /// A runtime that made its own clock is collected with it, so nothing is leaked by not
+        /// calling this. Nothing else is torn down: the state, the content and the entities are
+        /// ordinary objects, and calling any other member afterwards still works, minus the clock.
+        /// Calling it twice does nothing the second time.
+        /// </remarks>
+        public void Dispose()
+        {
+            if (_detached) return;
+            _detached = true;
+            State.Clock.Advanced -= OnClockAdvanced;
+        }
+
         /// <summary>
         /// The clock content asked for, or a turn clock when it did not say — which is what every
         /// game written before the <c>clock</c> setting existed gets.
@@ -97,10 +136,15 @@ namespace Cantrip
         public Interpreter Interpreter { get; }
         public ExecutionMode Execution { get; set; }
 
+        /// <summary>
+        /// Who answers a choice content asks for. Setting it to null throws rather than quietly
+        /// putting a <see cref="FirstOptionChooser"/> in its place: a game that meant to install its
+        /// own UI and handed in a null would otherwise find every decision made for it.
+        /// </summary>
         public IChoiceProvider Chooser
         {
             get => Interpreter.Chooser;
-            set => Interpreter.Chooser = value ?? new FirstOptionChooser();
+            set => Interpreter.Chooser = value ?? throw new ArgumentNullException(nameof(value), "A runtime always has a chooser; pass a FirstOptionChooser to keep the default.");
         }
 
         public Entity? Player => State.Player;
@@ -200,9 +244,14 @@ namespace Cantrip
 
         /// <param name="shuffle">Shuffle the draw pile first. Tests turn this off to control draw order.</param>
         /// <param name="drawOpeningHand">Draw the first hand. Tests turn this off to set the hand explicitly.</param>
-        public void StartBattle(bool shuffle = true, bool drawOpeningHand = true) =>
+        /// <returns>
+        /// <see cref="ActionResult.Played"/>, or <see cref="ActionResult.ChoicePending"/> when a
+        /// <c>battle_start</c> effect asks the player something: the whole call is rolled back and
+        /// runs again from <see cref="Answer(int[])"/>.
+        /// </returns>
+        public ActionResult StartBattle(bool shuffle = true, bool drawOpeningHand = true) =>
             Attempt(
-                () => { StartBattleCore(shuffle, drawOpeningHand); return PlayResult.Played; },
+                () => { StartBattleCore(shuffle, drawOpeningHand); return ActionResult.Played; },
                 () => { StartBattle(shuffle, drawOpeningHand); return Outcome(); });
 
         private void StartBattleCore(bool shuffle, bool drawOpeningHand)
@@ -232,9 +281,14 @@ namespace Cantrip
         }
 
         /// <summary>Ends the player's turn, runs the enemies' turn, and starts the next player turn.</summary>
-        public void EndTurn() =>
+        /// <returns>
+        /// <see cref="ActionResult.Played"/>, or <see cref="ActionResult.ChoicePending"/> when
+        /// something in the turn asks the player to choose: the whole call, enemy turn included, is
+        /// rolled back and runs again from <see cref="Answer(int[])"/>.
+        /// </returns>
+        public ActionResult EndTurn() =>
             Attempt(
-                () => { EndTurnCore(); return PlayResult.Played; },
+                () => { EndTurnCore(); return ActionResult.Played; },
                 () => { EndTurn(); return Outcome(); });
 
         private void EndTurnCore()
@@ -421,7 +475,7 @@ namespace Cantrip
         }
 
         /// <summary>Plays a card from hand: checks energy and target, pays, resolves, and drains triggers.</summary>
-        public PlayResult Play(Entity card, Entity? target = null)
+        public ActionResult Play(Entity card, Entity? target = null)
         {
             if (card == null) throw new ArgumentNullException(nameof(card));
 
@@ -429,7 +483,7 @@ namespace Cantrip
             int targetId = target?.Id ?? 0;
             return Attempt(
                 () => PlayCore(card, target),
-                () => Live(cardId) is Entity again ? Play(again, Live(targetId)) : PlayResult.NotACard);
+                () => Live(cardId) is Entity again ? Play(again, Live(targetId)) : ActionResult.NotACard);
         }
 
         /// <summary>
@@ -450,20 +504,20 @@ namespace Cantrip
         /// The causal chain to continue. A nested play extends its caller's, so <c>once per chain</c>
         /// counts one chain across a cascade rather than restarting at every play boundary.
         /// </param>
-        private PlayResult PlayCore(Entity card, Entity? target, string? from = Zones.Hand, bool free = false, Chain? chain = null)
+        private ActionResult PlayCore(Entity card, Entity? target, string? from = Zones.Hand, bool free = false, Chain? chain = null)
         {
-            if (card.Kind != EntityKind.Card || card.IsRemoved) return PlayResult.NotACard;
-            if (from != null ? card.Zone != from : NotInAPile(card)) return PlayResult.NotInHand;
-            if (card.HasTag("unplayable")) return PlayResult.Unplayable;
+            if (card.Kind != EntityKind.Card || card.IsRemoved) return ActionResult.NotACard;
+            if (from != null ? card.Zone != from : NotInAPile(card)) return ActionResult.NotInHand;
+            if (card.HasTag("unplayable")) return ActionResult.Unplayable;
 
             Entity player = card.Controller;
             int cost = CostOf(card);
             // A card priced in something else is refused the same way, so NotEnoughEnergy now means
             // "not enough of whatever this costs".
             string resource = CostResourceOf(card);
-            if (!free && !IsXCost(card) && player.GetInt(resource) < cost) return PlayResult.NotEnoughEnergy;
+            if (!free && !IsXCost(card) && player.GetInt(resource) < cost) return ActionResult.NotEnoughEnergy;
 
-            if (!TryResolveTarget(card, ref target, automatic: from == null)) return PlayResult.InvalidTarget;
+            if (!TryResolveTarget(card, ref target, automatic: from == null)) return ActionResult.InvalidTarget;
 
             if (_runDepth == 0) Interpreter.ResetSteps();
             string startedIn = card.Zone;
@@ -502,7 +556,7 @@ namespace Cantrip
                 if (gameEvent.Cancelled && card.Zone == startedIn)
                 {
                     if (_runDepth == 1) Interpreter.Drain();
-                    return PlayResult.Cancelled;
+                    return ActionResult.Cancelled;
                 }
 
                 // The effect may already have moved the card (exhausted it, shuffled it away).
@@ -532,7 +586,7 @@ namespace Cantrip
             }
 
             if (_runDepth == 0) CheckBattleOver();
-            return PlayResult.Played;
+            return ActionResult.Played;
         }
 
         /// <summary>
@@ -542,11 +596,11 @@ namespace Cantrip
         private static bool NotInAPile(Entity card) =>
             card.Zone.Length == 0 || card.Zone == Zones.Play || card.Zone == Zones.Powers;
 
-        public PlayResult Play(string cardName, Entity? target = null)
+        public ActionResult Play(string cardName, Entity? target = null)
         {
             Entity player = State.Player ?? throw new InvalidOperationException("There is no player.");
             Entity? card = State.ZoneOf(player, Zones.Hand).FirstOrDefault(c => string.Equals(c.Name, cardName, StringComparison.OrdinalIgnoreCase));
-            return card == null ? PlayResult.NotInHand : Play(card, target);
+            return card == null ? ActionResult.NotInHand : Play(card, target);
         }
 
         /// <summary>
@@ -741,27 +795,33 @@ namespace Cantrip
 
         public bool IsReady(Entity ability) => ability.GetBase("ready_at") <= Num.FromInt(State.Clock.Now);
 
-        /// <summary>Uses an ability if it is off cooldown. Returns false if it was not ready.</summary>
-        public bool UseAbility(Entity ability, Entity? target = null)
+        /// <summary>Uses an ability if it is off cooldown.</summary>
+        /// <returns>
+        /// <see cref="ActionResult.Played"/> when it ran, <see cref="ActionResult.NotReady"/> while it
+        /// is still on cooldown, <see cref="ActionResult.NotACard"/> when the ability has been removed
+        /// or its owner is gone or dead, and <see cref="ActionResult.ChoicePending"/> when it stopped
+        /// to ask the player something.
+        /// </returns>
+        /// <remarks>
+        /// An ability has no cost and does not settle its own target, so it never answers
+        /// <see cref="ActionResult.NotEnoughEnergy"/> or <see cref="ActionResult.InvalidTarget"/>; both
+        /// are here for the day it does, so that adding them is not a change to this signature.
+        /// </remarks>
+        public ActionResult UseAbility(Entity ability, Entity? target = null)
         {
             if (ability == null) throw new ArgumentNullException(nameof(ability));
 
             int abilityId = ability.Id;
             int targetId = target?.Id ?? 0;
-            bool used = false;
-            Attempt(
-                () => { used = UseAbilityCore(ability, target); return PlayResult.Played; },
-                () =>
-                {
-                    if (Live(abilityId) is Entity again) used = UseAbility(again, Live(targetId));
-                    return Outcome();
-                });
-            return used;
+            return Attempt(
+                () => UseAbilityCore(ability, target),
+                () => Live(abilityId) is Entity again ? UseAbility(again, Live(targetId)) : ActionResult.NotACard);
         }
 
-        private bool UseAbilityCore(Entity ability, Entity? target)
+        private ActionResult UseAbilityCore(Entity ability, Entity? target)
         {
-            if (ability.IsRemoved || ability.Owner == null || !ability.Owner.IsAlive || !IsReady(ability)) return false;
+            if (ability.IsRemoved || ability.Owner == null || !ability.Owner.IsAlive) return ActionResult.NotACard;
+            if (!IsReady(ability)) return ActionResult.NotReady;
 
             Entity owner = ability.Owner;
             bool used = false;
@@ -786,7 +846,7 @@ namespace Cantrip
                 ability.SetBase("ready_at", Num.FromInt(State.Clock.Now + CooldownOf(ability, owner, units)));
             }
 
-            return used;
+            return used ? ActionResult.Played : ActionResult.NotACard;
         }
 
         private const string CooldownChannel = "cooldown";
@@ -831,25 +891,25 @@ namespace Cantrip
 
         // Player choices ------------------------------------------------------------------------
 
-        private Func<PlayResult>? _replay;
+        private Func<ActionResult>? _replay;
         private bool _deferring;
 
         /// <summary>
         /// The decision a UI still has to make, set when an action returned
-        /// <see cref="PlayResult.ChoicePending"/>. Null when nothing is waiting.
+        /// <see cref="ActionResult.ChoicePending"/>. Null when nothing is waiting.
         /// </summary>
         public PendingChoice? Pending { get; private set; }
 
         /// <summary>
         /// Answers <see cref="Pending"/> and replays the action that asked. Returns what the replayed
-        /// action returned, which is <see cref="PlayResult.ChoicePending"/> again if it needs a
+        /// action returned, which is <see cref="ActionResult.ChoicePending"/> again if it needs a
         /// further decision.
         /// </summary>
-        public PlayResult Answer(params int[] entityIds) => Answer((IEnumerable<int>)entityIds);
+        public ActionResult Answer(params int[] entityIds) => Answer((IEnumerable<int>)entityIds);
 
-        public PlayResult Answer(IEnumerable<Entity> entities) => Answer((entities ?? Enumerable.Empty<Entity>()).Select(e => e.Id));
+        public ActionResult Answer(IEnumerable<Entity> entities) => Answer((entities ?? Enumerable.Empty<Entity>()).Select(e => e.Id));
 
-        public PlayResult Answer(IEnumerable<int> entityIds)
+        public ActionResult Answer(IEnumerable<int> entityIds)
         {
             if (Pending == null) throw new InvalidOperationException("No choice is pending.");
             if (Pending.IsOffer) throw new InvalidOperationException("This choice offers content, not entities: answer it with Answer(EntityDefinition).");
@@ -860,7 +920,7 @@ namespace Cantrip
         /// Answers a pending offer of content, as <c>discover</c> makes, with the candidate the
         /// player picked from <see cref="PendingChoice.Definitions"/>, and replays the action.
         /// </summary>
-        public PlayResult Answer(EntityDefinition chosen)
+        public ActionResult Answer(EntityDefinition chosen)
         {
             if (chosen == null) throw new ArgumentNullException(nameof(chosen));
             if (Pending == null) throw new InvalidOperationException("No choice is pending.");
@@ -881,11 +941,11 @@ namespace Cantrip
             return Replay(new[] { index }, Pending.Definitions[index]);
         }
 
-        private PlayResult Replay(IEnumerable<int> answer, EntityDefinition? pick = null)
+        private ActionResult Replay(IEnumerable<int> answer, EntityDefinition? pick = null)
         {
             if (!(Chooser is DeferredChooser deferred)) throw new InvalidOperationException("Answering a choice needs a DeferredChooser.");
 
-            Func<PlayResult> replay = _replay ?? throw new InvalidOperationException("There is no action to replay.");
+            Func<ActionResult> replay = _replay ?? throw new InvalidOperationException("There is no action to replay.");
             deferred.Add(answer, pick);
             Pending = null;
             _replay = null;
@@ -912,7 +972,7 @@ namespace Cantrip
             (Chooser as DeferredChooser)?.Clear();
         }
 
-        private PlayResult Outcome() => Pending == null ? PlayResult.Played : PlayResult.ChoicePending;
+        private ActionResult Outcome() => Pending == null ? ActionResult.Played : ActionResult.ChoicePending;
 
         private Entity? Live(int id) => id == 0 ? null : State.Find(id);
 
@@ -922,7 +982,7 @@ namespace Cantrip
         /// <see cref="Answer(int[])"/> replays it. Without a <see cref="DeferredChooser"/> this is
         /// nothing but a direct call.
         /// </summary>
-        private PlayResult Attempt(Func<PlayResult> action, Func<PlayResult> replay)
+        private ActionResult Attempt(Func<ActionResult> action, Func<ActionResult> replay)
         {
             if (_deferring || !(Chooser is DeferredChooser deferred)) return action();
 
@@ -963,7 +1023,7 @@ namespace Cantrip
 
             try
             {
-                PlayResult result = action();
+                ActionResult result = action();
 
                 // Only a completed action is real: now the game may hear about its events.
                 Interpreter.FlushHostBuffer();
@@ -992,7 +1052,7 @@ namespace Cantrip
                     Live(chooserId),
                     pending.Request.Span);
                 _replay = replay;
-                return PlayResult.ChoicePending;
+                return ActionResult.ChoicePending;
             }
             catch (OfferPendingException pending)
             {
@@ -1007,7 +1067,7 @@ namespace Cantrip
 
                 Pending = new PendingChoice(pending.Offer.Prompt, pending.Offer.Options, Live(chooserId), pending.Offer.Span);
                 _replay = replay;
-                return PlayResult.ChoicePending;
+                return ActionResult.ChoicePending;
             }
             catch
             {
@@ -1275,12 +1335,17 @@ namespace Cantrip
         /// A <c>next turn:</c> or <c>in N turns:</c> block among them is saved with their text, so a
         /// snapshot taken while it waits restores whatever content is loaded.
         /// </summary>
-        public void Execute(string statements, Entity? self = null, Entity? target = null)
+        /// <returns>
+        /// <see cref="ActionResult.Played"/>, or <see cref="ActionResult.ChoicePending"/> when the
+        /// statements ask the player something: they are rolled back and run again from
+        /// <see cref="Answer(int[])"/>.
+        /// </returns>
+        public ActionResult Execute(string statements, Entity? self = null, Entity? target = null)
         {
             int selfId = self?.Id ?? 0;
             int targetId = target?.Id ?? 0;
-            Attempt(
-                () => { ExecuteCore(statements, self, target); return PlayResult.Played; },
+            return Attempt(
+                () => { ExecuteCore(statements, self, target); return ActionResult.Played; },
                 () => { Execute(statements, Live(selfId), Live(targetId)); return Outcome(); });
         }
 
@@ -1461,7 +1526,7 @@ namespace Cantrip
 
             Entity? target = aimed ? aim : Inherited(card, call.Context.Target);
 
-            PlayResult result;
+            ActionResult result;
             _playDepth++;
             try
             {
@@ -1472,7 +1537,7 @@ namespace Cantrip
                 _playDepth--;
             }
 
-            if (result == PlayResult.Played) call.Context.SetLocal("played", Value.FromEntity(card));
+            if (result == ActionResult.Played) call.Context.SetLocal("played", Value.FromEntity(card));
         }
 
         /// <summary>

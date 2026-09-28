@@ -305,9 +305,9 @@ scenario ""A card that pays off later""
 
             internal sealed class Reading
             {
-                public (ulong S0, ulong S1, ulong S2, ulong S3) Before;
-                public (ulong S0, ulong S1, ulong S2, ulong S3) Inside;
-                public (ulong S0, ulong S1, ulong S2, ulong S3) After;
+                public ulong[] Before = System.Array.Empty<ulong>();
+                public ulong[] Inside = System.Array.Empty<ulong>();
+                public ulong[] After = System.Array.Empty<ulong>();
                 public bool OpenInside;
                 public bool OpenAfter;
             }

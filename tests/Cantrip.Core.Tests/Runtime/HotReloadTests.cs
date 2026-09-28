@@ -47,7 +47,7 @@ namespace Cantrip.Tests.Runtime
             runtime.AddCard("Strike", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Played, runtime.Play("Strike", enemy));
+            Assert.Equal(ActionResult.Played, runtime.Play("Strike", enemy));
             Assert.Equal(94, enemy.GetInt("hp"));
 
             library.LoadText(Dummy + """
@@ -63,7 +63,7 @@ namespace Cantrip.Tests.Runtime
             Assert.Empty(report.Missing);
             Assert.False(report.RulesetChanged);
 
-            Assert.Equal(PlayResult.Played, runtime.Play("Strike", enemy));
+            Assert.Equal(ActionResult.Played, runtime.Play("Strike", enemy));
             Assert.Equal(85, enemy.GetInt("hp"));
         }
 
@@ -187,7 +187,7 @@ namespace Cantrip.Tests.Runtime
             CardRuntime.ReloadReport report = runtime.ApplyContentChanges();
             Assert.Contains("card \"Strike\"", report.Missing);
 
-            Assert.Equal(PlayResult.Played, runtime.Play("Strike", enemy));
+            Assert.Equal(ActionResult.Played, runtime.Play("Strike", enemy));
             Assert.Equal(94, enemy.GetInt("hp"));
         }
 
@@ -273,8 +273,8 @@ namespace Cantrip.Tests.Runtime
             Assert.Contains("relic \"Tally\"", runtime.ApplyContentChanges().Missing);
 
             // The action asks, so it is rolled back to the game as it was, Tally included.
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Recycle"));
-            Assert.Equal(PlayResult.Played, runtime.Answer(runtime.Pending!.Options[0].Id));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play("Recycle"));
+            Assert.Equal(ActionResult.Played, runtime.Answer(runtime.Pending!.Options[0].Id));
 
             Assert.Empty(runtime.State.ZoneOf(runtime.Player, Zones.Hand));
             Assert.Equal(1, runtime.Player!.GetInt("gold"));
@@ -300,7 +300,7 @@ namespace Cantrip.Tests.Runtime
             runtime.AddRelic("Tally");
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Played, runtime.Play("Filler"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Filler"));
             Assert.Equal(1, runtime.Player!.GetInt("gold"));
             return runtime;
         }
@@ -314,7 +314,7 @@ namespace Cantrip.Tests.Runtime
             // Any edit to the file gives every definition in it, Tally's included, new syntax.
             library.LoadText(Tally.Replace("hp 100", "hp 120"), File);
             runtime.ApplyContentChanges();
-            Assert.Equal(PlayResult.Played, runtime.Play("Filler"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Filler"));
 
             Assert.Equal(1, runtime.Player!.GetInt("gold"));
         }
@@ -327,7 +327,7 @@ namespace Cantrip.Tests.Runtime
 
             library.LoadText(Tally.Replace("gain 1 gold", "gain 5 gold"), File);
             runtime.ApplyContentChanges();
-            Assert.Equal(PlayResult.Played, runtime.Play("Filler"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Filler"));
 
             Assert.Equal(1, runtime.Player!.GetInt("gold"));
         }
@@ -339,7 +339,7 @@ namespace Cantrip.Tests.Runtime
 
             library.LoadText(Tally.Replace("once per battle", "once per turn"), File);
             runtime.ApplyContentChanges();
-            Assert.Equal(PlayResult.Played, runtime.Play("Filler"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Filler"));
 
             Assert.Equal(2, runtime.Player!.GetInt("gold"));
         }

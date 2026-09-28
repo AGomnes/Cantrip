@@ -126,7 +126,7 @@ enemy ""Slime""
             Assert.Empty(result.Missing);
             Assert.False(result.RulesetChanged);
 
-            Assert.Equal(PlayResult.Played, service.Runtime.Play("Ember", slime));
+            Assert.Equal(ActionResult.Played, service.Runtime.Play("Ember", slime));
             Assert.Equal(21, slime.GetInt("hp"));
         }
 

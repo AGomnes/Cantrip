@@ -22,6 +22,11 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Cantrip.Core.Tests" />
+    <!--
+      The simulator is part of the tool, not part of the library's promise: it shares the setup
+      session and a few interpreter primitives that a game has no reason to reach for.
+    -->
+    <InternalsVisibleTo Include="Cantrip.Sim" />
     <None Include="PACKAGE.md" Pack="true" PackagePath="README.md" />
   </ItemGroup>
 

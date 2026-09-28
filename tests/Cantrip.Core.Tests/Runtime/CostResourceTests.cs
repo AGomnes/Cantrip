@@ -43,7 +43,7 @@ namespace Cantrip.Tests.Runtime
             CardRuntime runtime = Ready();
             runtime.Player!.SetBase("bones", 2);
 
-            Assert.Equal(PlayResult.Played, runtime.Play(runtime.AddCard("Bone Bargain", Zones.Hand), null));
+            Assert.Equal(ActionResult.Played, runtime.Play(runtime.AddCard("Bone Bargain", Zones.Hand), null));
 
             Assert.Equal(0, runtime.Player.GetInt("bones"));
             Assert.Equal(1, runtime.Player.GetInt("gold"));
@@ -67,7 +67,7 @@ namespace Cantrip.Tests.Runtime
             CardRuntime runtime = Ready();
             runtime.Player!.SetBase("bones", 1);
 
-            Assert.Equal(PlayResult.NotEnoughEnergy, runtime.Play(runtime.AddCard("Bone Bargain", Zones.Hand), null));
+            Assert.Equal(ActionResult.NotEnoughEnergy, runtime.Play(runtime.AddCard("Bone Bargain", Zones.Hand), null));
 
             // Refused, not merely ineffective: nothing was spent and nothing happened.
             Assert.Equal(1, runtime.Player.GetInt("bones"));
@@ -80,7 +80,7 @@ namespace Cantrip.Tests.Runtime
             CardRuntime runtime = Ready();
             int energy = runtime.Player!.GetInt("energy");
 
-            Assert.Equal(PlayResult.Played, runtime.Play(runtime.AddCard("Spark", Zones.Hand), null));
+            Assert.Equal(ActionResult.Played, runtime.Play(runtime.AddCard("Spark", Zones.Hand), null));
 
             Assert.Equal(energy - 1, runtime.Player.GetInt("energy"));
         }
@@ -93,10 +93,10 @@ namespace Cantrip.Tests.Runtime
             runtime.Player!.SetBase("bones", 2);
 
             // Tax makes it cost three, so two bones is no longer enough.
-            Assert.Equal(PlayResult.NotEnoughEnergy, runtime.Play(runtime.AddCard("Bone Bargain", Zones.Hand), null));
+            Assert.Equal(ActionResult.NotEnoughEnergy, runtime.Play(runtime.AddCard("Bone Bargain", Zones.Hand), null));
 
             runtime.Player.SetBase("bones", 3);
-            Assert.Equal(PlayResult.Played, runtime.Play(runtime.AddCard("Bone Bargain", Zones.Hand), null));
+            Assert.Equal(ActionResult.Played, runtime.Play(runtime.AddCard("Bone Bargain", Zones.Hand), null));
             Assert.Equal(0, runtime.Player.GetInt("bones"));
         }
     }

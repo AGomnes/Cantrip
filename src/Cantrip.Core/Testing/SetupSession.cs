@@ -30,7 +30,7 @@ namespace Cantrip.Testing
     /// foreach (StatementNode statement in scenario.Syntax.Body.Statements) session.Run(statement);
     /// </code>
     /// </example>
-    public sealed class SetupSession
+    internal sealed class SetupSession
     {
         /// <summary>More cards than any hand-written line means, so a typo cannot hang the run.</summary>
         private const int MaxRepeat = 1000;

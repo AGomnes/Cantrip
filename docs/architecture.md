@@ -10,11 +10,11 @@ A game extends Cantrip through these seams, without changing the library:
 |---|---|
 | A verb in C# | `runtime.RegisterVerb(name, call => ...)`. Use `call.Argument`, `call.Number`, `call.Clause`, `call.Targets` and the interpreter's primitives, such as `ChangeStat`, so events and modifiers still apply. See [Verbs written in C#](csharp.md#verbs-written-in-c). |
 | A verb in content | `verb name(params):` (see [Content-defined verbs](language.md#content-defined-verbs)). |
-| Names or functions the rules cannot know | Implement `IEffectHost.TryResolveName` or `TryCall` (subclass `EffectHostBase`). See [The host](csharp.md#the-host). |
+| Names or functions the rules cannot know | Implement `IEffectHost.TryResolveName` or `TryCall`; every member has a default, so `EffectHostBase` is a convenience rather than a requirement. See [The host](csharp.md#the-host). |
 | Presentation | `IEffectHost.OnEvent` sees every resolved event. See [Presenting events in a frame loop](csharp.md#presenting-events-in-a-frame-loop). |
-| A decision maker | Implement `IChoiceProvider`, and `IDefinitionChooser` for offers such as `discover`. A UI uses `DeferredChooser`; see [Player choices](csharp.md#player-choices). |
+| A decision maker | Implement `IChoiceProvider`. Its `Choose` answers entity choices and its `ChooseDefinition` answers offers such as `discover`; both have defaults, so implement only what you decide. A UI uses `DeferredChooser`; see [Player choices](csharp.md#player-choices). |
 | A clock | Implement `IGameClock`, advance it from the engine's fixed step, and pass it in `RuntimeOptions.Clock`. |
-| Translations | Implement `IDescriptionLocalizer` or subclass `EnglishDescriptions`, and pass it to `DescriptionBuilder`. |
+| Translations | Implement `IDescriptionLocalizer` or subclass `EnglishDescriptions`, and pass it to `DescriptionBuilder`. Every member defaults to null, which falls back to the content's own text and the built-in English. |
 | Lint rules for your game | Pass `LintOptions` with host verbs, events and names, or suppress codes. |
 | Content tests that use your verbs or host | Set `DslTestRunner.ConfigureRuntime` to register them on each test's runtime, and `DslTestRunner.CreateHost` to give each test a host. See [Verbs written in C#](csharp.md#verbs-written-in-c). |
 | Limits content cannot change | Pass a `Ruleset` in `RuntimeOptions.Rules`, which replaces the one content declares. See [When content fails at runtime](csharp.md#when-content-fails-at-runtime). |

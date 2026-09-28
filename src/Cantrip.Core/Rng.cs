@@ -38,13 +38,29 @@ namespace Cantrip
             if ((_s0 | _s1 | _s2 | _s3) == 0) _s0 = 0x9E3779B97F4A7C15UL;
         }
 
-        /// <summary>Snapshot of the full generator state, for save games and replays.</summary>
-        public (ulong S0, ulong S1, ulong S2, ulong S3) GetState() => (_s0, _s1, _s2, _s3);
+        /// <summary>
+        /// Snapshot of the full generator state, for save games and replays: four words, in the same
+        /// order and shape <see cref="Cantrip.Runtime.GameSnapshot.Rng"/> writes them.
+        /// </summary>
+        /// <remarks>
+        /// An array rather than a tuple because a tuple's arity is part of its type: a generator
+        /// with a fifth word would be a breaking change to every caller, and a save already carries
+        /// this state as a list of words alongside the generator's name.
+        /// </remarks>
+        public ulong[] GetState() => new[] { _s0, _s1, _s2, _s3 };
 
-        public void SetState((ulong S0, ulong S1, ulong S2, ulong S3) state)
+        /// <summary>Restores what <see cref="GetState"/> gave. Anything but four words is refused.</summary>
+        public void SetState(ulong[] state)
         {
-            _s0 = state.S0; _s1 = state.S1; _s2 = state.S2; _s3 = state.S3;
+            if (state == null) throw new ArgumentNullException(nameof(state));
+            if (state.Length != StateWords)
+                throw new ArgumentException($"This generator's state is {StateWords} words, not {state.Length}.", nameof(state));
+
+            _s0 = state[0]; _s1 = state[1]; _s2 = state[2]; _s3 = state[3];
         }
+
+        /// <summary>How many words <see cref="GetState"/> gives and <see cref="SetState"/> wants.</summary>
+        public const int StateWords = 4;
 
         /// <summary>
         /// Creates an independent stream derived from this generator, so that (for example)

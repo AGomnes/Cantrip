@@ -79,7 +79,7 @@ namespace Cantrip.Tests.Runtime
             CardRuntime runtime = Start(new DeferredChooser(), "Scholar");
             int energy = runtime.Player!.GetInt("energy");
 
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Scholar"));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play("Scholar"));
 
             PendingChoice pending = runtime.Pending!;
             Assert.True(pending.IsOffer);
@@ -101,7 +101,7 @@ namespace Cantrip.Tests.Runtime
             runtime.Play("Scholar");
             EntityDefinition picked = runtime.Pending!.Definitions[2];
 
-            Assert.Equal(PlayResult.Played, runtime.Answer(picked));
+            Assert.Equal(ActionResult.Played, runtime.Answer(picked));
 
             Assert.Null(runtime.Pending);
             Assert.Equal(new[] { picked.Name }, Hand(runtime));
@@ -113,15 +113,15 @@ namespace Cantrip.Tests.Runtime
         {
             // Seer is not a spell, so it cannot be confused with whatever the offer creates.
             CardRuntime runtime = Start(new DeferredChooser(), "Study", "Seer");
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Study"));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play("Study"));
             EntityDefinition picked = runtime.Pending!.Definitions[0];
 
-            Assert.Equal(PlayResult.ChoicePending, runtime.Answer(picked));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Answer(picked));
             PendingChoice toss = runtime.Pending!;
             Assert.False(toss.IsOffer);
             Entity seer = toss.Options.Single(o => o.Name == "Seer");
 
-            Assert.Equal(PlayResult.Played, runtime.Answer(seer.Id));
+            Assert.Equal(ActionResult.Played, runtime.Answer(seer.Id));
             Assert.Equal(new[] { picked.Name }, Hand(runtime));
             Assert.Equal(Zones.Exhaust, seer.Zone);
         }
@@ -147,7 +147,7 @@ namespace Cantrip.Tests.Runtime
         {
             CardRuntime runtime = Start(new DeferredChooser(), "Seer");
 
-            Assert.Equal(PlayResult.Played, runtime.Play("Seer"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Seer"));
             Assert.Null(runtime.Pending);
             Assert.Single(Hand(runtime));
         }
@@ -190,25 +190,25 @@ namespace Cantrip.Tests.Runtime
         public void A_reload_during_an_offer_never_creates_a_card_other_than_the_one_picked(int position)
         {
             CardRuntime runtime = StartReloadable(out ContentLibrary library);
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Scholar"));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play("Scholar"));
             string picked = runtime.Pending!.Definitions[position].Name;
 
             // A designer adds a spell while the offer is on screen: the replay draws from a new pool.
             library.LoadText(Spells + "\ncard Arc\n  cost 0\n  tags spell\n", "spells.cantrip");
             runtime.ApplyContentChanges();
 
-            PlayResult result = runtime.Answer(runtime.Pending!.Definitions[position]);
-            if (result == PlayResult.ChoicePending)
+            ActionResult result = runtime.Answer(runtime.Pending!.Definitions[position]);
+            if (result == ActionResult.ChoicePending)
             {
                 // The pick is no longer among the candidates: the player is asked again, afresh.
                 Assert.True(runtime.Pending!.IsOffer);
                 string repicked = runtime.Pending.Definitions[0].Name;
-                Assert.Equal(PlayResult.Played, runtime.Answer(runtime.Pending.Definitions[0]));
+                Assert.Equal(ActionResult.Played, runtime.Answer(runtime.Pending.Definitions[0]));
                 Assert.Equal(new[] { repicked }, Hand(runtime));
             }
             else
             {
-                Assert.Equal(PlayResult.Played, result);
+                Assert.Equal(ActionResult.Played, result);
                 Assert.Equal(new[] { picked }, Hand(runtime));
             }
         }
@@ -226,11 +226,11 @@ namespace Cantrip.Tests.Runtime
             library.LoadText(retagged, "spells.cantrip");
             runtime.ApplyContentChanges();
 
-            Assert.Equal(PlayResult.ChoicePending, runtime.Answer(picked));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Answer(picked));
             Assert.DoesNotContain(runtime.Pending!.Definitions, d => d.Name == picked.Name);
 
             EntityDefinition second = runtime.Pending.Definitions[0];
-            Assert.Equal(PlayResult.Played, runtime.Answer(second));
+            Assert.Equal(ActionResult.Played, runtime.Answer(second));
             Assert.Equal(new[] { second.Name }, Hand(runtime));
         }
 
@@ -244,7 +244,7 @@ namespace Cantrip.Tests.Runtime
             library.LoadText(Spells, "spells.cantrip");
             runtime.ApplyContentChanges();
 
-            Assert.Equal(PlayResult.Played, runtime.Answer(library.Find(picked, "card")!));
+            Assert.Equal(ActionResult.Played, runtime.Answer(library.Find(picked, "card")!));
             Assert.Equal(new[] { picked }, Hand(runtime));
         }
 
@@ -253,13 +253,13 @@ namespace Cantrip.Tests.Runtime
         public void A_new_action_does_not_inherit_the_answers_of_an_abandoned_one()
         {
             CardRuntime runtime = Start(new DeferredChooser(), "Study", "Seer", "Scholar");
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Study"));
-            Assert.Equal(PlayResult.ChoicePending, runtime.Answer(runtime.Pending!.Definitions[1]));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play("Study"));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Answer(runtime.Pending!.Definitions[1]));
             Assert.False(runtime.Pending!.IsOffer);   // Study now waits on its second question
 
             // The player walks away from Study and plays Scholar: its offer must be asked, not answered
             // with Study's leftover pick.
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Scholar"));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play("Scholar"));
             Assert.True(runtime.Pending!.IsOffer);
             Assert.Equal(new[] { "Study", "Seer", "Scholar" }, Hand(runtime));
         }
@@ -270,7 +270,7 @@ namespace Cantrip.Tests.Runtime
         {
             CardRuntime runtime = StartReloadable(out _);
             GameSnapshot save = runtime.Capture();
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Scholar"));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play("Scholar"));
             EntityDefinition picked = runtime.Pending!.Definitions[0];
 
             runtime.Restore(save);
@@ -285,7 +285,7 @@ namespace Cantrip.Tests.Runtime
             CardRuntime runtime = StartReloadable(out _, trace: true);
             int before = runtime.State.Trace.Entries.Count;
 
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Scholar"));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play("Scholar"));
             Assert.Equal(before, runtime.State.Trace.Entries.Count);
 
             runtime.Answer(runtime.Pending!.Definitions[0]);
@@ -298,7 +298,7 @@ namespace Cantrip.Tests.Runtime
             var host = new RecordingHost();
             CardRuntime runtime = StartReloadable(out _, host);
 
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Scholar"));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play("Scholar"));
             Assert.Empty(host.Events);
 
             // Outside any action: if the rollback left its event buffer open, this would vanish into it.
@@ -314,7 +314,7 @@ namespace Cantrip.Tests.Runtime
             for (ulong seed = 1; seed <= 12; seed++)
             {
                 CardRuntime runtime = Start(new RandomChooser(seed), "Scholar");
-                Assert.Equal(PlayResult.Played, runtime.Play("Scholar"));
+                Assert.Equal(ActionResult.Played, runtime.Play("Scholar"));
                 picks.Add(Hand(runtime).Single());
             }
 

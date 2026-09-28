@@ -7,6 +7,14 @@ namespace Cantrip.Runtime
     /// <see cref="TurnClock"/> advances one unit per turn and a <see cref="TickClock"/> one unit per
     /// fixed-timestep tick, so durations, cooldowns and <c>every</c> triggers share one code path.
     /// </summary>
+    /// <remarks>
+    /// <see cref="TryConvert"/> has a default, so a clock that measures only its own unit needs no
+    /// body for it, and a member added in a later release will have one too. <see cref="Now"/>,
+    /// <see cref="Advanced"/> and <see cref="Restore"/> deliberately have none: a default for them
+    /// could only be a clock stuck at zero, an event that never fires, and a restore that quietly
+    /// keeps the wrong time — the kind of silent wrong answer an interface should not offer. See
+    /// <see href="https://github.com/AGomnes/Cantrip/blob/main/docs/stability.md">Stability</see>.
+    /// </remarks>
     public interface IGameClock
     {
         long Now { get; }
@@ -17,7 +25,21 @@ namespace Cantrip.Runtime
         /// Converts a content-authored duration such as <c>3 turns</c> or <c>1.5s</c> to clock units.
         /// Returns false when the unit makes no sense for this clock (seconds on a turn clock).
         /// </summary>
-        bool TryConvert(Num amount, string? unit, out long units);
+        /// <remarks>
+        /// The default accepts a bare number as this clock's own unit and refuses every named one,
+        /// which is true of any clock; a clock that knows what a second or a turn is says so itself.
+        /// </remarks>
+        bool TryConvert(Num amount, string? unit, out long units)
+        {
+            if (string.IsNullOrEmpty(unit))
+            {
+                units = Math.Max(0, amount.Ceiling().ToInt());
+                return true;
+            }
+
+            units = 0;
+            return false;
+        }
 
         /// <summary>Restores time from a snapshot without raising <see cref="Advanced"/>.</summary>
         void Restore(long now);

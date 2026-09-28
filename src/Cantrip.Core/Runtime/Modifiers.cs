@@ -130,7 +130,11 @@ namespace Cantrip.Runtime
 
         internal ModifierPipeline(GameState state) => _state = state;
 
-        public IModifierEvaluator? Evaluator { get; set; }
+        /// <summary>
+        /// The interpreter, set when it is built. Settable only inside the library: a null here
+        /// stops every modifier applying, silently, and the pipeline is not a seam a game replaces.
+        /// </summary>
+        public IModifierEvaluator? Evaluator { get; internal set; }
 
         public int Count { get; private set; }
 

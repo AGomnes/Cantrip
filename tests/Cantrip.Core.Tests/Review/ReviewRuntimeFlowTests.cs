@@ -269,11 +269,11 @@ card ""Strike""
             Enemy(runtime);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            PlayResult result = PlayResult.NotACard;
+            ActionResult result = ActionResult.NotACard;
             Exception? error = Record.Exception(() => result = runtime.Play(runtime.AddCard("Strike", Zones.Hand)));
 
             Assert.Null(error);
-            Assert.Equal(PlayResult.Played, result);
+            Assert.Equal(ActionResult.Played, result);
         }
 
         /// <summary>Ruleset.MaxHandSize documents "cards beyond this are discarded instead of drawn"; Draw just stops.</summary>

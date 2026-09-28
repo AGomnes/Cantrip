@@ -51,7 +51,7 @@ namespace Cantrip.Tests.Battle
             Assert.True(runtime.CanPlay(slash));
 
             // The card names no target, so the runtime picks from the controller's opposing side.
-            Assert.Equal(PlayResult.Played, runtime.Play(slash));
+            Assert.Equal(ActionResult.Played, runtime.Play(slash));
 
             Assert.Equal(43, player.GetInt("hp"));
             Assert.Equal(40, duellist.GetInt("hp"));   // unhurt: its own card hit the player

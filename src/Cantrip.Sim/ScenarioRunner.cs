@@ -545,7 +545,7 @@ namespace Cantrip.Sim
         /// choices and the queue is left alone; a trial of a play whose answer was written can
         /// come out differently from the play itself, which is the cheaper of the two mistakes.
         /// </remarks>
-        private sealed class ScenarioChooser : IChoiceProvider, IDefinitionChooser
+        private sealed class ScenarioChooser : IChoiceProvider
         {
             private readonly ScriptedChooser _answers;
             private readonly IChoiceProvider _bot;
@@ -579,9 +579,7 @@ namespace Cantrip.Sim
                 if (Scripted) return _answers.ChooseDefinition(request, state);
 
                 _meter.Guessed(request.Span);
-                return _bot is IDefinitionChooser chooser
-                    ? chooser.ChooseDefinition(request, state)
-                    : request.Options.FirstOrDefault();
+                return _bot.ChooseDefinition(request, state);
             }
         }
     }

@@ -6,7 +6,7 @@ namespace Cantrip.Syntax
     /// <summary>Base for every parsed node. The span is what makes causality traces clickable.</summary>
     public abstract class Node
     {
-        protected Node(SourceSpan span) => Span = span;
+        private protected Node(SourceSpan span) => Span = span;
 
         public SourceSpan Span { get; }
     }
@@ -17,7 +17,7 @@ namespace Cantrip.Syntax
 
     public abstract class ExprNode : Node
     {
-        protected ExprNode(SourceSpan span) : base(span) { }
+        private protected ExprNode(SourceSpan span) : base(span) { }
     }
 
     /// <summary>A literal number, with the unit suffix it was written with (<c>%</c>, <c>s</c>, ...).</summary>
@@ -216,7 +216,7 @@ namespace Cantrip.Syntax
 
     public abstract class StatementNode : Node
     {
-        protected StatementNode(SourceSpan span) : base(span) { }
+        private protected StatementNode(SourceSpan span) : base(span) { }
     }
 
     public sealed class BlockNode : Node
@@ -428,14 +428,14 @@ namespace Cantrip.Syntax
 
     public abstract class DeclarationNode : Node
     {
-        protected DeclarationNode(string name, SourceSpan span) : base(span) => Name = name;
+        private protected DeclarationNode(string name, SourceSpan span) : base(span) => Name = name;
 
         public string Name { get; }
     }
 
     public abstract class MemberNode : Node
     {
-        protected MemberNode(SourceSpan span) : base(span) { }
+        private protected MemberNode(SourceSpan span) : base(span) { }
     }
 
     /// <summary>A simple <c>key value[, value]</c> line such as <c>cost 2</c> or <c>tags dot, poison</c>.</summary>

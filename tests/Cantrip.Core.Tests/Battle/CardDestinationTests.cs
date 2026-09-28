@@ -105,7 +105,7 @@ namespace Cantrip.Tests.Battle
             Entity burst = runtime.AddCard("Burst", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Played, runtime.Play(burst));
+            Assert.Equal(ActionResult.Played, runtime.Play(burst));
 
             Assert.Equal(Zones.Exhaust, burst.Zone);
             Assert.Empty(BattleKit.Zone(runtime, Zones.Discard));
@@ -138,7 +138,7 @@ namespace Cantrip.Tests.Battle
             Entity exile = runtime.AddCard("Self Exile", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Played, runtime.Play(exile));
+            Assert.Equal(ActionResult.Played, runtime.Play(exile));
 
             Assert.Equal(Zones.Exhaust, exile.Zone);
             Assert.Empty(BattleKit.Zone(runtime, Zones.Discard));
@@ -152,7 +152,7 @@ namespace Cantrip.Tests.Battle
             Entity form = runtime.AddCard("Demon Form", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Played, runtime.Play(form));
+            Assert.Equal(ActionResult.Played, runtime.Play(form));
 
             Assert.Equal(Zones.Powers, form.Zone);
             Assert.True(runtime.State.IsActive(form));

@@ -107,7 +107,7 @@ namespace Cantrip.Runtime
     /// is being attempted — it behaves like <see cref="FirstOptionChooser"/> rather than throwing
     /// at game code that has nothing to answer with.
     /// </remarks>
-    public sealed class DeferredChooser : IChoiceProvider, IDefinitionChooser
+    public sealed class DeferredChooser : IChoiceProvider
     {
         private readonly List<int[]> _answers = new List<int[]>();
 

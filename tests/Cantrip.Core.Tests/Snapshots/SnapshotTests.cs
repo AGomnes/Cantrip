@@ -33,8 +33,8 @@ namespace Cantrip.Tests.Snapshots
             CardRuntime original = SnapshotScenario.NewBattle(seed: 3);
             Entity prepare = original.AddCard("Prepare", Zones.Hand);
             Entity flex = original.AddCard("Flex", Zones.Hand);
-            Assert.Equal(PlayResult.Played, original.Play(flex));
-            Assert.Equal(PlayResult.Played, original.Play(prepare));
+            Assert.Equal(ActionResult.Played, original.Play(flex));
+            Assert.Equal(ActionResult.Played, original.Play(prepare));
             Assert.Equal(2, original.State.Scheduled.Count);
 
             CardRuntime restored = SnapshotScenario.RoundTrip(original);
@@ -122,7 +122,7 @@ namespace Cantrip.Tests.Snapshots
             foreach (Entity card in runtime.State.ZoneOf(player, Zones.Hand).ToArray())
             {
                 if (runtime.CostOf(card) > player.GetInt("energy")) continue;
-                if (runtime.Play(card, card.Definition?.Word("target") == "enemy" ? enemy : null) == PlayResult.Played) return;
+                if (runtime.Play(card, card.Definition?.Word("target") == "enemy" ? enemy : null) == ActionResult.Played) return;
             }
 
             runtime.EndTurn();

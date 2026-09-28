@@ -9,24 +9,34 @@ namespace Cantrip.Descriptions
     /// and placeholders; a game owns the translations. Return null from any member to fall back
     /// to the content's own text or the built-in English phrase.
     /// </summary>
+    /// <remarks>
+    /// Every member defaults to null, which is "I have no translation for this", so a localizer
+    /// implements only the parts it has, and a member added in a later release does not break one
+    /// written today. See
+    /// <see href="https://github.com/AGomnes/Cantrip/blob/main/docs/stability.md">Stability</see>.
+    /// </remarks>
     public interface IDescriptionLocalizer
     {
         /// <summary>The display name of a definition.</summary>
-        string? Name(EntityDefinition definition);
+        string? Name(EntityDefinition definition) => null;
 
         /// <summary>
         /// The definition's rules text in this language, using the same <c>{placeholders}</c> as its
         /// <c>text:</c>. When the definition uses <c>text_override:</c>, this replaces that instead.
         /// </summary>
-        string? Text(EntityDefinition definition);
+        string? Text(EntityDefinition definition) => null;
 
-        string? Flavour(EntityDefinition definition);
+        string? Flavour(EntityDefinition definition) => null;
 
         /// <summary>
         /// A phrase template used by generated text, such as <c>deal</c> =
         /// <c>"Deal {amount} {type}damage{target}{ignore}."</c>. See <see cref="EnglishDescriptions.Keys"/>.
         /// </summary>
-        string? Phrase(string key);
+        /// <remarks>
+        /// The default answers null, which falls back to the built-in English phrase, so a localizer
+        /// that translates only names and rules text still reads correctly.
+        /// </remarks>
+        string? Phrase(string key) => null;
     }
 
     /// <summary>

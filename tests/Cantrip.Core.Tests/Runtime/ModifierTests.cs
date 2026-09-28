@@ -273,7 +273,7 @@ namespace Cantrip.Tests.Runtime
             Assert.Equal(8, DamageDealt(runtime, enemy, 5));
 
             runtime.AddCard("Strike", Zones.Hand);
-            Assert.Equal(PlayResult.Played, runtime.Play("Strike", enemy));
+            Assert.Equal(ActionResult.Played, runtime.Play("Strike", enemy));
             Assert.Equal(50 - 8 - 9, Hp(enemy));
 
             runtime.Execute("deal 5 to player", self: enemy);

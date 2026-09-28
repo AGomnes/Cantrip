@@ -67,7 +67,7 @@ namespace Cantrip.Tests.Runtime
             CardRuntime runtime = Start(chooser, out RecordingHost host, "Recycle", "Strike", "Strike");
             ulong before = runtime.State.ComputeHash();
 
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Recycle"));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play("Recycle"));
 
             PendingChoice pending = Assert.IsType<PendingChoice>(runtime.Pending);
             Assert.Equal(1, pending.Min);
@@ -87,10 +87,10 @@ namespace Cantrip.Tests.Runtime
             var chooser = new DeferredChooser();
             CardRuntime runtime = Start(chooser, out RecordingHost host, "Recycle", "Strike", "Strike");
 
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Recycle"));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play("Recycle"));
             Entity chosen = runtime.Pending!.Options[1];
 
-            Assert.Equal(PlayResult.Played, runtime.Answer(chosen.Id));
+            Assert.Equal(ActionResult.Played, runtime.Answer(chosen.Id));
             Assert.Null(runtime.Pending);
 
             Assert.Equal(Zones.Exhaust, chosen.Zone);
@@ -105,15 +105,15 @@ namespace Cantrip.Tests.Runtime
             var chooser = new DeferredChooser();
             CardRuntime runtime = Start(chooser, out _, "Twice", "Strike", "Strike", "Strike");
 
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Twice"));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play("Twice"));
             Entity first = runtime.Pending!.Options[0];
 
             // Rolled back and replayed: the first answer applied, so the second choice offers the rest.
-            Assert.Equal(PlayResult.ChoicePending, runtime.Answer(first.Id));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Answer(first.Id));
             Assert.Equal(2, runtime.Pending!.Options.Count);
 
             Entity second = runtime.Pending.Options[1];
-            Assert.Equal(PlayResult.Played, runtime.Answer(second.Id));
+            Assert.Equal(ActionResult.Played, runtime.Answer(second.Id));
 
             var exhausted = runtime.State.ZoneOf(runtime.Player, Zones.Exhaust).Select(e => e.Id).ToList();
             Assert.Equal(2, exhausted.Count);
@@ -128,10 +128,10 @@ namespace Cantrip.Tests.Runtime
             CardRuntime runtime = Start(chooser, out _, "Strike");
             Entity second = runtime.SpawnEnemy("Dummy", hp: 50);
 
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Strike"));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play("Strike"));
             Assert.Equal(2, runtime.Pending!.Options.Count);
 
-            Assert.Equal(PlayResult.Played, runtime.Answer(second.Id));
+            Assert.Equal(ActionResult.Played, runtime.Answer(second.Id));
             Assert.Equal(44, second.GetInt("hp"));
         }
 
@@ -140,13 +140,13 @@ namespace Cantrip.Tests.Runtime
         {
             var deferred = new DeferredChooser();
             CardRuntime deferredRun = Start(deferred, out _, "Recycle", "Strike", "Strike");
-            Assert.Equal(PlayResult.ChoicePending, deferredRun.Play("Recycle"));
+            Assert.Equal(ActionResult.ChoicePending, deferredRun.Play("Recycle"));
             int chosenId = deferredRun.Pending!.Options[0].Id;   // what ScriptedChooser("Strike") picks too
-            Assert.Equal(PlayResult.Played, deferredRun.Answer(chosenId));
+            Assert.Equal(ActionResult.Played, deferredRun.Answer(chosenId));
 
             // The same game, answered on the spot by a scripted chooser.
             CardRuntime direct = Start(new ScriptedChooser("Strike"), out _, "Recycle", "Strike", "Strike");
-            Assert.Equal(PlayResult.Played, direct.Play("Recycle"));
+            Assert.Equal(ActionResult.Played, direct.Play("Recycle"));
 
             Assert.Equal(direct.State.ComputeHash(), deferredRun.State.ComputeHash());
         }
@@ -158,7 +158,7 @@ namespace Cantrip.Tests.Runtime
             CardRuntime runtime = Start(chooser, out _, "Recycle", "Strike");
             ulong before = runtime.State.ComputeHash();
 
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Recycle"));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play("Recycle"));
             runtime.CancelPending();
 
             Assert.Null(runtime.Pending);
@@ -166,7 +166,7 @@ namespace Cantrip.Tests.Runtime
             Assert.Equal(0, chooser.AnswerCount);
 
             // The card is still in hand and still playable.
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Recycle"));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play("Recycle"));
         }
 
         [Fact]
@@ -182,7 +182,7 @@ namespace Cantrip.Tests.Runtime
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
             int before = runtime.State.Trace.Entries.Count;
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Recycle"));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play("Recycle"));
             Assert.Equal(before, runtime.State.Trace.Entries.Count);
 
             runtime.Answer(runtime.Pending!.Options[0].Id);
@@ -222,7 +222,7 @@ namespace Cantrip.Tests.Runtime
             Entity player = runtime.Player!;
             Entity enemy = runtime.State.Actors(Team.Enemy).Single();
 
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Recycle"));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play("Recycle"));
 
             // Same objects, not stale copies: a game holding references keeps working.
             Assert.Same(player, runtime.Player);
@@ -238,7 +238,7 @@ namespace Cantrip.Tests.Runtime
         {
             CardRuntime runtime = Start(new FirstOptionChooser(), out _, "Recycle", "Strike");
 
-            Assert.Equal(PlayResult.Played, runtime.Play("Recycle"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Recycle"));
             Assert.Null(runtime.Pending);
             Assert.Single(runtime.State.ZoneOf(runtime.Player, Zones.Exhaust));
         }

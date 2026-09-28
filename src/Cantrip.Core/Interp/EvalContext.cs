@@ -19,8 +19,12 @@ namespace Cantrip.Runtime
             RootId = rootId;
         }
 
-        /// <summary>Starts a fresh chain for a top-level action such as playing a card.</summary>
-        public static Chain NewRoot(long rootId) => new Chain(null, 0, 0, rootId);
+        /// <summary>
+        /// Starts a fresh chain for a top-level action such as playing a card. Internal: chain roots
+        /// are handed out by the interpreter and are what <c>once per chain</c> counts, so game code
+        /// that minted its own could give two actions the same root and quietly defeat the limit.
+        /// </summary>
+        internal static Chain NewRoot(long rootId) => new Chain(null, 0, 0, rootId);
 
         public Chain? Parent { get; }
 
@@ -150,22 +154,41 @@ namespace Cantrip.Runtime
     /// The game's side of the integration. Everything is optional: a host only
     /// implements the parts the library cannot know, such as spatial queries or presentation.
     /// </summary>
+    /// <remarks>
+    /// Every member has a default that does nothing, so a host implements only the parts it cares
+    /// about, and a member added in a later release does not break one written today. See
+    /// <see href="https://github.com/AGomnes/Cantrip/blob/main/docs/stability.md">Stability</see>.
+    /// </remarks>
     public interface IEffectHost
     {
         /// <summary>Supplies custom names such as game-specific selectors. Return false to fall through.</summary>
-        bool TryResolveName(string name, EvalContext context, out Value value);
+        bool TryResolveName(string name, EvalContext context, out Value value)
+        {
+            value = Value.None;
+            return false;
+        }
 
         /// <summary>Supplies custom functions such as <c>within(...)</c> for spatial games.</summary>
-        bool TryCall(string function, IReadOnlyList<Value> arguments, EvalContext context, out Value value);
+        bool TryCall(string function, IReadOnlyList<Value> arguments, EvalContext context, out Value value)
+        {
+            value = Value.None;
+            return false;
+        }
 
         /// <summary>
         /// Called after each event's after phase resolves. VFX, audio and UI hang off this; the
         /// library never plays anything itself.
         /// </summary>
-        void OnEvent(GameEvent gameEvent);
+        void OnEvent(GameEvent gameEvent)
+        {
+        }
     }
 
-    /// <summary>A host that adds nothing. The default.</summary>
+    /// <summary>
+    /// A host that adds nothing. The default, and a convenience: since every member of
+    /// <see cref="IEffectHost"/> has a default of its own, a host can implement the interface
+    /// directly and override only what it needs.
+    /// </summary>
     public class EffectHostBase : IEffectHost
     {
         public virtual bool TryResolveName(string name, EvalContext context, out Value value)
@@ -215,7 +238,21 @@ namespace Cantrip.Runtime
     /// </summary>
     public interface IChoiceProvider
     {
-        IReadOnlyList<Entity> Choose(ChoiceRequest request, GameState state);
+        IReadOnlyList<Entity> Choose(ChoiceRequest request, GameState state)
+        {
+            return request.Options.Take(Math.Max(request.Min, Math.Min(request.Max, request.Options.Count))).ToList();
+        }
+
+        /// <summary>
+        /// Answers an offer of content that does not exist yet, as <c>discover</c> makes. The default
+        /// takes the first candidate, the way an answer to <see cref="Choose"/> that falls short is
+        /// topped up from the front, so a chooser that only decides between live entities needs
+        /// nothing here.
+        /// </summary>
+        Cantrip.Content.EntityDefinition? ChooseDefinition(DefinitionChoice request, GameState state)
+        {
+            return request.Options.Count == 0 ? null : request.Options[0];
+        }
     }
 
     /// <summary>
@@ -242,18 +279,8 @@ namespace Cantrip.Runtime
         public SourceSpan Span { get; }
     }
 
-    /// <summary>
-    /// Implemented by a chooser that can answer an offer of definitions. Optional: a provider that
-    /// does not implement it is given the first candidate, the way <see cref="IChoiceProvider"/>
-    /// answers that fall short are topped up from the front.
-    /// </summary>
-    public interface IDefinitionChooser
-    {
-        Cantrip.Content.EntityDefinition? ChooseDefinition(DefinitionChoice request, GameState state);
-    }
-
     /// <summary>Always takes the first options offered. Deterministic, and the default.</summary>
-    public sealed class FirstOptionChooser : IChoiceProvider, IDefinitionChooser
+    public sealed class FirstOptionChooser : IChoiceProvider
     {
         public IReadOnlyList<Entity> Choose(ChoiceRequest request, GameState state) =>
             request.Options.Take(Math.Max(request.Min, Math.Min(request.Max, request.Options.Count))).ToList();
@@ -263,7 +290,7 @@ namespace Cantrip.Runtime
     }
 
     /// <summary>Picks uniformly at random from its own forked RNG stream, so it never disturbs game rolls.</summary>
-    public sealed class RandomChooser : IChoiceProvider, IDefinitionChooser
+    public sealed class RandomChooser : IChoiceProvider
     {
         private readonly Rng _rng;
 
@@ -285,7 +312,7 @@ namespace Cantrip.Runtime
     /// Answers from a queue of names, for tests and replays. Each answer is a comma-separated list
     /// of entity names; when the queue runs dry it falls back to the first options.
     /// </summary>
-    public sealed class ScriptedChooser : IChoiceProvider, IDefinitionChooser
+    public sealed class ScriptedChooser : IChoiceProvider
     {
         private readonly Queue<string> _answers = new Queue<string>();
 

@@ -268,6 +268,10 @@ namespace Cantrip.GodotAdapter
 
             _debug?.Uninstall();
             _debug = null;
+
+            // Lets the old runtime go of its clock, so it stops resolving effects on a game that has
+            // been replaced. The node makes a clock per runtime, so nothing else changes here.
+            _core?.Dispose();
             _core = null;
 
             _choices.Close();
@@ -301,7 +305,7 @@ namespace Cantrip.GodotAdapter
         {
             CardRuntime core = EnsureRuntime();
             Entity? card = core.State.Find(cardId);
-            if (card == null) return Word(PlayResult.NotACard);
+            if (card == null) return Word(ActionResult.NotACard);
 
             Entity? target = targetId == VariantMap.NoEntity ? null : core.State.Find(targetId);
             return Act(() => Word(core.Play(card, target)));
@@ -334,7 +338,8 @@ namespace Cantrip.GodotAdapter
             if (ability == null) return false;
 
             Entity? target = targetId == VariantMap.NoEntity ? null : core.State.Find(targetId);
-            return Act(() => core.UseAbility(ability, target));
+            // The GDScript surface still answers true or false here; a later round widens it.
+            return Act(() => core.UseAbility(ability, target) == ActionResult.Played);
         }
 
         /// <summary>
@@ -895,16 +900,19 @@ namespace Cantrip.GodotAdapter
             };
 
         /// <summary>The result as script reads it: lower case, and "pending" for a choice.</summary>
-        private static string Word(PlayResult result) => result switch
+        private static string Word(ActionResult result) => result switch
         {
-            PlayResult.Played => "played",
-            PlayResult.ChoicePending => "pending",
-            PlayResult.NotACard => "not_a_card",
-            PlayResult.NotInHand => "not_in_hand",
-            PlayResult.Unplayable => "unplayable",
-            PlayResult.NotEnoughEnergy => "not_enough_energy",
-            PlayResult.InvalidTarget => "invalid_target",
-            PlayResult.Cancelled => "cancelled",
+            ActionResult.Played => "played",
+            ActionResult.ChoicePending => "pending",
+            ActionResult.NotACard => "not_a_card",
+            ActionResult.NotInHand => "not_in_hand",
+            ActionResult.Unplayable => "unplayable",
+            ActionResult.NotEnoughEnergy => "not_enough_energy",
+            ActionResult.InvalidTarget => "invalid_target",
+            ActionResult.Cancelled => "cancelled",
+            // Nothing reaches this through Play, but the words are frozen at 1.0 and the fallback
+            // would spell it "notready" the day UseAbility answers with one.
+            ActionResult.NotReady => "not_ready",
             _ => result.ToString().ToLowerInvariant(),
         };
     }

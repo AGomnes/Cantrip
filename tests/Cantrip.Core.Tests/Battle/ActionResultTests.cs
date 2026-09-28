@@ -6,10 +6,10 @@ using Xunit;
 namespace Cantrip.Tests.Battle
 {
     /// <summary>
-    /// One test per <see cref="PlayResult"/>. A refused play must leave no trace: no energy spent,
+    /// One test per <see cref="ActionResult"/>. A refused play must leave no trace: no energy spent,
     /// the card still in hand, no effect and no history.
     /// </summary>
-    public sealed class PlayResultTests
+    public sealed class ActionResultTests
     {
         private const string Content = """
             card "Strike"
@@ -67,7 +67,7 @@ namespace Cantrip.Tests.Battle
             Entity strike = runtime.AddCard("Strike", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Played, runtime.Play(strike, enemy));
+            Assert.Equal(ActionResult.Played, runtime.Play(strike, enemy));
 
             Assert.Equal(2, player.GetInt("energy"));
             Assert.Equal(24, enemy.GetInt("hp"));
@@ -90,7 +90,7 @@ namespace Cantrip.Tests.Battle
             runtime.AddCard("Strike", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Played, runtime.Play("strike"));
+            Assert.Equal(ActionResult.Played, runtime.Play("strike"));
             Assert.Equal(24, enemy.GetInt("hp"));
         }
 
@@ -101,11 +101,11 @@ namespace Cantrip.Tests.Battle
             Entity strike = runtime.AddCard("Strike", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.NotACard, runtime.Play(enemy));
-            Assert.Equal(PlayResult.NotACard, runtime.Play(player));
+            Assert.Equal(ActionResult.NotACard, runtime.Play(enemy));
+            Assert.Equal(ActionResult.NotACard, runtime.Play(player));
 
             runtime.State.Remove(strike);
-            Assert.Equal(PlayResult.NotACard, runtime.Play(strike));
+            Assert.Equal(ActionResult.NotACard, runtime.Play(strike));
             Assert.Equal(3, player.GetInt("energy"));
         }
 
@@ -117,9 +117,9 @@ namespace Cantrip.Tests.Battle
             Entity inDiscard = runtime.AddCard("Strike", Zones.Discard);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.NotInHand, runtime.Play(inDraw, enemy));
-            Assert.Equal(PlayResult.NotInHand, runtime.Play(inDiscard, enemy));
-            Assert.Equal(PlayResult.NotInHand, runtime.Play("Strike", enemy));
+            Assert.Equal(ActionResult.NotInHand, runtime.Play(inDraw, enemy));
+            Assert.Equal(ActionResult.NotInHand, runtime.Play(inDiscard, enemy));
+            Assert.Equal(ActionResult.NotInHand, runtime.Play("Strike", enemy));
             Assert.Equal(3, player.GetInt("energy"));
             Assert.Equal(30, enemy.GetInt("hp"));
         }
@@ -131,7 +131,7 @@ namespace Cantrip.Tests.Battle
             Entity curse = runtime.AddCard("Curse", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Unplayable, runtime.Play(curse));
+            Assert.Equal(ActionResult.Unplayable, runtime.Play(curse));
             AssertNothingHappened(runtime, player, enemy, curse);
         }
 
@@ -142,7 +142,7 @@ namespace Cantrip.Tests.Battle
             Entity heavy = runtime.AddCard("Heavy", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.NotEnoughEnergy, runtime.Play(heavy, enemy));
+            Assert.Equal(ActionResult.NotEnoughEnergy, runtime.Play(heavy, enemy));
             AssertNothingHappened(runtime, player, enemy, heavy);
         }
 
@@ -153,9 +153,9 @@ namespace Cantrip.Tests.Battle
             for (int i = 0; i < 4; i++) runtime.AddCard("Strike", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            for (int i = 0; i < 3; i++) Assert.Equal(PlayResult.Played, runtime.Play("Strike", enemy));
+            for (int i = 0; i < 3; i++) Assert.Equal(ActionResult.Played, runtime.Play("Strike", enemy));
 
-            Assert.Equal(PlayResult.NotEnoughEnergy, runtime.Play("Strike", enemy));
+            Assert.Equal(ActionResult.NotEnoughEnergy, runtime.Play("Strike", enemy));
             Assert.Equal(0, player.GetInt("energy"));
             Assert.Equal(12, enemy.GetInt("hp"));
             Assert.Single(BattleKit.Zone(runtime, Zones.Hand));
@@ -169,9 +169,9 @@ namespace Cantrip.Tests.Battle
             Entity bandage = runtime.AddCard("Bandage", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.InvalidTarget, runtime.Play(strike, player));
-            Assert.Equal(PlayResult.InvalidTarget, runtime.Play(strike, bandage));
-            Assert.Equal(PlayResult.InvalidTarget, runtime.Play(bandage, enemy));
+            Assert.Equal(ActionResult.InvalidTarget, runtime.Play(strike, player));
+            Assert.Equal(ActionResult.InvalidTarget, runtime.Play(strike, bandage));
+            Assert.Equal(ActionResult.InvalidTarget, runtime.Play(bandage, enemy));
 
             AssertNothingHappened(runtime, player, enemy, strike);
             Assert.Equal(Zones.Hand, bandage.Zone);
@@ -189,7 +189,7 @@ namespace Cantrip.Tests.Battle
             Assert.True(first.IsDead);
             Assert.True(runtime.State.InBattle);
 
-            Assert.Equal(PlayResult.InvalidTarget, runtime.Play(strike, first));
+            Assert.Equal(ActionResult.InvalidTarget, runtime.Play(strike, first));
             Assert.Equal(Zones.Hand, strike.Zone);
             Assert.Equal(3, player.GetInt("energy"));
             Assert.Equal(30, second.GetInt("hp"));
@@ -203,7 +203,7 @@ namespace Cantrip.Tests.Battle
             Entity strike = runtime.AddCard("Strike", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.InvalidTarget, runtime.Play(strike));
+            Assert.Equal(ActionResult.InvalidTarget, runtime.Play(strike));
             Assert.Equal(3, player.GetInt("energy"));
         }
 
@@ -217,12 +217,12 @@ namespace Cantrip.Tests.Battle
             Entity bandage = runtime.AddCard("Bandage", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.Cancelled, runtime.Play(strike, enemy));
+            Assert.Equal(ActionResult.Cancelled, runtime.Play(strike, enemy));
             AssertNothingHappened(runtime, player, enemy, strike);
             Assert.Empty(recorder.Named("card_played"));
 
             // The filter only stops attacks.
-            Assert.Equal(PlayResult.Played, runtime.Play(bandage));
+            Assert.Equal(ActionResult.Played, runtime.Play(bandage));
             Assert.Equal(2, player.GetInt("energy"));
         }
 

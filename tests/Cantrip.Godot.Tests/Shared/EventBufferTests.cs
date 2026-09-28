@@ -224,7 +224,7 @@ namespace Cantrip.GodotAdapter.Tests.Shared
             CardRuntime runtime = AdapterTestKit.Start(buffer, out _, "Twin");
             Entity enemy = AdapterTestKit.Enemy(runtime);
 
-            Assert.Equal(PlayResult.Played, runtime.Play("Twin", enemy));
+            Assert.Equal(ActionResult.Played, runtime.Play("Twin", enemy));
 
             List<EventRecord> hits = AdapterTestKit.DrainAll(buffer).Where(r => r.Name == "damaged").ToList();
 

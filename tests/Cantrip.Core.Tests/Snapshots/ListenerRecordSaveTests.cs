@@ -69,10 +69,10 @@ namespace Cantrip.Tests.Snapshots
 
         private static int Gold(CardRuntime runtime) => runtime.Player!.GetInt("gold");
 
-        private static void PlayFiller(CardRuntime runtime) => Assert.Equal(PlayResult.Played, runtime.Play("Filler"));
+        private static void PlayFiller(CardRuntime runtime) => Assert.Equal(ActionResult.Played, runtime.Play("Filler"));
 
         private static void PlayStrike(CardRuntime runtime) =>
-            Assert.Equal(PlayResult.Played, runtime.Play("Strike", runtime.State.Actors(Team.Enemy)[0]));
+            Assert.Equal(ActionResult.Played, runtime.Play("Strike", runtime.State.Actors(Team.Enemy)[0]));
 
         /// <summary>A save that has used Tally's once-per-battle listener, as 0.1.0-preview.2 and later write it.</summary>
         private static string UsedTally(string content = Tally, string relic = "Tally")

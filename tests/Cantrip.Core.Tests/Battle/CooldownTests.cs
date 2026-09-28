@@ -58,15 +58,15 @@ namespace Cantrip.Tests.Battle
             CardRuntime runtime = Setup(out Entity player, new TickClock(10));
             Entity bolt = runtime.GrantAbility("Bolt", player);
 
-            Assert.True(runtime.UseAbility(bolt));
-            Assert.False(runtime.UseAbility(bolt));
+            Assert.Equal(ActionResult.Played, runtime.UseAbility(bolt));
+            Assert.Equal(ActionResult.NotReady, runtime.UseAbility(bolt));
 
             runtime.Tick(99);
             Assert.False(runtime.IsReady(bolt));
 
             runtime.Tick(1);
             Assert.True(runtime.IsReady(bolt));
-            Assert.True(runtime.UseAbility(bolt));
+            Assert.Equal(ActionResult.Played, runtime.UseAbility(bolt));
         }
 
         [Fact]
@@ -76,8 +76,8 @@ namespace Cantrip.Tests.Battle
             Entity quick = runtime.GrantAbility("Quick", player);
             Entity bolt = runtime.GrantAbility("Bolt", player);
 
-            Assert.True(runtime.UseAbility(quick));
-            Assert.True(runtime.UseAbility(bolt));
+            Assert.Equal(ActionResult.Played, runtime.UseAbility(quick));
+            Assert.Equal(ActionResult.Played, runtime.UseAbility(bolt));
 
             runtime.Tick(50);
 
@@ -92,7 +92,7 @@ namespace Cantrip.Tests.Battle
             CardRuntime runtime = Setup(out Entity player, new TickClock(10), relic: "Vestments");
             Entity bolt = runtime.GrantAbility("Bolt", player);
 
-            Assert.True(runtime.UseAbility(bolt));
+            Assert.Equal(ActionResult.Played, runtime.UseAbility(bolt));
 
             runtime.Tick(24);
             Assert.False(runtime.IsReady(bolt));
@@ -107,11 +107,11 @@ namespace Cantrip.Tests.Battle
             CardRuntime runtime = Setup(out Entity player, new TickClock(10), relic: "Instant");
             Entity bolt = runtime.GrantAbility("Bolt", player);
 
-            Assert.True(runtime.UseAbility(bolt));
+            Assert.Equal(ActionResult.Played, runtime.UseAbility(bolt));
 
             // Nothing to wait for, so it is ready in the same instant rather than going negative.
             Assert.True(runtime.IsReady(bolt));
-            Assert.True(runtime.UseAbility(bolt));
+            Assert.Equal(ActionResult.Played, runtime.UseAbility(bolt));
         }
 
         [Fact]
@@ -120,7 +120,7 @@ namespace Cantrip.Tests.Battle
             CardRuntime runtime = Setup(out Entity player, clock: null, relic: "Vestments");
             Entity patience = runtime.GrantAbility("Patience", player);
 
-            Assert.True(runtime.UseAbility(patience));
+            Assert.Equal(ActionResult.Played, runtime.UseAbility(patience));
             Assert.False(runtime.IsReady(patience));
 
             // Two turns quartered rounds up to one, because a duration rounds up when it converts.

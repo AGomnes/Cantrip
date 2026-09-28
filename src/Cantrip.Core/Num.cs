@@ -35,7 +35,24 @@ namespace Cantrip
 
         public static Num FromRaw(long raw) => new Num(raw);
 
-        public static Num FromInt(long value) => new Num(value * Scale);
+        /// <summary>
+        /// A whole number as a <see cref="Num"/>. The parameter is a <see cref="long"/> for the
+        /// convenience of callers that already hold one, such as the clock, but the value must fit
+        /// this type: anything past <see cref="MaxValue"/> throws rather than wrapping round.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// <paramref name="value"/> is outside the range a <see cref="Num"/> can hold, which every
+        /// <see cref="int"/> is inside.
+        /// </exception>
+        public static Num FromInt(long value)
+        {
+            const long Limit = long.MaxValue / 2 / Scale;
+            if (value > Limit || value < -Limit)
+                throw new ArgumentOutOfRangeException(nameof(value), value,
+                    $"A Num holds whole numbers from {-Limit} to {Limit}; anything further would wrap round to a wrong value.");
+
+            return new Num(value * Scale);
+        }
 
         /// <summary>Builds a value from a percentage, so <c>Percent(40)</c> is 0.4.</summary>
         public static Num Percent(Num percent) => percent / FromInt(100);

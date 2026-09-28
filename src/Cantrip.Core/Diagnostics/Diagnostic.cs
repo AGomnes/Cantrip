@@ -122,9 +122,9 @@ namespace Cantrip.Diagnostics
     /// Finds the closest known spelling for an unrecognised name, which turns a bare
     /// "unknown verb" error into the "did you mean `deal`?" hint.
     /// </summary>
-    public static class Suggest
+    internal static class Suggest
     {
-        public static string? Closest(string input, IEnumerable<string> candidates, int maxDistance = 3)
+        internal static string? Closest(string input, IEnumerable<string> candidates, int maxDistance = 3)
         {
             if (string.IsNullOrEmpty(input) || candidates == null) return null;
 

@@ -11,7 +11,7 @@ These docs describe the `main` branch, which can be ahead of the latest release.
 The examples use the Fireball, Frozen, Burn and Kindling content from the [README](../README.md), plus the Strike, Defend and Jaw Worm in [samples/basic](../samples/basic/content.cantrip). The types live in a handful of namespaces; this page's snippets use:
 
 ```csharp
-using Cantrip;               // CardRuntime, RuntimeOptions, PlayResult, Num, Team
+using Cantrip;               // CardRuntime, RuntimeOptions, ActionResult, Num, Team
 using Cantrip.Content;       // ContentLibrary, EntityDefinition
 using Cantrip.Runtime;       // Entity, Zones, GameEvent, Value, the choosers, GameSnapshot, RuntimeError, Ruleset
 using Cantrip.Descriptions;  // DescriptionBuilder, Description, DescriptionSegment, ValueTrend
@@ -33,7 +33,7 @@ runtime.AddRelic("Kindling");
 Entity worm = runtime.SpawnEnemy("Jaw Worm");
 
 runtime.StartBattle();
-PlayResult result = runtime.Play("Fireball", worm);   // Played, NotEnoughEnergy, InvalidTarget...
+ActionResult result = runtime.Play("Fireball", worm);   // Played, NotEnoughEnergy, InvalidTarget...
 runtime.EndTurn();
 ```
 
@@ -152,16 +152,16 @@ sealed class BattleScreen
     public void CardDropped(Entity card, Entity? target)
     {
         if (Busy) return;
-        PlayResult result = runtime.Play(card, target);   // resolves at once, and its events are queued
-        if (result == PlayResult.Played) showing = ShowCardFlying(card, target);   // shown before its events
-        else if (result == PlayResult.ChoicePending) ShowChoice(runtime.Pending!);   // see Player choices
+        ActionResult result = runtime.Play(card, target);   // resolves at once, and its events are queued
+        if (result == ActionResult.Played) showing = ShowCardFlying(card, target);   // shown before its events
+        else if (result == ActionResult.ChoicePending) ShowChoice(runtime.Pending!);   // see Player choices
     }
 
     public void EndTurnPressed()
     {
         if (Busy) return;
-        runtime.EndTurn();   // the whole enemy turn resolves here, and its events are queued
-        if (runtime.Pending != null) ShowChoice(runtime.Pending);
+        // The whole enemy turn resolves here, and its events are queued.
+        if (runtime.EndTurn() == ActionResult.ChoicePending) ShowChoice(runtime.Pending!);
     }
 
     // Called once per frame from the game's Update.
@@ -239,7 +239,7 @@ A UI cannot answer on the spot, so it uses `DeferredChooser`. An action that nee
 ```csharp
 runtime.Chooser = new DeferredChooser();
 
-if (runtime.Play(card) == PlayResult.ChoicePending)
+if (runtime.Play(card) == ActionResult.ChoicePending)
 {
     PendingChoice choice = runtime.Pending!;    // Prompt, Options, Min, Max
     Entity chosen = choice.Options[0];          // ... whichever the player picked ...
@@ -253,14 +253,21 @@ Nothing happens until the action completes: host events are held back, so the ga
 
 `Prompt` is the engine's short summary of what is asked, in English: `choose a target`, `discard 2`, `exhaust 1`, `choose 1`, or `discover 1 of 3` for an offer. It suits a log rather than the player. Word what the player sees from the card being played and the options instead: each option's `Zone` says which pile it is in, `Chooser` is who chooses, and `Span` points at the line of content that asked.
 
-`Play` is not the only call that can stop. A relic whose turn-start effect asks the player to choose stops `EndTurn`: the whole call, enemy turn included, is rolled back and runs again once the choice is answered, so a game that checks only `Play` seems to hang on End Turn. Check `runtime.Pending` after each of these:
+`Play` is not the only call that can stop. A relic whose turn-end effect asks the player to choose stops `EndTurn`: the whole call, enemy turn included, is rolled back and runs again once the choice is answered. Every call that can stop says so the same way, by returning `ActionResult.ChoicePending`: `Play`, `Answer`, `StartBattle`, `EndTurn`, `Execute` and `UseAbility`. There is nothing to remember and no table to consult — read what the call hands back, as you would `Play`'s.
 
-| Call | Says it has stopped by |
-|---|---|
-| `Play` | returning `PlayResult.ChoicePending` |
-| `Answer` | returning `PlayResult.ChoicePending`, when the replay asks again |
-| `EndTurn`, `StartBattle`, `Execute` | setting `runtime.Pending` (they return nothing) |
-| `UseAbility` | returning false and setting `runtime.Pending` |
+`UseAbility` answers with the same type, so a cooldown is no longer the same answer as a question:
+
+```csharp
+switch (runtime.UseAbility(ability, target))
+{
+    case ActionResult.Played:        ShowAbility(ability); break;
+    case ActionResult.NotReady:      FlashCooldown(ability); break;
+    case ActionResult.ChoicePending: ShowChoice(runtime.Pending!); break;
+    case ActionResult.NotACard:      break;   // gone, or its owner is dead
+}
+```
+
+An ability has no cost and does not settle its own target, so it never answers `NotEnoughEnergy` or `InvalidTarget` today; both are in the type so that the day it does is not another signature change.
 
 `AddRelic`, `ApplyStatus` and `Tick` never stop: a choice they raise takes the first option.
 
@@ -283,7 +290,7 @@ if (runtime.Pending!.IsOffer)
 }
 ```
 
-A chooser that answers on the spot handles offers through `IDefinitionChooser`; `RandomChooser` and `ScriptedChooser` already do.
+A chooser that answers on the spot handles offers by overriding `IChoiceProvider.ChooseDefinition`; `RandomChooser` and `ScriptedChooser` already do. It has a default that takes the first candidate, so a chooser that only decides between live entities still runs.
 
 ## Winning, losing and several battles
 
@@ -310,6 +317,8 @@ if (runtime.Won == true)
 | | `once per battle` limits, the battle's history counters and the turn number |
 
 A card made during a battle, such as a Wound, stays in the deck like any other. To make it temporary, take it out between battles with `runtime.Execute("destroy target", target: wound)`.
+
+When a run is over and the game starts a new one with a new runtime, let the old one go with `runtime.Dispose()`. A runtime listens to its clock from the moment it is built — that is how scheduled work, `on every` triggers and timed statuses run — so a runtime given a clock through `RuntimeOptions.Clock` that the game keeps using goes on resolving effects on a game nobody is playing, and the clock holds it alive while it does. A runtime that made its own clock, which is every turn-based game that passes no clock, is collected with it either way. `Dispose` tears nothing else down: the state, the entities and the content are ordinary objects and still read afterwards.
 
 [src/Cantrip.Sim/ScenarioRunner.cs](../src/Cantrip.Sim/ScenarioRunner.cs) is a worked example of a run above the battle: one runtime carries hp, deck and relics from fight to fight, and whatever the scenario writes between them — `heal 12`, `relic "Ember Charm"` — runs as a statement.
 

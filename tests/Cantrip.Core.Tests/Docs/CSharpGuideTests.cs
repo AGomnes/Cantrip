@@ -197,7 +197,7 @@ namespace Cantrip.Tests.Docs
             Entity card = runtime.State.ZoneOf(player, Zones.Hand).Single();
             Entity worm = runtime.State.Actors(Team.Enemy).Single();
 
-            Assert.Equal(PlayResult.Played, runtime.Play(card, worm));
+            Assert.Equal(ActionResult.Played, runtime.Play(card, worm));
 
             Assert.Equal(new[] { "damaged", "damaged", "status_applied", "card_played" }, host.Names());
 
@@ -351,20 +351,20 @@ namespace Cantrip.Tests.Docs
             string? intent = worm.Intent;
 
             // A second `gain` on a status the player already has raises nothing; the first applied it.
-            Assert.Equal(PlayResult.Played, runtime.Play("Flex"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Flex"));
             Assert.Contains(host.Events, e => e.Name == "status_applied");
             host.Events.Clear();
-            Assert.Equal(PlayResult.Played, runtime.Play("Flex"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Flex"));
             Assert.Equal(4, player.CounterOf("Strength"));
             Assert.Equal(new[] { "card_played" }, host.Names());
 
             // Tags come and go without one.
             host.Events.Clear();
-            Assert.Equal(PlayResult.Played, runtime.Play("Brand", worm));
+            Assert.Equal(ActionResult.Played, runtime.Play("Brand", worm));
             Assert.True(worm.HasTag("branded"));
             Assert.Equal(new[] { "card_played" }, host.Names());
 
-            Assert.Equal(PlayResult.Played, runtime.Play(defend));
+            Assert.Equal(ActionResult.Played, runtime.Play(defend));
             Assert.True(player.GetInt("block") > 0);
             runtime.ApplyStatus("Weak", player, 2);
             host.Events.Clear();
@@ -421,7 +421,7 @@ namespace Cantrip.Tests.Docs
             Assert.Equal(77, quietPlayer.GetInt("hp"));
             Assert.Empty(quietHost.Events);
 
-            Assert.Equal(PlayResult.Played, quiet.Play("Defend"));
+            Assert.Equal(ActionResult.Played, quiet.Play("Defend"));
             quietHost.Events.Clear();
             quiet.EndTurn();
             Assert.Equal(0, quietPlayer.GetInt("block"));
@@ -430,7 +430,7 @@ namespace Cantrip.Tests.Docs
             // With one, the reset raises block_changed, marked as a reset.
             CardRuntime heard = Start(out Recorder heardHost, out Entity heardPlayer, enemy: "Sleeper", hand: new[] { "Defend" });
             heard.AddRelic("Block Ledger");
-            Assert.Equal(PlayResult.Played, heard.Play("Defend"));
+            Assert.Equal(ActionResult.Played, heard.Play("Defend"));
             heardHost.Events.Clear();
             heard.EndTurn();
             GameEvent reset = heardHost.Events.Select(e => e.Event).Single(e => e.Name == "block_changed" && e.Target == heardPlayer);
@@ -466,7 +466,7 @@ namespace Cantrip.Tests.Docs
             CardRuntime runtime = Start(out Recorder host, out Entity player, new DeferredChooser(), hand: new[] { "Survey", "Strike", "Defend" });
             Entity survey = runtime.State.ZoneOf(player, Zones.Hand).First(c => c.Name == "Survey");
 
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play(survey));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play(survey));
 
             PendingChoice choice = runtime.Pending!;
             Assert.Equal("discard 1", choice.Prompt);
@@ -478,7 +478,7 @@ namespace Cantrip.Tests.Docs
             Assert.Empty(host.Events);
 
             // Answered with the entities themselves, in a list, as the guide's second example does.
-            Assert.Equal(PlayResult.Played, runtime.Answer(new List<Entity> { choice.Options[0] }));
+            Assert.Equal(ActionResult.Played, runtime.Answer(new List<Entity> { choice.Options[0] }));
             Assert.Equal(Zones.Discard, survey.Zone);
             Assert.Equal(2, player.GetInt("energy"));
         }
@@ -493,7 +493,7 @@ namespace Cantrip.Tests.Docs
             CardRuntime runtime = Start(out _, out Entity player, new DeferredChooser(), enemies: 2, hand: new[] { card, "Strike", "Defend" });
             Entity played = runtime.State.ZoneOf(player, Zones.Hand).First(c => c.Name == card);
 
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play(played));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play(played));
             Assert.Equal(prompt, runtime.Pending!.Prompt);
         }
 

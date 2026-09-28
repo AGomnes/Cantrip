@@ -367,8 +367,7 @@ namespace Cantrip.Runtime
                 ClockNow = Clock.Now,
             };
 
-            var (s0, s1, s2, s3) = Rng.GetState();
-            snapshot.Rng = new[] { s0, s1, s2, s3 };
+            snapshot.Rng = Rng.GetState();
 
             foreach (Entity entity in _entities)
             {
@@ -603,7 +602,7 @@ namespace Cantrip.Runtime
             _nextId = snapshot.NextEntityId;
             _nextSequence = snapshot.NextSequence;
             _nextScheduleId = snapshot.NextScheduleId;
-            Rng.SetState((snapshot.Rng[0], snapshot.Rng[1], snapshot.Rng[2], snapshot.Rng[3]));
+            Rng.SetState(snapshot.Rng);
             Clock.Restore(snapshot.ClockNow);
 
             RestoreHistory(

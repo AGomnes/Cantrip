@@ -136,7 +136,14 @@ namespace Cantrip.Runtime
         public Ruleset Rules => State.Rules;
         public IEffectHost Host { get; }
 
-        public IChoiceProvider Chooser { get; set; } = new FirstOptionChooser();
+        private IChoiceProvider _chooser = new FirstOptionChooser();
+
+        /// <summary>Who answers a choice. Never null; setting it to null throws.</summary>
+        public IChoiceProvider Chooser
+        {
+            get => _chooser;
+            set => _chooser = value ?? throw new ArgumentNullException(nameof(value), "An interpreter always has a chooser; pass a FirstOptionChooser to keep the default.");
+        }
 
         /// <summary>Adds or replaces a verb implemented in C#, as games do through <c>runtime.RegisterVerb</c>.</summary>
         public void RegisterVerb(string name, VerbHandler handler)
@@ -168,7 +175,7 @@ namespace Cantrip.Runtime
 
         public IEnumerable<string> VerbNames => _verbs.Keys.Concat(Content.Verbs.Select(v => v.Name)).Distinct(StringComparer.OrdinalIgnoreCase);
 
-        public bool IsBuiltinVerb(string name) => _builtinVerbs.Contains(name);
+        internal bool IsBuiltinVerb(string name) => _builtinVerbs.Contains(name);
 
         /// <summary>The channel content adds its own target rules to: a taunt, a stealth, a reach limit.</summary>
         public const string TargetableChannel = "targetable";
@@ -509,8 +516,12 @@ namespace Cantrip.Runtime
         }
 
         // Modifier evaluation ---------------------------------------------------------------
+        //
+        // Implemented explicitly: the pipeline calls these through IModifierEvaluator, and they are
+        // no use to anyone else. Calling one from game code would evaluate a modifier outside the
+        // pipeline that caches and orders it.
 
-        public bool Applies(Modifier modifier, ModifierQuery query)
+        bool IModifierEvaluator.Applies(Modifier modifier, ModifierQuery query)
         {
             EvalContext context = ModifierContext(modifier, query);
 
@@ -550,7 +561,7 @@ namespace Cantrip.Runtime
             return Evaluate(scope, groupContext).AsEntities().Contains(query.Subject!);
         }
 
-        public Value Amount(Modifier modifier, ModifierQuery query)
+        Value IModifierEvaluator.Amount(Modifier modifier, ModifierQuery query)
         {
             EvalContext context = ModifierContext(modifier, query);
             context.It = null;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using Cantrip.Content;
 
 namespace Cantrip.Runtime
@@ -157,7 +158,14 @@ namespace Cantrip.Runtime
 
         // Tags -----------------------------------------------------------------------------
 
-        public IReadOnlyCollection<string> Tags => _tags;
+        private ReadOnlySetView<string>? _tagsView;
+
+        /// <summary>
+        /// This entity's runtime tags. A view, not the set itself: adding a tag has to go through
+        /// <see cref="AddTag"/>, which tells the state, because modifier scopes and the stat cache
+        /// are keyed on tags and a tag added behind their back would leave stale numbers in play.
+        /// </summary>
+        public IReadOnlyCollection<string> Tags => _tagsView ??= new ReadOnlySetView<string>(_tags);
 
         public bool HasTag(string tag) => _tags.Contains(tag);
 
@@ -244,8 +252,13 @@ namespace Cantrip.Runtime
 
         // Attachments ----------------------------------------------------------------------
 
-        /// <summary>Statuses and keywords currently attached to this entity, in application order.</summary>
-        public IReadOnlyList<Entity> Attached => _attached;
+        private ReadOnlyCollection<Entity>? _attachedView;
+
+        /// <summary>
+        /// Statuses and keywords currently attached to this entity, in application order. A view,
+        /// not the list itself, for the same reason <see cref="Tags"/> is.
+        /// </summary>
+        public IReadOnlyList<Entity> Attached => _attachedView ??= new ReadOnlyCollection<Entity>(_attached);
 
         internal void Attach(Entity child)
         {
@@ -306,5 +319,40 @@ namespace Cantrip.Runtime
         public bool IsAlive => !IsDead && !IsRemoved;
 
         public override string ToString() => $"{Name}#{Id}";
+    }
+
+    /// <summary>
+    /// A read-only window on a set. <see cref="System.Collections.ObjectModel.ReadOnlyCollection{T}"/>
+    /// wraps a list; there is no such wrapper for a set, and handing the set itself out lets a
+    /// caller cast it back and mutate it behind the cache that reads it.
+    /// </summary>
+    /// <remarks>
+    /// It implements <see cref="ICollection{T}"/> as well as <see cref="IReadOnlyCollection{T}"/>,
+    /// with every mutator throwing, so that callers such as <c>ToArray</c> still take the
+    /// count-and-copy path rather than growing a list one item at a time.
+    /// </remarks>
+    internal sealed class ReadOnlySetView<T> : IReadOnlyCollection<T>, ICollection<T>
+    {
+        private readonly ICollection<T> _items;
+
+        internal ReadOnlySetView(ICollection<T> items) => _items = items;
+
+        public int Count => _items.Count;
+
+        public bool IsReadOnly => true;
+
+        public bool Contains(T item) => _items.Contains(item);
+
+        public void CopyTo(T[] array, int index) => _items.CopyTo(array, index);
+
+        public IEnumerator<T> GetEnumerator() => _items.GetEnumerator();
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+
+        void ICollection<T>.Add(T item) => throw new NotSupportedException("Tags are added with Entity.AddTag, which tells the game state.");
+
+        bool ICollection<T>.Remove(T item) => throw new NotSupportedException("Tags are removed with Entity.RemoveTag, which tells the game state.");
+
+        void ICollection<T>.Clear() => throw new NotSupportedException("Tags are removed with Entity.RemoveTag, which tells the game state.");
     }
 }

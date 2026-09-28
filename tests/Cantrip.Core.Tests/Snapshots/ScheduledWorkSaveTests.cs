@@ -146,8 +146,8 @@ namespace Cantrip.Tests.Snapshots
             CardRuntime runtime = Start(Common, new[] { "Recycle", "Filler" }, new DeferredChooser());
             runtime.Execute("next turn:\n  draw 1");
 
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play("Recycle"));
-            Assert.Equal(PlayResult.Played, runtime.Answer(runtime.Pending!.Options[0].Id));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play("Recycle"));
+            Assert.Equal(ActionResult.Played, runtime.Answer(runtime.Pending!.Options[0].Id));
             Assert.Empty(runtime.State.ZoneOf(runtime.Player, Zones.Hand));
 
             EndTurnAnsweringFirst(runtime);
@@ -198,7 +198,7 @@ namespace Cantrip.Tests.Snapshots
         public void Pending_work_can_still_be_saved_after_a_hot_reload()
         {
             CardRuntime runtime = Start(Prepare, new[] { "Prepare" });
-            Assert.Equal(PlayResult.Played, runtime.Play("Prepare"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Prepare"));
 
             // Any edit to the file gives every definition in it new syntax, Prepare's block included.
             string edited = Prepare.Replace("hp 100", "hp 120");
@@ -228,7 +228,7 @@ namespace Cantrip.Tests.Snapshots
                       draw 1
                 """;
             CardRuntime runtime = Start(twins, new[] { "Prepare" });
-            Assert.Equal(PlayResult.Played, runtime.Play("Prepare"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Prepare"));
 
             string edited = twins.Replace("hp 100", "hp 120");
             runtime.Content.LoadText(edited, File);
@@ -261,7 +261,7 @@ namespace Cantrip.Tests.Snapshots
         public void A_reload_that_changes_waiting_work_blocks_saves_until_that_work_has_run()
         {
             CardRuntime runtime = Start(Prepare, new[] { "Prepare" });
-            Assert.Equal(PlayResult.Played, runtime.Play("Prepare"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Prepare"));
 
             runtime.Content.LoadText(Prepare.Replace("draw 1", "draw 2"), File);
             runtime.ApplyContentChanges();
@@ -283,7 +283,7 @@ namespace Cantrip.Tests.Snapshots
         {
             CardRuntime runtime = Start(Prepare, new[] { "Prepare" }, new DeferredChooser(), enemies: 2);
             runtime.AddRelic("Compass");
-            Assert.Equal(PlayResult.Played, runtime.Play("Prepare"));
+            Assert.Equal(ActionResult.Played, runtime.Play("Prepare"));
 
             runtime.Content.LoadText(Prepare.Replace("draw 1", "draw 2"), File);
             runtime.ApplyContentChanges();
@@ -304,7 +304,7 @@ namespace Cantrip.Tests.Snapshots
         public void A_patch_that_moves_a_waiting_block_still_runs_that_block()
         {
             CardRuntime original = Start(Prepare, new[] { "Prepare" });
-            Assert.Equal(PlayResult.Played, original.Play("Prepare"));
+            Assert.Equal(ActionResult.Played, original.Play("Prepare"));
             string save = Save(original);
 
             // The patch puts another block where the waiting one was, and moves that one down.
@@ -329,7 +329,7 @@ namespace Cantrip.Tests.Snapshots
         public void A_patch_that_adds_a_line_above_a_waiting_block_still_runs_that_block()
         {
             CardRuntime original = Start(Prepare, new[] { "Prepare" });
-            Assert.Equal(PlayResult.Played, original.Play("Prepare"));
+            Assert.Equal(ActionResult.Played, original.Play("Prepare"));
             string save = Save(original);
 
             string patched = Common + """
@@ -352,7 +352,7 @@ namespace Cantrip.Tests.Snapshots
         public void A_game_restored_after_a_patch_that_moves_a_waiting_block_hashes_like_the_original()
         {
             CardRuntime original = Start(Prepare, new[] { "Prepare" });
-            Assert.Equal(PlayResult.Played, original.Play("Prepare"));
+            Assert.Equal(ActionResult.Played, original.Play("Prepare"));
 
             // The block has moved down two lines, and runs just the same.
             string patched = Common + """
@@ -406,7 +406,7 @@ namespace Cantrip.Tests.Snapshots
         public void A_patch_that_changes_a_waiting_block_is_refused_by_name()
         {
             CardRuntime original = Start(Prepare, new[] { "Prepare" });
-            Assert.Equal(PlayResult.Played, original.Play("Prepare"));
+            Assert.Equal(ActionResult.Played, original.Play("Prepare"));
             string save = Save(original);
 
             var error = Assert.Throws<InvalidOperationException>(() => Load(save, Prepare.Replace("draw 1", "draw 2")));
@@ -425,7 +425,7 @@ namespace Cantrip.Tests.Snapshots
                       draw 3
                 """;
             CardRuntime original = Start(two, new[] { "Prepare/Deluxe" });
-            Assert.Equal(PlayResult.Played, original.Play("Prepare/Deluxe"));
+            Assert.Equal(ActionResult.Played, original.Play("Prepare/Deluxe"));
             string save = Save(original);
 
             var error = Assert.Throws<InvalidOperationException>(() => Load(save, two.Replace("draw 3", "draw 4")));
@@ -437,7 +437,7 @@ namespace Cantrip.Tests.Snapshots
         public void A_patch_that_removes_a_waiting_block_is_refused_by_name()
         {
             CardRuntime original = Start(Prepare, new[] { "Prepare" });
-            Assert.Equal(PlayResult.Played, original.Play("Prepare"));
+            Assert.Equal(ActionResult.Played, original.Play("Prepare"));
             string save = Save(original);
 
             string patched = Common + """
@@ -454,7 +454,7 @@ namespace Cantrip.Tests.Snapshots
         public void A_patch_that_only_reformats_a_waiting_block_is_accepted()
         {
             CardRuntime original = Start(Prepare, new[] { "Prepare" });
-            Assert.Equal(PlayResult.Played, original.Play("Prepare"));
+            Assert.Equal(ActionResult.Played, original.Play("Prepare"));
             string save = Save(original);
 
             string patched = Common + """
@@ -476,7 +476,7 @@ namespace Cantrip.Tests.Snapshots
         {
             string unix = Prepare.Replace("\r\n", "\n");
             CardRuntime original = Start(unix.Replace("\n", "\r\n"), new[] { "Prepare" });
-            Assert.Equal(PlayResult.Played, original.Play("Prepare"));
+            Assert.Equal(ActionResult.Played, original.Play("Prepare"));
 
             CardRuntime restored = Load(Save(original), unix);
             restored.EndTurn();
@@ -544,7 +544,7 @@ namespace Cantrip.Tests.Snapshots
         public void Saves_without_block_hashes_still_load()
         {
             CardRuntime original = Start(Prepare, new[] { "Prepare" });
-            Assert.Equal(PlayResult.Played, original.Play("Prepare"));
+            Assert.Equal(ActionResult.Played, original.Play("Prepare"));
 
             // A save from before the hash was recorded: the address alone, unchecked.
             JsonNode json = JsonNode.Parse(Save(original))!;
@@ -565,7 +565,7 @@ namespace Cantrip.Tests.Snapshots
         public void A_restore_refused_for_a_changed_block_leaves_the_game_in_progress_untouched()
         {
             CardRuntime original = Start(Prepare, new[] { "Prepare" });
-            Assert.Equal(PlayResult.Played, original.Play("Prepare"));
+            Assert.Equal(ActionResult.Played, original.Play("Prepare"));
             GameSnapshot save = JsonSerializer.Deserialize<GameSnapshot>(Save(original))!;
 
             CardRuntime current = Start(Prepare.Replace("draw 1", "draw 2"), new[] { "Filler" });
@@ -574,7 +574,7 @@ namespace Cantrip.Tests.Snapshots
             Assert.Throws<InvalidOperationException>(() => current.Restore(save));
 
             Assert.Equal(before, current.State.ComputeHash());
-            Assert.Equal(PlayResult.Played, current.Play("Filler"));
+            Assert.Equal(ActionResult.Played, current.Play("Filler"));
         }
 
         [Fact]
@@ -591,7 +591,7 @@ namespace Cantrip.Tests.Snapshots
             Assert.Contains("card \"Prepare\"", error.Message);
 
             Assert.Equal(before, current.State.ComputeHash());
-            Assert.Equal(PlayResult.Played, current.Play("Filler"));
+            Assert.Equal(ActionResult.Played, current.Play("Filler"));
         }
 
         [Fact]
@@ -602,13 +602,13 @@ namespace Cantrip.Tests.Snapshots
             GameSnapshot save = JsonSerializer.Deserialize<GameSnapshot>(Save(original))!;
 
             CardRuntime current = Start(Common, new[] { "Recycle", "Filler" }, new DeferredChooser());
-            Assert.Equal(PlayResult.ChoicePending, current.Play("Recycle"));
+            Assert.Equal(ActionResult.ChoicePending, current.Play("Recycle"));
             ulong before = current.State.ComputeHash();
 
             Assert.Throws<InvalidOperationException>(() => current.Restore(save));
 
             Assert.Equal(before, current.State.ComputeHash());
-            Assert.Equal(PlayResult.Played, current.Answer(current.Pending!.Options[0].Id));
+            Assert.Equal(ActionResult.Played, current.Answer(current.Pending!.Options[0].Id));
             Assert.Empty(current.State.ZoneOf(current.Player, Zones.Hand));
         }
     }

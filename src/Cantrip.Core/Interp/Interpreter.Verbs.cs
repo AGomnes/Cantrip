@@ -789,14 +789,12 @@ namespace Cantrip.Runtime
         internal EntityDefinition ChooseDefinition(string prompt, IReadOnlyList<EntityDefinition> options, Entity? chooser, VerbCall call)
         {
             EntityDefinition? picked = null;
-            if (Chooser is IDefinitionChooser provider)
-            {
-                EntityDefinition? answer = provider.ChooseDefinition(new DefinitionChoice(prompt, options, chooser, call.Span), State);
-                if (answer != null && options.Contains(answer)) picked = answer;
-            }
+            EntityDefinition? answer = Chooser.ChooseDefinition(new DefinitionChoice(prompt, options, chooser, call.Span), State);
+            if (answer != null && options.Contains(answer)) picked = answer;
 
-            // A provider that cannot answer an offer of content gets the first candidate, the same
-            // way a short answer to an entity choice is topped up from the front.
+            // A chooser that answers with nothing, or with something that was not offered, gets the
+            // first candidate, the same way a short answer to an entity choice is topped up from the
+            // front. That is also what the interface's own default answers.
             picked ??= options[0];
 
             State.Trace.Record(State.Clock.Now, "choice", prompt, chooser?.ToString(), span: call.Span,

@@ -57,7 +57,7 @@ namespace Cantrip.Tests.Snapshots
                 thrown = Record.Exception(() => runtime.Capture());
             });
 
-            Assert.Equal(PlayResult.Played, runtime.Play(runtime.AddCard("Peek", Zones.Hand)));
+            Assert.Equal(ActionResult.Played, runtime.Play(runtime.AddCard("Peek", Zones.Hand)));
 
             Assert.False(canCapture);
             Assert.IsType<InvalidOperationException>(thrown);

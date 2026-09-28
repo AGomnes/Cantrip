@@ -15,6 +15,14 @@ Cantrip is in preview (0.x). It works, it is tested, and it has been used to bui
 
 The public API, which includes the Godot node's methods, signals and dictionary keys; the language; and the ability to load a save made with any earlier 1.x release.
 
+### Adding a member to a seam is additive, not breaking
+
+The four interfaces a game implements — `IEffectHost`, `IGameClock`, `IChoiceProvider` and `IDescriptionLocalizer` — may gain members in a 1.x release, as long as each new member has a default implementation. Adding one does not break code that compiles against an earlier 1.x: an implementation written today keeps compiling and keeps working, and inherits the new member's default until it chooses to say something else. Removing a member, or adding one without a default, stays a breaking change.
+
+That rests on default interface members dispatching correctly at run time, which is checked rather than assumed: the unit tests implement each seam with the smallest type the compiler accepts and drive a battle through it, and the Godot headless suite does the same inside the engine a game ships on.
+
+The existing members have defaults too, wherever a default is correct, so a game implements only the part it has an opinion about. `IGameClock.Now`, `Advanced` and `Restore` deliberately have none: the only default they could have is a clock stuck at zero, an event that never fires, and a restore that quietly keeps the wrong time, and a silent wrong answer is worse than a compiler error. Giving an existing member a default later is itself additive, so nothing here is frozen by leaving it out.
+
 Same-seed results are not on that list. A 1.x release may change what the same content, seed and inputs produce, to fix a rule, and its changelog says so under **Same-seed results**.
 
 ## How it is checked

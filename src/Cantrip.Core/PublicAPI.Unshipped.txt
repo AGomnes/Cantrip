@@ -45,3 +45,79 @@ Cantrip.Runtime.NewListeners.HearTheEvent = 0 -> Cantrip.Runtime.NewListeners
 Cantrip.Runtime.NewListeners.MissTheEvent = 1 -> Cantrip.Runtime.NewListeners
 Cantrip.Runtime.Ruleset.NewListeners.get -> Cantrip.Runtime.NewListeners
 Cantrip.Runtime.Ruleset.NewListeners.set -> void
+*REMOVED*Cantrip.Runtime.IDefinitionChooser
+*REMOVED*Cantrip.Runtime.IDefinitionChooser.ChooseDefinition(Cantrip.Runtime.DefinitionChoice! request, Cantrip.Runtime.GameState! state) -> Cantrip.Content.EntityDefinition?
+Cantrip.Runtime.IChoiceProvider.ChooseDefinition(Cantrip.Runtime.DefinitionChoice! request, Cantrip.Runtime.GameState! state) -> Cantrip.Content.EntityDefinition?
+*REMOVED*Cantrip.CardRuntime.Answer(params int[]! entityIds) -> Cantrip.PlayResult
+*REMOVED*Cantrip.CardRuntime.Answer(System.Collections.Generic.IEnumerable<Cantrip.Runtime.Entity!>! entities) -> Cantrip.PlayResult
+*REMOVED*Cantrip.CardRuntime.Answer(System.Collections.Generic.IEnumerable<int>! entityIds) -> Cantrip.PlayResult
+*REMOVED*Cantrip.CardRuntime.Answer(Cantrip.Content.EntityDefinition! chosen) -> Cantrip.PlayResult
+*REMOVED*Cantrip.CardRuntime.EndTurn() -> void
+*REMOVED*Cantrip.CardRuntime.Execute(string! statements, Cantrip.Runtime.Entity? self = null, Cantrip.Runtime.Entity? target = null) -> void
+*REMOVED*Cantrip.CardRuntime.Play(Cantrip.Runtime.Entity! card, Cantrip.Runtime.Entity? target = null) -> Cantrip.PlayResult
+*REMOVED*Cantrip.CardRuntime.Play(string! cardName, Cantrip.Runtime.Entity? target = null) -> Cantrip.PlayResult
+*REMOVED*Cantrip.CardRuntime.StartBattle(bool shuffle = true, bool drawOpeningHand = true) -> void
+*REMOVED*Cantrip.CardRuntime.UseAbility(Cantrip.Runtime.Entity! ability, Cantrip.Runtime.Entity? target = null) -> bool
+*REMOVED*Cantrip.PlayResult
+*REMOVED*Cantrip.PlayResult.Cancelled = 6 -> Cantrip.PlayResult
+*REMOVED*Cantrip.PlayResult.ChoicePending = 7 -> Cantrip.PlayResult
+*REMOVED*Cantrip.PlayResult.InvalidTarget = 5 -> Cantrip.PlayResult
+*REMOVED*Cantrip.PlayResult.NotACard = 1 -> Cantrip.PlayResult
+*REMOVED*Cantrip.PlayResult.NotEnoughEnergy = 4 -> Cantrip.PlayResult
+*REMOVED*Cantrip.PlayResult.NotInHand = 2 -> Cantrip.PlayResult
+*REMOVED*Cantrip.PlayResult.Played = 0 -> Cantrip.PlayResult
+*REMOVED*Cantrip.PlayResult.Unplayable = 3 -> Cantrip.PlayResult
+Cantrip.ActionResult
+Cantrip.ActionResult.Cancelled = 6 -> Cantrip.ActionResult
+Cantrip.ActionResult.ChoicePending = 7 -> Cantrip.ActionResult
+Cantrip.ActionResult.InvalidTarget = 5 -> Cantrip.ActionResult
+Cantrip.ActionResult.NotACard = 1 -> Cantrip.ActionResult
+Cantrip.ActionResult.NotEnoughEnergy = 4 -> Cantrip.ActionResult
+Cantrip.ActionResult.NotInHand = 2 -> Cantrip.ActionResult
+Cantrip.ActionResult.NotReady = 8 -> Cantrip.ActionResult
+Cantrip.ActionResult.Played = 0 -> Cantrip.ActionResult
+Cantrip.ActionResult.Unplayable = 3 -> Cantrip.ActionResult
+Cantrip.CardRuntime.Answer(Cantrip.Content.EntityDefinition! chosen) -> Cantrip.ActionResult
+Cantrip.CardRuntime.Answer(params int[]! entityIds) -> Cantrip.ActionResult
+Cantrip.CardRuntime.Answer(System.Collections.Generic.IEnumerable<Cantrip.Runtime.Entity!>! entities) -> Cantrip.ActionResult
+Cantrip.CardRuntime.Answer(System.Collections.Generic.IEnumerable<int>! entityIds) -> Cantrip.ActionResult
+Cantrip.CardRuntime.EndTurn() -> Cantrip.ActionResult
+Cantrip.CardRuntime.Execute(string! statements, Cantrip.Runtime.Entity? self = null, Cantrip.Runtime.Entity? target = null) -> Cantrip.ActionResult
+Cantrip.CardRuntime.Play(Cantrip.Runtime.Entity! card, Cantrip.Runtime.Entity? target = null) -> Cantrip.ActionResult
+Cantrip.CardRuntime.Play(string! cardName, Cantrip.Runtime.Entity? target = null) -> Cantrip.ActionResult
+Cantrip.CardRuntime.StartBattle(bool shuffle = true, bool drawOpeningHand = true) -> Cantrip.ActionResult
+Cantrip.CardRuntime.UseAbility(Cantrip.Runtime.Entity! ability, Cantrip.Runtime.Entity? target = null) -> Cantrip.ActionResult
+*REMOVED*Cantrip.Content.Scenario
+*REMOVED*static Cantrip.Content.Scenario.Metrics.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+*REMOVED*static Cantrip.Content.Scenario.SetupVerbs.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+*REMOVED*static Cantrip.Content.Scenario.Verbs.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+*REMOVED*Cantrip.Diagnostics.Suggest
+*REMOVED*static Cantrip.Diagnostics.Suggest.Closest(string! input, System.Collections.Generic.IEnumerable<string!>! candidates, int maxDistance = 3) -> string?
+*REMOVED*Cantrip.Testing.SetupSession
+*REMOVED*Cantrip.Testing.SetupSession.Defined(string! name, Cantrip.Diagnostics.SourceSpan span, string! what, params string![]! kinds) -> string!
+*REMOVED*Cantrip.Testing.SetupSession.Run(Cantrip.Syntax.StatementNode! statement) -> void
+*REMOVED*Cantrip.Testing.SetupSession.SetupSession(Cantrip.CardRuntime! runtime, Cantrip.Runtime.ScriptedChooser! chooser) -> void
+*REMOVED*static Cantrip.Testing.SetupSession.Names(Cantrip.Runtime.VerbCall! call) -> System.Collections.Generic.IReadOnlyList<string!>!
+*REMOVED*Cantrip.Runtime.Interpreter.AdjustStatusStacks(Cantrip.Runtime.Entity! host, string! statusName, Cantrip.Syntax.AssignOperator op, Cantrip.Num amount, Cantrip.Runtime.EvalContext! context, Cantrip.Diagnostics.SourceSpan span = default(Cantrip.Diagnostics.SourceSpan)) -> void
+*REMOVED*Cantrip.Runtime.Interpreter.ExpireTimedStatuses() -> void
+*REMOVED*Cantrip.Runtime.Interpreter.IsBuiltinVerb(string! name) -> bool
+*REMOVED*Cantrip.Runtime.Interpreter.ResetResources(Cantrip.Runtime.Entity! actor, string! trigger) -> void
+*REMOVED*Cantrip.Runtime.Interpreter.ShuffleDiscardIntoDraw(Cantrip.Runtime.Entity! actor, Cantrip.Runtime.EvalContext! context) -> void
+*REMOVED*Cantrip.Runtime.Interpreter.ShuffleZone(Cantrip.Runtime.Entity! actor, string! zone) -> void
+*REMOVED*Cantrip.Syntax.DeclarationNode.DeclarationNode(string! name, Cantrip.Diagnostics.SourceSpan span) -> void
+*REMOVED*Cantrip.Syntax.ExprNode.ExprNode(Cantrip.Diagnostics.SourceSpan span) -> void
+*REMOVED*Cantrip.Syntax.MemberNode.MemberNode(Cantrip.Diagnostics.SourceSpan span) -> void
+*REMOVED*Cantrip.Syntax.Node.Node(Cantrip.Diagnostics.SourceSpan span) -> void
+*REMOVED*Cantrip.Syntax.StatementNode.StatementNode(Cantrip.Diagnostics.SourceSpan span) -> void
+*REMOVED*static Cantrip.Runtime.Ruleset.Default.get -> Cantrip.Runtime.Ruleset!
+static Cantrip.Runtime.Ruleset.CreateDefault() -> Cantrip.Runtime.Ruleset!
+*REMOVED*Cantrip.Runtime.Interpreter.Amount(Cantrip.Runtime.Modifier! modifier, Cantrip.Runtime.ModifierQuery! query) -> Cantrip.Runtime.Value
+*REMOVED*Cantrip.Runtime.Interpreter.Applies(Cantrip.Runtime.Modifier! modifier, Cantrip.Runtime.ModifierQuery! query) -> bool
+*REMOVED*Cantrip.Runtime.ModifierPipeline.Evaluator.set -> void
+*REMOVED*Cantrip.Rng.GetState() -> (ulong S0, ulong S1, ulong S2, ulong S3)
+*REMOVED*Cantrip.Rng.SetState((ulong S0, ulong S1, ulong S2, ulong S3) state) -> void
+Cantrip.Rng.GetState() -> ulong[]!
+Cantrip.Rng.SetState(ulong[]! state) -> void
+const Cantrip.Rng.StateWords = 4 -> int
+*REMOVED*static Cantrip.Runtime.Chain.NewRoot(long rootId) -> Cantrip.Runtime.Chain!
+Cantrip.CardRuntime.Dispose() -> void

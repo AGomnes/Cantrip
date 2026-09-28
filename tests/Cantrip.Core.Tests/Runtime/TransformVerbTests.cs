@@ -570,7 +570,7 @@ namespace Cantrip.Tests.Runtime
             Entity card = runtime.AddCard("Shape and Sift", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(PlayResult.ChoicePending, runtime.Play(card, ogre));
+            Assert.Equal(ActionResult.ChoicePending, runtime.Play(card, ogre));
 
             // The action rolled back, so the game is where it was — and the caller's reference is
             // still the game's entity, not an abandoned instance beside it.
@@ -579,7 +579,7 @@ namespace Cantrip.Tests.Runtime
             Assert.False(ogre.IsRemoved);
 
             Entity picked = runtime.State.ZoneOf(runtime.Player, Zones.Hand).First(c => c.Name == "Filler");
-            Assert.Equal(PlayResult.Played, runtime.Answer(picked.Id));
+            Assert.Equal(ActionResult.Played, runtime.Answer(picked.Id));
 
             Assert.Same(ogre, runtime.State.Find(ogreId));
             Assert.Equal("Sheepling", ogre.Name);
