@@ -159,8 +159,14 @@ namespace Cantrip.Runtime
             string? zone = zoneNode == null ? null : ZoneName(zoneNode, call);
             Entity? owner = call.Context.Controller;
 
+            // A summon a full lane refuses makes nothing, so `created` is short by one — empty, when
+            // every one of them was refused. The statements after this read what was made, which is
+            // what "the row is full" has to mean if it is not to be an error.
             var created = new List<Entity>();
-            for (int i = 0; i < count; i++) created.Add(Create(definition, owner, zone, call.Context));
+            for (int i = 0; i < count; i++)
+            {
+                if (Create(definition, owner, zone, call.Context) is Entity one) created.Add(one);
+            }
             call.Context.SetLocal("created", Value.FromEntities(created));
         }
 
@@ -216,7 +222,10 @@ namespace Cantrip.Runtime
                 if (original.Kind == EntityKind.Status || original.Kind == EntityKind.Keyword || original.Kind == EntityKind.Ability)
                     throw call.Error($"`{original.Name}` is {A(original.Definition.KindName)} and belongs to whoever has it, not to a zone. Write `apply {Quoted(original.Name)} 3 to <who>` to give another one.");
 
-                for (int i = 0; i < count; i++) copied.Add(Copy(original, zone, call.Context));
+                for (int i = 0; i < count; i++)
+                {
+                    if (Copy(original, zone, call.Context) is Entity one) copied.Add(one);
+                }
             }
 
             call.Context.SetLocal("copied", Value.FromEntities(copied));

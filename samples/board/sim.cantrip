@@ -1,0 +1,25 @@
+# The train fought many times, so that a change to the board shows up here as well as in the
+# tests. A bot that could not summon, or that stalled when a floor filled up and a card stopped
+# doing anything, would fail this.
+#
+# Both bots win every run of all three fights. That is not a measurement of the content — three
+# small fights against enemies with one move each are winnable, and a level is a fact about the
+# bot rather than about the cards. What this is for is the two expectations at the bottom: that
+# nothing throws, and that no run stalls. The hp column is the part worth reading, and it climbs
+# from 0.6 to 13.4 across the three as the Brood Mother fills her floor.
+#
+# Run:  dotnet run --project src/Cantrip.Cli -- sim samples/board
+
+scenario "Climbing the train"
+  runs 200
+
+  player hp 40
+  player energy 3
+  deck 4 "Summon Imp", 3 Pike, 2 "Post a Sentinel", 2 Sweep
+
+  battle Crawler
+  battle Crawler, Crawler
+  battle "Brood Mother", Crawler
+
+  expect no stalls
+  expect no errors

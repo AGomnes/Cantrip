@@ -65,6 +65,12 @@ namespace Cantrip.Linting
         public const string PercentageWhereACountIsMeant = "CT324";
         public const string WrongClock = "CT325";
 
+        // CT326 is the party work's `player` rule and is not ours to use.
+
+        public const string OffTheBoard = "CT327";
+        public const string PlaceAssigned = "CT328";
+        public const string PositionIsNowRank = "CT329";
+
         /// <summary>Below this many runs, a scenario's numbers move about from one run to the next (CT318).</summary>
         private const int FewRuns = 100;
 
@@ -210,6 +216,8 @@ namespace Cantrip.Linting
             public List<AssignNode> Assigns { get; } = new List<AssignNode>();
             public List<CallExpr> Calls { get; } = new List<CallExpr>();
             public List<BinaryExpr> OnExpressions { get; } = new List<BinaryExpr>();
+            public List<BinaryExpr> Comparisons { get; } = new List<BinaryExpr>();
+            public List<SelectorExpr> Selectors { get; } = new List<SelectorExpr>();
             public List<ScheduleNode> Schedules { get; } = new List<ScheduleNode>();
             public HashSet<string> Locals { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -265,6 +273,12 @@ namespace Cantrip.Linting
                     case BinaryExpr { Operator: BinaryOperator.On } on:
                         OnExpressions.Add(on);
                         break;
+                    case BinaryExpr binary:
+                        Comparisons.Add(binary);
+                        break;
+                    case SelectorExpr selector:
+                        Selectors.Add(selector);
+                        break;
                 }
                 base.VisitExpression(expression);
             }
@@ -311,6 +325,9 @@ namespace Cantrip.Linting
                 CheckStacks(body);
                 CheckMoves(body);
                 CheckStatusLengths(body);
+                CheckPlaces(body);
+                CheckPlaceAssignments(body);
+                CheckPositionReads(body);
             }
 
             CheckBlocks();
@@ -338,7 +355,7 @@ namespace Cantrip.Linting
         private void CollectBodies()
         {
             IEnumerable<EntityDefinition> definitions = _content.Definitions
-                .Where(d => d.KindName != "resource")
+                .Where(d => d.IsThing)
                 .OrderBy(d => d.Syntax.Span.File, StringComparer.Ordinal)
                 .ThenBy(d => d.Syntax.Span.Line);
 
@@ -420,9 +437,11 @@ namespace Cantrip.Linting
             _stats.UnionWith(Interpreter.CommonStats);
             _stats.UnionWith(RuntimeStats);
             _stats.UnionWith(_content.Resources.Keys);
-            foreach (EntityDefinition definition in _content.Definitions) _stats.UnionWith(definition.Stats.Keys);
+            // A board's `lanes 3` is its shape, not a stat anything has, and its name is not a tag,
+            // so the declarations that are rules rather than things are left out of both.
+            foreach (EntityDefinition definition in _content.Definitions.Where(d => d.IsThing)) _stats.UnionWith(definition.Stats.Keys);
 
-            foreach (EntityDefinition definition in _content.Definitions)
+            foreach (EntityDefinition definition in _content.Definitions.Where(d => d.IsThing))
             {
                 _tags.UnionWith(definition.Tags);
                 _tags.Add(definition.Name); // a status's name counts as a tag on its host
@@ -657,6 +676,212 @@ namespace Cantrip.Linting
                 {
                     if (schedule.Delay is NumberExpr delay) Check(delay.Value, delay.Unit, delay.Span, "This delay");
                 }
+            }
+        }
+
+        /// <summary>
+        /// The boards a rule could be running on: the ones content declares, or the default board
+        /// when it declares none. A rule is not tied to one board, so a place is only wrong when it
+        /// is wrong on every board this game has.
+        /// </summary>
+        private IReadOnlyList<BoardShape> PossibleBoards =>
+            _content.Boards.Count > 0 ? _content.Boards : new[] { _content.DefaultBoard };
+
+        /// <summary>
+        /// CT327: a lane or rank no board this game has can hold. <c>it.lane == 2</c> on a one-lane
+        /// board matches nothing, and no message ever said so — the filter simply never passed and
+        /// the card did nothing, which is exactly the class of silence this linter exists for. The
+        /// mirror case is reported too: <c>it.rank &lt;= 3</c> on a two-rank board passes for
+        /// everybody, so the <c>where</c> that was meant to limit the card's reach limits nothing.
+        /// </summary>
+        /// <remarks>
+        /// Only a comparison against a literal is checked, because only then is the answer the same
+        /// for every actor before the game runs. A rule is checked against every board content
+        /// declares and reported only when all of them agree, since a card in a game with a narrow
+        /// board and a wide one is legitimately written for the wide one.
+        /// </remarks>
+        private void CheckPlaces(Body body)
+        {
+            foreach (BinaryExpr comparison in body.Facts.Comparisons)
+            {
+                if (!IsPlaceComparison(comparison, out string axis, out BinaryOperator op, out int literal, out ExprNode blame)) continue;
+
+                bool never = true, always = true;
+                foreach (BoardShape board in PossibleBoards)
+                {
+                    int? last = axis == "lane"
+                        ? board.Lanes - 1
+                        : board.RanksAreUnbounded ? (int?)null : board.Ranks - 1;
+
+                    never &= Never(op, literal, last);
+                    always &= Always(op, literal, last);
+                }
+
+                string word = axis == "lane" ? PossibleBoards[0].LaneWord : PossibleBoards[0].RankWord;
+                string boards = PossibleBoards.Count == 1
+                    ? $"This game's board is {PossibleBoards[0].Describe()}"
+                    : "Every board this game declares is smaller than that";
+
+                if (never)
+                {
+                    Warn(OffTheBoard,
+                        $"No actor is ever there, so this never matches. {boards}, and {word}s count from 0.",
+                        blame.Span);
+                }
+                else if (always)
+                {
+                    Warn(OffTheBoard,
+                        $"Every actor is there, so this passes for all of them and limits nothing. {boards}, and {word}s count from 0.",
+                        blame.Span);
+                }
+            }
+
+            // A board property that is out of its own board's bounds cannot happen: `lanes` and
+            // `ranks` are the bounds. Nothing to check there.
+        }
+
+        /// <summary>Whether a comparison is <c>&lt;something&gt;.lane|rank|position OP &lt;literal&gt;</c>.</summary>
+        private static bool IsPlaceComparison(BinaryExpr comparison, out string axis, out BinaryOperator op, out int literal, out ExprNode blame)
+        {
+            axis = string.Empty;
+            op = comparison.Operator;
+            literal = 0;
+            blame = comparison;
+
+            if (!IsComparison(comparison.Operator)) return false;
+
+            if (Axis(comparison.Left) is string left && Literal(comparison.Right) is int right)
+            {
+                axis = left;
+                literal = right;
+                return true;
+            }
+
+            // `3 >= it.rank` is the same rule written the other way round, so the operator flips.
+            if (Axis(comparison.Right) is string other && Literal(comparison.Left) is int value)
+            {
+                axis = other;
+                literal = value;
+                op = Mirror(comparison.Operator);
+                return true;
+            }
+
+            return false;
+
+            static string? Axis(ExprNode node) => node is MemberExpr member ? PlaceWord(member.Member) : null;
+
+            static int? Literal(ExprNode node) => node switch
+            {
+                NumberExpr number when number.Unit == null && number.Value == number.Value.Floor() => number.Value.ToInt(),
+                UnaryExpr { Operator: UnaryOperator.Negate, Operand: NumberExpr negative } when negative.Unit == null && negative.Value == negative.Value.Floor()
+                    => -negative.Value.ToInt(),
+                _ => null,
+            };
+        }
+
+        /// <summary>Which axis a member name reads, or null for one that is not a place.</summary>
+        private static string? PlaceWord(string member) => member.ToLowerInvariant() switch
+        {
+            "lane" => "lane",
+            "rank" => "rank",
+            "position" => "rank",
+            _ => null,
+        };
+
+        private static bool IsComparison(BinaryOperator op) =>
+            op is BinaryOperator.Equal or BinaryOperator.NotEqual or BinaryOperator.Less
+                or BinaryOperator.LessOrEqual or BinaryOperator.Greater or BinaryOperator.GreaterOrEqual;
+
+        private static BinaryOperator Mirror(BinaryOperator op) => op switch
+        {
+            BinaryOperator.Less => BinaryOperator.Greater,
+            BinaryOperator.LessOrEqual => BinaryOperator.GreaterOrEqual,
+            BinaryOperator.Greater => BinaryOperator.Less,
+            BinaryOperator.GreaterOrEqual => BinaryOperator.LessOrEqual,
+            _ => op,
+        };
+
+        /// <summary>Whether the comparison is false for every slot from 0 to <paramref name="last"/>.</summary>
+        private static bool Never(BinaryOperator op, int literal, int? last) => op switch
+        {
+            BinaryOperator.Equal => literal < 0 || (last.HasValue && literal > last.Value),
+            BinaryOperator.NotEqual => last == 0 && literal == 0,
+            BinaryOperator.Less => literal <= 0,
+            BinaryOperator.LessOrEqual => literal < 0,
+            BinaryOperator.Greater => last.HasValue && literal >= last.Value,
+            BinaryOperator.GreaterOrEqual => last.HasValue && literal > last.Value,
+            _ => false,
+        };
+
+        /// <summary>Whether the comparison is true for every slot from 0 to <paramref name="last"/>.</summary>
+        private static bool Always(BinaryOperator op, int literal, int? last) => op switch
+        {
+            BinaryOperator.Equal => last == 0 && literal == 0,
+            BinaryOperator.NotEqual => literal < 0 || (last.HasValue && literal > last.Value),
+            BinaryOperator.Less => last.HasValue && literal > last.Value,
+            BinaryOperator.LessOrEqual => last.HasValue && literal >= last.Value,
+            BinaryOperator.Greater => false,
+            BinaryOperator.GreaterOrEqual => literal <= 0,
+            _ => false,
+        };
+
+        /// <summary>
+        /// CT328: a place written to as if it were a stat. <c>who.position = 2</c> wrote a stat
+        /// called <c>position</c> that nothing ever read, because reading <c>who.position</c> goes to
+        /// the slot the actor is standing on and shadows it — the line looked like a move, did
+        /// nothing at all, and said nothing about it.
+        /// </summary>
+        private void CheckPlaceAssignments(Body body)
+        {
+            foreach (AssignNode assign in body.Facts.Assigns)
+            {
+                string? written = assign.Target switch
+                {
+                    MemberExpr member => member.Member,
+                    NameExpr name => name.Name,
+                    _ => null,
+                };
+                if (written == null || PlaceWord(written) == null) continue;
+
+                bool isPosition = string.Equals(written, "position", StringComparison.OrdinalIgnoreCase);
+                Error(PlaceAssigned,
+                    isPosition
+                        ? "`position` is the old name for `rank`, and assigning it writes a stat nothing reads: " +
+                          "the slot shadows it, so this line does nothing. Write `rank`."
+                        : $"Where an actor stands is not a stat, so assigning `{written.ToLowerInvariant()}` writes a value nothing reads and moves nobody. " +
+                          "A game moves an actor with `GameState.Assign`.",
+                    assign.Span);
+            }
+        }
+
+        /// <summary>
+        /// CT329: a note on every <c>position</c> read, suggesting <c>rank</c>. The old word keeps
+        /// working for the whole of the 1.x line and reads the same number, so this is a note and
+        /// never a warning: the word fades rather than flips.
+        /// </summary>
+        private void CheckPositionReads(Body body)
+        {
+            // A `position` being written to is CT328, which already says to write `rank`. Saying it
+            // twice about one line would make the error look like two problems.
+            var written = new HashSet<Node>(body.Facts.Assigns.Select(a => (Node)a.Target));
+
+            foreach (MemberExpr member in body.Facts.Members)
+            {
+                if (!string.Equals(member.Member, "position", StringComparison.OrdinalIgnoreCase)) continue;
+                if (written.Contains(member)) continue;
+                Info(PositionIsNowRank,
+                    "`position` is now called `rank`, because a board has a lane across it as well. " +
+                    "It reads the same number and keeps working; write `rank` when you next touch this line.",
+                    member.Span);
+            }
+
+            foreach (SelectorExpr selector in body.Facts.Selectors)
+            {
+                if (!string.Equals(selector.Key, "position", StringComparison.OrdinalIgnoreCase)) continue;
+                Info(PositionIsNowRank,
+                    "`position` is now called `rank`, because a board has a lane across it as well. " +
+                    "`lowest rank enemies` and `highest rank enemies` sort by the same number.",
+                    selector.Span);
             }
         }
 
@@ -1103,8 +1328,32 @@ namespace Cantrip.Linting
                     case "enemy" when body.Kind == BodyKind.Test:
                         RequireDefinition(body, TestEnemyName(command), "enemy");
                         break;
+
+                    // `board "Corridor"` picks the board this test is fought on. A board is out of
+                    // name lookup, the way a resource is, so it is checked here against the boards
+                    // rather than left to CT302, which would call every board name undefined.
+                    case "board" when body.Kind == BodyKind.Test:
+                        RequireBoard(body, TestNames(command).FirstOrDefault());
+                        break;
                 }
             }
+        }
+
+        /// <summary>The board a test names, which the runner looks up and fails without.</summary>
+        private void RequireBoard(Body body, ExprNode? node)
+        {
+            if (node == null) return;
+            _reported.Add(node);
+
+            string name = node is StringExpr text ? text.Value : ((NameExpr)node).Name;
+            if (_content.Board(name) != null) return;
+
+            Error(UnknownName,
+                $"No board called `{name}` is declared." + (_content.Boards.Count == 0
+                    ? " This content declares none, so every battle is fought on the default board."
+                    : string.Empty),
+                node.Span,
+                Suggest.Closest(name, _content.Boards.Select(b => b.Name)));
         }
 
         /// <summary>Checks each name a line lists once, so <c>deck Strik, Strik</c> is one error.</summary>
@@ -1845,7 +2094,7 @@ namespace Cantrip.Linting
         {
             var descriptions = new DescriptionBuilder(_content);
             IEnumerable<EntityDefinition> definitions = _content.Definitions
-                .Where(d => d.KindName != "resource")
+                .Where(d => d.IsThing)
                 .OrderBy(d => d.Syntax.Span.File, StringComparer.Ordinal)
                 .ThenBy(d => d.Syntax.Span.Line);
 

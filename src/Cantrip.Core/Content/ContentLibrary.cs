@@ -64,6 +64,11 @@ namespace Cantrip.Content
         private readonly Dictionary<string, ResourceRule> _resources =
             new Dictionary<string, ResourceRule>(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>Boards by name, and in declaration order, so "the one declared first" is stable.</summary>
+        private readonly Dictionary<string, BoardShape> _boards = new Dictionary<string, BoardShape>(StringComparer.OrdinalIgnoreCase);
+
+        private readonly List<string> _boardOrder = new List<string>();
+
         private readonly List<TestDefinition> _tests = new List<TestDefinition>();
         private readonly List<ScenarioDefinition> _scenarios = new List<ScenarioDefinition>();
         private readonly Dictionary<string, SourceFileNode> _files = new Dictionary<string, SourceFileNode>(FileNames);
@@ -93,6 +98,9 @@ namespace Cantrip.Content
                 foreach (EntityDefinition definition in _definitions.Values) names.Add(definition.KindName + ":" + definition.Name);
                 foreach (string verb in _verbs.Keys) names.Add("verb:" + verb);
                 foreach (string resource in _resources.Keys) names.Add("resource:" + resource);
+                // The name only, as for everything else here: a board that has been reshaped is
+                // still the board the save names, and a restore judges the new shape itself.
+                foreach (BoardShape board in _boards.Values) names.Add("board:" + board.Name);
                 names.Sort(StringComparer.OrdinalIgnoreCase);
 
                 ulong hash = 14695981039346656037UL;
@@ -133,6 +141,31 @@ namespace Cantrip.Content
         public IReadOnlyList<ScenarioDefinition> Scenarios => _scenarios;
         public IReadOnlyDictionary<string, ResourceRule> Resources => _resources;
         public IEnumerable<SourceFileNode> Files => _files.Values;
+
+        /// <summary>The boards content declares, in declaration order. Empty when it declares none.</summary>
+        public IReadOnlyList<BoardShape> Boards =>
+            _boardOrder.Where(_boards.ContainsKey).Select(name => _boards[name]).ToList();
+
+        /// <summary>The board of that name, or null. Names compare case-insensitively, as everything does.</summary>
+        public BoardShape? Board(string name) =>
+            name != null && _boards.TryGetValue(name, out BoardShape? board) ? board : null;
+
+        /// <summary>
+        /// The board a battle is fought on when nobody names one: the first board content declares,
+        /// or <see cref="BoardShape.Default"/> when it declares none — today's board, spelled out,
+        /// which is what keeps every game written before boards existed working unchanged.
+        /// </summary>
+        public BoardShape DefaultBoard
+        {
+            get
+            {
+                foreach (string name in _boardOrder)
+                {
+                    if (_boards.TryGetValue(name, out BoardShape? board)) return board;
+                }
+                return BoardShape.Default;
+            }
+        }
 
         /// <summary>The ruleset declared in content, merged with defaults. Null when content declares none.</summary>
         public RulesetDeclNode? RulesetSyntax => _rulesets.Count == 0 ? null : _rulesets[_rulesets.Count - 1].Syntax;
@@ -208,6 +241,11 @@ namespace Cantrip.Content
                 _definitions.Remove(key);
                 if (_byName.TryGetValue(definition.Name, out List<EntityDefinition>? list)) list.Remove(definition);
                 if (definition.KindName == "resource") _resources.Remove(definition.Name);
+                if (definition.KindName == "board")
+                {
+                    _boards.Remove(definition.Name);
+                    _boardOrder.RemoveAll(n => string.Equals(n, definition.Name, StringComparison.OrdinalIgnoreCase));
+                }
             }
 
             foreach (string verb in _verbs.Where(kv => SameFile(kv.Value.Syntax.Span.File, file)).Select(kv => kv.Key).ToList())
@@ -267,6 +305,15 @@ namespace Cantrip.Content
                     if (entity.Kind == "resource")
                     {
                         _resources[definition.Name] = ResourceRule.FromDefinition(definition);
+                        break;
+                    }
+
+                    // A board names a shape, not a thing anything is ever made from, so it is kept
+                    // out of name lookup for the same reason a resource is.
+                    if (entity.Kind == "board")
+                    {
+                        _boards[definition.Name] = BoardShape.FromDefinition(definition, diagnostics);
+                        _boardOrder.Add(definition.Name);
                         break;
                     }
 

@@ -83,6 +83,7 @@ namespace Cantrip.Testing
             ("seed", s => call => s.State.Rng.Reseed((ulong)call.Number(0, Num.One).ToInt())),
             ("answer", s => call => { foreach (string name in Names(call)) s._chooser.Enqueue(name); }),
             ("realtime", s => _ => { }),
+            ("board", s => s.Board),
             ("grant", s => call => { foreach (string name in Names(call)) s._runtime.GrantAbility(s.Defined(name, call.Span, "ability", "ability"), s.State.Player!); }),
         };
 
@@ -140,15 +141,47 @@ namespace Cantrip.Testing
             _context.SetLocal("enemy" + _enemies, Value.FromEntity(enemy));
         }
 
+        /// <summary><c>board "Floor"</c>: fights the rest of this test on a board content declares.</summary>
+        private void Board(VerbCall call)
+        {
+            IReadOnlyList<string> names = Names(call);
+            if (names.Count != 1) throw Fail("`board` takes the name of one board, as in `board \"Floor\"`.", call.Span);
+
+            BoardShape? shape = _runtime.Content.Board(names[0]);
+            if (shape == null)
+            {
+                string? close = Suggest.Closest(names[0], _runtime.Content.Boards.Select(b => b.Name));
+                throw Fail(
+                    $"No board named `{names[0]}` is declared." + (close == null ? string.Empty : $" Did you mean `{close}`?") +
+                    $" Declare it with `board {names[0]}`.",
+                    call.Span);
+            }
+            State.UseBoard(shape);
+        }
+
         /// <summary>Reads <c>stat value</c> pairs. Status names apply that many stacks.</summary>
         private void SetStats(Entity actor, VerbCall call, int start)
         {
             IReadOnlyList<ExprNode> nodes = call.Node.Arguments;
+
+            // A slot is set after the stats, because `enemy Ogre lane 2 rank 1` names one place and
+            // the two halves of it must arrive together or the first would land somewhere else.
+            int? lane = null, rank = null;
+
             for (int i = start; i < nodes.Count; i += 2)
             {
                 string stat = nodes[i] is NameExpr name ? name.Name : throw Fail($"expected a stat name, found `{AstPrinter.Print(nodes[i])}`.", call.Span);
                 if (i + 1 >= nodes.Count) throw Fail($"`{stat}` needs a value.", call.Span);
                 Num value = Interpreter.EvaluateNumber(nodes[i + 1], call.Context);
+
+                // Where an actor stands is a place on the board, not a stat, so `lane` and `rank`
+                // put it there. `position` is what `rank` used to be called and does the same.
+                switch (stat.ToLowerInvariant())
+                {
+                    case "lane": lane = value.ToInt(); continue;
+                    case "rank":
+                    case "position": rank = value.ToInt(); continue;
+                }
 
                 if (_runtime.Content.FindAny(stat, "status", "keyword") != null)
                 {
@@ -162,6 +195,18 @@ namespace Cantrip.Testing
                 if (string.Equals(stat, "energy", StringComparison.OrdinalIgnoreCase) && actor.GetBase("max_energy") < value)
                     actor.SetBase("max_energy", value);
             }
+
+            if (lane == null && rank == null) return;
+
+            int toLane = lane ?? actor.Lane;
+            int toRank = rank ?? actor.Rank;
+            if (!State.Board.Holds(toLane, toRank))
+            {
+                throw Fail(
+                    $"Board \"{State.Board.Name}\" ({State.Board.Describe()}) has no {State.Board.LaneWord} {toLane}, {State.Board.RankWord} {toRank}.",
+                    call.Span);
+            }
+            State.Assign(actor, toLane, toRank);
         }
 
         private void AddCards(VerbCall call, string zone)

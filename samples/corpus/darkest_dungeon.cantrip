@@ -71,15 +71,15 @@ actor "Zealot"
 
 # --- 6. ref a skill that only reaches the front ranks ---------------------------------------
 # Works. A skill's reach is written on the skill, as a `where` on its own `target` line: `it` is
-# the candidate, and positions are counted from zero, so the front two ranks are `it.position <= 1`.
-# It used to be `modify targetable of enemies where card:Pike, it.position > 1: set 0`, which made
+# the candidate, and ranks count from zero, so the front two ranks are `it.rank <= 1`.
+# It used to be `modify targetable of enemies where card:Pike, it.rank > 1: set 0`, which made
 # the card name itself — the qualifier compares names and there is no `card:self`, so without that
 # the limit would have applied to every card played while this one sat in hand. Reach is still a
 # property of the board rather than of the skill, so a hero's own rank does not enter into it.
 
 card "Pike"
   cost 1
-  target enemy where it.position <= 1
+  target enemy where it.rank <= 1
   tags attack
   effect:
     deal 5 to target

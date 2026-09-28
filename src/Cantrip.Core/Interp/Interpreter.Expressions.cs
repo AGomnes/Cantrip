@@ -316,7 +316,13 @@ namespace Cantrip.Runtime
                 case "controller": return Value.FromEntity(entity.Controller);
                 case "team": return Value.FromText(entity.Team.ToString().ToLowerInvariant());
                 case "zone": return Value.FromText(entity.Zone);
-                case "position": return Value.FromNumber(Num.FromInt(entity.Position));
+                case "lane": return Value.FromNumber(Num.FromInt(entity.Lane));
+
+                // `rank` is the name. `position` is what it was called when a board had one axis,
+                // and reads the same number for the whole of the 1.x line; CT329 suggests the
+                // newer word on a read, so it fades rather than flips.
+                case "rank":
+                case "position": return Value.FromNumber(Num.FromInt(entity.Rank));
                 case "intent": return entity.Intent == null ? Value.None : Value.FromText(entity.Intent);
                 case "phase": return entity.Phase == null ? Value.None : Value.FromText(entity.Phase);
                 case "statuses": return Value.FromEntities(entity.Attached.Where(a => !a.IsRemoved).ToList());
@@ -445,10 +451,9 @@ namespace Cantrip.Runtime
                     var result = new List<Entity>();
                     foreach (Entity center in Evaluate(call.Arguments[0], context).AsEntities())
                     {
-                        foreach (Entity actor in State.Actors(center.Team))
+                        foreach (Entity actor in State.Neighbours(center))
                         {
-                            if (actor != center && Math.Abs(actor.Position - center.Position) == 1 && !result.Contains(actor))
-                                result.Add(actor);
+                            if (!result.Contains(actor)) result.Add(actor);
                         }
                     }
                     return Value.FromEntities(result);
@@ -717,7 +722,7 @@ namespace Cantrip.Runtime
                     IOrderedEnumerable<Entity> ordered = selector.Modifier == SelectorModifier.Lowest
                         ? source.OrderBy(e => ReadSortKey(e, key).Raw)
                         : source.OrderByDescending(e => ReadSortKey(e, key).Raw);
-                    return Value.FromEntities(ordered.ThenBy(e => e.Position).ThenBy(e => e.Id).Take(count).ToList());
+                    return Value.FromEntities(ordered.ThenBy(e => e.Lane).ThenBy(e => e.Rank).ThenBy(e => e.Id).Take(count).ToList());
                 }
 
                 case SelectorModifier.Other:

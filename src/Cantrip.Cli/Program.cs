@@ -376,7 +376,7 @@ turn limit or a failed expectation (or lint warnings, with --warnings-as-errors)
 
             var builder = new DescriptionBuilder(content);
             var definitions = content.Definitions
-                .Where(d => d.KindName != "resource")
+                .Where(d => d.IsThing)
                 .Where(d => name == null || string.Equals(d.Name, name, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(d => d.KindName, StringComparer.Ordinal)
                 .ThenBy(d => d.Name, StringComparer.Ordinal)

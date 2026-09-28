@@ -10,6 +10,7 @@ In Godot, start with the demo project in the first row: it is the addon running,
 | [`basic`](basic) | Small examples of most features in one file, with a test for each: Fireball, Frozen and Kindling from the README, poison and other statuses, a content-defined verb, a real-time ability, and the Strike, Defend and Jaw Worm that the README's C# example and the [C# guide](../docs/csharp.md) use. |
 | [`recipes`](recipes) | The content from [Writing content](../docs/writing-content.md). [`recipes/tutorial`](recipes/tutorial) holds the tutorial's finished files, and every other file is one recipe with its tests, such as [a boss that switches moves at half health](recipes/boss-switches-at-half-health.cantrip) or [a debuff that lasts N enemy turns](recipes/debuff-for-enemy-turns.cantrip). Some recipes use the tutorial's Strike, Defend, Poison or Bog Troll, so load the whole folder. |
 | [`abilities`](abilities) | A fight with no cards in it, as a turn-based roguelike has: two abilities on cooldowns, a bleed that ticks, and an enemy whose moves change when it is wounded, with tests for each. Everything a deckbuilder uses except the cards. [`sim.cantrip`](abilities/sim.cantrip) plays that fight many times. |
+| [`board`](board) | A fight on a board with more than one row, as a Monster Train style train has: three floors, three slots to a floor, units summoned onto their summoner's floor, and a floor with no room that turns a summon away instead of growing. It declares a second board to show the other answer to a freed slot, `close_ranks`. [`sim.cantrip`](board/sim.cantrip) plays the climb many times. |
 | [`slice`](slice) | A small roguelite: a witch climbing a five-floor tower, fire against frost, with 17 cards, 4 relics and 5 enemies, among them a boss, the Archmage, that changes its moves at half health. [`sim.cantrip`](slice/sim.cantrip) states the tower as a scenario, which `cantrip sim` plays hundreds of times. |
 | [`corpus`](corpus) | Effects from nine existing games, re-created under our own names, one content file and one test file per game. [Coverage](../docs/coverage.md) says which the language writes directly, which need a workaround and which it cannot express yet. |
 
@@ -24,7 +25,7 @@ dotnet run --project src/Cantrip.Cli -- test samples/basic
 dotnet run --project src/Cantrip.Cli -- lint samples/basic
 ```
 
-Put `samples/recipes`, `samples/abilities`, `samples/slice` or `samples/corpus` in place of `samples/basic` for the others. `test` runs every test and prints PASS or FAIL for each; `lint` checks the files for mistakes a test might not reach. Both end with a count, and `lint` reports notes as well as errors and warnings: a note is information, not a failure. `lint` fails only on errors unless you add `--warnings-as-errors`, as CI does.
+Put `samples/recipes`, `samples/abilities`, `samples/board`, `samples/slice` or `samples/corpus` in place of `samples/basic` for the others. `test` runs every test and prints PASS or FAIL for each; `lint` checks the files for mistakes a test might not reach. Both end with a count, and `lint` reports notes as well as errors and warnings: a note is information, not a failure. `lint` fails only on errors unless you add `--warnings-as-errors`, as CI does.
 
 Load one folder at a time. The folders define some of the same names, such as `Strength`, so loading two together fails with error CT0110, "already defined".
 
@@ -34,7 +35,7 @@ In a project that has the tool installed, as the [quickstart](../docs/quickstart
 
 ## Simulating a sample
 
-`samples/slice` and `samples/abilities` each hold a `scenario`: a deck, some fights in order, and whatever happens between them, played many times by a bot.
+`samples/slice`, `samples/abilities` and `samples/board` each hold a `scenario`: a deck, some fights in order, and whatever happens between them, played many times by a bot.
 
 ```
 dotnet run --project src/Cantrip.Cli -- sim samples/slice

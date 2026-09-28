@@ -5,13 +5,13 @@
 enemy "Raider"
   hp 30
   move "Hack":
-    deal 4 to highest position enemies
+    deal 4 to highest rank enemies
 
 actor "Train Steward"
   hp 5
   attack 5
   on turn_end:
-    deal attack to lowest position enemies
+    deal attack to lowest rank enemies
 
 # --- 1. ref Rage: +2 attack per stack, loses a stack each turn -------------------------------------
 
@@ -51,7 +51,7 @@ actor "Brawler"
   attack 3
   on turn_end:
     repeat 1 + self.Multistrike:
-      deal attack to lowest position enemies
+      deal attack to lowest rank enemies
 
 # --- 5. ref Slay: triggers when the unit lands a killing blow ----------------------------------------
 
@@ -59,7 +59,7 @@ actor "Headsman"
   hp 8
   attack 10
   on turn_end:
-    deal attack to lowest position enemies
+    deal attack to lowest rank enemies
   on killed(source:self):
     gain 5 gold to player
 

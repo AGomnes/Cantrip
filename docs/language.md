@@ -74,6 +74,7 @@ Content lives in `.cantrip` files. A folder loads every `.cantrip` file under it
 | `actor "Name"` | A generic actor; when created, it joins its creator's side |
 | `ability "Name"` | An ability with a cooldown, for real-time play |
 | `resource "stat"` | Bounds and reset rules for a stat |
+| `board "Name"` | The shape of the board a battle is fought on |
 | `verb name(params):` | A verb written in the DSL |
 | `ruleset` | Rules the content is written against |
 | `test "Name"` | A test run by `cantrip test` |
@@ -97,6 +98,7 @@ What each declaration reads, beyond the listeners, modifiers, `tags` and present
 | `enemy`, `actor` | `hp`, `phase`, `pattern`, `immune` | `move "Name":` |
 | `ability` | `cooldown` | `effect:` |
 | `resource` | `min`, `max`, `reset_to`, `reset_on` | none |
+| `board` | `lanes`, `ranks`, `facing`/`shared`, `metric`, `on_vacated`, `lane_word`, `rank_word` | none |
 
 `rarity` and `weight` are read by [`discover`](#built-in-verbs) on any kind of definition.
 
@@ -451,6 +453,48 @@ Real-time games create the runtime with a `TickClock` and call `runtime.Tick()` 
 
 An ability takes a `target` line and reads it exactly as a card does — the same four filters, in [Targets](#targets). `UseAbility` with no target settles one: with a single candidate it takes it, and with several it asks the chooser. An ability with nothing legal to aim at is refused with `InvalidTarget` and does not start its cooldown, rather than running at nobody. `cast Smite` in a [test](#tests) does the same.
 
+## Boards
+
+Every battle is fought on a board: a rectangle of **lanes** across and **ranks** along the facing axis, both counting from 0. An actor stands on one slot, and no two actors share one.
+
+```
+board "Train"
+  lanes 3
+  ranks 3
+  facing
+  metric manhattan
+  on_vacated gap
+  lane_word "floor"
+  rank_word "slot"
+```
+
+| Property | Values | Default |
+|---|---|---|
+| `lanes` | a whole number of 1 or more | `1` |
+| `ranks` | a whole number of 1 or more, or `unbounded` | `unbounded` |
+| `facing` / `shared` | written on its own, with nothing after it | `facing` |
+| `metric` | `manhattan`, `chebyshev` | `manhattan` |
+| `on_vacated` | `gap`, `close_ranks` | `gap` |
+| `lane_word`, `rank_word` | one word, for rules text | `lane`, `rank` |
+
+**Content that declares no board** is played on `lanes 1, ranks unbounded, facing, manhattan, gap`, which is the board every game had before boards existed. Nothing written against it moves.
+
+**`facing` or `shared`.** On a `facing` board each side has its own grid, mirrored, so rank 0 is the front for both and a rank never means the same place on both sides. Two actors in the same lane at rank 0, one on each side, are **one** step apart: across the sides the rank term is `a.rank + b.rank + 1`. On a `shared` board there is one grid for everyone, a rank is the same place whoever stands on it, and an actor on either side can take any free slot.
+
+**`metric`** decides how the lane term and the rank term combine: `manhattan` adds them, so a diagonal step is two; `chebyshev` takes the larger, so a diagonal step is one.
+
+**`on_vacated`** decides what the survivors do when a slot's occupant leaves. `gap` is the default: nobody moves, and the hole waits for the next thing put in it. `close_ranks` steps everyone behind it in that lane forward one rank.
+
+**Where a new actor lands.** `create` puts it in its creator's lane, on its own side, at the lowest free rank. If that lane is full, **nothing is made**: `created` binds empty, the trace says which lane was full, and the statements after it still run. That is a refusal, the way `play` on an empty pile is, rather than an error — and it is Monster Train's floor capacity with no new concept. A game that calls `SpawnEnemy` or `Instantiate` from C# takes the first lane with room.
+
+**A freed slot is reusable.** A dead actor leaves the board for the `dead` zone, so its slot is free and a later summon fills the hole rather than landing past it. That is what keeps an adjacency aura working across a death. Survivors still never shift unless the board says `close_ranks`.
+
+**Reading a place.** `it.lane` and `it.rank` are ordinary members, so `target enemy where it.rank <= 1` is a card whose reach is the front two ranks. `lowest rank enemies` and `highest rank enemies` sort by rank. `adjacent(x)` is the actors one step from `x` **on its own side**. `position` is what `rank` was called before a board had two axes: it reads the same number and keeps working for the whole of the 1.x line, with a note (CT329) suggesting the newer word. Assigning `lane`, `rank` or `position` is error CT328, because where an actor stands is a place and not a stat.
+
+**Picking one.** Content may declare any number of boards by name, and a game picks one per battle with `StartBattle(board: "Train")`; a `test` picks one with `board "Train"` in its setup, and with no board named a battle is fought on the first one declared. A name no `board` declares is refused rather than invented, because the linter has to know how deep a board is to say that `it.rank <= 3` on a two-rank board reaches everybody (CT327). Changing board mid-run keeps everyone who still fits exactly where they are and gives the rest the lowest free slot.
+
+See [`samples/board`](../samples/board) for a worked one.
+
 ## Resources
 
 A resource is a stat with bounds and reset rules. These are built in, and content can redeclare any of them:
@@ -743,13 +787,13 @@ A percentage is a **fraction to multiply by**, not a number of its own: `target.
 
 Percent values multiply as fractions: `10 * 50%` is 5. Division by zero gives 0.
 
-**Selectors.** `random N group` shuffles with the game's RNG and takes N. `lowest <stat> group` and `highest <stat> group` take the first by that stat, breaking ties by board position then id; with a single name (`lowest enemies`) the stat is `hp`. `other group` leaves out the running entity itself, and also the target when the target is in the group, or else the running entity's controller. In a modifier's `of` scope the running entity is the one the modifier is written on, so `modify attack of other allies where it.has(tag:goblin): +1` on a goblin leader buffs every other goblin but not the leader. A prefix word followed by nothing selectable (as in `pattern random`) is an ordinary name. `within` is passed to the host's `TryCall`; without a host that implements it, it is a runtime error.
+**Selectors.** `random N group` shuffles with the game's RNG and takes N. `lowest <stat> group` and `highest <stat> group` take the first by that stat, breaking ties by where an actor stands — lane, then rank — and then by id; with a single name (`lowest enemies`) the stat is `hp`. `other group` leaves out the running entity itself, and also the target when the target is in the group, or else the running entity's controller. In a modifier's `of` scope the running entity is the one the modifier is written on, so `modify attack of other allies where it.has(tag:goblin): +1` on a goblin leader buffs every other goblin but not the leader. A prefix word followed by nothing selectable (as in `pattern random`) is an ordinary name. `within` is passed to the host's `TryCall`; without a host that implements it, it is a runtime error.
 
 **Functions**: `min(a, b, ...)`, `max(...)`, `abs(n)`, `floor(n)`, `ceil(n)`, `round(n)`, `clamp(n, lo, hi)`, `count(group)`, `random(lo, hi)`, `adjacent(who)`, `has(who, predicate)`, `stacks(Status[, who])`. Methods: `who.has(predicate)`, `who.stacks(Status)`.
 
 `has` is true when the entity has the tag (directly or on an attached status), has a status of that name, or is that entity.
 
-**Members of an entity**: `dead`, `alive`, `removed`, `name`, `id`, `owner`, `source`, `controller`, `team`, `zone`, `position`, `intent`, `phase`, `statuses`, `kind`, a status name (its counter), a history name (`damage_taken_this_turn`), or any stat. Stats that nothing has set read as 0. `position` counts board slots from 0, so the front two slots are `position <= 1`. `intent` and `phase` are text, or `none`; compare them with a quoted string, as in `enemy.intent == "Chomp"`, or with `none` unquoted. `enemy.phase == "none"` is never true.
+**Members of an entity**: `dead`, `alive`, `removed`, `name`, `id`, `owner`, `source`, `controller`, `team`, `zone`, `lane`, `rank`, `position`, `intent`, `phase`, `statuses`, `kind`, a status name (its counter), a history name (`damage_taken_this_turn`), or any stat. Stats that nothing has set read as 0. `lane` and `rank` are where the entity stands on the [board](#boards), both counting from 0, so the front two ranks are `rank <= 1`; `position` is the older name for `rank` and reads the same number. `intent` and `phase` are text, or `none`; compare them with a quoted string, as in `enemy.intent == "Chomp"`, or with `none` unquoted. `enemy.phase == "none"` is never true.
 
 **Members of a group**: `count`, `size`, `length`, `first`, `last`, `empty`, `any`, or a stat, which sums it across the group (`enemies.hp`).
 
@@ -1269,6 +1313,7 @@ Codes with four digits come from reading and loading the files. An error among t
 | CT0111 | error | Two content verbs with the same name. | Rename one. |
 | CT0112 | warning | More than one `ruleset` is loaded. The last one loaded is used. | Keep one. |
 | CT0113 | error | An `event` or `encounter` declaration. Both words are reserved and do nothing yet. | Remove it. Encounters are the game's code for now. |
+| CT0114 | error | A `board` line the declaration cannot mean: a lane count of 0, an unknown `metric` or `on_vacated`, a word after `facing`, or a property no board reads. | Use a property from [Boards](#boards); the message says what that one takes and suggests the closest name. |
 | CT0201 | warning | An unknown ruleset setting. It is ignored. | Use a setting from [Rulesets](#rulesets); the message suggests the closest. |
 | CT0202 | error | An unknown value in `ordering` or `modifier_layers`. | Use the values listed under [Rulesets](#rulesets). |
 
@@ -1301,6 +1346,9 @@ Codes with four digits come from reading and loading the files. An error among t
 | CT323 | error | A named clause a built-in verb does not read, such as `block 8 for 2 turns`, `apply Poison 3 at target` or `deal 5 against enemy2`. The clause was dropped in silence, so the line read as one thing and did another. It is a runtime error too. A flag after a comma is not a clause and is never reported, and neither is a verb content declares or a game registers. | Write the clause the verb reads — the message names it, and [Built-in verbs](#built-in-verbs) has the table — or drop the clause. Some of them are not a spelling at all: block is not timed, and a heal happens once. `--suppress CT323`, or `LintOptions.HostVerbs`, for content that reaches a verb of that name another way. |
 | CT324 | error | A bare percentage where a built-in verb counts whole things, such as `apply Slow 40%`. The unit was dropped, so forty stacks were applied while the card's generated text said "Apply 40% Slow". It is a runtime error too. | Write the number (`apply Slow 40`), or a share of something (`deal target.max_hp * 40% to target`), which is what a percentage is for. |
 | CT325 | error | A length in units the game's clock cannot measure: `on every 1s:` or `for 3s` where the ruleset says `clock turns`, or `2 turns` where it says `clock ticks`. Only content that states its clock is checked. | Write the length in the units that clock measures, or change the `clock` setting. The message says which units the stated clock takes. |
+| CT327 | warning | A lane or rank compared against a number no [board](#boards) this game declares can hold, so the comparison is the same for every actor before the game runs: `it.lane == 4` on a three-lane board matches nobody, and `it.rank <= 3` on a three-rank board matches everybody and limits nothing. | Compare against a place the board has, counting from 0, or declare the board the rule is written for. |
+| CT328 | error | `lane`, `rank` or `position` assigned as if it were a stat. It wrote a stat nothing reads — the slot the actor stands on shadows it — so the line did nothing at all and said nothing about it. | Where an actor stands is a place, not a stat. Read it with `it.rank`; a game moves an actor with `GameState.Assign`. |
+| CT329 | note | `position` read, which is the older name for `rank`. | Nothing is wrong: it reads the same number and keeps working for the whole 1.x line. Write `rank` when you next touch the line. |
 
 **Descriptions**
 

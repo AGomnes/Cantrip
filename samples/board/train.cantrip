@@ -1,0 +1,110 @@
+# A fight on a board with more than one row: a Monster Train style train, three floors tall, with
+# room for three on each floor. Units are summoned onto the floor whoever summoned them is standing
+# on, they hold that floor, and a floor with no room turns a summon away instead of growing.
+#
+# Everything here is the board and nothing else: the units are plain actors, the cards are plain
+# cards, and the only new word in the file is `board`.
+#
+# Run:  dotnet run --project src/Cantrip.Cli -- test samples/board
+
+ruleset
+  clock turns
+
+# --- the board ------------------------------------------------------------------------------
+#
+# Two axes, both counting from 0: `lane` across and `rank` along the facing axis, where rank 0 is
+# the front. `facing` gives each side its own mirrored grid, so rank 0 means "at the front" for
+# both of them and no rank ever means the same place on both sides. `gap` is the default and is
+# written out here: when someone dies the survivors do not shift, and the hole waits to be filled.
+#
+# A train calls a lane a floor and a rank a slot, and says so, so its rules text reads like a
+# train's. The words change nothing about how anything is measured.
+
+board Train
+  lanes 3
+  ranks 3
+  facing
+  metric manhattan
+  on_vacated gap
+  lane_word "floor"
+  rank_word "slot"
+
+# The same fight in a corridor, for the other half of `on_vacated`: one lane, and when someone at
+# the front dies everybody behind steps forward. A game picks one board per battle, so declaring
+# two costs nothing until one is chosen.
+
+board Corridor
+  lanes 1
+  ranks 4
+  on_vacated close_ranks
+
+# --- the player's units ----------------------------------------------------------------------
+
+# An Imp hits whatever is at the front of the enemy's side. `lowest rank enemies` is the front:
+# ranks count from 0, and this is the same selector that has always been there, under the newer
+# of its two names.
+actor "Imp"
+  hp 6
+  attack 3
+  tags summoned
+  on turn_end:
+    deal attack to lowest rank enemies
+
+# A Sentinel makes the units beside it hit harder. `adjacent` is one step away on its own side, so
+# on this board that is the unit in front of it, the unit behind it, and the units on the floors to
+# either side — whatever the board's shape says is one step.
+actor "Sentinel"
+  hp 12
+  attack 2
+  tags summoned
+  modify attack of adjacent(self): +1
+  on turn_end:
+    deal attack to lowest rank enemies
+
+card "Summon Imp"
+  cost 1
+  text: "Summon an Imp on your floor."
+  effect:
+    create Imp
+
+card "Post a Sentinel"
+  cost 2
+  text: "Summon a Sentinel on your floor. Units beside it hit for 1 more."
+  effect:
+    create Sentinel
+
+# Reach written on the card, as a `where` on its own `target` line: `it` is the candidate and ranks
+# count from 0, so this reaches the front slot and nothing behind it. On a board three slots deep
+# the linter can tell that `it.rank <= 2` would reach everybody and say so; here it cannot.
+card "Pike"
+  cost 1
+  target enemy where it.rank <= 0
+  text: "Deal 6 to an enemy in the front slot."
+  effect:
+    deal 6 to target
+
+card "Sweep"
+  cost 2
+  text: "Deal 3 to every enemy beside the front one."
+  effect:
+    deal 3 to adjacent(lowest rank enemies)
+
+# --- what is climbing the train ----------------------------------------------------------------
+
+enemy "Crawler"
+  hp 8
+  attack 4
+  move "Gnaw":
+    deal attack to player
+
+# A brood mother puts her young on her own floor, and stops when it is full. Nothing in this
+# declaration says how many fit: the board does, and a summon that has nowhere to stand is turned
+# away — `created` comes back empty and the trace says which floor was full.
+enemy "Brood Mother"
+  hp 24
+  attack 3
+  pattern cycle Brood, Lash
+  move "Brood":
+    create Crawler
+  move "Lash":
+    deal attack to player

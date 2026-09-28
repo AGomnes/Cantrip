@@ -30,11 +30,19 @@ namespace Cantrip.Tests.Snapshots
     /// </remarks>
     public sealed class PublishedSaveTests
     {
-        /// <summary>The state hash the preview.5 build printed for the game it saved.</summary>
-        private const ulong Saved = 15834000141062751246UL;
+        /// <summary>The state hash this build computes for the game preview.5 saved.</summary>
+        /// <remarks>
+        /// It is not the number preview.5 itself printed, which was 15834000141062751246. A hash is
+        /// a fingerprint of the whole rules state, and 1.0 mixed two new facts into it: every actor
+        /// has a lane as well as a rank, and every game is played on a named board. So every hash
+        /// of every game moved at once, which <c>docs/stability.md</c> allows and the changelog
+        /// records. What may not move is the save, and that is what the rest of this file checks:
+        /// the restored game is the same game, on the one-lane board that <em>is</em> preview.5's.
+        /// </remarks>
+        private const ulong Saved = 2602745777152438152UL;
 
-        /// <summary>And the hash it printed after playing one more turn from there.</summary>
-        private const ulong OneTurnOn = 6355761473111257813UL;
+        /// <summary>And the hash after playing one more turn from there. Was 6355761473111257813.</summary>
+        private const ulong OneTurnOn = 16353394762656795743UL;
 
         [Fact]
         public void A_save_written_by_0_1_0_preview_5_restores_into_this_build()
@@ -56,6 +64,39 @@ namespace Cantrip.Tests.Snapshots
             Assert.Equal(5, restored.State.ZoneOf(restored.Player, Zones.Hand).Count);
             Assert.Equal(5, restored.State.ZoneOf(restored.Player, Zones.Draw).Count);
             Assert.Equal(5, restored.State.Actors(Team.Enemy).Single().GetInt("hp"));
+        }
+
+        /// <summary>
+        /// The 2 -> 3 step, on the only save on disk that can prove it: a game saved before boards
+        /// had two axes was played on one lane with no floor, so everyone in it stands in lane 0 on
+        /// the rank the save already recorded, and the board is the default one.
+        /// </summary>
+        [Fact]
+        public void A_save_from_before_boards_comes_back_on_the_default_board()
+        {
+            GameSnapshot save = Fixture("0.1.0-preview.5.save.json");
+            Assert.Equal(string.Empty, save.BoardName);
+            Assert.Null(save.Board);
+
+            CardRuntime restored = Fresh();
+            restored.Restore(save);
+
+            Assert.Equal(BoardShape.DefaultName, restored.State.Board.Name);
+            Assert.Equal(1, restored.State.Board.Lanes);
+            Assert.True(restored.State.Board.RanksAreUnbounded);
+            Assert.Equal(BoardSides.Facing, restored.State.Board.Sides);
+            Assert.Equal(BoardMetric.Manhattan, restored.State.Board.Metric);
+            Assert.Equal(OnVacated.Gap, restored.State.Board.OnVacated);
+
+            foreach (Entity actor in restored.State.Actors())
+            {
+                Assert.Equal(0, actor.Lane);
+                Assert.Equal(actor.Position, actor.Rank);
+            }
+
+            // The rank each actor stood on is the Position the save wrote, unchanged.
+            Assert.Equal(0, restored.Player!.Rank);
+            Assert.Equal(0, restored.State.Actors(Team.Enemy).Single().Rank);
         }
 
         [Fact]

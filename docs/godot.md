@@ -461,7 +461,8 @@ nothing will ever draw from, and answers no differently from the zone you meant.
 | `id`, `name` | Its id and its name in content |
 | `kind` | `"actor"`, `"card"`, `"status"`, `"relic"`, `"ability"`, `"keyword"`, `"item"` or `"global"` |
 | `team` | `"player"`, `"enemy"` or `"neutral"` |
-| `zone`, `position` | Where it is (see [Zones](#zones)) and its board slot |
+| `zone` | Where it is (see [Zones](#zones)) |
+| `lane`, `rank` | Where it stands on the board, both counting from 0. `position` is the older name for `rank` and carries the same number |
 | `alive`, `dead`, `removed` | A body still on the board is `dead`: neither alive nor removed |
 | `intent` | An enemy's next move, such as `"Claw"`; `""` before the battle starts |
 | `owner`, `source` | Whose it is (a card's player, a status's host) and who made or applied it; 0 for none |

@@ -24,7 +24,7 @@ namespace Cantrip.Runtime
         /// format up to its own: a save made by an earlier release loads here, brought forward by
         /// <see cref="Upgrade"/>, and only a save that needs a reader this build is not is refused.
         /// </summary>
-        public const int CurrentFormat = 2;
+        public const int CurrentFormat = 3;
 
         /// <summary>
         /// The oldest reader a save this build writes can be given to, which a reader compares
@@ -33,7 +33,7 @@ namespace Cantrip.Runtime
         /// so that adding an optional field can bump <see cref="CurrentFormat"/> — saying honestly
         /// that the shape changed — without locking every earlier build out of the save.
         /// </summary>
-        public const int CurrentMinimumReader = 2;
+        public const int CurrentMinimumReader = 3;
 
         /// <summary>
         /// The generator behind <see cref="Rng"/> in a save this build writes. A save that names
@@ -94,6 +94,20 @@ namespace Cantrip.Runtime
         public bool? Won { get; set; }
         public bool SkipNextDraw { get; set; }
 
+        /// <summary>
+        /// The board this battle is being fought on, by name. Empty in a save from before boards
+        /// existed, which <see cref="Upgrade"/> fills in with <see cref="BoardShape.DefaultName"/>.
+        /// </summary>
+        public string BoardName { get; set; } = string.Empty;
+
+        /// <summary>
+        /// The board's shape as it stood when the save was written. It is here so that a save is
+        /// self-describing — a game whose content no longer declares that board still loads and
+        /// plays on the board it was saved on — and so that a restore can say exactly what changed
+        /// when content has reshaped it underneath.
+        /// </summary>
+        public BoardSnapshot? Board { get; set; }
+
         public List<EntitySnapshot> Entities { get; set; } = new List<EntitySnapshot>();
         public List<ZoneSnapshot> Zones { get; set; } = new List<ZoneSnapshot>();
         public List<ScheduledSnapshot> Scheduled { get; set; } = new List<ScheduledSnapshot>();
@@ -124,14 +138,31 @@ namespace Cantrip.Runtime
         /// deserialized, and by recording who wrote the save, its minimum reader and the name of
         /// its generator — three things a format 1 save cannot know, and whose absence means
         /// exactly what it should: an unknown earlier writer, a reader as old as the format, and
-        /// the generator of the day. So this is a no-op with a place to put the next one, and the
-        /// tests that pin a format 1 save's restore are what prove that no-op is the truth.
+        /// the generator of the day. So that step is a no-op with a place to put the next one, and
+        /// the tests that pin a format 1 save's restore are what prove that no-op is the truth.
+        /// <para>
+        /// Format 2 became format 3 when a board grew a second axis. A format 2 save was played on
+        /// one lane with no floor, which is exactly <see cref="BoardShape.Default"/>, and every
+        /// actor in it stood at lane 0 on the rank its <c>Position</c> already records. So the step
+        /// is: lane 0 for everyone, the default board, and nothing else moves.
+        /// </para>
         /// </remarks>
         internal static void Upgrade(GameSnapshot snapshot)
         {
             if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
 
             // 1 -> 2: nothing to move.
+
+            // 2 -> 3: the board every save before this one was played on, spelled out.
+            if (snapshot.FormatVersion < 3)
+            {
+                snapshot.BoardName = BoardShape.DefaultName;
+                snapshot.Board = BoardSnapshot.Of(BoardShape.Default);
+                foreach (EntitySnapshot? record in snapshot.Entities ?? new List<EntitySnapshot>())
+                {
+                    if (record != null) record.Lane = 0;
+                }
+            }
 
             snapshot.FormatVersion = CurrentFormat;
             if (snapshot.MinimumReader > CurrentMinimumReader) snapshot.MinimumReader = CurrentMinimumReader;
@@ -172,8 +203,14 @@ namespace Cantrip.Runtime
         /// </summary>
         public string Zone { get; set; } = string.Empty;
 
-        /// <summary>Slot on the board. Not a place in <see cref="ZoneSnapshot.Entities"/>.</summary>
+        /// <summary>
+        /// Slot along the facing axis. Not a place in <see cref="ZoneSnapshot.Entities"/>. It keeps
+        /// the name format 1 gave it, because a save on disk is not renamed to suit a new word.
+        /// </summary>
         public int Position { get; set; }
+
+        /// <summary>Slot across the board. Zero in a save from before boards had two axes.</summary>
+        public int Lane { get; set; }
         public bool IsDead { get; set; }
         public bool IsRemoved { get; set; }
         public long Sequence { get; set; }
@@ -189,6 +226,40 @@ namespace Cantrip.Runtime
 
         /// <summary>Attached statuses and keywords, in attachment order.</summary>
         public List<int> Attached { get; set; } = new List<int>();
+    }
+
+    /// <summary>
+    /// The shape of the board a save was written on, as <see cref="BoardShape"/> means it. Written
+    /// beside the board's name so that a save says what it was played on and not only what that was
+    /// called, which is what lets a restore tell a reshaped board from a renamed one.
+    /// </summary>
+    public sealed class BoardSnapshot
+    {
+        public int Lanes { get; set; } = 1;
+
+        /// <summary>Zero for unbounded, as <see cref="BoardShape.Unbounded"/> means it.</summary>
+        public int Ranks { get; set; }
+
+        /// <summary><see cref="BoardSides"/> as a number.</summary>
+        public int Sides { get; set; }
+
+        /// <summary><see cref="BoardMetric"/> as a number.</summary>
+        public int Metric { get; set; }
+
+        /// <summary><see cref="Cantrip.Content.OnVacated"/> as a number.</summary>
+        public int OnVacated { get; set; }
+
+        internal static BoardSnapshot Of(BoardShape board) => new BoardSnapshot
+        {
+            Lanes = board.Lanes,
+            Ranks = board.Ranks,
+            Sides = (int)board.Sides,
+            Metric = (int)board.Metric,
+            OnVacated = (int)board.OnVacated,
+        };
+
+        internal BoardShape ToShape(string name) =>
+            new BoardShape(name, Math.Max(1, Lanes), Math.Max(0, Ranks), (BoardSides)Sides, (BoardMetric)Metric, (OnVacated)OnVacated);
     }
 
     /// <summary>One owner's zone and what is in it, in order.</summary>
@@ -365,6 +436,8 @@ namespace Cantrip.Runtime
                 NextSequence = _nextSequence,
                 NextScheduleId = _nextScheduleId,
                 ClockNow = Clock.Now,
+                BoardName = Board.Name,
+                Board = BoardSnapshot.Of(Board),
             };
 
             snapshot.Rng = Rng.GetState();
@@ -382,7 +455,8 @@ namespace Cantrip.Runtime
                     SourceId = entity.Source?.Id ?? 0,
                     Team = (int)entity.RawTeam,
                     Zone = entity.Zone,
-                    Position = entity.Position,
+                    Position = entity.Rank,
+                    Lane = entity.Lane,
                     IsDead = entity.IsDead,
                     IsRemoved = entity.IsRemoved,
                     Sequence = entity.Sequence,
@@ -466,6 +540,7 @@ namespace Cantrip.Runtime
             // refused save leaves the game in progress exactly as it was.
             CheckComplete(snapshot);
             CheckZonesAgree(snapshot);
+            BoardShape board = BoardFor(snapshot);
             var definitions = new EntityDefinition?[snapshot.Entities.Count];
             var ids = new HashSet<int>(snapshot.Entities.Count);
             for (int i = 0; i < snapshot.Entities.Count; i++)
@@ -528,8 +603,10 @@ namespace Cantrip.Runtime
             _entities.Clear();
             _byId.Clear();
             _zones.Clear();
+            _slots.Clear();
             _active.Clear();
             _scheduled.Clear();
+            _board = board;
 
             for (int i = 0; i < snapshot.Entities.Count; i++)
             {
@@ -558,7 +635,8 @@ namespace Cantrip.Runtime
 
                 entity.Team = (Team)record.Team;
                 entity.Zone = record.Zone ?? string.Empty;
-                entity.Position = record.Position;
+                entity.Lane = record.Lane;
+                entity.Rank = record.Position;
                 entity.IsDead = record.IsDead;
                 entity.IsRemoved = record.IsRemoved;
                 entity.Sequence = record.Sequence;
@@ -593,6 +671,14 @@ namespace Cantrip.Runtime
 
             foreach (ZoneSnapshot zone in snapshot.Zones)
                 MutableZone(Lookup(zone.OwnerId), zone.Zone).AddRange(zone.Entities.Select(id => Lookup(id) ?? throw Missing(id)));
+
+            // Who stands where, rebuilt from the slots the save records. The bounds were checked
+            // before anything was torn down, so nothing here can find an actor with nowhere to go.
+            foreach (Entity actor in ZoneOf(null, Zones.Board))
+            {
+                if (actor.Kind != EntityKind.Actor || actor.IsRemoved) continue;
+                _slots[Key(actor.Team, actor.Lane, actor.Rank)] = actor;
+            }
 
             Turn = snapshot.Turn;
             BattleNumber = snapshot.BattleNumber;
@@ -637,6 +723,52 @@ namespace Cantrip.Runtime
             RestoreListeners(snapshot.ListenerLimits, snapshot.ListenerDues);
 
             Touch();
+        }
+
+        /// <summary>
+        /// The board a save is continued on. Content decides, because a patch that reshapes a board
+        /// means the reshaped board — but only where everyone in the save still fits on it. An actor
+        /// standing outside the new bounds is a refusal naming the board, the way a missing
+        /// definition is a refusal naming the definition; growing a board loads fine, because
+        /// everybody who fitted still does. A board the content no longer declares at all falls back
+        /// to the shape the save itself carries, so a save is never stranded by an edit.
+        /// </summary>
+        private BoardShape BoardFor(GameSnapshot snapshot)
+        {
+            string name = string.IsNullOrEmpty(snapshot.BoardName) ? BoardShape.DefaultName : snapshot.BoardName;
+            BoardShape saved = snapshot.Board?.ToShape(name)
+                ?? (string.Equals(name, BoardShape.DefaultName, StringComparison.OrdinalIgnoreCase) ? BoardShape.Default : new BoardShape(name));
+
+            BoardShape? declared = Content.Board(name);
+            if (declared == null && string.Equals(name, BoardShape.DefaultName, StringComparison.OrdinalIgnoreCase))
+                declared = Content.Boards.Count == 0 ? BoardShape.Default : null;
+
+            if (declared == null || declared.SameShapeAs(saved)) return declared ?? saved;
+
+            string Reshaped(EntitySnapshot record, string why) =>
+                $"This save was played on board \"{name}\" ({saved.Describe()}), and the loaded content has reshaped it to " +
+                $"{declared.Describe()}. {record.Name} is standing at {declared.LaneWord} {record.Lane}, " +
+                $"{declared.RankWord} {record.Position}, {why}. The save was written by {Wrote(snapshot)}.";
+
+            var taken = new Dictionary<(int Side, int Lane, int Rank), EntitySnapshot>();
+            foreach (EntitySnapshot record in snapshot.Entities)
+            {
+                if ((EntityKind)record.Kind != EntityKind.Actor || record.IsRemoved) continue;
+                if (!string.Equals(record.Zone, Zones.Board, StringComparison.Ordinal)) continue;
+
+                if (!declared.Holds(record.Lane, record.Position))
+                    throw new InvalidOperationException(Reshaped(record, "which is off the new board"));
+
+                // Turning a facing board into a shared one folds the two sides onto one grid, where
+                // slots that were a side apart become the same slot. Two actors on one slot is not a
+                // board, so that is a refusal too, and for the same reason.
+                var key = (declared.Sides == BoardSides.Shared ? 0 : record.Team, record.Lane, record.Position);
+                if (taken.TryGetValue(key, out EntitySnapshot? already))
+                    throw new InvalidOperationException(Reshaped(record, $"where {already.Name} is also standing on the new board"));
+                taken[key] = record;
+            }
+
+            return declared;
         }
 
         /// <summary>

@@ -227,6 +227,15 @@ namespace Cantrip
             return ability;
         }
 
+        private ArgumentException NoSuchBoard(string name)
+        {
+            string? close = Suggest.Closest(name, Content.Boards.Select(b => b.Name));
+            return new ArgumentException(
+                $"No board named \"{name}\" is declared." + (close == null ? string.Empty : $" Did you mean \"{close}\"?") +
+                $" A board is content, not something a game makes up at runtime: declare it with `board {name}`.",
+                "board");
+        }
+
         private EntityDefinition Require(string name, string kind)
         {
             EntityDefinition? definition = Content.Find(name, kind);
@@ -249,14 +258,26 @@ namespace Cantrip
         /// <c>battle_start</c> effect asks the player something: the whole call is rolled back and
         /// runs again from <see cref="Answer(int[])"/>.
         /// </returns>
-        public ActionResult StartBattle(bool shuffle = true, bool drawOpeningHand = true) =>
+        /// <param name="board">
+        /// The board to fight this battle on, by name, or null to keep the one in play — which
+        /// before the first battle is <see cref="ContentLibrary.DefaultBoard"/>. Content owns the
+        /// shapes: a name no <c>board</c> declaration matches is refused rather than invented,
+        /// because the linter has to know how deep a board is to check what reaches across it.
+        /// </param>
+        public ActionResult StartBattle(bool shuffle = true, bool drawOpeningHand = true, string? board = null) =>
             Attempt(
-                () => { StartBattleCore(shuffle, drawOpeningHand); return ActionResult.Played; },
-                () => { StartBattle(shuffle, drawOpeningHand); return Outcome(); });
+                () => { StartBattleCore(shuffle, drawOpeningHand, board); return ActionResult.Played; },
+                () => { StartBattle(shuffle, drawOpeningHand, board); return Outcome(); });
 
-        private void StartBattleCore(bool shuffle, bool drawOpeningHand)
+        private void StartBattleCore(bool shuffle, bool drawOpeningHand, string? board)
         {
             Entity player = State.Player ?? throw new InvalidOperationException("Create a player before starting a battle.");
+
+            if (board != null)
+            {
+                BoardShape shape = Content.Board(board) ?? throw NoSuchBoard(board);
+                State.UseBoard(shape);
+            }
 
             State.ResetBattleHistory();
             State.BattleNumber++;

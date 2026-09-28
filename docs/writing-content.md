@@ -891,7 +891,7 @@ test "Polymorph keeps the seat and the identity"
   player energy 9
   play Polymorph on enemy2
   expect enemy2.name == "Sheepling"
-  expect enemy2.position == 1
+  expect enemy2.rank == 1
   expect enemy2.intent == "Baa"
 ```
 

@@ -81,7 +81,7 @@ Content: [monster_train.cantrip](../samples/corpus/monster_train.cantrip). Tests
 | 7 | Summon | Recruiter's Bell | Works | `on created(kind:actor)` |
 | 8 | Incant | Acolyte | Works | `on card_played(tag:spell)` |
 | 9 | Burnout | Burnout | Works | Decays each turn and kills its host after the last one |
-| 10 | Floors and capacity | | Not expressible | There is one board row per side. Multiple floors, per-floor capacity and moving units between floors need a richer board model |
+| 10 | Floors and capacity | | Not expressible | Floors and per-floor capacity are expressible since 1.0: a `board` with `lanes 3, ranks 3`, where a summon lands on its summoner's floor and a full floor turns one away, as [`samples/board`](../samples/board) does. What is still missing is moving a unit from one floor to another, which is the third of the three things this row asks for, so it stays here until that lands. The corpus file is written against the default board |
 
 ## Hearthstone
 
@@ -93,7 +93,7 @@ Content: [hearthstone.cantrip](../samples/corpus/hearthstone.cantrip). Tests: [h
 | 2 | Leper Gnome (Deathrattle) | Plague Gnome | Works | `on self.died: deal 2 to all enemies` |
 | 3 | Elven Archer (Battlecry) | Elven Archer | Works | The card's effect summons the minion and pings |
 | 4 | Kobold Geomancer (Spell Damage) | Kobold Geomancer | Works | `modify damage of enemies where tag:spell, source:player`. Naming a scope is how an outward modifier is written here, as War Banner does; without one it would be anchored to the minion itself |
-| 5 | Dire Wolf Alpha (adjacency aura) | Dire Wolf | Works | `modify attack of adjacent(self): +1` |
+| 5 | Dire Wolf Alpha (adjacency aura) | Dire Wolf | Works | `modify attack of adjacent(self): +1`. Until 1.0 this silently stopped working across a death: a minion summoned after a neighbour died landed one slot past the hole rather than in it, so it stood two slots from the wolf and got nothing. A freed slot is reusable now, and survivors still do not shift |
 | 6 | Knife Juggler | Knife Juggler | Workaround | A listener that becomes active during an event hears it, so the Juggler must leave its own summon out. `not target:self` says it as a filter rather than a guard in the body, but it still has to be said. `new_listeners: miss_the_event` drops the filter for a game that wants that rule throughout; the corpus keeps it, because one ruleset covers all nine games loaded together |
 | 7 | Minion combat | `trade` verb | Works | The `attack` verb makes each creature the source of its own hit. A content verb still spells the trade out, which is where combat rules belong |
 | 8 | Taunt | Taunt | Works | `modify targetable of allies where source:enemies, not it.has(Taunt): set 0`. The `targetable` channel is asked before anything is pointed at somebody — a card's target, the `attack` verb, an enemy's move — so a taunt binds a minion's swing as well as a card, and the chooser is only offered what passes |
@@ -192,7 +192,7 @@ Content: [darkest_dungeon.cantrip](../samples/corpus/darkest_dungeon.cantrip). T
 | 3 | Rally | Rally | Works | `lose 25 stress`, which the resource's floor stops below zero |
 | 4 | Bleed | Bleeding, Lash | Works | `decay 1 on turn_end` beside a `turn_end` listener; the listener sees the stacks before they tick down |
 | 5 | Death's Door | Faltering | Works | `on instead_of_died(target:owner) once per battle: heal 1 to owner` |
-| 6 | Rank-limited skills | Pike | Works | `target enemy where it.position <= 1` — the skill's own reach written on the skill, with `it` the candidate and positions counting from zero. Until 1.0 this was a `targetable` modifier that had to name its own card (`card:Pike`), because without that the limit bound every card played while this one sat in hand |
+| 6 | Rank-limited skills | Pike | Works | `target enemy where it.rank <= 1` — the skill's own reach written on the skill, with `it` the candidate and ranks counting from zero. Until 1.0 this was a `targetable` modifier that had to name its own card (`card:Pike`), because without that the limit bound every card played while this one sat in hand |
 | 7 | Camping between fights | | Not expressible | Camping happens between battles, and nothing models a run of battles with stress and health carried across them. The same shape as Inscryption's candles |
 | 8 | Virtue or affliction | Breaking Point | Works | `discover 1 statuses where tag:affliction or tag:virtue, weighted`. Offering one candidate is a pick with nothing to decide, so nobody is asked; "rarely a virtue" is a weight of 1 against three 5s |
 
@@ -202,7 +202,7 @@ What the language cannot say yet, ranked by how many rows of the tables above ea
 
 | Gap | What is missing | Rows | What works today |
 |---|---|---|---|
-| 12 | **Space and richer boards.** Actors have board slots, not positions in space, and each side has one row. | Dota 2 #6, #7; Monster Train #10 | Slots and `adjacent(target)`. `within` parses, and a game can give it a meaning through its host's `TryCall`. |
+| 12 | **Space, and reaching across a board.** A board is a rectangle of lanes and ranks since 1.0, so floors and capacity are expressible; what is missing is the words content uses to reach across one — `within`, `lane(...)`, `rank(...)`, `distance(...)` and a `range` on an action — and any way for content to move an actor. Nothing here is ever positions in space. | Dota 2 #6, #7; Monster Train #10 | A declared [`board`](language.md#boards) of any size, `it.lane` and `it.rank`, `lowest rank enemies`, `adjacent(target)` and per-lane capacity. `within` parses, and a game can give it a meaning through its host's `TryCall`. |
 | 15 | **Costs in several currencies, or paid by a sacrifice.** A cost is one amount in one resource. | Magic #7; Inscryption #6; Dominion #7 | A cost in a named resource, `cost 2 bones`. A sacrifice written into the effect, which cannot refuse the play. |
 | 5 | **Effects as values.** Nothing can copy another entity's effects, or switch them off. `copy` duplicates an entity's *state* — its live stats, tags and statuses — which is a different thing. | Balatro #6; Hearthstone #9 | `copy` for an entity's state. Nothing for its effects. |
 | 17 | **A run above the battle.** A battle is the outermost thing content can see: nothing carries lives, candles or stress from one battle to the next, and `once per run` is the only nod to runs. | Inscryption #8; Darkest Dungeon #7 | The game carries hp, deck and relics between battles in its own code, as [Winning, losing and several battles](csharp.md#winning-losing-and-several-battles) shows. `cantrip sim` plays a gauntlet a `scenario` states; it does not generate one. |
@@ -240,8 +240,8 @@ Rules that are stated in the language reference but still catch authors out, mos
 - **A modifier without `of` applies to what it is written on:** on a card, to that card's own damage. See [Modifiers](language.md#modifiers).
 - **In the `where` of a modifier's `of` group, a bare qualifier tests the value being computed.** Write `it.has(tag:goblin)` to test the candidate. See [Modifiers](language.md#modifiers).
 - **`other` leaves out the entity the modifier is written on,** so `of other allies` on a goblin leader buffs every goblin but the leader. See [Expressions](language.md#expressions).
-- **There is no `card:self`.** A card whose *modifier* needs a rule about itself names itself. A card whose *reach* is the rule writes it on its own `target` line instead, as in `target enemy where it.position <= 1`. See [Qualifiers](language.md#qualifiers) and [Targets](language.md#targets).
-- **Board positions count from 0,** so the front two slots are `position <= 1`. See [Expressions](language.md#expressions).
+- **There is no `card:self`.** A card whose *modifier* needs a rule about itself names itself. A card whose *reach* is the rule writes it on its own `target` line instead, as in `target enemy where it.rank <= 1`. See [Qualifiers](language.md#qualifiers) and [Targets](language.md#targets).
+- **A place on the board is a `lane` across and a `rank` along, both counting from 0,** so the front two ranks are `rank <= 1`. `position` is the older name for `rank` and reads the same number. See [Boards](language.md#boards).
 - **`draw` draws for the controller, and a creature controls itself,** so a creature draws for the player with `draw 1 to player`. See [Built-in verbs](language.md#built-in-verbs).
 - **`discover` offers from everything loaded,** not only from the card's own file. Give a pool a tag of its own. See [Built-in verbs](language.md#built-in-verbs).
 - **`player` is always the game's player,** whichever side is acting. See [Names](language.md#names).

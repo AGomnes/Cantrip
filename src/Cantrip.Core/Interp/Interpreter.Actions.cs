@@ -702,7 +702,7 @@ namespace Cantrip.Runtime
         }
 
         /// <summary>Creates cards, relics or actors from a definition, per the <c>create</c> verb.</summary>
-        public Entity Create(EntityDefinition definition, Entity? owner, string? zone, EvalContext context) =>
+        public Entity? Create(EntityDefinition definition, Entity? owner, string? zone, EvalContext context) =>
             Materialise(
                 definition,
                 owner,
@@ -723,7 +723,7 @@ namespace Cantrip.Runtime
         /// original happens to sit in, which would drop a copied power straight into <c>powers</c> as
         /// a second active power nobody played, and a copied exhausted card into the exhaust pile.
         /// </remarks>
-        public Entity Copy(Entity original, string? zone, EvalContext context)
+        public Entity? Copy(Entity original, string? zone, EvalContext context)
         {
             if (original == null) throw new ArgumentNullException(nameof(original));
 
@@ -753,7 +753,7 @@ namespace Cantrip.Runtime
         /// <paramref name="copyOf"/> is the original, for a copy: it rides along on the event as
         /// <c>copy_of</c>.
         /// </remarks>
-        private Entity Materialise(
+        private Entity? Materialise(
             EntityDefinition definition,
             Entity? owner,
             Team? side,
@@ -763,6 +763,7 @@ namespace Cantrip.Runtime
             Func<Entity?, Team, string, Entity> make)
         {
             Entity? made = null;
+            bool noRoom = false;
             var gameEvent = new GameEvent("created") { Source = context.Source };
             if (copyOf != null) gameEvent.Data["copy_of"] = Value.FromEntity(copyOf);
 
@@ -775,7 +776,29 @@ namespace Cantrip.Runtime
                         // An enemy always joins the enemy side; a generic actor joins whoever made it.
                         Team team = side ?? DeclaredSide(definition, context);
 
-                        made = make(null, team, Zones.Board);
+                        // A new actor goes in its maker's lane, on its own side, at the lowest free
+                        // rank. A lane with no room makes nothing at all: `created` binds empty and
+                        // the trace says so, the way `play` on an empty pile is a refusal rather
+                        // than an error. That is Monster Train's floor capacity with no new concept.
+                        // The room is checked here rather than before the event, because a
+                        // `before created:` listener that summons something can fill the lane.
+                        int lane = LaneOfMaker(context);
+                        if (!State.HasRoom(team, lane))
+                        {
+                            noRoom = true;
+                            State.Trace.Record(
+                                State.Clock.Now,
+                                "refused",
+                                $"no room for {definition.Name}: {State.Board.LaneWord} {lane} of board \"{State.Board.Name}\" is full",
+                                context.Self?.ToString(),
+                                span: context.Self?.Definition?.Syntax.Span ?? SourceSpan.None);
+                            return;
+                        }
+
+                        using (State.PlacingInLane(lane))
+                        {
+                            made = make(null, team, Zones.Board);
+                        }
                         if (!made.HasStat("block")) made.SetBase("block", Num.Zero);
                         break;
                     }
@@ -791,12 +814,29 @@ namespace Cantrip.Runtime
                 if (made.Kind == EntityKind.Card) gameEvent.Card = made;
             });
 
+            if (noRoom) return null;
+
             if (made == null)
                 throw new RuntimeError($"Creating {definition} was replaced, so there is nothing to return.", context.Self?.Definition?.Syntax.Span ?? SourceSpan.None);
 
             // A summon or split mid-battle acts on the next enemy turn, like any other enemy.
             if (made.Kind == EntityKind.Actor && State.InBattle) RollIntent(made);
             return made;
+        }
+
+        /// <summary>
+        /// The lane a summon arrives in: its maker's, when whoever is running this is standing on
+        /// the board, and otherwise lane 0 — which on the default one-lane board is every lane there
+        /// is, so nothing written before boards existed notices this rule at all.
+        /// </summary>
+        private int LaneOfMaker(EvalContext context)
+        {
+            foreach (Entity? candidate in new[] { context.Self?.Controller, context.Source?.Controller, context.Controller })
+            {
+                if (candidate != null && candidate.Kind == EntityKind.Actor && candidate.Zone == Zones.Board)
+                    return candidate.Lane;
+            }
+            return 0;
         }
 
         /// <summary>The side a freshly declared actor joins: an enemy is always an enemy, a generic actor joins its maker.</summary>

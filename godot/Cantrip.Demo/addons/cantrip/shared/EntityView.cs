@@ -120,7 +120,8 @@ namespace Cantrip.GodotAdapter
             string kind,
             string team,
             string zone,
-            int position,
+            int lane,
+            int rank,
             bool alive,
             bool dead,
             bool removed,
@@ -137,7 +138,8 @@ namespace Cantrip.GodotAdapter
             Kind = kind;
             Team = team;
             Zone = zone;
-            Position = position;
+            Lane = lane;
+            Rank = rank;
             Alive = alive;
             Dead = dead;
             Removed = removed;
@@ -163,8 +165,17 @@ namespace Cantrip.GodotAdapter
         /// <summary>Where it lives: board, hand, draw, discard, exhaust, play, powers, relics, attached, dead, or empty.</summary>
         public string Zone { get; }
 
-        /// <summary>Board slot, which is what adjacency reads. Zero for anything not on the board.</summary>
-        public int Position { get; }
+        /// <summary>Slot across the board. Zero on a one-lane board, and for anything not on it.</summary>
+        public int Lane { get; }
+
+        /// <summary>
+        /// Slot along the facing axis, which together with <see cref="Lane"/> is where this actor
+        /// stands and what adjacency reads. Zero for anything not on the board.
+        /// </summary>
+        public int Rank { get; }
+
+        /// <summary>What <see cref="Rank"/> was called before a board had two axes. The same number.</summary>
+        public int Position => Rank;
 
         public bool Alive { get; }
 
@@ -214,7 +225,8 @@ namespace Cantrip.GodotAdapter
                 Words.KindName(entity.Kind),
                 Words.TeamName(entity.Team),
                 entity.Zone,
-                entity.Position,
+                entity.Lane,
+                entity.Rank,
                 entity.IsAlive,
                 entity.IsDead,
                 entity.IsRemoved,

@@ -12,8 +12,8 @@ Cantrip.Runtime.ScheduledSnapshot.BlockAddress.get -> string?
 Cantrip.Runtime.ScheduledSnapshot.BlockAddress.set -> void
 Cantrip.Runtime.ScheduledSnapshot.UntilEvent.get -> string?
 Cantrip.Runtime.ScheduledSnapshot.UntilEvent.set -> void
-const Cantrip.Runtime.GameSnapshot.CurrentFormat = 2 -> int
-const Cantrip.Runtime.GameSnapshot.CurrentMinimumReader = 2 -> int
+const Cantrip.Runtime.GameSnapshot.CurrentFormat = 3 -> int
+const Cantrip.Runtime.GameSnapshot.CurrentMinimumReader = 3 -> int
 const Cantrip.Runtime.GameSnapshot.CurrentRng = "xoshiro256**" -> string!
 static Cantrip.Runtime.GameSnapshot.ReaderNeededBy(Cantrip.Runtime.GameSnapshot! snapshot) -> int
 static readonly Cantrip.Runtime.GameSnapshot.CurrentWriter -> string!
@@ -85,7 +85,7 @@ Cantrip.CardRuntime.EndTurn() -> Cantrip.ActionResult
 Cantrip.CardRuntime.Execute(string! statements, Cantrip.Runtime.Entity? self = null, Cantrip.Runtime.Entity? target = null) -> Cantrip.ActionResult
 Cantrip.CardRuntime.Play(Cantrip.Runtime.Entity! card, Cantrip.Runtime.Entity? target = null) -> Cantrip.ActionResult
 Cantrip.CardRuntime.Play(string! cardName, Cantrip.Runtime.Entity? target = null) -> Cantrip.ActionResult
-Cantrip.CardRuntime.StartBattle(bool shuffle = true, bool drawOpeningHand = true) -> Cantrip.ActionResult
+Cantrip.CardRuntime.StartBattle(bool shuffle = true, bool drawOpeningHand = true, string? board = null) -> Cantrip.ActionResult
 Cantrip.CardRuntime.UseAbility(Cantrip.Runtime.Entity! ability, Cantrip.Runtime.Entity? target = null) -> Cantrip.ActionResult
 *REMOVED*Cantrip.Content.Scenario
 *REMOVED*static Cantrip.Content.Scenario.Metrics.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
@@ -127,3 +127,72 @@ static Cantrip.Runtime.Zones.WellKnown.get -> System.Collections.Generic.IReadOn
 *REMOVED*Cantrip.CardRuntime.TargetMode(Cantrip.Runtime.Entity! card) -> string!
 Cantrip.CardRuntime.LegalTargets(Cantrip.Runtime.Entity! action) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
 Cantrip.CardRuntime.TargetMode(Cantrip.Runtime.Entity! action) -> string!
+*REMOVED*Cantrip.Runtime.Interpreter.Create(Cantrip.Content.EntityDefinition! definition, Cantrip.Runtime.Entity? owner, string? zone, Cantrip.Runtime.EvalContext! context) -> Cantrip.Runtime.Entity!
+*REMOVED*Cantrip.Runtime.Interpreter.Copy(Cantrip.Runtime.Entity! original, string? zone, Cantrip.Runtime.EvalContext! context) -> Cantrip.Runtime.Entity!
+Cantrip.Runtime.Interpreter.Create(Cantrip.Content.EntityDefinition! definition, Cantrip.Runtime.Entity? owner, string? zone, Cantrip.Runtime.EvalContext! context) -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.Interpreter.Copy(Cantrip.Runtime.Entity! original, string? zone, Cantrip.Runtime.EvalContext! context) -> Cantrip.Runtime.Entity?
+Cantrip.Content.BoardMetric
+Cantrip.Content.BoardMetric.Chebyshev = 1 -> Cantrip.Content.BoardMetric
+Cantrip.Content.BoardMetric.Manhattan = 0 -> Cantrip.Content.BoardMetric
+Cantrip.Content.BoardSides
+Cantrip.Content.BoardSides.Facing = 0 -> Cantrip.Content.BoardSides
+Cantrip.Content.BoardSides.Shared = 1 -> Cantrip.Content.BoardSides
+Cantrip.Content.OnVacated
+Cantrip.Content.OnVacated.CloseRanks = 1 -> Cantrip.Content.OnVacated
+Cantrip.Content.OnVacated.Gap = 0 -> Cantrip.Content.OnVacated
+Cantrip.Content.BoardShape
+Cantrip.Content.BoardShape.BoardShape(string! name, int lanes = 1, int ranks = 0, Cantrip.Content.BoardSides sides = Cantrip.Content.BoardSides.Facing, Cantrip.Content.BoardMetric metric = Cantrip.Content.BoardMetric.Manhattan, Cantrip.Content.OnVacated onVacated = Cantrip.Content.OnVacated.Gap, string? laneWord = null, string? rankWord = null) -> void
+Cantrip.Content.BoardShape.Describe() -> string!
+Cantrip.Content.BoardShape.HasLane(int lane) -> bool
+Cantrip.Content.BoardShape.HasRank(int rank) -> bool
+Cantrip.Content.BoardShape.Holds(int lane, int rank) -> bool
+Cantrip.Content.BoardShape.LaneWord.get -> string!
+Cantrip.Content.BoardShape.Lanes.get -> int
+Cantrip.Content.BoardShape.Metric.get -> Cantrip.Content.BoardMetric
+Cantrip.Content.BoardShape.Name.get -> string!
+Cantrip.Content.BoardShape.OnVacated.get -> Cantrip.Content.OnVacated
+Cantrip.Content.BoardShape.RankWord.get -> string!
+Cantrip.Content.BoardShape.Ranks.get -> int
+Cantrip.Content.BoardShape.RanksAreUnbounded.get -> bool
+Cantrip.Content.BoardShape.SameShapeAs(Cantrip.Content.BoardShape? other) -> bool
+Cantrip.Content.BoardShape.Sides.get -> Cantrip.Content.BoardSides
+const Cantrip.Content.BoardShape.DefaultName = "default" -> string!
+const Cantrip.Content.BoardShape.Unbounded = 0 -> int
+override Cantrip.Content.BoardShape.ToString() -> string!
+static Cantrip.Content.BoardShape.Default.get -> Cantrip.Content.BoardShape!
+Cantrip.Content.ContentLibrary.Board(string! name) -> Cantrip.Content.BoardShape?
+Cantrip.Content.ContentLibrary.Boards.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Content.BoardShape!>!
+Cantrip.Content.ContentLibrary.DefaultBoard.get -> Cantrip.Content.BoardShape!
+Cantrip.Runtime.Entity.Lane.get -> int
+Cantrip.Runtime.Entity.Rank.get -> int
+Cantrip.Runtime.Entity.Slot.get -> (int Lane, int Rank)
+Cantrip.Runtime.GameState.Assign(Cantrip.Runtime.Entity! actor, int lane, int rank) -> void
+Cantrip.Runtime.GameState.At(Cantrip.Team team, int lane, int rank) -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.GameState.Board.get -> Cantrip.Content.BoardShape!
+Cantrip.Runtime.GameState.CloseRanks(Cantrip.Team team, int lane, int vacated) -> void
+Cantrip.Runtime.GameState.Distance(Cantrip.Runtime.Entity! a, Cantrip.Runtime.Entity! b) -> int
+Cantrip.Runtime.GameState.HasRoom(Cantrip.Team team, int lane) -> bool
+Cantrip.Runtime.GameState.Neighbours(Cantrip.Runtime.Entity! actor) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.Runtime.GameState.UseBoard(Cantrip.Content.BoardShape! board) -> void
+Cantrip.Runtime.BoardSnapshot
+Cantrip.Runtime.BoardSnapshot.BoardSnapshot() -> void
+Cantrip.Runtime.BoardSnapshot.Lanes.get -> int
+Cantrip.Runtime.BoardSnapshot.Lanes.set -> void
+Cantrip.Runtime.BoardSnapshot.Metric.get -> int
+Cantrip.Runtime.BoardSnapshot.Metric.set -> void
+Cantrip.Runtime.BoardSnapshot.OnVacated.get -> int
+Cantrip.Runtime.BoardSnapshot.OnVacated.set -> void
+Cantrip.Runtime.BoardSnapshot.Ranks.get -> int
+Cantrip.Runtime.BoardSnapshot.Ranks.set -> void
+Cantrip.Runtime.BoardSnapshot.Sides.get -> int
+Cantrip.Runtime.BoardSnapshot.Sides.set -> void
+Cantrip.Runtime.EntitySnapshot.Lane.get -> int
+Cantrip.Runtime.EntitySnapshot.Lane.set -> void
+Cantrip.Runtime.GameSnapshot.Board.get -> Cantrip.Runtime.BoardSnapshot?
+Cantrip.Runtime.GameSnapshot.Board.set -> void
+Cantrip.Runtime.GameSnapshot.BoardName.get -> string!
+Cantrip.Runtime.GameSnapshot.BoardName.set -> void
+Cantrip.Content.EntityDefinition.IsThing.get -> bool
+const Cantrip.Linting.Linter.OffTheBoard = "CT327" -> string!
+const Cantrip.Linting.Linter.PlaceAssigned = "CT328" -> string!
+const Cantrip.Linting.Linter.PositionIsNowRank = "CT329" -> string!

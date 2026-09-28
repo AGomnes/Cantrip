@@ -114,6 +114,16 @@ namespace Cantrip.Runtime
         private readonly Dictionary<string, Num> _turnHistory = new Dictionary<string, Num>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Num> _battleHistory = new Dictionary<string, Num>(StringComparer.OrdinalIgnoreCase);
         private readonly List<ScheduledAction> _scheduled = new List<ScheduledAction>();
+
+        /// <summary>
+        /// Who stands where. One actor per slot, and the only account of it: <see cref="Entity.Lane"/>
+        /// and <see cref="Entity.Rank"/> are what this index is keyed by, so the two cannot drift
+        /// apart. An actor is in here exactly while it is in the <c>board</c> zone, alive or not — a
+        /// corpse that has not been buried yet is still standing in its slot.
+        /// </summary>
+        private readonly Dictionary<(int Side, int Lane, int Rank), Entity> _slots =
+            new Dictionary<(int, int, int), Entity>();
+
         private int _nextId = 1;
         private long _nextSequence = 1;
         private long _nextScheduleId = 1;
@@ -127,6 +137,7 @@ namespace Cantrip.Runtime
             Modifiers = new ModifierPipeline(this);
             Events = new EventBus();
             Trace = new TraceLog();
+            _board = content.DefaultBoard;
 
             // Modifiers can read `now`, so time passing is a state change like any other.
             clock.Advanced += _ => Touch();
@@ -150,6 +161,7 @@ namespace Cantrip.Runtime
         private Team _activeTeam = Team.Player;
         private bool _inBattle;
         private Entity? _player;
+        private BoardShape _board;
 
         // Modifiers can read `turn` and friends, so each of these bumps the version when it changes.
 
@@ -181,6 +193,60 @@ namespace Cantrip.Runtime
         {
             get => _player;
             internal set { if (_player != value) { _player = value; Touch(); } }
+        }
+
+        /// <summary>
+        /// The board this battle is fought on. Content owns the shapes; a game picks one per battle
+        /// with <see cref="CardRuntime.StartBattle"/>, and a game that names none is played on
+        /// <see cref="ContentLibrary.DefaultBoard"/>.
+        /// </summary>
+        public BoardShape Board => _board;
+
+        /// <summary>
+        /// Plays the rest of this battle on another board, moving anyone who no longer fits. Each
+        /// actor keeps its slot when the new shape has one free there; otherwise it takes the lowest
+        /// free slot in its own lane, and failing that the lowest free slot anywhere, so nobody is
+        /// ever lost. A board with no room at all for who is standing on it is refused by name.
+        /// </summary>
+        public void UseBoard(BoardShape board)
+        {
+            if (board == null) throw new ArgumentNullException(nameof(board));
+            if (ReferenceEquals(board, _board)) return;
+
+            // Everyone on the board, in the order they stand in, so the re-seating is deterministic
+            // and an actor that already fits never loses its slot to one that was behind it.
+            List<Entity> standing = ZoneOf(null, Zones.Board)
+                .Where(e => e.Kind == EntityKind.Actor && !e.IsRemoved)
+                .OrderBy(e => (int)e.Team).ThenBy(e => e.Lane).ThenBy(e => e.Rank).ThenBy(e => e.Id)
+                .ToList();
+
+            _slots.Clear();
+            _board = board;
+            Touch();
+
+            var homeless = new List<Entity>();
+            foreach (Entity actor in standing)
+            {
+                if (board.Holds(actor.Lane, actor.Rank) && !_slots.ContainsKey(Key(actor.Team, actor.Lane, actor.Rank)))
+                    _slots[Key(actor.Team, actor.Lane, actor.Rank)] = actor;
+                else
+                    homeless.Add(actor);
+            }
+
+            foreach (Entity actor in homeless)
+            {
+                (int Lane, int Rank)? slot = FreeSlot(actor.Team, actor.Lane) ?? FreeSlot(actor.Team, null);
+                if (slot == null)
+                {
+                    throw new InvalidOperationException(
+                        $"Board \"{board.Name}\" ({board.Describe()}) has no room for {actor}, which was standing at " +
+                        $"{board.LaneWord} {actor.Lane}, {board.RankWord} {actor.Rank}.");
+                }
+
+                actor.Lane = slot.Value.Lane;
+                actor.Rank = slot.Value.Rank;
+                _slots[Key(actor.Team, actor.Lane, actor.Rank)] = actor;
+            }
         }
 
         public IReadOnlyList<Entity> Entities => _entities;
@@ -405,8 +471,55 @@ namespace Cantrip.Runtime
             return list;
         }
 
+        private int? _placingInLane;
+
+        /// <summary>
+        /// Puts the next actor that goes onto the board in <paramref name="lane"/> rather than in the
+        /// first lane with room, until the returned scope is disposed. This is how a summon arrives
+        /// beside the thing that made it without every creation path having to carry a lane.
+        /// </summary>
+        internal IDisposable PlacingInLane(int lane)
+        {
+            int? before = _placingInLane;
+            _placingInLane = lane;
+            return new LaneScope(this, before);
+        }
+
+        private sealed class LaneScope : IDisposable
+        {
+            private readonly GameState _state;
+            private readonly int? _before;
+
+            public LaneScope(GameState state, int? before)
+            {
+                _state = state;
+                _before = before;
+            }
+
+            public void Dispose() => _state._placingInLane = _before;
+        }
+
         private void Place(Entity entity, string zone, bool toTop)
         {
+            Place(entity, zone, toTop, preferredLane: _placingInLane);
+        }
+
+        /// <summary>
+        /// The one place an entity is put anywhere. For an actor going onto the board that means a
+        /// slot search: the lowest free rank, in <paramref name="preferredLane"/> when one is named
+        /// and across the lanes in order when none is. It throws when there is no room, which the
+        /// callers that can meet a full board — <c>create</c> and <c>copy</c> — ask about first.
+        /// </summary>
+        private void Place(Entity entity, string zone, bool toTop, int? preferredLane)
+        {
+            (int Lane, int Rank)? slot = null;
+            if (entity.Kind == EntityKind.Actor && zone == Zones.Board)
+            {
+                slot = FreeSlot(entity.Team, preferredLane)
+                    ?? throw new InvalidOperationException(
+                        $"Board \"{Board.Name}\" ({Board.Describe()}) has no free slot for {entity}.");
+            }
+
             entity.Zone = zone ?? Zones.None;
             if (entity.Zone.Length > 0)
             {
@@ -415,15 +528,11 @@ namespace Cantrip.Runtime
                 else list.Add(entity);
             }
 
-            if (entity.Kind == EntityKind.Actor && entity.Zone == Zones.Board)
+            if (slot != null)
             {
-                // One past the highest live slot, so positions stay unique after a death.
-                int next = 0;
-                foreach (Entity mate in Actors(entity.Team))
-                {
-                    if (mate != entity) next = Math.Max(next, mate.Position + 1);
-                }
-                entity.Position = next;
+                entity.Lane = slot.Value.Lane;
+                entity.Rank = slot.Value.Rank;
+                _slots[Key(entity.Team, entity.Lane, entity.Rank)] = entity;
             }
 
             Touch();
@@ -434,7 +543,19 @@ namespace Cantrip.Runtime
         {
             if (entity.Zone.Length == 0) return;
             if (_zones.TryGetValue((ZoneOwner(entity)?.Id ?? 0, entity.Zone), out List<Entity>? list)) list.Remove(entity);
+
+            bool wasOnBoard = entity.Kind == EntityKind.Actor && entity.Zone == Zones.Board;
+            int lane = entity.Lane, rank = entity.Rank;
+            Team side = entity.Team;
+
             entity.Zone = Zones.None;
+
+            if (wasOnBoard && _slots.TryGetValue(Key(side, lane, rank), out Entity? standing) && standing == entity)
+            {
+                _slots.Remove(Key(side, lane, rank));
+                if (Board.OnVacated == OnVacated.CloseRanks) CloseRanks(side, lane, rank);
+            }
+
             Touch();
         }
 
@@ -442,7 +563,16 @@ namespace Cantrip.Runtime
         private static Entity? ZoneOwner(Entity entity) =>
             entity.Kind == EntityKind.Actor ? null : entity.Owner?.Controller;
 
-        /// <summary>Live actors on the board, optionally for one team, in position order.</summary>
+        /// <summary>
+        /// Live actors on the board, optionally for one side, ordered by <c>(lane, rank)</c> — which
+        /// is where they stand, and so the order a party takes its steps in and the order an area
+        /// effect reaches them in.
+        /// </summary>
+        /// <remarks>
+        /// It used to be insertion order, which its own summary already called position order; the
+        /// two agreed only because a new actor always landed past everyone. Now that a freed slot is
+        /// filled again, they do not, and where an actor stands is the answer that means something.
+        /// </remarks>
         public IReadOnlyList<Entity> Actors(Team? team = null)
         {
             var result = new List<Entity>();
@@ -452,8 +582,185 @@ namespace Cantrip.Runtime
                 if (team.HasValue && entity.Team != team.Value) continue;
                 result.Add(entity);
             }
+            result.Sort(BySlot);
             return result;
         }
+
+        /// <summary>Where an actor stands, then its id, so the order is total and deterministic.</summary>
+        private static int BySlot(Entity a, Entity b)
+        {
+            int lane = a.Lane.CompareTo(b.Lane);
+            if (lane != 0) return lane;
+            int rank = a.Rank.CompareTo(b.Rank);
+            return rank != 0 ? rank : a.Id.CompareTo(b.Id);
+        }
+
+        // The board ----------------------------------------------------------------------------
+
+        /// <summary>
+        /// Which grid a side stands on. A <c>facing</c> board gives each side its own, mirrored, so
+        /// rank 0 is the front for both; a <c>shared</c> board is one grid for everyone.
+        /// </summary>
+        private int Key(Team team) => Board.Sides == BoardSides.Shared ? 0 : (int)team;
+
+        private (int Side, int Lane, int Rank) Key(Team team, int lane, int rank) => (Key(team), lane, rank);
+
+        /// <summary>Who is standing on a slot, alive or not, or null when it is free.</summary>
+        public Entity? At(Team team, int lane, int rank) =>
+            _slots.TryGetValue(Key(team, lane, rank), out Entity? standing) ? standing : null;
+
+        /// <summary>
+        /// The lowest free rank in <paramref name="lane"/>, or — when no lane is named — the lowest
+        /// free rank in the first lane that has one. Null when there is no room at all.
+        /// </summary>
+        private (int Lane, int Rank)? FreeSlot(Team team, int? lane)
+        {
+            if (lane.HasValue)
+            {
+                if (!Board.HasLane(lane.Value)) return null;
+                int? rank = FreeRank(team, lane.Value);
+                return rank == null ? null : (lane.Value, rank.Value);
+            }
+
+            for (int l = 0; l < Board.Lanes; l++)
+            {
+                int? rank = FreeRank(team, l);
+                if (rank != null) return (l, rank.Value);
+            }
+            return null;
+        }
+
+        private int? FreeRank(Team team, int lane)
+        {
+            int side = Key(team);
+
+            // An unbounded lane is only ever as deep as what is standing in it, so one rank past
+            // every occupied slot in the game is certainly free: the search has a floor either way.
+            int floor = Board.RanksAreUnbounded ? _slots.Count + 1 : Board.Ranks;
+            for (int rank = 0; rank < floor; rank++)
+            {
+                if (!_slots.ContainsKey((side, lane, rank))) return rank;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Whether a side has a free slot in a lane, which is what <c>create</c> asks before it makes
+        /// anything: a lane with no room refuses the summon rather than making an actor with nowhere
+        /// to stand.
+        /// </summary>
+        public bool HasRoom(Team team, int lane) => FreeRank(team, lane) != null;
+
+        /// <summary>
+        /// Puts an actor on a slot. Assigning a slot someone else is standing on <em>swaps</em> the
+        /// two: total, deterministic, and its own inverse, which is what lets a rollback put a board
+        /// back exactly as it was.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException">The slot is not one this board has.</exception>
+        public void Assign(Entity actor, int lane, int rank)
+        {
+            if (actor == null) throw new ArgumentNullException(nameof(actor));
+            if (actor.Kind != EntityKind.Actor || actor.Zone != Zones.Board)
+                throw new ArgumentException($"{actor} is not an actor on the board, so it has no slot.", nameof(actor));
+            if (!Board.Holds(lane, rank))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(lane),
+                    $"Board \"{Board.Name}\" ({Board.Describe()}) has no {Board.LaneWord} {lane}, {Board.RankWord} {rank}.");
+            }
+
+            if (actor.Lane == lane && actor.Rank == rank) return;
+
+            Entity? sitting = At(actor.Team, lane, rank);
+            (int Lane, int Rank) from = (actor.Lane, actor.Rank);
+
+            _slots.Remove(Key(actor.Team, from.Lane, from.Rank));
+            actor.Lane = lane;
+            actor.Rank = rank;
+            _slots[Key(actor.Team, lane, rank)] = actor;
+
+            if (sitting != null && sitting != actor)
+            {
+                sitting.Lane = from.Lane;
+                sitting.Rank = from.Rank;
+                _slots[Key(sitting.Team, from.Lane, from.Rank)] = sitting;
+            }
+
+            Touch();
+        }
+
+        /// <summary>
+        /// Steps everyone behind <paramref name="vacated"/> in a lane forward one rank. This is what
+        /// <c>on_vacated close_ranks</c> asks for; the default is <c>gap</c>, where survivors never
+        /// move and the hole waits for the next thing put in it.
+        /// </summary>
+        public void CloseRanks(Team team, int lane, int vacated)
+        {
+            int side = Key(team);
+            List<Entity> behind = _slots
+                .Where(s => s.Key.Side == side && s.Key.Lane == lane && s.Key.Rank > vacated)
+                .Select(s => s.Value)
+                .OrderBy(e => e.Rank)
+                .ToList();
+
+            if (behind.Count == 0) return;
+
+            foreach (Entity actor in behind) _slots.Remove((side, lane, actor.Rank));
+            int next = vacated;
+            foreach (Entity actor in behind)
+            {
+                actor.Rank = next++;
+                _slots[(side, lane, actor.Rank)] = actor;
+            }
+            Touch();
+        }
+
+        /// <summary>
+        /// How many steps apart two actors are, in slots, by the board's metric.
+        /// </summary>
+        /// <remarks>
+        /// On a <c>facing</c> board the two sides are mirrored, so a rank means a different place on
+        /// each: across the sides the rank term is <c>a.rank + b.rank + 1</c>, which makes two
+        /// front-rank actors one step apart however deep the board is. Within one side, and on a
+        /// <c>shared</c> board — where a rank is the same place for everyone — it is the plain
+        /// metric over <c>(lane, rank)</c>. Anything not standing on the board has no distance to
+        /// anything, and gets <see cref="int.MaxValue"/>.
+        /// </remarks>
+        public int Distance(Entity a, Entity b)
+        {
+            if (a == null) throw new ArgumentNullException(nameof(a));
+            if (b == null) throw new ArgumentNullException(nameof(b));
+            if (!OnBoard(a) || !OnBoard(b)) return int.MaxValue;
+            if (a == b) return 0;
+
+            int lanes = Math.Abs(a.Lane - b.Lane);
+            int ranks = Board.Sides == BoardSides.Facing && a.Team != b.Team
+                ? a.Rank + b.Rank + 1
+                : Math.Abs(a.Rank - b.Rank);
+
+            return Board.Metric == BoardMetric.Chebyshev ? Math.Max(lanes, ranks) : lanes + ranks;
+        }
+
+        /// <summary>
+        /// The live actors one step from this one, <em>on its own side</em>. This is what
+        /// <c>adjacent</c> is built from, and it is deliberately no wider: reaching across the board
+        /// is what <see cref="Distance"/> is for.
+        /// </summary>
+        public IReadOnlyList<Entity> Neighbours(Entity actor)
+        {
+            if (actor == null) throw new ArgumentNullException(nameof(actor));
+            if (!OnBoard(actor)) return Array.Empty<Entity>();
+
+            var result = new List<Entity>();
+            foreach (Entity other in Actors(actor.Team))
+            {
+                if (other != actor && Distance(actor, other) == 1) result.Add(other);
+            }
+            return result;
+        }
+
+        private static bool OnBoard(Entity entity) =>
+            entity.Kind == EntityKind.Actor && entity.Zone == Zones.Board && !entity.IsRemoved;
 
         // Activation ---------------------------------------------------------------------------
 
@@ -689,6 +996,15 @@ namespace Cantrip.Runtime
             Mix(InBattle ? 1 : 0);
             Mix(Player?.Id ?? 0);
             Mix(Clock.Now);
+
+            // The board decides who can reach whom and where the next summon lands, so two games on
+            // different boards have different futures and must never hash the same.
+            MixText(Board.Name);
+            Mix(Board.Lanes);
+            Mix(Board.Ranks);
+            Mix((long)Board.Sides);
+            Mix((long)Board.Metric);
+            Mix((long)Board.OnVacated);
             foreach (ulong word in Rng.GetState()) Mix((long)word);
 
             foreach (Entity entity in _entities)
@@ -703,7 +1019,8 @@ namespace Cantrip.Runtime
                 Mix(entity.Owner?.Id ?? 0);
                 Mix(entity.Source?.Id ?? 0);
                 Mix((long)entity.RawTeam);
-                Mix(entity.Position);
+                Mix(entity.Lane);
+                Mix(entity.Rank);
                 Mix(entity.PatternIndex);
                 MixText(entity.Intent ?? string.Empty);
                 MixText(entity.LastMove ?? string.Empty);

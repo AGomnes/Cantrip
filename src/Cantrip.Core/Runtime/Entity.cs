@@ -54,7 +54,8 @@ namespace Cantrip.Runtime
         private Entity? _source;
         private Team _team;
         private string _zone = string.Empty;
-        private int _position;
+        private int _lane;
+        private int _rank;
         private bool _isDead;
         private bool _isRemoved;
         private string? _intent;
@@ -93,12 +94,38 @@ namespace Cantrip.Runtime
             internal set => Set(ref _zone, value ?? string.Empty);
         }
 
-        /// <summary>Slot on the board, used by adjacency selectors. Unique among an actor's live teammates.</summary>
+        /// <summary>
+        /// Slot across the board, counting from 0. Always 0 on a one-lane board, which is what
+        /// content that declares no board is played on.
+        /// </summary>
+        public int Lane
+        {
+            get => _lane;
+            internal set => Set(ref _lane, value);
+        }
+
+        /// <summary>
+        /// Slot along the facing axis, counting from 0. On a <c>facing</c> board rank 0 is the front
+        /// — nearest the other side — and a rank never means the same place on both sides.
+        /// </summary>
+        public int Rank
+        {
+            get => _rank;
+            internal set => Set(ref _rank, value);
+        }
+
+        /// <summary>
+        /// What <see cref="Rank"/> was called before a board had two axes. It is an alias, not a
+        /// second number, and it keeps working for the whole 1.x line.
+        /// </summary>
         public int Position
         {
-            get => _position;
-            internal set => Set(ref _position, value);
+            get => Rank;
+            internal set => Rank = value;
         }
+
+        /// <summary>The slot an actor stands on, as a pair. Zero for anything not on the board.</summary>
+        public (int Lane, int Rank) Slot => (Lane, Rank);
 
         public bool IsDead
         {
@@ -240,7 +267,8 @@ namespace Cantrip.Runtime
             Owner = null;
             Source = null;
             Zone = string.Empty;
-            Position = 0;
+            Lane = 0;
+            Rank = 0;
             IsDead = false;
             IsRemoved = false;
             PatternIndex = 0;

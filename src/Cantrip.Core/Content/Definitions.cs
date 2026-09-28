@@ -178,6 +178,14 @@ namespace Cantrip.Content
         /// <summary>The keyword it was declared with: <c>card</c>, <c>status</c>, <c>relic</c>...</summary>
         public string KindName { get; }
 
+        /// <summary>
+        /// Whether this declares something the game can make one of, rather than a rule about the
+        /// game. <c>resource</c> names a stat and <c>board</c> names a shape: nothing is instantiated
+        /// from either, neither has rules text, and no card can name one. So both are left out
+        /// wherever definitions are listed, suggested or described.
+        /// </summary>
+        public bool IsThing => KindName != "resource" && KindName != "board";
+
         public EntityKind Kind { get; }
         public IReadOnlyList<string> Tags { get; }
         public IReadOnlyList<ListenerNode> Listeners { get; }

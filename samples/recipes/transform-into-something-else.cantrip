@@ -39,11 +39,11 @@ test "Polymorph keeps the seat, the identity and the side"
   hand Polymorph
   player hp 80
   player energy 9
-  expect enemy2.position == 1
+  expect enemy2.rank == 1
   play Polymorph on enemy2
   expect enemies.count == 3
   expect enemy2.name == "Sheepling"
-  expect enemy2.position == 1
+  expect enemy2.rank == 1
   expect enemy2.hp == 1
   expect enemy2.has(tag:meek)
   expect not enemy2.has(tag:big)

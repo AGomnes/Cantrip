@@ -84,6 +84,8 @@ namespace Cantrip.GodotAdapter
                 ["team"] = view.Team,
                 ["zone"] = view.Zone,
                 ["position"] = view.Position,
+                ["lane"] = view.Lane,
+                ["rank"] = view.Rank,
                 ["alive"] = view.Alive,
                 ["dead"] = view.Dead,
                 ["removed"] = view.Removed,

@@ -1,0 +1,148 @@
+# Tests for the train: where a summon lands, what happens when a floor is full, what a freed slot
+# does, and what `adjacent` and a rank-limited card reach on a board with more than one row.
+
+test "board a summon takes the lowest free slot on its summoner's floor"
+  player hp 40
+  enemy Crawler
+  hand "Summon Imp", "Summon Imp"
+  player energy 4
+  play "Summon Imp"
+  expect allies.count == 2
+  play "Summon Imp"
+  expect allies.count == 3
+
+# The player stands at the front of floor 0 and three fit on a floor, so two Imps fill it. The
+# third has nowhere to stand: nothing is made, `created` is empty, and the card is not an error.
+test "board a floor with no room turns a summon away rather than growing"
+  player hp 40
+  player energy 9
+  enemy Crawler
+  hand "Summon Imp", "Summon Imp", "Summon Imp"
+  play "Summon Imp"
+  play "Summon Imp"
+  expect allies.count == 3
+  play "Summon Imp"
+  expect allies.count == 3
+
+# A dead unit leaves the board, so its slot is free and the next summon fills the hole instead of
+# landing past it. Before 1.0 the row grew instead, and a unit summoned after a death stood one
+# slot further out than it should have.
+test "board a freed slot is filled by the next summon"
+  player hp 40
+  player energy 9
+  enemy Crawler hp 40
+  hand "Summon Imp", "Summon Imp", "Summon Imp"
+  play "Summon Imp"
+  play "Summon Imp"
+  expect allies.count == 3
+
+  # Two Imps have the same hp, and the tie breaks on where they stand, so this is the one in slot
+  # 1 — leaving a hole with a survivor behind it, which is the case the old rule got wrong.
+  kill lowest allies
+  expect allies.count == 2
+  expect allies.last.rank == 2
+
+  play "Summon Imp"
+  expect allies.count == 3
+
+  # The survivor never shifted, and every slot on the floor is taken again.
+  expect allies.last.rank == 2
+
+# And the aura reaches into the refilled hole, which is the whole reason a freed slot is reusable:
+# a Sentinel's neighbours are the slots beside it, and a unit that landed past a corpse was not in
+# one of them.
+test "board a sentinel buffs the unit that fills the hole beside it"
+  player hp 40
+  player energy 9
+  enemy Crawler hp 40
+  hand "Summon Imp", "Post a Sentinel", "Summon Imp"
+  play "Summon Imp"
+  play "Post a Sentinel"
+  expect allies.count == 3
+  expect allies.last.name == "Sentinel"
+
+  # The player holds slot 0, the Imp slot 1 and the Sentinel slot 2. The Imp is beside the
+  # Sentinel, so it hits for 4 rather than its printed 3: 0 + 4 + 2 across the three of them.
+  expect allies.attack == 6
+
+  # The Imp has the least hp of the three, so killing it leaves a hole in the middle of the floor
+  # with a survivor standing behind it.
+  kill lowest allies
+  expect allies.count == 2
+  expect allies.attack == 2
+
+  # The new Imp fills the hole, so it stands beside the Sentinel and is buffed in its turn. Before
+  # a freed slot could be filled again it landed past the Sentinel and got nothing.
+  play "Summon Imp"
+  expect allies.count == 3
+  expect allies.last.name == "Sentinel"
+  expect allies.last.rank == 2
+  expect allies.attack == 6
+
+test "board a card can reach the front slot and nothing behind it"
+  player hp 40
+  player energy 9
+  enemy Crawler lane 0 rank 0
+  enemy Crawler lane 0 rank 1
+  hand Pike
+  expect enemy1.rank == 0
+  expect enemy2.rank == 1
+  play Pike on enemy1
+  expect enemy1.hp == 2
+  expect enemy2.hp == 8
+
+test "board the brood mother puts her young on her own floor"
+  player hp 40
+  enemy "Brood Mother" lane 2 rank 0
+  expect enemy1.lane == 2
+  expect enemy1.intent == "Brood"
+  end turn
+  expect enemies.count == 2
+  expect enemies.last.name == "Crawler"
+  expect enemies.last.lane == 2
+  expect enemies.last.rank == 1
+
+# Three fit on a floor, so she broods twice and then has nowhere to put a third. The move still
+# runs, and still costs her the turn: a full floor is a refusal, not an error.
+test "board a brood mother stops when her floor is full"
+  player hp 40
+  enemy "Brood Mother" lane 1 rank 0
+  end turn
+  end turn
+  end turn
+  end turn
+  expect enemies.count == 3
+
+# `close_ranks` is the other answer, and it is a property of the board rather than of anybody on
+# it. In the corridor the survivors step forward when the front one dies.
+test "board a corridor closes ranks when the front one dies"
+  board Corridor
+  player hp 40
+  enemy Crawler lane 0 rank 0
+  enemy Crawler lane 0 rank 1
+  enemy Crawler lane 0 rank 2
+  expect enemy3.rank == 2
+  kill enemy1
+  expect enemy2.rank == 0
+  expect enemy3.rank == 1
+
+# `position` is what a rank was called before a board had a floor as well, and it keeps working:
+# the same number, under the older name, for the whole of the 1.x line.
+test "board position still reads the rank it always did"
+  player hp 40
+  enemy Crawler lane 0 rank 2
+  expect enemy1.rank == 2
+  expect enemy1.position == 2
+  expect enemy1.lane == 0
+
+test "board sweeping hits the units beside the front one"
+  player hp 40
+  player energy 9
+  enemy Crawler lane 0 rank 0 hp 20
+  enemy Crawler lane 0 rank 1 hp 20
+  enemy Crawler lane 1 rank 0 hp 20
+  hand Sweep
+  play Sweep
+  expect enemy1.hp == 20
+  expect enemy2.hp == 17
+  expect enemy3.hp == 17
