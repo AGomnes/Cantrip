@@ -138,13 +138,38 @@ card "Whirlwind"
 | `cost N` | Energy to play. Goes through the `cost` modifier channel. |
 | `cost x` | Spends all energy; the effect sees the amount as `x`. |
 | `cost N <resource>` | Paid in that resource instead of energy: `cost 2 bones`. The card is refused when the payer has too little, exactly as it would be for energy, and `cost x bones` spends all of it. Declare the resource with `resource` so its bounds are known. |
-| `target enemy` | Needs a living enemy. With one enemy it is chosen automatically; with several, the chooser picks. |
-| `target ally` | Needs a living ally; defaults to the player. |
-| `target self` | Targets the player. |
+| `target enemy` | Needs a living enemy. With one candidate it is chosen automatically; with several, the chooser picks. |
+| `target ally` | Needs a living ally. With one candidate — a party of one, so usually the player — it is chosen automatically; with several, the chooser picks. |
+| `target self` | Targets the player. Not a choice, so nothing is asked about it. |
 | `target any` | Any living actor, or none. |
+| `target <side> where <filter>` | The same, narrowed to the candidates the filter accepts. See [Targets](#targets). |
 | (none) | No target. |
 
-A card that names a target also consults the [`targetable`](#modifiers) channel, which is how content adds its own rules to target selection, such as a taunt. The `attack` verb and an enemy's move ask the same channel, so a taunt means one thing wherever something is pointed at somebody.
+### Targets
+
+Everything that is pointed at somebody settles who that is the same way: a card, an [ability](#abilities-and-real-time), an enemy's move, and the [`attack`](#built-in-verbs) verb. A candidate has to pass all four of these, in this order:
+
+1. **Side, and alive.** What the `target` word names: `enemy`, `ally`, `self` or `any`.
+2. **Reach.** Nothing narrows a target by distance yet; this is where that will go.
+3. **The action's own `where` filter**, if it has one.
+4. **The [`targetable`](#modifiers) channel**, which is how content adds rules from somewhere other than the action itself: a taunt, a stealth.
+
+```
+card "Pike"
+  cost 1
+  target enemy where it.position <= 1
+  tags attack
+  effect:
+    deal 5 to target
+```
+
+`it` is the candidate, so `it.position`, `it.hp` and `it.has(Burn)` all read the one being considered. It is an ordinary [`where`](#expressions), so a bare qualifier such as `tag:undead` tests the candidate too — unlike the same words inside a `targetable` modifier, where a bare qualifier tests the card being played. `self` is the card or ability; `source` is whoever is using it.
+
+This is how a card states a rule about its own reach. The alternative was a `targetable` modifier that had to name its own card, because a modifier written on a card in hand otherwise binds every card played while it sits there, and there is no `card:self`.
+
+An action whose filter leaves nobody has no legal target, which means what it always meant: the card cannot be played, and the ability is refused.
+
+Area and random effects are not target selection and ask none of this. `deal 3 to enemies` reaches a stealthed minion, and one a reach limit could not be pointed at, exactly as it always has.
 
 Tags with built-in behaviour:
 
@@ -414,9 +439,17 @@ ability "Frost Nova"
   cooldown 8s
   effect:
     apply Chill 1 for 3s to enemies
+
+ability "Smite"
+  cooldown 2 turns
+  target enemy
+  effect:
+    deal 8 to target
 ```
 
 Real-time games create the runtime with a `TickClock` and call `runtime.Tick()` from their fixed timestep. `GrantAbility` attaches an ability to an actor; `UseAbility` runs it if it is off cooldown and starts the cooldown. Durations with `s` or `ms` convert to ticks on a tick clock; `turns` convert on a turn clock. Using seconds on a turn clock is an error when the line runs, and error CT325 at lint for content that states its [`clock`](#rulesets). A cooldown goes through the [`cooldown` modifier channel](#modifiers), so content can shorten it.
+
+An ability takes a `target` line and reads it exactly as a card does — the same four filters, in [Targets](#targets). `UseAbility` with no target settles one: with a single candidate it takes it, and with several it asks the chooser. An ability with nothing legal to aim at is refused with `InvalidTarget` and does not start its cooldown, rather than running at nobody. `cast Smite` in a [test](#tests) does the same.
 
 ## Resources
 
@@ -593,15 +626,16 @@ status "Taunt"
 
 While that is attached, the other side's `target enemy` cards may only be pointed at something that also has Taunt, and so may the other side's `attack` and its enemies' moves. Write the predicate as `not it.has(Taunt)` rather than a comparison with the owner, so that two taunting entities leave each other available instead of cancelling out. `source:enemies` is what keeps a taunt from constraining its own side's cards.
 
-Three things ask.
+Four things ask, and they ask through the one function described under [Targets](#targets).
 
 - **A card's target.** Only the `target` words that name someone: `enemy`, `ally` and `any`. `target self` is not a choice, so nothing is asked of it. The chooser is offered only the candidates that pass, so a rule narrows what a player may pick rather than making the play fail, and a card left with nothing to point at is refused as `InvalidTarget`.
+- **An ability's target.** The same, for the same reasons. An ability with nothing legal to aim at is refused and its cooldown does not start.
 - **The `attack` verb.** `attack enemy` swings only at what the attacker may be pointed at. Everything named being untouchable is a rules outcome and not a mistake: the swing lands nowhere, and `into` binds 0.
 - **An enemy's move.** The move keeps the target it was handed whenever that target is still legal, and otherwise goes to the first entity on that side which is — which is what a taunt is. An enemy whose every option is hidden still takes its turn, against the one it was going to hit.
 
 Area and random effects use the selectors under [Expressions](#expressions) and are not filtered, so a blast still reaches what a card may not single out — which is the rule these games actually have. Inside a move, likewise, only the target the move is *handed* moves; a `deal 5 to all enemies` in its body reaches whoever it reaches.
 
-Because the query carries the card being played, a `where` on the group must write `it.` to mean the candidate: a bare `tag:` there tests the card, not the entity being considered. An enemy's move carries no card, so a rule scoped with `card:` — such as a card that limits its own reach — never binds one.
+Because the query carries the card being played, a `where` on the group must write `it.` to mean the candidate: a bare `tag:` there tests the card, not the entity being considered. An enemy's move carries no card, so a rule scoped with `card:` never binds one. A card that wants a rule about *itself* writes it on its own `target` line instead, where there is nothing to name: see [Targets](#targets).
 
 **Cooldowns.** `cooldown` is a channel as well, so content can shorten what an ability waits:
 
@@ -885,7 +919,7 @@ card "Havoc"
 
 **A refusal the rules allow is not an error.** An empty pile, a Curse, a cost the payer cannot afford, no legal target, a card already in `play` or `powers`: nothing happens, `played` is `none`, and the trace says so. That is what lets "play the top card of your draw pile" be written once and not crash the first time the top card is a Curse. `played` is bound before anything else, so the name always exists.
 
-**Targeting never prompts.** `on <target>` if written, exactly as written; otherwise the effect's own target, but only where the card could legally be pointed at it — a `play` inside a listener inherits whatever that event happened to be about, which is usually the actor whose turn started or the card that was drawn, and a hint the card cannot take is dropped rather than allowed to refuse the play; otherwise, for a `target enemy` or `target ally` card, one **at random** from the legal targets, rolled from the game's own RNG — so the roll replays and saves like any other, and one candidate costs no roll. The roll goes through the `targetable` channel, so a Taunt binds an automatic play exactly as it binds a hand-played one. A `target self` card is aimed at the controller, and a card with no legal target is not played.
+**Targeting never prompts.** `on <target>` if written, exactly as written; otherwise the effect's own target, but only where the card could legally be pointed at it — a `play` inside a listener inherits whatever that event happened to be about, which is usually the actor whose turn started or the card that was drawn, and a hint the card cannot take is dropped rather than allowed to refuse the play; otherwise, for a `target enemy` or `target ally` card, one **at random** from the legal targets, rolled from the game's own RNG — so the roll replays and saves like any other, and one candidate costs no roll. The roll picks from [the same legal targets](#targets) a player would be offered, so a Taunt, or the card's own `target … where`, binds an automatic play exactly as it binds a hand-played one. A `target self` card is aimed at the controller, and a card with no legal target is not played.
 
 A card played by another card's effect **extends that effect's chain**, so a `once per chain` limit counts one chain across the whole cascade rather than restarting at every play. A card that plays a card that plays a card is fine; direct recursion stops at `max_call_depth` (64) with an error that says what happened. A nested play does not drain the outer effect's queued triggers — they resolve after the outer effect, as they would without it.
 

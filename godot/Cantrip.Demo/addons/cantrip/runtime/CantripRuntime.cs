@@ -521,7 +521,7 @@ namespace Cantrip.GodotAdapter
         }
 
         /// <summary>
-        /// What the card asks to be aimed at: whatever word content wrote after <c>target</c>,
+        /// What the card or ability asks to be aimed at: whatever word content wrote after <c>target</c>,
         /// usually "enemy", "ally", "self", "any" or "none". Empty, rather than "none", for an id
         /// that names nothing, so a UI can tell a stale id from a card that needs no target.
         /// </summary>
@@ -533,8 +533,9 @@ namespace Cantrip.GodotAdapter
         }
 
         /// <summary>
-        /// The entities that card may be aimed at after content's <c>targetable</c> rules, so a UI
-        /// highlights exactly what <c>Play</c> accepts.
+        /// The entities that card or ability may be aimed at, after its own <c>target … where</c>
+        /// filter and content's <c>targetable</c> rules, so a UI highlights exactly what <c>Play</c>
+        /// and <c>UseAbility</c> accept.
         /// </summary>
         public Godot.Collections.Array GetLegalTargets(int card_id)
         {

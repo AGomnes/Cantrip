@@ -31,8 +31,8 @@ The tables say what each effect needs. [What cannot be expressed yet](#open-gaps
 | Magic | 10 | 7 | 1 | 2 |
 | Inscryption | 8 | 6 | 1 | 1 |
 | Dominion | 8 | 5 | 1 | 2 |
-| Darkest Dungeon | 8 | 6 | 1 | 1 |
-| **Total** | **93** | **71** | **9** | **13** |
+| Darkest Dungeon | 8 | 7 | 0 | 1 |
+| **Total** | **93** | **72** | **8** | **13** |
 
 Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics. Inscryption models creatures the same way, with sigils as `keyword` definitions applied to them and bones as a declared `resource`. Dominion is treasure and victory cards as cards, with actions, buys and coins as declared resources that establish and refresh themselves each turn. Darkest Dungeon has heroes as actors, stress as a declared resource with bounds and no reset, and trinkets as `item` definitions.
 
@@ -192,7 +192,7 @@ Content: [darkest_dungeon.cantrip](../samples/corpus/darkest_dungeon.cantrip). T
 | 3 | Rally | Rally | Works | `lose 25 stress`, which the resource's floor stops below zero |
 | 4 | Bleed | Bleeding, Lash | Works | `decay 1 on turn_end` beside a `turn_end` listener; the listener sees the stacks before they tick down |
 | 5 | Death's Door | Faltering | Works | `on instead_of_died(target:owner) once per battle: heal 1 to owner` |
-| 6 | Rank-limited skills | Pike | Workaround | `modify targetable of enemies where card:Pike, it.position > 1: set 0` — reach as a targeting rule, positions counting from zero. The wart is that the card must name itself: the qualifier compares names and there is no `card:self`, so without it the limit would bind every card played while this one sat in hand |
+| 6 | Rank-limited skills | Pike | Works | `target enemy where it.position <= 1` — the skill's own reach written on the skill, with `it` the candidate and positions counting from zero. Until 1.0 this was a `targetable` modifier that had to name its own card (`card:Pike`), because without that the limit bound every card played while this one sat in hand |
 | 7 | Camping between fights | | Not expressible | Camping happens between battles, and nothing models a run of battles with stress and health carried across them. The same shape as Inscryption's candles |
 | 8 | Virtue or affliction | Breaking Point | Works | `discover 1 statuses where tag:affliction or tag:virtue, weighted`. Offering one candidate is a pick with nothing to decide, so nobody is asked; "rarely a virtue" is a weight of 1 against three 5s |
 
@@ -206,7 +206,7 @@ What the language cannot say yet, ranked by how many rows of the tables above ea
 | 15 | **Costs in several currencies, or paid by a sacrifice.** A cost is one amount in one resource. | Magic #7; Inscryption #6; Dominion #7 | A cost in a named resource, `cost 2 bones`. A sacrifice written into the effect, which cannot refuse the play. |
 | 5 | **Effects as values.** Nothing can copy another entity's effects, or switch them off. `copy` duplicates an entity's *state* — its live stats, tags and statuses — which is a different thing. | Balatro #6; Hearthstone #9 | `copy` for an entity's state. Nothing for its effects. |
 | 17 | **A run above the battle.** A battle is the outermost thing content can see: nothing carries lives, candles or stress from one battle to the next, and `once per run` is the only nod to runs. | Inscryption #8; Darkest Dungeon #7 | The game carries hp, deck and relics between battles in its own code, as [Winning, losing and several battles](csharp.md#winning-losing-and-several-battles) shows. `cantrip sim` plays a gauntlet a `scenario` states; it does not generate one. |
-| 3 | **Target rules beyond choosing a target.** There is no blocking step for a rule such as Flying, and no `card:self`. | Magic #8; Darkest Dungeon #6 | The `targetable` channel, asked by a card's target, the `attack` verb and an enemy's move. A card that limits its own reach names itself, as in `card:Pike`. |
+| 3 | **A blocking step.** There is no step in which one side's rule stops an attack from landing, as Flying needs. | Magic #8 | The `targetable` channel, asked wherever something is pointed at somebody, and `target … where` for an action's own reach. Neither of them can interpose on a swing that is already aimed. |
 | 18 | **A priority window.** Nothing lets one side respond to a card while it is being played. | Magic #5 | A permanent that commits in advance to countering the next spell, which is still cast and paid for. |
 | 8 | **Grouping over collections.** Counting by rank or suit, distinct values, runs. | Balatro #7 | `where` filters and `.count`. |
 | 9 | **Modifiers in source order.** Layers apply in a fixed order, not by the position of their sources, as Balatro's jokers need. It would be a ruleset option. | Balatro #5 | The fixed layer order, which `modifier_layers` can rearrange. |
@@ -221,7 +221,7 @@ The other workarounds are explained in their rows: Heavy Blade (Slay the Spire #
 
 - **1. Time-based triggers.** `on every 1s:` fires on the clock (Dota 2 #2, #8).
 - **2. Re-telegraphing when a phase changes.** `retelegraph` on a phase re-rolls the intent as the threshold is crossed (Slay the Spire #22). It is opt-in: see [Phases](language.md#phases).
-- **3, in part. Target validity.** The `targetable` channel is asked before anything is pointed at somebody — a card's target, the `attack` verb and an enemy's move — which is how a taunt and stealth are written (Hearthstone #8, #11). What is left open above is a blocking step and `card:self`.
+- **3, in part. Target validity.** Everything that is pointed at somebody — a card, an ability, the `attack` verb and an enemy's move — settles its target through one function, which asks the `targetable` channel (how a taunt and stealth are written: Hearthstone #8, #11) and the action's own `target … where` (how a reach limit is written: Darkest Dungeon #6). A card no longer has to name itself to have a rule about itself. What is left open above is a blocking step.
 - **7, in part. Definition pools.** `discover` offers content that nothing has been made from yet (Hearthstone #10, Darkest Dungeon #8). Since 0.1.0-preview.2 the player can answer the offer in a game, as with any other choice. The rest is open above.
 - **10. Cancellable resets.** `event.reset` marks a reset, so `if event.reset: cancel` keeps block across turns (Slay the Spire #9).
 - **11. Cooldown as a modifier channel.** `modify cooldown: x0.5` (Dota 2 #5).
@@ -240,7 +240,7 @@ Rules that are stated in the language reference but still catch authors out, mos
 - **A modifier without `of` applies to what it is written on:** on a card, to that card's own damage. See [Modifiers](language.md#modifiers).
 - **In the `where` of a modifier's `of` group, a bare qualifier tests the value being computed.** Write `it.has(tag:goblin)` to test the candidate. See [Modifiers](language.md#modifiers).
 - **`other` leaves out the entity the modifier is written on,** so `of other allies` on a goblin leader buffs every goblin but the leader. See [Expressions](language.md#expressions).
-- **There is no `card:self`.** A card that needs a rule about itself names itself. See [Qualifiers](language.md#qualifiers).
+- **There is no `card:self`.** A card whose *modifier* needs a rule about itself names itself. A card whose *reach* is the rule writes it on its own `target` line instead, as in `target enemy where it.position <= 1`. See [Qualifiers](language.md#qualifiers) and [Targets](language.md#targets).
 - **Board positions count from 0,** so the front two slots are `position <= 1`. See [Expressions](language.md#expressions).
 - **`draw` draws for the controller, and a creature controls itself,** so a creature draws for the player with `draw 1 to player`. See [Built-in verbs](language.md#built-in-verbs).
 - **`discover` offers from everything loaded,** not only from the card's own file. Give a pool a tag of its own. See [Built-in verbs](language.md#built-in-verbs).

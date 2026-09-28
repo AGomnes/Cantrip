@@ -48,6 +48,15 @@ test "Cleave wounds the Ghast and leaves it bleeding"
   expect enemy.hp == 22
   expect enemy.Bleed == 2
 
+# An ability reads its `target` line the way a card does, so `cast Cleave` with nobody named finds
+# the only Ghast. With two enemies it would ask; with none it would be refused rather than run at
+# nobody, which is what it used to do.
+test "Cleave finds the only enemy without being aimed"
+  enemy Ghast
+  grant Cleave
+  cast Cleave
+  expect enemy.hp == 22
+
 test "Bracing turns the Ghast's rake aside"
   player hp 40
   enemy Ghast

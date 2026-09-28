@@ -369,6 +369,23 @@ namespace Cantrip.Linting
                         case BlockMemberNode block:
                             _bodies.Add(new Body(BodyKind.Effect, block, definition) { Block = block.Body });
                             break;
+
+                        // `target enemy where it.position <= 1`: the filter is an expression the
+                        // rules evaluate per candidate, with `it` in focus, so its names are checked
+                        // the way a modifier's `where` is. The side word in front of it is not a name.
+                        case PropertyNode property when string.Equals(property.Name, "target", StringComparison.OrdinalIgnoreCase):
+                        {
+                            foreach (ExprNode value in property.Values)
+                            {
+                                for (ExprNode node = value; node is WhereExpr where; node = where.Source)
+                                {
+                                    var body = new Body(BodyKind.Modifier, property, definition);
+                                    body.Expressions.Add(where.Predicate);
+                                    _bodies.Add(body);
+                                }
+                            }
+                            break;
+                        }
                     }
                 }
             }
@@ -1805,10 +1822,13 @@ namespace Cantrip.Linting
         {
             foreach (Body body in _bodies)
             {
-                if (body.Kind != BodyKind.Effect || body.Owner?.Kind != EntityKind.Card) continue;
+                // An ability reads its `target` line the way a card does, so an unused one is the
+                // same mistake: it can now refuse the cast, and nothing is done with what it asked for.
+                if (body.Kind != BodyKind.Effect) continue;
+                if (body.Owner?.Kind != EntityKind.Card && body.Owner?.Kind != EntityKind.Ability) continue;
                 if (!(body.Anchor is BlockMemberNode { Name: "effect" })) continue;
 
-                string? target = body.Owner.Word("target");
+                string target = TargetRule.Of(body.Owner).Mode;
                 if (target != "enemy" && target != "ally" && target != "any") continue;
 
                 bool usesTarget = body.Facts.Names.Any(n => string.Equals(n.Name, "target", StringComparison.OrdinalIgnoreCase))

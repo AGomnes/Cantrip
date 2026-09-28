@@ -604,30 +604,27 @@ namespace Cantrip
         }
 
         /// <summary>
-        /// What the card asks to be aimed at: <c>enemy</c>, <c>ally</c>, <c>self</c>, <c>any</c>,
-        /// or <c>none</c> for a card with no <c>target</c> line.
+        /// What an action asks to be aimed at: <c>enemy</c>, <c>ally</c>, <c>self</c>, <c>any</c>,
+        /// or <c>none</c> for one with no <c>target</c> line. A card or an ability; both read their
+        /// <c>target</c> line the same way.
         /// </summary>
-        public string TargetMode(Entity card) => card.Definition?.Word("target") ?? "none";
+        public string TargetMode(Entity action) => TargetRule.Of(action.Definition).Mode;
 
         /// <summary>
-        /// The entities this card may be pointed at right now, in board order, after content's
-        /// <c>targetable</c> rules: exactly what <see cref="Play(Entity, Entity)"/> accepts. Empty for a card that
-        /// takes no target. A <c>target any</c> card may also be played at nothing, which this
-        /// list cannot say, so a UI that wants to offer that asks <see cref="TargetMode"/>.
+        /// The entities this action may be pointed at right now, in board order, after its own
+        /// <c>target … where</c> filter and content's <c>targetable</c> rules: exactly what
+        /// <see cref="Play(Entity, Entity)"/> and <see cref="UseAbility(Entity, Entity)"/> accept.
+        /// Empty for one that takes no target. A <c>target any</c> action may also be played at
+        /// nothing, which this list cannot say, so a UI that wants to offer that asks
+        /// <see cref="TargetMode"/>.
         /// </summary>
-        public IReadOnlyList<Entity> LegalTargets(Entity card)
+        /// <param name="action">A card or an ability.</param>
+        public IReadOnlyList<Entity> LegalTargets(Entity action)
         {
-            if (card == null) throw new ArgumentNullException(nameof(card));
+            if (action == null) throw new ArgumentNullException(nameof(action));
 
-            Entity player = card.Controller;
-            switch (TargetMode(card))
-            {
-                case "enemy": return Targetable(card, player, State.Actors(Opposing(player)));
-                case "ally": return Targetable(card, player, State.Actors(player.Team));
-                case "self": return new[] { player };
-                case "any": return Targetable(card, player, State.Actors());
-                default: return Array.Empty<Entity>();
-            }
+            TargetRule rule = TargetRule.Of(action.Definition);
+            return rule.Mode == "none" ? Array.Empty<Entity>() : Interpreter.LegalTargets(rule, action.Controller, action);
         }
 
         /// <summary>
@@ -642,14 +639,11 @@ namespace Cantrip
             if (card.HasTag("unplayable")) return false;
             if (!IsXCost(card) && card.Controller.GetInt(CostResourceOf(card)) < CostOf(card)) return false;
 
-            string mode = TargetMode(card);
-            return (mode != "enemy" && mode != "ally") || LegalTargets(card).Count > 0;
+            return !TargetRule.Of(card.Definition).NeedsSomeone || LegalTargets(card).Count > 0;
         }
 
-        private static Team Opposing(Entity actor) => actor.Team == Team.Enemy ? Team.Player : Team.Enemy;
-
-        /// <summary>Settles who a card is aimed at, and whether that target is legal.</summary>
-        /// <param name="card">The card being played.</param>
+        /// <summary>Settles who an action is aimed at, and whether that target is legal.</summary>
+        /// <param name="action">The card or ability being used.</param>
         /// <param name="target">The target given, if any; set to the one settled on.</param>
         /// <param name="automatic">
         /// True when nobody is choosing: the <c>play</c> verb playing a card out of a pile. The
@@ -657,47 +651,42 @@ namespace Cantrip
         /// of your draw pile" contradicts the verb's reason for existing. A target is rolled instead,
         /// from the game's own snapshotted RNG, so the roll replays and saves like any other.
         /// </param>
-        private bool TryResolveTarget(Entity card, ref Entity? target, bool automatic = false)
+        /// <remarks>
+        /// Which candidates there are is <see cref="Interpreter.LegalTargets(TargetRule, Entity, Entity)"/>'s
+        /// answer and nothing else's; what is left here is only what to do with the list — take the
+        /// one, ask, or roll. The ask happens inside the rolled-back action, so a target chosen
+        /// through a <see cref="DeferredChooser"/> is answer number one and replays in the same
+        /// place as any other choice the action goes on to make.
+        /// </remarks>
+        private bool TryResolveTarget(Entity action, ref Entity? target, bool automatic = false)
         {
-            Entity player = card.Controller;
-            Team opposing = Opposing(player);
+            Entity user = action.Controller;
+            TargetRule rule = TargetRule.Of(action.Definition);
 
-            switch (TargetMode(card))
+            switch (rule.Mode)
             {
                 case "enemy":
-                {
-                    if (target == null)
-                    {
-                        IReadOnlyList<Entity> enemies = Targetable(card, player, State.Actors(opposing));
-                        if (enemies.Count == 0) return false;
-                        target = enemies.Count == 1 ? enemies[0]
-                            : automatic ? enemies[State.Rng.NextInt(0, enemies.Count - 1)]
-                            : Chooser.Choose(new ChoiceRequest("choose a target", enemies, 1, 1, player, card.Definition!.Syntax.Span), State)?.FirstOrDefault(enemies.Contains) ?? enemies[0];
-                    }
-                    return target.Kind == EntityKind.Actor && target.IsAlive && target.Team == opposing && IsTargetable(card, player, target);
-                }
-
                 case "ally":
                 {
-                    if (target == null)
-                    {
-                        if (!automatic) target = player;
-                        else
-                        {
-                            IReadOnlyList<Entity> allies = Targetable(card, player, State.Actors(player.Team));
-                            if (allies.Count == 0) return false;
-                            target = allies.Count == 1 ? allies[0] : allies[State.Rng.NextInt(0, allies.Count - 1)];
-                        }
-                    }
-                    return target.Kind == EntityKind.Actor && target.IsAlive && target.Team == player.Team && IsTargetable(card, player, target);
+                    if (target != null) return Interpreter.IsLegalTarget(rule, user, action, target);
+
+                    IReadOnlyList<Entity> candidates = Interpreter.LegalTargets(rule, user, action);
+                    if (candidates.Count == 0) return false;
+
+                    // One candidate is not a choice, so nobody is asked and nothing is rolled — which
+                    // is also why a party of one behaves exactly as it always has.
+                    target = candidates.Count == 1 ? candidates[0]
+                        : automatic ? candidates[State.Rng.NextInt(0, candidates.Count - 1)]
+                        : Chooser.Choose(new ChoiceRequest("choose a target", candidates, 1, 1, user, action.Definition!.Syntax.Span), State)?.FirstOrDefault(candidates.Contains) ?? candidates[0];
+                    return true;
                 }
 
                 case "self":
-                    target = player;
+                    target = user;
                     return true;
 
                 case "any":
-                    return target == null || (target.Kind == EntityKind.Actor && target.IsAlive && IsTargetable(card, player, target));
+                    return target == null || Interpreter.IsLegalTarget(rule, user, action, target);
 
                 default:
                     return true;
@@ -705,31 +694,23 @@ namespace Cantrip
         }
 
         // Target validity ----------------------------------------------------------------------
+        //
+        // Every rule about what may be aimed at lives in Interpreter's targeting section, which is
+        // the only place any of the four filters is applied. What is left in this file is who asks,
+        // and what to do with the answer.
+        //
+        // Content adds its own rules through the `targetable` channel, where a value of zero or less
+        // means "not this one". With no `of` scope a modifier anchors to its owner, so
+        // `modify targetable: set 0` on a status hides its host; a scope is how one entity speaks
+        // for others, which is what Taunt needs:
+        // `modify targetable of allies where source:enemies, not it.has(Taunt): set 0`.
+        //
+        // Only the `target` words that name someone ask — `enemy`, `ally` and `any`. `target self`
+        // is not a choice, so nothing is asked of it. Area and random effects resolve through the
+        // interpreter's own selectors rather than here, which is deliberate: Taunt constrains what a
+        // card may be pointed at, not what a blast reaches.
 
         private const string TargetableChannel = Interpreter.TargetableChannel;
-
-        /// <summary>
-        /// Whether one entity may be named as this card's target. Content adds rules to target
-        /// selection through the <c>targetable</c> channel, where a value of zero or less means
-        /// "not this one". With no <c>of</c> scope a modifier anchors to its owner, so
-        /// <c>modify targetable: set 0</c> on a status hides its host; a scope is how one entity
-        /// speaks for others, which is what Taunt needs:
-        /// <c>modify targetable of allies where source:enemies, not it.has(Taunt): set 0</c>.
-        /// </summary>
-        /// <remarks>
-        /// Only the <c>target</c> words that name someone ask — <c>enemy</c>, <c>ally</c> and
-        /// <c>any</c>. <c>target self</c> is not a choice, so nothing is asked of it. Area and
-        /// random effects resolve through the interpreter's own selectors rather than here, which is
-        /// deliberate: Taunt constrains what a card may be pointed at, not what a blast reaches.
-        /// The query carries the card, so a <c>where</c> on the group must say <c>it.</c> to mean the
-        /// candidate; a bare <c>tag:</c> there tests the card being played.
-        /// </remarks>
-        private bool IsTargetable(Entity card, Entity chooser, Entity candidate) =>
-            Interpreter.IsTargetable(candidate, chooser, card);
-
-        /// <summary>Those of a group the card may actually be pointed at, in the group's own order.</summary>
-        private IReadOnlyList<Entity> Targetable(Entity card, Entity chooser, IReadOnlyList<Entity> candidates) =>
-            Interpreter.Targetable(candidates, chooser, card);
 
         // Enemies ------------------------------------------------------------------------------
 
@@ -774,9 +755,9 @@ namespace Cantrip
         /// </remarks>
         private Entity? MoveTarget(Entity enemy, Entity? target)
         {
-            if (target == null || Interpreter.IsTargetable(target, enemy, null)) return target;
+            if (target == null || Interpreter.IsLegalTarget(TargetRule.Any, enemy, null, target)) return target;
 
-            IReadOnlyList<Entity> side = Interpreter.Targetable(State.Actors(target.Team), enemy, null);
+            IReadOnlyList<Entity> side = Interpreter.LegalTargets(TargetRule.Any, enemy, null, State.Actors(target.Team));
             return side.Count > 0 ? side[0] : target;
         }
 
@@ -803,9 +784,11 @@ namespace Cantrip
         /// to ask the player something.
         /// </returns>
         /// <remarks>
-        /// An ability has no cost and does not settle its own target, so it never answers
-        /// <see cref="ActionResult.NotEnoughEnergy"/> or <see cref="ActionResult.InvalidTarget"/>; both
-        /// are here for the day it does, so that adding them is not a change to this signature.
+        /// An ability reads its own <c>target</c> line exactly as a card does, so
+        /// <see cref="ActionResult.InvalidTarget"/> means the same here as there: an ability that
+        /// asks for an enemy and has none left is refused rather than run at nobody. An ability has
+        /// no cost, so it still never answers <see cref="ActionResult.NotEnoughEnergy"/>; that one is
+        /// here for the day it does, so adding it is not a change to this signature.
         /// </remarks>
         public ActionResult UseAbility(Entity ability, Entity? target = null)
         {
@@ -822,6 +805,11 @@ namespace Cantrip
         {
             if (ability.IsRemoved || ability.Owner == null || !ability.Owner.IsAlive) return ActionResult.NotACard;
             if (!IsReady(ability)) return ActionResult.NotReady;
+
+            // An ability aims the way a card does: the chooser is offered only legal candidates, a
+            // taunt narrows them, and nothing to aim at refuses the cast rather than running it at
+            // nobody. Before this, `target` on an ability was read by nothing at all.
+            if (!TryResolveTarget(ability, ref target)) return ActionResult.InvalidTarget;
 
             Entity owner = ability.Owner;
             bool used = false;

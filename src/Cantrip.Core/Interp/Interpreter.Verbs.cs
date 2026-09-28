@@ -475,10 +475,11 @@ namespace Cantrip.Runtime
             if (targets.Count == 0)
                 throw call.Error("nobody to attack. Write `attack <who>`, or give the effect a `target`.");
 
-            // An attack is a thing pointed at somebody, so it asks the same channel a card's target
-            // asks: a taunt or a stealth means one thing everywhere. Everything named being untouchable
-            // is a rules outcome, not a mistake, so the swing lands nowhere and `into` binds nothing.
-            targets = Targetable(targets, attacker, call.Context.Card);
+            // An attack is a thing pointed at somebody, so it runs the same filters a card's target
+            // runs: a taunt, a stealth or a reach limit means one thing everywhere. Everything named
+            // being untouchable is a rules outcome, not a mistake, so the swing lands nowhere and
+            // `into` binds nothing.
+            targets = LegalTargets(TargetRule.Any, attacker, call.Context.Card, targets);
             if (targets.Count == 0)
             {
                 BindResult(call, Num.Zero);

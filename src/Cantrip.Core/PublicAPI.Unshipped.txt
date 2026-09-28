@@ -123,3 +123,7 @@ const Cantrip.Rng.StateWords = 4 -> int
 Cantrip.CardRuntime.Dispose() -> void
 static Cantrip.Runtime.Zones.IsWellKnown(string? zone) -> bool
 static Cantrip.Runtime.Zones.WellKnown.get -> System.Collections.Generic.IReadOnlyList<string!>!
+*REMOVED*Cantrip.CardRuntime.LegalTargets(Cantrip.Runtime.Entity! card) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+*REMOVED*Cantrip.CardRuntime.TargetMode(Cantrip.Runtime.Entity! card) -> string!
+Cantrip.CardRuntime.LegalTargets(Cantrip.Runtime.Entity! action) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.CardRuntime.TargetMode(Cantrip.Runtime.Entity! action) -> string!

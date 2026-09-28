@@ -20,6 +20,7 @@ namespace Cantrip.Tests.Docs
         [InlineData("Cantrip.Testing.SetupSession")]
         [InlineData("Cantrip.Content.Scenario")]
         [InlineData("Cantrip.Diagnostics.Suggest")]
+        [InlineData("Cantrip.Runtime.TargetRule")]
         public void A_type_only_the_library_and_its_tools_use_is_internal(string name)
         {
             Type type = Core.GetType(name) ?? throw new InvalidOperationException(name + " is gone entirely.");

@@ -358,7 +358,7 @@ that is the value to pass if you have no other in mind.
 | `PlayNamed(card_name: String, target_id: int) -> String` | Plays the first card of that name in the hand |
 | `EndTurn() -> void` | Ends the player's turn; the enemies act, and the next turn starts |
 | `Tick(count: int) -> void` | Advances a real-time clock by `count` ticks. Default: `1`. In a turn game it fails with an error saying the runtime uses turns. |
-| `UseAbility(ability_id: int, target_id: int) -> String` | Uses an ability, answering with the same words `Play` does. Default target: `0`. |
+| `UseAbility(ability_id: int, target_id: int) -> String` | Uses an ability, answering with the same words `Play` does. An ability with a `target` line settles its own target from 0, the way a card does, and answers `invalid_target` when there is nobody legal to aim it at. Default target: `0`. |
 | `Execute(statements: String, self_id: int, target_id: int) -> void` | Runs statements as content would, for a console, a cheat key or a heal between battles. `self_id` 0 runs them as the player; `target_id` 0 means nobody. Defaults: `0, 0`. |
 
 `Play`, `PlayNamed` and `UseAbility` answer `played`, `pending`
@@ -379,8 +379,8 @@ it is still on cooldown. `not_ready` never comes back from `Play`, and `not_in_h
 | `GetStat(entity_id: int, stat: String) -> int` | One stat after modifiers, which is the number the rules would use now; 0 both when the id is unknown and when the entity has no such stat |
 | `CostOf(card_id: int) -> int` | What the card costs now; 0 for an unknown id |
 | `CanPlay(card_id: int) -> bool` | Whether `Play` would accept it: in hand, affordable, with a legal target if it needs one |
-| `GetTargetMode(card_id: int) -> String` | What the card is aimed at: whatever word content wrote after `target`, usually `"enemy"`, `"ally"`, `"self"`, `"any"` or `"none"`. `""` for an id that names nothing, which is how a stale id is told from a card needing no target. |
-| `GetLegalTargets(card_id: int) -> Array` | The ids it may be aimed at, for highlighting. Empty for a `target` word the rules do not recognise. |
+| `GetTargetMode(card_id: int) -> String` | What the card is aimed at: whatever word content wrote after `target`, usually `"enemy"`, `"ally"`, `"self"`, `"any"` or `"none"`. An ability id works here too, and answers about its `target` line. `""` for an id that names nothing, which is how a stale id is told from a card needing no target. |
+| `GetLegalTargets(card_id: int) -> Array` | The ids it may be aimed at, for highlighting, after the card's own `target … where` and content's `targetable` rules. An ability id works here too. Empty for a `target` word the rules do not recognise. |
 | `IsInBattle() -> bool` | Whether a battle is running |
 | `GetTurn() -> int` | The turn number, counted from 1 in each battle |
 | `GetWon() -> Variant` | How the last battle ended: `true` if the player won it, `false` if not, and `null` while a battle runs and before the first has ended |

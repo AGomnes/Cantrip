@@ -187,6 +187,62 @@ namespace Cantrip.Tests.Linting
         }
 
         [Fact]
+        public void A_name_in_a_target_filter_is_checked_like_any_other()
+        {
+            IReadOnlyList<Diagnostic> diagnostics = Lint("""
+                card "Reach"
+                  cost 1
+                  target enemy where it.position <= 1
+                  effect:
+                    deal 5 to target
+
+                ability "Mercy"
+                  cooldown 1 turns
+                  target enemy where it.hp <= 10
+                  effect:
+                    deal 8 to target
+
+                card "Typo"
+                  cost 1
+                  target enemy where postion <= 1
+                  effect:
+                    deal 5 to target
+                """);
+
+            Diagnostic d = Single(diagnostics, Linter.UnknownName);
+            Assert.Equal(DiagnosticSeverity.Warning, d.Severity);
+            Assert.Contains("postion", d.Message);
+        }
+
+        [Fact]
+        public void An_ability_that_asks_for_a_target_and_never_uses_it_is_reported()
+        {
+            Diagnostic d = Single(Lint("""
+                ability "Shout"
+                  cooldown 1 turns
+                  target enemy
+                  effect:
+                    block 4
+                """), Linter.UnusedTarget);
+
+            Assert.Contains("Shout", d.Message);
+        }
+
+        [Fact]
+        public void A_filtered_target_line_is_still_a_target_the_effect_has_to_use()
+        {
+            Diagnostic d = Single(Lint("""
+                card "Aimless"
+                  cost 1
+                  target enemy where it.hp <= 10
+                  effect:
+                    block 4
+                """), Linter.UnusedTarget);
+
+            Assert.Contains("Aimless", d.Message);
+        }
+
+        [Fact]
         public void Event_and_move_names_are_not_mistaken_for_values()
         {
             IReadOnlyList<Diagnostic> diagnostics = Lint("""
