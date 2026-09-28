@@ -106,6 +106,66 @@ namespace Cantrip.GodotAdapter.Tests.Shared
             Assert.Contains("format " + SaveEnvelope.CurrentFormat, check.Message);
         }
 
+        /// <summary>
+        /// The other half of that: an envelope from an older addon is read, not refused. Refusing
+        /// anything that is not exactly current keeps "every earlier save still loads" only while
+        /// the number never moves, and the number then stops describing the file.
+        /// </summary>
+        [Fact]
+        public void A_save_from_an_older_version_of_the_addon_is_read_rather_than_refused()
+        {
+            ContentLibrary library = ViewTestKit.Library();
+
+            var older = new SaveEnvelope(SaveEnvelope.CurrentFormat - 1, library.Fingerprint, "{}");
+
+            Assert.True(older.Check(library.Fingerprint).Accepted);
+        }
+
+        [Fact]
+        public void An_older_envelope_is_brought_forward_with_everything_it_carries()
+        {
+            ContentLibrary library = ViewTestKit.Library();
+
+            var older = new SaveEnvelope(SaveEnvelope.CurrentFormat - 1, library.Fingerprint, "{\"FormatVersion\":1}");
+            SaveEnvelope current = older.Upgraded();
+
+            Assert.Equal(SaveEnvelope.CurrentFormat, current.Format);
+            Assert.Equal(older.Fingerprint, current.Fingerprint);
+            Assert.Equal(older.Payload, current.Payload);
+
+            // One already in this format is itself, so nothing is copied for nothing.
+            SaveEnvelope wrapped = SaveEnvelope.Wrap(library.Fingerprint, "{}");
+            Assert.Same(wrapped, wrapped.Upgraded());
+        }
+
+        /// <summary>
+        /// The rule the node applies to the game inside the envelope, which is the core's and not
+        /// the addon's: a save is turned away only when it needs a reader newer than this build.
+        /// </summary>
+        [Fact]
+        public void The_game_inside_is_judged_by_the_reader_it_needs_not_by_the_format_it_is_in()
+        {
+            CardRuntime runtime = ViewTestKit.Runtime(out _);
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+            GameSnapshot save = runtime.Capture();
+
+            Assert.Equal(GameSnapshot.CurrentMinimumReader, GameSnapshot.ReaderNeededBy(save));
+
+            // An older save: readable here.
+            save.FormatVersion = GameSnapshot.CurrentFormat - 1;
+            save.MinimumReader = 0;
+            Assert.True(GameSnapshot.ReaderNeededBy(save) <= GameSnapshot.CurrentFormat);
+
+            // A newer one that added a field this build can do without: readable too.
+            save.FormatVersion = GameSnapshot.CurrentFormat + 1;
+            save.MinimumReader = GameSnapshot.CurrentFormat;
+            Assert.True(GameSnapshot.ReaderNeededBy(save) <= GameSnapshot.CurrentFormat);
+
+            // A newer one that changed something: not readable, and the node says wrong_format.
+            save.MinimumReader = GameSnapshot.CurrentFormat + 1;
+            Assert.True(GameSnapshot.ReaderNeededBy(save) > GameSnapshot.CurrentFormat);
+        }
+
         [Fact]
         public void An_envelope_with_no_game_in_it_is_refused()
         {

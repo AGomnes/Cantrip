@@ -144,7 +144,7 @@ card "Whirlwind"
 | `target any` | Any living actor, or none. |
 | (none) | No target. |
 
-A card that names a target also consults the [`targetable`](#modifiers) channel, which is how content adds its own rules to target selection, such as a taunt.
+A card that names a target also consults the [`targetable`](#modifiers) channel, which is how content adds its own rules to target selection, such as a taunt. The `attack` verb and an enemy's move ask the same channel, so a taunt means one thing wherever something is pointed at somebody.
 
 Tags with built-in behaviour:
 
@@ -416,7 +416,7 @@ ability "Frost Nova"
     apply Chill 1 for 3s to enemies
 ```
 
-Real-time games create the runtime with a `TickClock` and call `runtime.Tick()` from their fixed timestep. `GrantAbility` attaches an ability to an actor; `UseAbility` runs it if it is off cooldown and starts the cooldown. Durations with `s` or `ms` convert to ticks on a tick clock; `turns` convert on a turn clock. Using seconds on a turn clock is an error. A cooldown goes through the [`cooldown` modifier channel](#modifiers), so content can shorten it.
+Real-time games create the runtime with a `TickClock` and call `runtime.Tick()` from their fixed timestep. `GrantAbility` attaches an ability to an actor; `UseAbility` runs it if it is off cooldown and starts the cooldown. Durations with `s` or `ms` convert to ticks on a tick clock; `turns` convert on a turn clock. Using seconds on a turn clock is an error when the line runs, and error CT325 at lint for content that states its [`clock`](#rulesets). A cooldown goes through the [`cooldown` modifier channel](#modifiers), so content can shorten it.
 
 ## Resources
 
@@ -503,13 +503,17 @@ The scope is matched against the event's target, whatever the event. So `on owne
 
 **Resolution.** Before and instead listeners run immediately. After listeners are queued and resolve in order once the current action finishes; work they raise joins the back of the queue. With `triggers: immediate` in the ruleset they run immediately instead.
 
-**Every.** `on every 1s:` fires on an interval rather than on an event. It is pumped by the clock instead of raised by anything, so only the listener whose interval has elapsed runs. The interval is written like any other duration (`1s`, `250ms`, `2 turns`), and the clock has to understand the unit: seconds mean nothing to a turn-based game, so `every 1s` there registers nothing at all rather than half-working. Filters and `once per ...` apply as they do to any listener. When the next firing is due is part of the game's state, so a restored save resumes mid-interval instead of restarting it, and so does a hot reload. A content change can make a listener start afresh, as [Save and load](csharp.md#save-and-load) describes.
+**Every.** `on every 1s:` fires on an interval rather than on an event. It is pumped by the clock instead of raised by anything, so only the listener whose interval has elapsed runs. The interval is written like any other duration (`1s`, `250ms`, `2 turns`), and the clock has to understand the unit: seconds mean nothing to a turn-based game, so `every 1s` there registers nothing at all rather than half-working. Say [`clock turns` or `clock ticks`](#rulesets) in the ruleset and that becomes error CT325 instead, before anything runs. Filters and `once per ...` apply as they do to any listener. When the next firing is due is part of the game's state, so a restored save resumes mid-interval instead of restarting it, and so does a hot reload. A content change can make a listener start afresh, as [Save and load](csharp.md#save-and-load) describes.
 
 **Ordering.** Listeners for the same event run by priority (higher first), then play order (the order their entities became active), then the active side first, then registration order. The ruleset can reorder the first three.
+
+**One is a group of one.** `.count`, `.size`, `.length`, `.first`, `.last`, `.empty` and `.any` work on a single entity as they do on a group: the count is 1, `.first` and `.last` are the entity itself. That is what makes `choose` safe to read either way — `choose 1 from hand as picked` binds an entity while `choose 2` binds a group, and `picked.first` used to fall through to "a stat nothing has" and read 0 on the one-card path.
 
 **Joining mid-event.** A listener that becomes active while an event is being handled hears that event's after timing. A status applied by a card's effect hears the `card_played` of that same card, and a minion listening `on created(kind:actor)` hears its own creation. Where that is not wanted, leave the listener's own cause out with a filter: `on created(kind:actor, not target:self):`, or `not card:Reverb` for the card that applied the status. A `power` card is the exception, since it only becomes active after its `card_played` has finished.
 
 **Loop protection.** A listener never re-triggers from its own consequences within one causal chain, and chains stop at depth 50. `once per turn`, `once per battle`, `once per run` and `once per chain` limit how often a listener fires; `once per battle` starts again when the next battle starts.
+
+**`once per run` has no boundary of its own.** Cantrip has no idea what a run is — a battle is the outermost thing content can see ([coverage gap 17](coverage.md#open-gaps-most-useful-first)) — so the window is *one `CardRuntime`*, and nothing in content can reset it. What that means in practice depends on what the listener is written on. On a relic held for the whole game it fires once and never again, and it survives a save and a restore, because a spent limit is part of the saved state. On a card it is reset whenever the card's listeners are registered again, which is every time the card comes back to hand, so it is closer to "once per visit to hand" than to "once per run". A game that carries a run across several `CardRuntime`s in its own code gets one use per runtime, not one per run. Where the window has to be exact, count it in a stat the game controls instead.
 
 **A limit is spent when the listener fires,** whatever its body then does. An `if` in the body that does nothing still uses it up, so a relic that heals "the first time you fall to half health" with the condition in an `if` spends its one use on the first hit. Put the condition in the filter, which is checked before the limit: `on owner.damaged(owner.hp <= owner.max_hp / 2) once per battle:`.
 
@@ -579,7 +583,7 @@ relic "Siege Engine"
 
 **Filters** (`where`) see the value being computed: `tag:fire` checks the damage's tags and the card's tags, `source:self` compares the source's controller with the modifier owner's. Roles and group names such as `source:enemies` and `allies.count` are read from the modifier owner's side, whoever is acting.
 
-**Target validity.** The `targetable` channel is asked before a card accepts a target, over a base of 1: zero or less means the card may not be pointed at that entity. With no scope it anchors to its owner like any other modifier, so `modify targetable: set 0` on a status hides its host. A scope is how one entity speaks for others, which is what a taunt is:
+**Target validity.** The `targetable` channel is asked before anything is pointed at somebody, over a base of 1: zero or less means it may not be pointed at that entity. With no scope it anchors to its owner like any other modifier, so `modify targetable: set 0` on a status hides its host. A scope is how one entity speaks for others, which is what a taunt is:
 
 ```
 status "Taunt"
@@ -587,11 +591,17 @@ status "Taunt"
   modify targetable of allies where source:enemies, not it.has(Taunt): set 0
 ```
 
-While that is attached, the other side's `target enemy` cards may only be pointed at something that also has Taunt. Write the predicate as `not it.has(Taunt)` rather than a comparison with the owner, so that two taunting entities leave each other available instead of cancelling out. `source:enemies` is what keeps a taunt from constraining its own side's cards.
+While that is attached, the other side's `target enemy` cards may only be pointed at something that also has Taunt, and so may the other side's `attack` and its enemies' moves. Write the predicate as `not it.has(Taunt)` rather than a comparison with the owner, so that two taunting entities leave each other available instead of cancelling out. `source:enemies` is what keeps a taunt from constraining its own side's cards.
 
-Only the `target` words that name someone ask: `enemy`, `ally` and `any`. `target self` is not a choice, so nothing is asked of it. The chooser is offered only the candidates that pass, so a rule narrows what a player may pick rather than making the play fail, and a card left with nothing to point at is refused as `InvalidTarget`. Area and random effects use the selectors under [Expressions](#expressions) and are not filtered, so a blast still reaches what a card may not single out — which is the rule these games actually have.
+Three things ask.
 
-Because the query carries the card being played, a `where` on the group must write `it.` to mean the candidate: a bare `tag:` there tests the card, not the entity being considered.
+- **A card's target.** Only the `target` words that name someone: `enemy`, `ally` and `any`. `target self` is not a choice, so nothing is asked of it. The chooser is offered only the candidates that pass, so a rule narrows what a player may pick rather than making the play fail, and a card left with nothing to point at is refused as `InvalidTarget`.
+- **The `attack` verb.** `attack enemy` swings only at what the attacker may be pointed at. Everything named being untouchable is a rules outcome and not a mistake: the swing lands nowhere, and `into` binds 0.
+- **An enemy's move.** The move keeps the target it was handed whenever that target is still legal, and otherwise goes to the first entity on that side which is — which is what a taunt is. An enemy whose every option is hidden still takes its turn, against the one it was going to hit.
+
+Area and random effects use the selectors under [Expressions](#expressions) and are not filtered, so a blast still reaches what a card may not single out — which is the rule these games actually have. Inside a move, likewise, only the target the move is *handed* moves; a `deal 5 to all enemies` in its body reaches whoever it reaches.
+
+Because the query carries the card being played, a `where` on the group must write `it.` to mean the candidate: a bare `tag:` there tests the card, not the entity being considered. An enemy's move carries no card, so a rule scoped with `card:` — such as a card that limits its own reach — never binds one.
 
 **Cooldowns.** `cooldown` is a channel as well, so content can shorten what an ability waits:
 
@@ -610,11 +620,11 @@ Stat reads are cached and the cache is invalidated by any change to the game sta
 
 ```
 deal 6 to target
-apply Slow 40% for 3s to enemies
+apply Slow 2 for 3s to enemies
 deal stacks to owner, ignore block
 ```
 
-Clause keywords are `to`, `from`, `for`, `with`, `at`, `by`, `into`, `over`, `as`, `of`, `against`, `using`, `onto`.
+Clause keywords are `to`, `from`, `for`, `with`, `at`, `by`, `into`, `over`, `as`, `of`, `against`, `using`, `onto`. The grammar knows all thirteen and gives none of them a meaning; which verb reads which is [in the verb reference](#built-in-verbs), and a clause a built-in verb does not read is error CT323 rather than a word that quietly does nothing.
 
 In a command, a comma introduces a flag word rather than another argument, so arguments are separated by spaces: `log "hp is" enemy.hp`, not `log "hp is", enemy.hp` (error CT0023). The built-in verbs read these flags:
 
@@ -677,6 +687,8 @@ Inside a body, labelled blocks such as `setup:` or `first:` just run their state
 ## Expressions
 
 **Literals**: numbers (`6`, `1.5`), units written against the number or after a space (`40%`, `3s`, `250ms`, `2 turns`, `3 seconds`), `x1.5` for multipliers, strings (`"text"`), and ranges (`3..6`), which roll a whole number when used as a number.
+
+A percentage is a **fraction to multiply by**, not a number of its own: `target.max_hp * 40%` is two fifths of the target's maximum health, and `modify damage: x150%` is half again. A bare one where a built-in verb counts whole things is error **CT324**, at lint and at run: `apply Slow 40%` applied forty stacks and printed "Apply 40% Slow", so the card's own text stated a percentage nothing implements.
 
 **Operators**, loosest first:
 
@@ -744,8 +756,8 @@ A bare name resolves in this order: local variables (`let` bindings, `for each` 
 |---|---|
 | `deal` (`damage`) | `deal N [to who] [as tag] [, ignore block]`. Without `to`, hits the effect's target. The damage carries the tags of the running card, status or relic. |
 | `attack` | `attack [who] [with attacker] [as tag] [, ignore block]`. Deals the attacker's `attack` stat to the target, with the attacker as the damage source, so the attacker's own listeners and modifiers see it as its damage. The attacker defaults to the running entity when that is an actor, otherwise to its controller, so a card or relic swings with the player; the target defaults to the effect's target. |
-| `block` (`gain_block`) | `block N [to who]`. Defaults to yourself. |
-| `heal` | `heal N [to who]`. Defaults to yourself. |
+| `block` (`gain_block`) | `block N [to who] [into name]`. Defaults to yourself. Block is not timed: it lasts until it is spent or the holder's turn starts, so there is no `for` on it. |
+| `heal` | `heal N [to who] [into name]`. Defaults to yourself. |
 | `draw` | `draw [N] [to who]` for the controller, or for whoever `to` names. Reshuffles the discard pile when the draw pile runs out. A creature controls itself, so `draw 1 to player` is how a creature draws for you. |
 | `discard`, `exhaust` | `discard N` asks the chooser to pick from hand; `discard who` and `exhaust self` name the cards. |
 | `apply` | `apply Status [N] [for duration] [to who]`. Defaults to the target, or a status's host, or the controller. |
@@ -753,23 +765,51 @@ A bare name resolves in this order: local variables (`let` bindings, `for each` 
 | `remove` | `remove Status [from who]`, `remove tag:x from who` (every status with the tag, and the tag), `remove who` (destroys it). |
 | `gain`, `lose` | `gain N Status` adjusts a status; `gain N stat` changes a stat. `[to who]`, else yourself. |
 | `change` | `change stat by N [to who]`, or `change hp -5 on target`. |
-| `create` | `create Card [N] [into zone]` (default hand), `create Relic`, `create Enemy`. Makes a fresh one from the definition, so it arrives with its printed stats. Binds `created`. |
+| `create` | `create Card [N] [into zone]` (default hand), `create Relic`, `create Enemy`. Makes a fresh one from the definition, so it arrives with its printed stats. Binds `created`. A status, keyword or ability is refused (CT320): those belong to whoever has them, and `apply` is the verb that gives one. |
 | `copy` | `copy [who] [N] [into zone]` duplicates something that is **in the game**, as it stands now — an upgraded card, a wounded minion, a discounted power. Defaults to itself. Binds `copied`, always a list. See below. |
-| `shuffle` | `shuffle` (discard into draw), `shuffle Card [N]` (creates copies in the draw pile), `shuffle cards into draw`. |
+| `shuffle` | `shuffle` (discard into draw), `shuffle Card [N] [into zone]` (creates copies), `shuffle cards into zone`. `into` says which pile the cards land in and which pile is then shuffled; without it, the draw pile. |
 | `move` | `move cards to zone [, top]` |
 | `transform` | `transform [who] into Definition` replaces what something is while it keeps its place, its id and everything holding it. Defaults to the effect's target. Binds nothing. See below. |
 | `destroy` | `destroy [who]`. Defaults to itself. |
 | `kill` | `kill [who]`. Defaults to the target. |
-| `choose` | `choose N from group [as name]`. Binds the result to `chosen`, or to the name after `as`: one entity, or a group when more than one is chosen. |
+| `choose` | `choose N from group [as name]`. Binds the result to `chosen`, or to the name after `as`: one entity, or a group when more than one is chosen. Either answers `.first`, `.last` and `.count`, so a line written for one works for the other. |
 | `discover` | `discover N <kind> [where filter] [, weighted] [as name]`. Offers N pieces of content and binds the one chosen to `discovered`, or to the name after `as`. See below. |
-| `emit` | `emit event [amount] [to who]` raises a custom event. |
+| `emit` | `emit event [amount] [to who]` raises a **custom** event. A built-in event name is refused (CT322): the engine raises those itself, and emitting one would run its listeners while the history counters stayed where they were. |
 | `cancel` | In a `before_` or `instead_of_` listener, cancels the event. |
 | `play` | `play card [on target] [, free]` plays a card out of a pile its controller owns, with its cost, its `card_played` and its triggers. Binds `played` to the card, or to `none` when it was not played. See below. |
-| `replay` | `replay card [on target]` resolves a card's effect again, for free. The card stays where it is, nothing is paid, and no `card_played` is raised: it is not a play. |
+| `replay` | `replay card [on target]` resolves a card's effect again, for free. The card stays where it is, nothing is paid, and no `card_played` is raised: it is not a play. The card must be one that is in the game: `replay Strike` is refused (CT320). |
 | `use` | In an enemy, performs one of its moves. |
 | `log` | `log "hp is" target.hp`, with the values separated by spaces, writes them to the runtime's `Logged` event. `cantrip repl` prints it. In a test it goes into the trace, as a `[log]` line under the `log` statement, which `cantrip test --trace` prints for a failing test. A passing test shows nothing, so to see a value there, use `expect`, whose failure shows it. |
 
-**`into`** binds what a damage verb actually achieved, so an effect can act on it: `deal 4 to all enemies into dealt`, then `heal dealt`. The number is what landed, summed across the targets — after modifiers changed the amount, after block absorbed what it could, and counting only what a dying target could still take, which is rarely the number the line asked for. Available on `deal`, `damage` and `attack`.
+**Which clauses a verb reads.** A clause a verb does not read is error **CT323** — at lint and at run — because a dropped clause is a card that reads as one thing and does another. `block 8 for 2 turns` used to give ordinary block that vanished at the next turn start, and `deal 5 against enemy2` hit whatever the card was aimed at.
+
+| Verb | Clauses it reads |
+|---|---|
+| `deal`, `damage` | `to`, `as`, `into` |
+| `attack` | `to`, `with`, `as`, `into` |
+| `heal` | `to`, `into` |
+| `block`, `gain_block` | `to`, `into` |
+| `draw` | `to` |
+| `apply` | `to`, `for` |
+| `add` | `to` |
+| `remove` | `from` |
+| `gain`, `lose` | `to` |
+| `change` | `to`, `of`, `by` |
+| `create`, `copy` | `into`, `to`, `onto` |
+| `move` | `to`, `into`, `onto` |
+| `shuffle` | `into`, `to` |
+| `transform` | `into`, `to` |
+| `choose` | `from`, `as` |
+| `discover` | `as` |
+| `emit` | `to` |
+| `kill` | `to` |
+| `destroy`, `discard`, `exhaust`, `cancel`, `log`, `play`, `replay`, `use` | none |
+
+The grammar knows thirteen clause words, four of which — `at`, `over`, `against` and `using` — no built-in verb reads. They stay reserved so that a verb a game registers in C# can read them, and so that a built-in verb handed one can name the word that works: `apply Poison 3 at target` says to write `to`. Three spellings of one clause would be language to learn and content to keep consistent, for nothing, so they are not synonyms.
+
+**A flag after a comma is not a clause** and is never checked: `, ignore block`, `, free`, `, top`, `, weighted`, and whatever a game's own verb reads. Only the verbs above are held to the table — a verb content declares, or one a game registers, reads what it likes.
+
+**`into`** binds what a verb actually achieved, so an effect can act on it: `deal 4 to all enemies into dealt`, then `heal dealt`. The number is what landed, summed across the targets — after modifiers changed the amount, after block absorbed what it could, and counting only what a dying target could still take, which is rarely the number the line asked for. Available on `deal`, `damage`, `attack`, `heal` and `block`: a heal stops at full health and block goes through its own modifiers, so those two are worth asking about for the same reason. It binds a **new name**, so do not reuse the name of a stat: `heal 5 into hp` binds a local called `hp` that shadows the stat for the rest of the effect. On `create`, `copy`, `move` and `shuffle`, `into` names a **zone** instead.
 
 **`copy`** is the other half of `create`. `create Strike` makes a Strike as it is printed; `copy picked` makes one as it *is* — with the buff it was given this battle, the cost it was discounted to, the wound it is carrying. That is the only difference between the two verbs, and it is the whole point of this one:
 
@@ -923,6 +963,7 @@ card "Fuse"
 
 ```
 ruleset
+  clock turns
   events: before, instead, after
   loops: once_per_chain, max_depth 50
   ordering: priority, play_order, active_player
@@ -933,17 +974,47 @@ ruleset
 
 | Setting | Default | Meaning |
 |---|---|---|
+| `clock` | unstated | `turns` or `ticks`: which clock the content is written for. See below. |
 | `events` | all three | which phases are dispatched |
 | `loops` | `once_per_chain, max_depth 50` | `once_per_chain` stops self-retriggering; without it only the depth cap applies |
 | `ordering` | `priority, play_order, active_player` | listener order; anything left out keeps its default position |
 | `modifier_layers` | `add, multiply, clamp, override` | modifier layer order |
 | `triggers` | `queued` | `immediate` runs after listeners inline |
+| `new_listeners` | `hear_the_event` | whether a listener that comes into play during an event hears that event. See below. |
 | `hand_size` | 5 | cards drawn each turn |
 | `max_hand_size` | 10 | cards drawn beyond this go to the discard pile |
 | `max_steps` | 100000 | interpreter steps per top-level action before it is stopped with a runtime error (see [When content fails at runtime](csharp.md#when-content-fails-at-runtime)) |
 | `max_call_depth` | 64 | content verb nesting |
 
 If several rulesets are loaded, the last one loaded wins (CT0112).
+
+**`clock`** says which clock the content is written for, because the two sets of units do not convert into each other: a turn clock measures `2 turns`, a tick clock measures `3s`, `250ms` and ticks. Content that says nothing is unchanged — nothing is checked, and a runtime given no clock of its own still uses turns.
+
+Content that does say gets two things. A length in the wrong units is error **CT325** at lint: a cooldown, a `for`, an `in N ...:` delay or an `on every ...:` interval. And a runtime built with the other clock throws as it is built, rather than later. Both halves used to fail differently and neither said so: `on every 1s:` in a turn game registered nothing at all, in silence, while `apply Weak 1 for 3s` in the same game threw only when the line ran.
+
+```
+ruleset
+  clock ticks
+```
+
+A runtime with no `RuntimeOptions.Clock` of its own then starts a `TickClock`, so the content runs on the clock it asked for.
+
+**`new_listeners`** says whether a listener that comes into play *during* an event hears that event. The default, `hear_the_event`, is what it has always done: a minion summoned by "whenever you summon a minion" hears its own summoning, so a listener of that shape has to leave its own cause out —
+
+```
+actor "Knife Juggler"
+  on created(kind:actor, not target:self):
+    deal 1 to random enemies
+```
+
+— and the sample roguelite's Chill is written against exactly that. `miss_the_event` is the other answer: what was already here hears the event, and what arrived during it starts listening from the next one. The filter above then does nothing and can be dropped, and "when this enters play it also triggers on what put it there" becomes unwritable. Both are real rules in real games, which is why this is a setting.
+
+```
+ruleset
+  new_listeners: miss_the_event
+```
+
+Only a listener's own arrival counts, by registration order: a status applied during an event, a minion created by it, a relic obtained in it. Nothing else changes — filters, `once per ...`, ordering and loop protection are the same either way.
 
 ## How a battle runs
 
@@ -1190,8 +1261,12 @@ Codes with four digits come from reading and loading the files. An error among t
 | CT317 | warning | A [scenario](#scenarios) with no `battle` line, or a `battle` that names no enemy. There is nothing to play and nothing to measure. | Name the enemies to fight: `battle "Cinder Imp"`. |
 | CT318 | note or error | A scenario's `runs` count: a note below 100, where the same content answers differently each time, and an error when it is not a whole number of one or more. | `runs 500`. |
 | CT319 | error | An `expect` a scenario cannot check: a measurement it does not take, or a condition about one game, such as `expect enemy.hp == 3`. A scenario plays hundreds of games and measures `stalls`, `errors`, `wins`, `hp_left` and `turns` over all of them. | Compare a measurement with a number: `expect wins >= 55%`, `expect no stalls`. |
-| CT320 | error | A verb that acts on something already in the game, handed a name that is content: `copy Strike`, `transform Strike into Wound`, or `play Strike` outside a test. All three are runtime errors. A game whose own verb has one of those names is left alone. | Use the verb that makes one (`create Strike`, or `create Strike into hand` and then `play created.first`), or name something in the game in the slot: `transform target into Wound`. `--suppress CT320` for content that reaches a verb of that name another way. |
+| CT320 | error | A verb handed a name it cannot act on. Either a verb that acts on something already in the game, given a name that is content — `copy Strike`, `transform Strike into Wound`, `replay Strike`, or `play Strike` outside a test — or `create` given a status, keyword or ability, which belong to whoever has them rather than to a zone. All of them are runtime errors. A game whose own verb has one of those names is left alone. | Use the verb that makes one (`create Strike`, or `create Strike into hand` and then `play created.first`), name something in the game in the slot (`transform target into Wound`), or hand the status out instead of making one (`apply Poison 2 to target`). `--suppress CT320` for content that reaches a verb of that name another way. |
 | CT321 | error | A `transform` inside an `until` block. `until` puts back what it did, and the stats, statuses and used-up limits a transform replaces are gone. A game whose own `transform` verb runs instead is left alone. | Transform it outside the block, or apply a status instead. A `next turn:` block inside the `until` runs later on its own and is fine. `--suppress CT321` where a game's own verb is reached another way. |
+| CT322 | error | `emit` handed the name of a built-in event, such as `emit damaged 99 to player`. `emit` raises a custom event; a built-in one belongs to the engine. Emitting one runs every listener of it while nothing happened and no history counter moves, so the event is forged and the record is not. It is a runtime error too. | Use the verb that really does it (`deal 99 to player`), or pick a name the engine does not use for an event of your own: `emit my_damaged 99 to player`. A game whose own `emit` verb runs instead is left alone; `--suppress CT322` where one is reached another way. |
+| CT323 | error | A named clause a built-in verb does not read, such as `block 8 for 2 turns`, `apply Poison 3 at target` or `deal 5 against enemy2`. The clause was dropped in silence, so the line read as one thing and did another. It is a runtime error too. A flag after a comma is not a clause and is never reported, and neither is a verb content declares or a game registers. | Write the clause the verb reads — the message names it, and [Built-in verbs](#built-in-verbs) has the table — or drop the clause. Some of them are not a spelling at all: block is not timed, and a heal happens once. `--suppress CT323`, or `LintOptions.HostVerbs`, for content that reaches a verb of that name another way. |
+| CT324 | error | A bare percentage where a built-in verb counts whole things, such as `apply Slow 40%`. The unit was dropped, so forty stacks were applied while the card's generated text said "Apply 40% Slow". It is a runtime error too. | Write the number (`apply Slow 40`), or a share of something (`deal target.max_hp * 40% to target`), which is what a percentage is for. |
+| CT325 | error | A length in units the game's clock cannot measure: `on every 1s:` or `for 3s` where the ruleset says `clock turns`, or `2 turns` where it says `clock ticks`. Only content that states its clock is checked. | Write the length in the units that clock measures, or change the `clock` setting. The message says which units the stated clock takes. |
 
 **Descriptions**
 

@@ -321,6 +321,18 @@ namespace Cantrip.Runtime
                 case "phase": return entity.Phase == null ? Value.None : Value.FromText(entity.Phase);
                 case "statuses": return Value.FromEntities(entity.Attached.Where(a => !a.IsRemoved).ToList());
                 case "kind": return Value.FromText(entity.Definition?.KindName ?? entity.Kind.ToString().ToLowerInvariant());
+
+                // One entity answers the group words as a group of one. `choose 1 from hand as
+                // picked` binds an entity where `choose 2` binds a list, so without this the line
+                // that reads `picked.first` fell through to "a stat nothing has" and got 0 — and it
+                // did so only on the one-card path, which is the path an author tries last.
+                case "count":
+                case "size":
+                case "length": return Value.FromNumber(Num.One);
+                case "first":
+                case "last": return Value.FromEntity(entity);
+                case "empty": return Value.FromBool(false);
+                case "any": return Value.FromBool(true);
             }
 
             if (TryHistory(key, entity, out Value history)) return history;

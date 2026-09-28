@@ -134,10 +134,27 @@ namespace Cantrip.Runtime
         };
 
         /// <summary><c>create Shiv 2 into hand</c>, <c>create Slime</c>.</summary>
+        /// <remarks>
+        /// A status, keyword or ability is refused by name, the way <c>copy</c> refuses one. Those
+        /// three belong to whoever has them rather than to a zone, and <c>create Poison 2</c> made
+        /// two Poisons attached to nobody: they raised <c>created</c>, so listeners fired, and they
+        /// went into saves. `apply` is the verb that gives one to someone.
+        /// </remarks>
         private void VerbCreate(VerbCall call)
         {
             EntityDefinition definition = RequireDefinition(call, 0, "card", "enemy", "actor", "relic", "item");
-            int count = call.Number(1, Num.One).ToInt();
+            int count = call.Amount(1, Num.One).ToInt();
+
+            if (definition.Kind == EntityKind.Status || definition.Kind == EntityKind.Keyword || definition.Kind == EntityKind.Ability)
+            {
+                string spelt = Quoted(definition.Name);
+                throw call.Error(
+                    $"`{definition.Name}` is {A(definition.KindName)} and belongs to whoever has it, not to a zone. " +
+                    (definition.Kind == EntityKind.Ability
+                        ? $"An ability is granted to an actor rather than made: a test writes `grant {spelt}`, and a game calls `GrantAbility`."
+                        : $"Write `apply {spelt} {Math.Max(1, count)} to <who>` to give one."));
+            }
+
             ExprNode? zoneNode = call.Node.Clause("into") ?? call.Node.Clause("to") ?? call.Node.Clause("onto");
             string? zone = zoneNode == null ? null : ZoneName(zoneNode, call);
             Entity? owner = call.Context.Controller;
@@ -180,7 +197,7 @@ namespace Cantrip.Runtime
                 throw call.Error($"`copy` duplicates something that is in the game. Write `create {Quoted(named)}` for a fresh one.");
             }
 
-            int count = call.Number(1, Num.One).ToInt();
+            int count = call.Amount(1, Num.One).ToInt();
             ExprNode? zoneNode = call.Node.Clause("into") ?? call.Node.Clause("to") ?? call.Node.Clause("onto");
             string? zone = zoneNode == null ? null : ZoneName(zoneNode, call);
 
@@ -316,7 +333,7 @@ namespace Cantrip.Runtime
             if (definition.Kind != EntityKind.Status && definition.Kind != EntityKind.Keyword)
                 throw call.Error($"`{definition.Name}` is a {definition.KindName}, not a status.");
 
-            Num stacks = call.Number(1, Num.One);
+            Num stacks = call.Amount(1, Num.One);
 
             long? duration = null;
             if (call.Node.Clause("for") != null)
@@ -358,6 +375,11 @@ namespace Cantrip.Runtime
         }
 
         /// <summary><c>emit charged 2 to target</c>: raise a content-defined event.</summary>
+        /// <remarks>
+        /// A built-in name is refused. <c>emit damaged 99 to player</c> ran every <c>on damaged</c>
+        /// listener while nothing was damaged, and no history counter moved with it: the event was
+        /// forged and the record was not.
+        /// </remarks>
         private void VerbEmit(VerbCall call)
         {
             string name = call.ArgumentNode(0) switch
@@ -367,12 +389,14 @@ namespace Cantrip.Runtime
                 _ => throw call.Error("expected an event name."),
             };
 
+            if (BuiltinEvents.IsBuiltin(name)) throw call.Error(BuiltinEvents.CannotBeEmitted(name.ToLowerInvariant()));
+
             var gameEvent = new GameEvent(name.ToLowerInvariant())
             {
                 Source = call.Context.Source,
                 Target = call.Node.Clause("to") != null ? call.Clause("to").Entity ?? call.Clause("to").AsEntities().FirstOrDefault() : call.Context.Target,
                 Card = call.Context.Card,
-                Amount = call.Number(1, Num.Zero),
+                Amount = call.Amount(1, Num.Zero),
             };
             if (call.Context.Self != null) foreach (string tag in call.Context.Self.Tags) gameEvent.Tags.Add(tag);
             Raise(gameEvent, call.Context);
@@ -383,7 +407,7 @@ namespace Cantrip.Runtime
         /// <summary><c>deal 6 to target</c>, <c>deal stacks to owner, ignore block</c>, <c>deal 4 to all enemies as fire</c>.</summary>
         private void VerbDeal(VerbCall call)
         {
-            Num amount = call.Number(0, Num.Zero);
+            Num amount = call.Amount(0, Num.Zero);
             IReadOnlyList<Entity> targets = call.Targets("to");
             if (targets.Count == 0 && call.Node.Clause("to") == null)
                 throw call.Error("no target. Write `deal N to <who>` or give the card a `target`.");
@@ -419,9 +443,9 @@ namespace Cantrip.Runtime
         /// </summary>
         /// <remarks>
         /// Damage, healing and block are all worth asking about after the fact, because what lands is
-        /// not what was asked for: block absorbs it, modifiers change it, a target dies part way. The
-        /// alternative in content was to read a history counter either side of the line and subtract,
-        /// which is a lot of ceremony for "how much did that do".
+        /// not what was asked for: block absorbs it, modifiers change it, a target dies part way, a
+        /// heal stops at full health. The alternative in content was to read a history counter either
+        /// side of the line and subtract, which is a lot of ceremony for "how much did that do".
         /// </remarks>
         private static void BindResult(VerbCall call, Num total)
         {
@@ -450,6 +474,16 @@ namespace Cantrip.Runtime
 
             if (targets.Count == 0)
                 throw call.Error("nobody to attack. Write `attack <who>`, or give the effect a `target`.");
+
+            // An attack is a thing pointed at somebody, so it asks the same channel a card's target
+            // asks: a taunt or a stealth means one thing everywhere. Everything named being untouchable
+            // is a rules outcome, not a mistake, so the swing lands nowhere and `into` binds nothing.
+            targets = Targetable(targets, attacker, call.Context.Card);
+            if (targets.Count == 0)
+            {
+                BindResult(call, Num.Zero);
+                return;
+            }
 
             Num swing = Num.FromInt(attacker.GetInt("attack"));
 
@@ -491,16 +525,26 @@ namespace Cantrip.Runtime
                 ?? throw call.Error("nothing to attack with. Name one with `with <who>`.");
         }
 
+        /// <summary><c>heal 5</c>, <c>heal 5 to ally</c>, <c>heal 5 into restored</c>.</summary>
         private void VerbHeal(VerbCall call)
         {
-            Num amount = call.Number(0, Num.Zero);
-            foreach (Entity target in SelfTargets(call).ToArray()) Heal(call.Context.Source, target, amount, call.Context, call.Span);
+            Num amount = call.Amount(0, Num.Zero);
+            Num healed = Num.Zero;
+            foreach (Entity target in SelfTargets(call).ToArray())
+                healed += Heal(call.Context.Source, target, amount, call.Context, call.Span);
+
+            BindResult(call, healed);
         }
 
+        /// <summary><c>block 8</c>, <c>block 8 to ally</c>, <c>block 8 into gained</c>.</summary>
         private void VerbBlock(VerbCall call)
         {
-            Num amount = call.Number(0, Num.Zero);
-            foreach (Entity target in SelfTargets(call).ToArray()) GainBlock(call.Context.Source, target, amount, call.Context, call.Span);
+            Num amount = call.Amount(0, Num.Zero);
+            Num gained = Num.Zero;
+            foreach (Entity target in SelfTargets(call).ToArray())
+                gained += GainBlock(call.Context.Source, target, amount, call.Context, call.Span);
+
+            BindResult(call, gained);
         }
 
         /// <summary>
@@ -513,7 +557,7 @@ namespace Cantrip.Runtime
         /// </remarks>
         private void VerbDraw(VerbCall call)
         {
-            int count = call.Number(0, Num.One).ToInt();
+            int count = call.Amount(0, Num.One).ToInt();
 
             if (call.Node.Clause("to") != null)
             {
@@ -546,6 +590,16 @@ namespace Cantrip.Runtime
             foreach (Entity card in cards.ToArray()) MoveCard(card, zone, eventName, call.Context);
         }
 
+        /// <summary>
+        /// <c>shuffle</c> (the discard pile back into the draw pile), <c>shuffle Wound 2 into draw</c>
+        /// (copies), <c>shuffle hand into discard</c> (moves what is named).
+        /// </summary>
+        /// <remarks>
+        /// The <c>into</c> clause names where the cards land and which pile is then shuffled. It used
+        /// to be dropped, so <c>shuffle hand into discard</c> — a form the language reference itself
+        /// lists — put the hand into the draw pile. The bare <c>shuffle</c> is unchanged and still
+        /// means the discard pile.
+        /// </remarks>
         private void VerbShuffle(VerbCall call)
         {
             Entity actor = call.Context.Controller ?? throw call.Error("nobody to shuffle for.");
@@ -556,25 +610,28 @@ namespace Cantrip.Runtime
                 return;
             }
 
+            ExprNode? zoneNode = call.Node.Clause("into") ?? call.Node.Clause("to");
+            string zone = zoneNode == null ? Zones.Draw : ZoneName(zoneNode, call);
+
             // `shuffle Wound 2 into draw` creates copies; `shuffle hand into draw` moves cards.
             Value first = call.Argument(0);
             if (first.Kind == ValueKind.Definition || first.Kind == ValueKind.Text)
             {
                 EntityDefinition card = RequireDefinition(call, 0, "card");
-                int count = call.Number(1, Num.One).ToInt();
-                for (int i = 0; i < count; i++) Create(card, actor, Zones.Draw, call.Context);
+                int count = call.Amount(1, Num.One).ToInt();
+                for (int i = 0; i < count; i++) Create(card, actor, zone, call.Context);
             }
             else
             {
-                foreach (Entity card in first.AsEntities().ToArray()) MoveCard(card, Zones.Draw, "moved", call.Context);
+                foreach (Entity card in first.AsEntities().ToArray()) MoveCard(card, zone, "moved", call.Context);
             }
-            ShuffleZone(actor, Zones.Draw);
+            ShuffleZone(actor, zone);
         }
 
         /// <summary><c>gain 1 energy</c>, <c>gain 2 Strength</c>, <c>lose 3 hp</c>.</summary>
         private void VerbGainOrLose(VerbCall call, AssignOperator op)
         {
-            Num amount = call.Number(0, Num.One);
+            Num amount = call.Amount(0, Num.One);
             string what = call.ArgumentNode(1) switch
             {
                 NameExpr n => n.Name,
@@ -614,7 +671,7 @@ namespace Cantrip.Runtime
         /// <summary><c>choose 2 from hand as picked</c>. Binds the result to <c>chosen</c> unless renamed.</summary>
         private void VerbChoose(VerbCall call)
         {
-            int count = call.Number(0, Num.One).ToInt();
+            int count = call.Amount(0, Num.One).ToInt();
             IReadOnlyList<Entity> options = call.Node.Clause("from") != null
                 ? call.Clause("from").AsEntities()
                 : throw call.Error("expected `from <group>`.");
@@ -639,7 +696,7 @@ namespace Cantrip.Runtime
         /// </remarks>
         private void VerbDiscover(VerbCall call)
         {
-            int count = call.Number(0, Num.One).ToInt();
+            int count = call.Amount(0, Num.One).ToInt();
             if (count <= 0) throw call.Error("needs a positive number of candidates, as in `discover 3 cards`.");
 
             ExprNode source = call.ArgumentNode(1) ?? throw call.Error("expected a kind to discover, as in `discover 3 cards`.");

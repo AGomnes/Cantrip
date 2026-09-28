@@ -1,0 +1,694 @@
+{
+  "FormatVersion": 1,
+  "Turn": 3,
+  "BattleNumber": 1,
+  "ActiveTeam": 1,
+  "InBattle": true,
+  "PlayerId": 1,
+  "NextEntityId": 20,
+  "NextSequence": 20,
+  "NextScheduleId": 3,
+  "NextChainRoot": 39,
+  "ClockNow": 2,
+  "Rng": [
+    5726367031845654541,
+    3662791717741399644,
+    17042498262953750018,
+    5049584178551681873
+  ],
+  "Won": null,
+  "SkipNextDraw": false,
+  "Entities": [
+    {
+      "Id": 1,
+      "Name": "Player",
+      "Kind": 0,
+      "DefinitionKind": null,
+      "DefinitionName": null,
+      "OwnerId": 0,
+      "SourceId": 0,
+      "Team": 1,
+      "Zone": "board",
+      "Position": 0,
+      "IsDead": false,
+      "IsRemoved": false,
+      "Sequence": 1,
+      "PatternIndex": 0,
+      "LastMove": null,
+      "Intent": null,
+      "Phase": null,
+      "Stats": {
+        "block": 0,
+        "energy": 2000000,
+        "hp": 49000000,
+        "max_energy": 3000000,
+        "max_hp": 60000000
+      },
+      "Tags": [],
+      "Attached": [
+        19
+      ]
+    },
+    {
+      "Id": 2,
+      "Name": "Strike",
+      "Kind": 1,
+      "DefinitionKind": "card",
+      "DefinitionName": "Strike",
+      "OwnerId": 1,
+      "SourceId": 0,
+      "Team": 0,
+      "Zone": "hand",
+      "Position": 0,
+      "IsDead": false,
+      "IsRemoved": false,
+      "Sequence": 2,
+      "PatternIndex": 0,
+      "LastMove": null,
+      "Intent": null,
+      "Phase": null,
+      "Stats": {
+        "cost": 1000000
+      },
+      "Tags": [
+        "attack"
+      ],
+      "Attached": []
+    },
+    {
+      "Id": 3,
+      "Name": "Strike",
+      "Kind": 1,
+      "DefinitionKind": "card",
+      "DefinitionName": "Strike",
+      "OwnerId": 1,
+      "SourceId": 0,
+      "Team": 0,
+      "Zone": "hand",
+      "Position": 0,
+      "IsDead": false,
+      "IsRemoved": false,
+      "Sequence": 3,
+      "PatternIndex": 0,
+      "LastMove": null,
+      "Intent": null,
+      "Phase": null,
+      "Stats": {
+        "cost": 1000000
+      },
+      "Tags": [
+        "attack"
+      ],
+      "Attached": []
+    },
+    {
+      "Id": 4,
+      "Name": "Strike",
+      "Kind": 1,
+      "DefinitionKind": "card",
+      "DefinitionName": "Strike",
+      "OwnerId": 1,
+      "SourceId": 0,
+      "Team": 0,
+      "Zone": "draw",
+      "Position": 0,
+      "IsDead": false,
+      "IsRemoved": false,
+      "Sequence": 4,
+      "PatternIndex": 0,
+      "LastMove": null,
+      "Intent": null,
+      "Phase": null,
+      "Stats": {
+        "cost": 1000000
+      },
+      "Tags": [
+        "attack"
+      ],
+      "Attached": []
+    },
+    {
+      "Id": 5,
+      "Name": "Strike",
+      "Kind": 1,
+      "DefinitionKind": "card",
+      "DefinitionName": "Strike",
+      "OwnerId": 1,
+      "SourceId": 0,
+      "Team": 0,
+      "Zone": "draw",
+      "Position": 0,
+      "IsDead": false,
+      "IsRemoved": false,
+      "Sequence": 5,
+      "PatternIndex": 0,
+      "LastMove": null,
+      "Intent": null,
+      "Phase": null,
+      "Stats": {
+        "cost": 1000000
+      },
+      "Tags": [
+        "attack"
+      ],
+      "Attached": []
+    },
+    {
+      "Id": 6,
+      "Name": "Defend",
+      "Kind": 1,
+      "DefinitionKind": "card",
+      "DefinitionName": "Defend",
+      "OwnerId": 1,
+      "SourceId": 0,
+      "Team": 0,
+      "Zone": "hand",
+      "Position": 0,
+      "IsDead": false,
+      "IsRemoved": false,
+      "Sequence": 6,
+      "PatternIndex": 0,
+      "LastMove": null,
+      "Intent": null,
+      "Phase": null,
+      "Stats": {
+        "cost": 1000000
+      },
+      "Tags": [
+        "skill"
+      ],
+      "Attached": []
+    },
+    {
+      "Id": 7,
+      "Name": "Defend",
+      "Kind": 1,
+      "DefinitionKind": "card",
+      "DefinitionName": "Defend",
+      "OwnerId": 1,
+      "SourceId": 0,
+      "Team": 0,
+      "Zone": "draw",
+      "Position": 0,
+      "IsDead": false,
+      "IsRemoved": false,
+      "Sequence": 7,
+      "PatternIndex": 0,
+      "LastMove": null,
+      "Intent": null,
+      "Phase": null,
+      "Stats": {
+        "cost": 1000000
+      },
+      "Tags": [
+        "skill"
+      ],
+      "Attached": []
+    },
+    {
+      "Id": 8,
+      "Name": "Defend",
+      "Kind": 1,
+      "DefinitionKind": "card",
+      "DefinitionName": "Defend",
+      "OwnerId": 1,
+      "SourceId": 0,
+      "Team": 0,
+      "Zone": "draw",
+      "Position": 0,
+      "IsDead": false,
+      "IsRemoved": false,
+      "Sequence": 8,
+      "PatternIndex": 0,
+      "LastMove": null,
+      "Intent": null,
+      "Phase": null,
+      "Stats": {
+        "cost": 1000000
+      },
+      "Tags": [
+        "skill"
+      ],
+      "Attached": []
+    },
+    {
+      "Id": 9,
+      "Name": "Fireball",
+      "Kind": 1,
+      "DefinitionKind": "card",
+      "DefinitionName": "Fireball",
+      "OwnerId": 1,
+      "SourceId": 0,
+      "Team": 0,
+      "Zone": "hand",
+      "Position": 0,
+      "IsDead": false,
+      "IsRemoved": false,
+      "Sequence": 9,
+      "PatternIndex": 0,
+      "LastMove": null,
+      "Intent": null,
+      "Phase": null,
+      "Stats": {
+        "cost": 2000000
+      },
+      "Tags": [
+        "attack",
+        "fire"
+      ],
+      "Attached": []
+    },
+    {
+      "Id": 10,
+      "Name": "Flame Jab",
+      "Kind": 1,
+      "DefinitionKind": "card",
+      "DefinitionName": "Flame Jab",
+      "OwnerId": 1,
+      "SourceId": 0,
+      "Team": 0,
+      "Zone": "draw",
+      "Position": 0,
+      "IsDead": false,
+      "IsRemoved": false,
+      "Sequence": 10,
+      "PatternIndex": 0,
+      "LastMove": null,
+      "Intent": null,
+      "Phase": null,
+      "Stats": {
+        "cost": 1000000
+      },
+      "Tags": [
+        "attack",
+        "fire"
+      ],
+      "Attached": []
+    },
+    {
+      "Id": 11,
+      "Name": "Deadly Poison",
+      "Kind": 1,
+      "DefinitionKind": "card",
+      "DefinitionName": "Deadly Poison",
+      "OwnerId": 1,
+      "SourceId": 0,
+      "Team": 0,
+      "Zone": "hand",
+      "Position": 0,
+      "IsDead": false,
+      "IsRemoved": false,
+      "Sequence": 11,
+      "PatternIndex": 0,
+      "LastMove": null,
+      "Intent": null,
+      "Phase": null,
+      "Stats": {
+        "cost": 1000000
+      },
+      "Tags": [
+        "skill"
+      ],
+      "Attached": []
+    },
+    {
+      "Id": 12,
+      "Name": "Kindling",
+      "Kind": 3,
+      "DefinitionKind": "relic",
+      "DefinitionName": "Kindling",
+      "OwnerId": 1,
+      "SourceId": 0,
+      "Team": 0,
+      "Zone": "relics",
+      "Position": 0,
+      "IsDead": false,
+      "IsRemoved": false,
+      "Sequence": 12,
+      "PatternIndex": 0,
+      "LastMove": null,
+      "Intent": null,
+      "Phase": null,
+      "Stats": {},
+      "Tags": [],
+      "Attached": []
+    },
+    {
+      "Id": 13,
+      "Name": "Jaw Worm",
+      "Kind": 0,
+      "DefinitionKind": "enemy",
+      "DefinitionName": "Jaw Worm",
+      "OwnerId": 0,
+      "SourceId": 0,
+      "Team": 2,
+      "Zone": "board",
+      "Position": 0,
+      "IsDead": false,
+      "IsRemoved": false,
+      "Sequence": 13,
+      "PatternIndex": 3,
+      "LastMove": "Bellow",
+      "Intent": "Chomp",
+      "Phase": null,
+      "Stats": {
+        "block": 6000000,
+        "hp": 5000000,
+        "max_hp": 40000000
+      },
+      "Tags": [],
+      "Attached": [
+        15,
+        16
+      ]
+    },
+    {
+      "Id": 14,
+      "Name": "Frozen",
+      "Kind": 2,
+      "DefinitionKind": "status",
+      "DefinitionName": "Frozen",
+      "OwnerId": 13,
+      "SourceId": 1,
+      "Team": 0,
+      "Zone": "",
+      "Position": 0,
+      "IsDead": false,
+      "IsRemoved": true,
+      "Sequence": 14,
+      "PatternIndex": 0,
+      "LastMove": null,
+      "Intent": null,
+      "Phase": null,
+      "Stats": {
+        "stacks": 1000000
+      },
+      "Tags": [
+        "control",
+        "ice"
+      ],
+      "Attached": []
+    },
+    {
+      "Id": 15,
+      "Name": "Burn",
+      "Kind": 2,
+      "DefinitionKind": "status",
+      "DefinitionName": "Burn",
+      "OwnerId": 13,
+      "SourceId": 12,
+      "Team": 0,
+      "Zone": "attached",
+      "Position": 0,
+      "IsDead": false,
+      "IsRemoved": false,
+      "Sequence": 15,
+      "PatternIndex": 0,
+      "LastMove": null,
+      "Intent": null,
+      "Phase": null,
+      "Stats": {
+        "stacks": 2000000
+      },
+      "Tags": [
+        "debuff",
+        "dot",
+        "fire"
+      ],
+      "Attached": []
+    },
+    {
+      "Id": 16,
+      "Name": "Strength",
+      "Kind": 2,
+      "DefinitionKind": "status",
+      "DefinitionName": "Strength",
+      "OwnerId": 13,
+      "SourceId": 13,
+      "Team": 0,
+      "Zone": "attached",
+      "Position": 0,
+      "IsDead": false,
+      "IsRemoved": false,
+      "Sequence": 16,
+      "PatternIndex": 0,
+      "LastMove": null,
+      "Intent": null,
+      "Phase": null,
+      "Stats": {
+        "stacks": 3000000
+      },
+      "Tags": [
+        "buff"
+      ],
+      "Attached": []
+    },
+    {
+      "Id": 17,
+      "Name": "Prepare",
+      "Kind": 1,
+      "DefinitionKind": "card",
+      "DefinitionName": "Prepare",
+      "OwnerId": 1,
+      "SourceId": 0,
+      "Team": 0,
+      "Zone": "discard",
+      "Position": 0,
+      "IsDead": false,
+      "IsRemoved": false,
+      "Sequence": 17,
+      "PatternIndex": 0,
+      "LastMove": null,
+      "Intent": null,
+      "Phase": null,
+      "Stats": {
+        "cost": 1000000
+      },
+      "Tags": [
+        "skill"
+      ],
+      "Attached": []
+    },
+    {
+      "Id": 18,
+      "Name": "Flex",
+      "Kind": 1,
+      "DefinitionKind": "card",
+      "DefinitionName": "Flex",
+      "OwnerId": 1,
+      "SourceId": 0,
+      "Team": 0,
+      "Zone": "discard",
+      "Position": 0,
+      "IsDead": false,
+      "IsRemoved": false,
+      "Sequence": 18,
+      "PatternIndex": 0,
+      "LastMove": null,
+      "Intent": null,
+      "Phase": null,
+      "Stats": {
+        "cost": 0
+      },
+      "Tags": [
+        "skill"
+      ],
+      "Attached": []
+    },
+    {
+      "Id": 19,
+      "Name": "Strength",
+      "Kind": 2,
+      "DefinitionKind": "status",
+      "DefinitionName": "Strength",
+      "OwnerId": 1,
+      "SourceId": 1,
+      "Team": 0,
+      "Zone": "attached",
+      "Position": 0,
+      "IsDead": false,
+      "IsRemoved": false,
+      "Sequence": 19,
+      "PatternIndex": 0,
+      "LastMove": null,
+      "Intent": null,
+      "Phase": null,
+      "Stats": {
+        "stacks": 2000000
+      },
+      "Tags": [
+        "buff"
+      ],
+      "Attached": []
+    }
+  ],
+  "Zones": [
+    {
+      "OwnerId": 0,
+      "Zone": "board",
+      "Entities": [
+        1,
+        13
+      ]
+    },
+    {
+      "OwnerId": 1,
+      "Zone": "attached",
+      "Entities": [
+        19
+      ]
+    },
+    {
+      "OwnerId": 1,
+      "Zone": "discard",
+      "Entities": [
+        17,
+        18
+      ]
+    },
+    {
+      "OwnerId": 1,
+      "Zone": "draw",
+      "Entities": [
+        7,
+        10,
+        4,
+        5,
+        8
+      ]
+    },
+    {
+      "OwnerId": 1,
+      "Zone": "hand",
+      "Entities": [
+        2,
+        3,
+        9,
+        6,
+        11
+      ]
+    },
+    {
+      "OwnerId": 1,
+      "Zone": "relics",
+      "Entities": [
+        12
+      ]
+    },
+    {
+      "OwnerId": 13,
+      "Zone": "attached",
+      "Entities": [
+        15,
+        16
+      ]
+    }
+  ],
+  "Scheduled": [
+    {
+      "Id": 1,
+      "Timing": 1,
+      "OwnerId": 1,
+      "Block": "card:Prepare/effect/0.body",
+      "BlockHash": "6c0644c7537e7b86",
+      "Statements": null,
+      "DueAt": 0,
+      "Deadline": null,
+      "Bindings": {
+        "self": {
+          "Kind": 4,
+          "Number": 0,
+          "High": 0,
+          "Unit": null,
+          "Text": null,
+          "Entities": [
+            17
+          ],
+          "DefinitionKind": null,
+          "DefinitionName": null,
+          "Qualifier": null
+        },
+        "source": {
+          "Kind": 4,
+          "Number": 0,
+          "High": 0,
+          "Unit": null,
+          "Text": null,
+          "Entities": [
+            1
+          ],
+          "DefinitionKind": null,
+          "DefinitionName": null,
+          "Qualifier": null
+        },
+        "target": {
+          "Kind": 0,
+          "Number": 0,
+          "High": 0,
+          "Unit": null,
+          "Text": null,
+          "Entities": null,
+          "DefinitionKind": null,
+          "DefinitionName": null,
+          "Qualifier": null
+        },
+        "card": {
+          "Kind": 4,
+          "Number": 0,
+          "High": 0,
+          "Unit": null,
+          "Text": null,
+          "Entities": [
+            17
+          ],
+          "DefinitionKind": null,
+          "DefinitionName": null,
+          "Qualifier": null
+        }
+      },
+      "Undo": []
+    },
+    {
+      "Id": 2,
+      "Timing": 2,
+      "OwnerId": 1,
+      "Block": null,
+      "BlockHash": null,
+      "Statements": null,
+      "DueAt": 0,
+      "Deadline": "turn_end",
+      "Bindings": {},
+      "Undo": [
+        {
+          "EntityId": 19,
+          "Tag": null,
+          "AttachedId": 0,
+          "Stat": "stacks",
+          "Delta": 2000000
+        }
+      ]
+    }
+  ],
+  "ListenerLimits": [],
+  "ListenerDues": [],
+  "TurnHistory": {
+    "cards_drawn": 5000000,
+    "cards_drawn#1": 5000000,
+    "cards_played": 2000000,
+    "cards_played#1": 2000000
+  },
+  "BattleHistory": {
+    "cards_drawn": 15000000,
+    "cards_drawn#1": 15000000,
+    "cards_played": 7000000,
+    "cards_played#1": 7000000,
+    "attacks": 3000000,
+    "attacks#1": 3000000,
+    "damage_taken": 46000000,
+    "damage_taken#13": 35000000,
+    "damage_dealt": 46000000,
+    "damage_dealt#1": 18000000,
+    "damage_dealt#13": 28000000,
+    "damage_taken#1": 11000000
+  }
+}

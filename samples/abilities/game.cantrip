@@ -4,6 +4,11 @@
 #
 # Run:  dotnet run --project src/Cantrip.Cli -- test samples/abilities
 
+# Abilities here wait 1 and 2 turns, so this is a turn-clock game and says so. A `3s` anywhere
+# in it is then error CT325 at lint, rather than a runtime error the day that line runs.
+ruleset
+  clock turns
+
 status Bleed
   tags debuff
   stacking intensity

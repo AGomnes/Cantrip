@@ -128,18 +128,23 @@ namespace Cantrip.Tests.Snapshots
             runtime.EndTurn();
         }
 
+        /// <summary>The same content freshly loaded, with no game in it, for a save to land in.</summary>
+        public static CardRuntime Fresh() =>
+            new CardRuntime(ContentLibrary.FromText(SampleContent.Value, "content.cantrip"), new RuntimeOptions { Seed = 999 });
+
         /// <summary>Captures, serializes to JSON, and restores into a brand new runtime with freshly loaded content.</summary>
         public static CardRuntime RoundTrip(CardRuntime original)
         {
             string json = JsonSerializer.Serialize(original.Capture());
             GameSnapshot snapshot = JsonSerializer.Deserialize<GameSnapshot>(json)!;
 
-            var restored = new CardRuntime(ContentLibrary.FromText(SampleContent.Value, "content.cantrip"), new RuntimeOptions { Seed = 999 });
+            CardRuntime restored = Fresh();
             restored.Restore(snapshot);
             return restored;
         }
 
-        private static string RepositoryRoot()
+        /// <summary>The repository root, for a test that reads a file checked in beside it.</summary>
+        public static string RepositoryRoot()
         {
             for (DirectoryInfo? directory = new DirectoryInfo(AppContext.BaseDirectory); directory != null; directory = directory.Parent)
             {

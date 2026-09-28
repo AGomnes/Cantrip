@@ -20,10 +20,22 @@ namespace Cantrip.Syntax
         /// Words that introduce a named clause and therefore terminate the argument list. These
         /// are the only reserved words inside a command line.
         /// </summary>
-        private static readonly HashSet<string> ClauseKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        /// <remarks>
+        /// This is grammar, not meaning: the parser still attaches none to any of them, and which
+        /// verb reads which is <see cref="Runtime.BuiltinClauses"/>'s business. Four of these words
+        /// — <c>at</c>, <c>over</c>, <c>against</c> and <c>using</c> — are read by no built-in verb
+        /// and stay that way. They are here so that a verb a game registers in C# can read them, and
+        /// so that a built-in verb handed one can name the word that works instead.
+        /// </remarks>
+        public static IReadOnlyList<string> ClauseWords { get; } = new[]
         {
             "to", "from", "for", "with", "at", "by", "into", "over", "as", "of", "against", "using", "onto",
         };
+
+        /// <summary>True for a word that introduces a clause, as opposed to a flag written after a comma.</summary>
+        public static bool IsClauseWord(string word) => word != null && ClauseKeywords.Contains(word);
+
+        private static readonly HashSet<string> ClauseKeywords = new HashSet<string>(ClauseWords, StringComparer.OrdinalIgnoreCase);
 
         /// <summary>Bare modifiers that may trail a command after a comma, such as <c>ignore block</c>.</summary>
         private static readonly HashSet<string> FlagKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)

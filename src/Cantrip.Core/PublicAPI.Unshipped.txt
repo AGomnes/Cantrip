@@ -1,1 +1,47 @@
 #nullable enable
+*REMOVED*Cantrip.Runtime.ScheduledSnapshot.Block.get -> string?
+*REMOVED*Cantrip.Runtime.ScheduledSnapshot.Deadline.get -> string?
+*REMOVED*const Cantrip.Runtime.GameSnapshot.CurrentFormat = 1 -> int
+Cantrip.Runtime.GameSnapshot.MinimumReader.get -> int
+Cantrip.Runtime.GameSnapshot.MinimumReader.set -> void
+Cantrip.Runtime.GameSnapshot.RngGenerator.get -> string!
+Cantrip.Runtime.GameSnapshot.RngGenerator.set -> void
+Cantrip.Runtime.GameSnapshot.WrittenBy.get -> string!
+Cantrip.Runtime.GameSnapshot.WrittenBy.set -> void
+Cantrip.Runtime.ScheduledSnapshot.BlockAddress.get -> string?
+Cantrip.Runtime.ScheduledSnapshot.BlockAddress.set -> void
+Cantrip.Runtime.ScheduledSnapshot.UntilEvent.get -> string?
+Cantrip.Runtime.ScheduledSnapshot.UntilEvent.set -> void
+const Cantrip.Runtime.GameSnapshot.CurrentFormat = 2 -> int
+const Cantrip.Runtime.GameSnapshot.CurrentMinimumReader = 2 -> int
+const Cantrip.Runtime.GameSnapshot.CurrentRng = "xoshiro256**" -> string!
+static Cantrip.Runtime.GameSnapshot.ReaderNeededBy(Cantrip.Runtime.GameSnapshot! snapshot) -> int
+static readonly Cantrip.Runtime.GameSnapshot.CurrentWriter -> string!
+static Cantrip.Runtime.BuiltinEvents.VerbsThatRaise(string! eventName) -> System.Collections.Generic.IReadOnlyList<string!>!
+const Cantrip.Linting.Linter.EmitsBuiltinEvent = "CT322" -> string!
+const Cantrip.Linting.Linter.ClauseNotRead = "CT323" -> string!
+Cantrip.Runtime.BuiltinClauses
+static Cantrip.Runtime.BuiltinClauses.IsKnownVerb(string! verb) -> bool
+static Cantrip.Runtime.BuiltinClauses.ReadBy(string! verb) -> System.Collections.Generic.IReadOnlyList<string!>!
+static Cantrip.Runtime.BuiltinClauses.Reads(string! verb, string! clause) -> bool
+static Cantrip.Runtime.BuiltinClauses.Unread(Cantrip.Syntax.CommandNode! command) -> System.Collections.Generic.IReadOnlyList<Cantrip.Syntax.ClauseNode!>!
+static Cantrip.Runtime.BuiltinClauses.Verbs.get -> System.Collections.Generic.IReadOnlyList<string!>!
+static Cantrip.Syntax.Parser.ClauseWords.get -> System.Collections.Generic.IReadOnlyList<string!>!
+static Cantrip.Syntax.Parser.IsClauseWord(string! word) -> bool
+const Cantrip.Linting.Linter.PercentageWhereACountIsMeant = "CT324" -> string!
+Cantrip.Runtime.VerbCall.Amount(int index, Cantrip.Num fallback) -> Cantrip.Num
+const Cantrip.Linting.Linter.WrongClock = "CT325" -> string!
+Cantrip.Runtime.ClockKind
+Cantrip.Runtime.ClockKind.Ticks = 2 -> Cantrip.Runtime.ClockKind
+Cantrip.Runtime.ClockKind.Turns = 1 -> Cantrip.Runtime.ClockKind
+Cantrip.Runtime.ClockKind.Unstated = 0 -> Cantrip.Runtime.ClockKind
+Cantrip.Runtime.Ruleset.Clock.get -> Cantrip.Runtime.ClockKind
+Cantrip.Runtime.Ruleset.Clock.set -> void
+Cantrip.Runtime.Interpreter.IsTargetable(Cantrip.Runtime.Entity! candidate, Cantrip.Runtime.Entity? source, Cantrip.Runtime.Entity? card) -> bool
+Cantrip.Runtime.Interpreter.Targetable(System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>! candidates, Cantrip.Runtime.Entity? source, Cantrip.Runtime.Entity? card) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+const Cantrip.Runtime.Interpreter.TargetableChannel = "targetable" -> string!
+Cantrip.Runtime.NewListeners
+Cantrip.Runtime.NewListeners.HearTheEvent = 0 -> Cantrip.Runtime.NewListeners
+Cantrip.Runtime.NewListeners.MissTheEvent = 1 -> Cantrip.Runtime.NewListeners
+Cantrip.Runtime.Ruleset.NewListeners.get -> Cantrip.Runtime.NewListeners
+Cantrip.Runtime.Ruleset.NewListeners.set -> void

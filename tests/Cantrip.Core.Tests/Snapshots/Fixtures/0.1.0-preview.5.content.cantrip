@@ -145,4 +145,4 @@ enemy "Jaw Worm"
 ability "Frost Nova"
   cooldown 8s
   effect:
-    apply Slow 2 for 3s to enemies
+    apply Slow 40% for 3s to enemies

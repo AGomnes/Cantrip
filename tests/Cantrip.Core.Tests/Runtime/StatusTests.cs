@@ -382,11 +382,11 @@ namespace Cantrip.Tests.Runtime
             CardRuntime runtime = Create(Statuses, new RuntimeOptions { Clock = new TickClock(10) });
             Entity enemy = Enemy(runtime);
 
-            runtime.Execute("apply Poison 40% for 2s to enemy");
-            Assert.Equal(40, Stacks(enemy, "Poison"));
+            runtime.Execute("apply Poison 4 for 2s to enemy");
+            Assert.Equal(4, Stacks(enemy, "Poison"));
 
             runtime.Tick(19);
-            Assert.Equal(40, Stacks(enemy, "Poison"));
+            Assert.Equal(4, Stacks(enemy, "Poison"));
 
             runtime.Tick(1);
             Assert.Null(enemy.FindAttached("Poison"));

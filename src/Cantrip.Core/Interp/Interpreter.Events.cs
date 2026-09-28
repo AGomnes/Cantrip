@@ -76,6 +76,10 @@ namespace Cantrip.Runtime
         /// </param>
         public bool Raise(GameEvent gameEvent, EvalContext context, Action? action = null, Action? committed = null)
         {
+            // Noted before anything runs, so "was this listener already here?" has an answer even
+            // though it is the action in the middle that usually brings the new ones in.
+            gameEvent.ListenersAtRaise = State.Events.NextOrder;
+
             gameEvent.TraceId = State.Trace.Record(
                 State.Clock.Now,
                 "event",
@@ -157,6 +161,17 @@ namespace Cantrip.Runtime
             {
                 // An earlier listener in this same dispatch may have removed or moved this one's owner.
                 if (listener.Owner.IsRemoved || !State.IsActive(listener.Owner)) continue;
+
+                // A listener that came into play during this event hears it or does not, as the
+                // ruleset says. The default is that it does, which is what content written before
+                // the setting existed expects — and what makes "whenever you summon a minion" have
+                // to leave its own summon out.
+                if (Rules.NewListeners == NewListeners.MissTheEvent && listener.Order >= gameEvent.ListenersAtRaise)
+                {
+                    State.Trace.Record(State.Clock.Now, "new", $"skipped {listener}: it arrived during this event", span: listener.Syntax.Span);
+                    continue;
+                }
+
                 if (!Matches(listener, gameEvent, context.Chain)) continue;
 
                 if (Rules.Loops == LoopProtection.OncePerChain && context.Chain.Contains(listener.Id))

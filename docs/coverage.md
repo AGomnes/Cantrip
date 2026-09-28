@@ -51,7 +51,7 @@ Content: [slay_the_spire.cantrip](../samples/corpus/slay_the_spire.cantrip). Tes
 | 7 | Accuracy | Honed Edge | Works | `modify damage of enemies where card:Shiv` on the power card itself. A modifier with no scope is anchored to what it is written on — for a card, its own damage — and naming a scope reaches past that |
 | 8 | Corruption | Rot Pact | Works | Skills cost 0 and exhaust |
 | 9 | Barricade | Bastion | Works | `on before_block_changed(target:owner): if event.reset: cancel`. The reset marks the change it raises, so this refuses that and nothing else — an effect that means to strip block still strips it |
-| 10 | Burst | Reverb | Workaround | The next skill is replayed. A listener that becomes active during an event also hears that event's after phase, so Echo needs `not card:Reverb` |
+| 10 | Burst | Reverb | Workaround | The next skill is replayed. A listener that becomes active during an event also hears that event's after phase, so Echo needs `not card:Reverb`. A game that would rather it did not says `new_listeners: miss_the_event` in its ruleset; the corpus cannot, because one ruleset covers all nine games loaded together |
 | 11 | Reaper | Soul Reap | Works | `deal 4 to all enemies into dealt`, then `heal dealt`. The clause binds what actually landed — past block, and only what a dying enemy could still take |
 | 12 | Envenom | Venom Coat | Works | Unblocked attack damage applies Poison |
 | 13 | Pain | Ache | Works | A curse that hurts while held |
@@ -94,12 +94,12 @@ Content: [hearthstone.cantrip](../samples/corpus/hearthstone.cantrip). Tests: [h
 | 3 | Elven Archer (Battlecry) | Elven Archer | Works | The card's effect summons the minion and pings |
 | 4 | Kobold Geomancer (Spell Damage) | Kobold Geomancer | Works | `modify damage of enemies where tag:spell, source:player`. Naming a scope is how an outward modifier is written here, as War Banner does; without one it would be anchored to the minion itself |
 | 5 | Dire Wolf Alpha (adjacency aura) | Dire Wolf | Works | `modify attack of adjacent(self): +1` |
-| 6 | Knife Juggler | Knife Juggler | Workaround | A listener that becomes active during an event hears it, so the Juggler must leave its own summon out. `not target:self` says it as a filter rather than a guard in the body, but it still has to be said |
+| 6 | Knife Juggler | Knife Juggler | Workaround | A listener that becomes active during an event hears it, so the Juggler must leave its own summon out. `not target:self` says it as a filter rather than a guard in the body, but it still has to be said. `new_listeners: miss_the_event` drops the filter for a game that wants that rule throughout; the corpus keeps it, because one ruleset covers all nine games loaded together |
 | 7 | Minion combat | `trade` verb | Works | The `attack` verb makes each creature the source of its own hit. A content verb still spells the trade out, which is where combat rules belong |
-| 8 | Taunt | Taunt | Works | `modify targetable of allies where source:enemies, not it.has(Taunt): set 0`. The `targetable` channel is asked before a card accepts a target, and the chooser is only offered what passes |
+| 8 | Taunt | Taunt | Works | `modify targetable of allies where source:enemies, not it.has(Taunt): set 0`. The `targetable` channel is asked before anything is pointed at somebody — a card's target, the `attack` verb, an enemy's move — so a taunt binds a minion's swing as well as a card, and the chooser is only offered what passes |
 | 9 | Silence | | Not expressible | Nothing can switch off an entity's own listeners and modifiers |
 | 10 | Discover | Discovery | Works | `discover 3 cards where tag:arcane as found`, then `create found into hand`. The two candidates nobody picks never become cards at all, so no `created` listener hears about them |
-| 11 | Stealth | Stealth | Works | The same channel with no scope, so it anchors to its host: `modify targetable: set 0`. Only pointing a card at it is refused; a blast still reaches it |
+| 11 | Stealth | Stealth | Works | The same channel with no scope, so it anchors to its host: `modify targetable: set 0`. Pointing a card or an `attack` at it is refused; a blast still reaches it |
 
 A Deathrattle that draws a card needs to name who draws — `draw 1 to player` — because `draw` otherwise draws for the running entity's controller, and a minion controls itself.
 
@@ -206,8 +206,7 @@ What the language cannot say yet, ranked by how many rows of the tables above ea
 | 15 | **Costs in several currencies, or paid by a sacrifice.** A cost is one amount in one resource. | Magic #7; Inscryption #6; Dominion #7 | A cost in a named resource, `cost 2 bones`. A sacrifice written into the effect, which cannot refuse the play. |
 | 5 | **Effects as values.** Nothing can copy another entity's effects, or switch them off. `copy` duplicates an entity's *state* — its live stats, tags and statuses — which is a different thing. | Balatro #6; Hearthstone #9 | `copy` for an entity's state. Nothing for its effects. |
 | 17 | **A run above the battle.** A battle is the outermost thing content can see: nothing carries lives, candles or stress from one battle to the next, and `once per run` is the only nod to runs. | Inscryption #8; Darkest Dungeon #7 | The game carries hp, deck and relics between battles in its own code, as [Winning, losing and several battles](csharp.md#winning-losing-and-several-battles) shows. `cantrip sim` plays a gauntlet a `scenario` states; it does not generate one. |
-| 3 | **Target rules beyond choosing a card's target.** There is no blocking step for a rule such as Flying, and no `card:self`. Enemy moves and the `attack` verb do not ask the `targetable` channel, so a taunt does not bind them. | Magic #8; Darkest Dungeon #6 | The `targetable` channel for cards. A card that limits its own reach names itself, as in `card:Pike`. |
-| 6 | **Whether a listener should hear the event that brought it into play.** Today it does, so each listener of that shape must leave its own cause out. The sample roguelite's Chill relies on the current behaviour, so changing it is a decision rather than a fix. | Slay the Spire #10; Hearthstone #6 | A filter: `not target:self`, `not card:Reverb`. |
+| 3 | **Target rules beyond choosing a target.** There is no blocking step for a rule such as Flying, and no `card:self`. | Magic #8; Darkest Dungeon #6 | The `targetable` channel, asked by a card's target, the `attack` verb and an enemy's move. A card that limits its own reach names itself, as in `card:Pike`. |
 | 18 | **A priority window.** Nothing lets one side respond to a card while it is being played. | Magic #5 | A permanent that commits in advance to countering the next spell, which is still cast and paid for. |
 | 8 | **Grouping over collections.** Counting by rank or suit, distinct values, runs. | Balatro #7 | `where` filters and `.count`. |
 | 9 | **Modifiers in source order.** Layers apply in a fixed order, not by the position of their sources, as Balatro's jokers need. It would be a ruleset option. | Balatro #5 | The fixed layer order, which `modifier_layers` can rearrange. |
@@ -222,12 +221,13 @@ The other workarounds are explained in their rows: Heavy Blade (Slay the Spire #
 
 - **1. Time-based triggers.** `on every 1s:` fires on the clock (Dota 2 #2, #8).
 - **2. Re-telegraphing when a phase changes.** `retelegraph` on a phase re-rolls the intent as the threshold is crossed (Slay the Spire #22). It is opt-in: see [Phases](language.md#phases).
-- **3, in part. Target validity.** The `targetable` channel is asked before a card accepts a target, which is how a taunt and stealth are written (Hearthstone #8, #11). The rest is open above.
+- **3, in part. Target validity.** The `targetable` channel is asked before anything is pointed at somebody — a card's target, the `attack` verb and an enemy's move — which is how a taunt and stealth are written (Hearthstone #8, #11). What is left open above is a blocking step and `card:self`.
 - **7, in part. Definition pools.** `discover` offers content that nothing has been made from yet (Hearthstone #10, Darkest Dungeon #8). Since 0.1.0-preview.2 the player can answer the offer in a game, as with any other choice. The rest is open above.
 - **10. Cancellable resets.** `event.reset` marks a reset, so `if event.reset: cancel` keeps block across turns (Slay the Spire #9).
 - **11. Cooldown as a modifier channel.** `modify cooldown: x0.5` (Dota 2 #5).
 - **13. Not a gap: the modifier anchor.** A modifier without `of` applies to what it is written on, and naming a scope reaches past that (Slay the Spire #7, Hearthstone #4).
 - **14. `draw` for someone else.** `draw 1 to player` lets a creature draw for the player (Inscryption #7).
+- **6. Whether a listener hears the event that brought it into play.** It is a ruleset setting, `new_listeners`, defaulting to `hear_the_event` — today's behaviour, which the sample roguelite's Chill and Slay the Spire #10's Echo are written against. Content that wants the other rule writes `new_listeners: miss_the_event` and drops the `not target:self` filter (Hearthstone #6). The default can move in a later release without breaking anyone, because content that cares now says which it means.
 - **15, in part. A cost in another resource.** `cost 2 bones` is refused when the bones are not there, as an energy cost is (Inscryption #2). The rest is open above.
 - **16. A declared resource creates its own stat.** `resource "actions"` with `reset_to 1` gives every actor one action a turn with nothing else to grant it (Dominion #1).
 

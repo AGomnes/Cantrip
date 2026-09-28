@@ -49,6 +49,13 @@ namespace Cantrip.Runtime
         /// <summary>Trace entry for this event, so listeners can be recorded as its children.</summary>
         public long TraceId { get; internal set; }
 
+        /// <summary>
+        /// The registration order the event bus had reached when this event was raised. A listener
+        /// whose <see cref="Listener.Order"/> is at least this came into play during the event, and
+        /// is the one a <c>new_listeners: miss_the_event</c> ruleset leaves out.
+        /// </summary>
+        internal long ListenersAtRaise { get; set; } = long.MaxValue;
+
         public override string ToString() => $"{Phase.ToString().ToLowerInvariant()} {Name}";
     }
 
@@ -131,6 +138,12 @@ namespace Cantrip.Runtime
         private long _nextOrder = 1;
 
         public int Count { get; private set; }
+
+        /// <summary>
+        /// The order the next listener registered will be given. An event stamps this as it is
+        /// raised, so anything that arrives afterwards can be told apart from what was already here.
+        /// </summary>
+        internal long NextOrder => _nextOrder;
 
         internal Listener Register(Entity owner, ListenerNode syntax, long intervalUnits = 0)
         {

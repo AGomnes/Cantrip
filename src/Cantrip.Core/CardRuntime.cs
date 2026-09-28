@@ -57,7 +57,15 @@ namespace Cantrip
             options ??= new RuntimeOptions();
 
             Ruleset rules = options.Rules ?? content.BuildRuleset();
-            IGameClock clock = options.Clock ?? new TurnClock();
+            IGameClock clock = options.Clock ?? DeclaredClock(rules);
+
+            // A game that hands in a clock its content was not written for is the same mistake the
+            // ruleset setting exists to catch, one layer up: `on every 1s:` would register nothing
+            // and `for 3s` would throw when the line ran. Say it here, where the runtime is built.
+            if (rules.Clock == ClockKind.Turns && !(clock is TurnClock))
+                throw new InvalidOperationException("This content says `clock turns`, but the runtime was given a tick clock. Remove the clock, or change the ruleset.");
+            if (rules.Clock == ClockKind.Ticks && !(clock is TickClock))
+                throw new InvalidOperationException("This content says `clock ticks`, but the runtime was given a turn clock. Pass a `TickClock`, or change the ruleset.");
 
             State = new GameState(content, rules, clock, options.Seed);
             State.Trace.Enabled = options.Trace;
@@ -68,6 +76,13 @@ namespace Cantrip
             RegisterRuntimeVerbs();
             clock.Advanced += OnClockAdvanced;
         }
+
+        /// <summary>
+        /// The clock content asked for, or a turn clock when it did not say — which is what every
+        /// game written before the <c>clock</c> setting existed gets.
+        /// </summary>
+        private static IGameClock DeclaredClock(Ruleset rules) =>
+            rules.Clock == ClockKind.Ticks ? new TickClock() : (IGameClock)new TurnClock();
 
         /// <summary>Loads content from text and throws if it has any errors.</summary>
         public static CardRuntime FromText(string text, RuntimeOptions? options = null)
@@ -637,7 +652,7 @@ namespace Cantrip
 
         // Target validity ----------------------------------------------------------------------
 
-        private const string TargetableChannel = "targetable";
+        private const string TargetableChannel = Interpreter.TargetableChannel;
 
         /// <summary>
         /// Whether one entity may be named as this card's target. Content adds rules to target
@@ -655,32 +670,12 @@ namespace Cantrip
         /// The query carries the card, so a <c>where</c> on the group must say <c>it.</c> to mean the
         /// candidate; a bare <c>tag:</c> there tests the card being played.
         /// </remarks>
-        private bool IsTargetable(Entity card, Entity chooser, Entity candidate)
-        {
-            if (!State.Modifiers.HasChannel(TargetableChannel)) return true;
-
-            var query = new ModifierQuery(TargetableChannel)
-            {
-                Subject = candidate,
-                Source = chooser,
-                Card = card,
-                Tags = card.Tags.ToArray(),
-            };
-            return State.Modifiers.Compute(query, Num.One) > Num.Zero;
-        }
+        private bool IsTargetable(Entity card, Entity chooser, Entity candidate) =>
+            Interpreter.IsTargetable(candidate, chooser, card);
 
         /// <summary>Those of a group the card may actually be pointed at, in the group's own order.</summary>
-        private IReadOnlyList<Entity> Targetable(Entity card, Entity chooser, IReadOnlyList<Entity> candidates)
-        {
-            if (!State.Modifiers.HasChannel(TargetableChannel)) return candidates;
-
-            var allowed = new List<Entity>();
-            foreach (Entity candidate in candidates)
-            {
-                if (IsTargetable(card, chooser, candidate)) allowed.Add(candidate);
-            }
-            return allowed;
-        }
+        private IReadOnlyList<Entity> Targetable(Entity card, Entity chooser, IReadOnlyList<Entity> candidates) =>
+            Interpreter.Targetable(candidates, chooser, card);
 
         // Enemies ------------------------------------------------------------------------------
 
@@ -700,6 +695,8 @@ namespace Cantrip
             MoveDefinition? move = enemy.Definition?.Moves.FirstOrDefault(m => string.Equals(m.Name, moveName, StringComparison.OrdinalIgnoreCase));
             if (move == null) return;
 
+            target = MoveTarget(enemy, target);
+
             Run(enemy, context =>
             {
                 context.Target = target;
@@ -707,6 +704,26 @@ namespace Cantrip
                 gameEvent.Data["move"] = Value.FromText(move.Name);
                 Interpreter.Raise(gameEvent, context, () => Interpreter.Execute(move.Body, context));
             });
+        }
+
+        /// <summary>
+        /// Who a move is really aimed at, after content's <c>targetable</c> rules. A move points at
+        /// somebody the way a card does, so a taunt that takes the player off the table sends the
+        /// move to whoever is left — which is the whole of what a taunt is.
+        /// </summary>
+        /// <remarks>
+        /// The move keeps the target it was given whenever that target is still legal, and falls
+        /// back to it when nothing on that side is: an enemy whose every option is hidden still
+        /// takes its turn, against the one it was going to hit. Only the target the move is handed
+        /// moves; a <c>deal 5 to all enemies</c> inside the move reaches whoever it reaches, as an
+        /// area effect does everywhere else.
+        /// </remarks>
+        private Entity? MoveTarget(Entity enemy, Entity? target)
+        {
+            if (target == null || Interpreter.IsTargetable(target, enemy, null)) return target;
+
+            IReadOnlyList<Entity> side = Interpreter.Targetable(State.Actors(target.Team), enemy, null);
+            return side.Count > 0 ? side[0] : target;
         }
 
         // Real time ----------------------------------------------------------------------------
@@ -1112,7 +1129,7 @@ namespace Cantrip
             var (address, hash, statements) = Describe(waiting) ?? throw new InvalidOperationException(
                 $"The block waiting at {waiting.Body!.Span} cannot be saved: the loaded content does not contain its statements, because a reload has changed them " +
                 "or game code parsed them itself instead of calling Execute. Save once it has run.");
-            record.Block = address;
+            record.BlockAddress = address;
             record.BlockHash = hash;
             record.Statements = statements;
         }
@@ -1188,7 +1205,7 @@ namespace Cantrip
         /// </summary>
         private BlockNode? Saved(ScheduledSnapshot record, ref Dictionary<string, ExecutedStatements>? parsed)
         {
-            string? address = record.Block;
+            string? address = record.BlockAddress;
             if (address == null) return null;
 
             if (record.Statements != null)
@@ -1332,10 +1349,10 @@ namespace Cantrip
         {
             // `play draw.first, free`: play a card out of a pile, with its cost and its triggers,
             // without the player choosing it (Havoc, Mayhem, Monster Train's automatic plays).
-            Interpreter.RegisterVerb("play", VerbPlay);
+            Interpreter.RegisterRuntimeVerb("play", VerbPlay);
 
             // `replay card on target`: resolve a card's effect again, for free (Burst, Echo Form).
-            Interpreter.RegisterVerb("replay", call =>
+            Interpreter.RegisterRuntimeVerb("replay", call =>
             {
                 ExprNode? node = call.ArgumentNode(0) ?? throw call.Error("expected a card.");
                 Entity? target = call.Context.Target;
@@ -1346,6 +1363,24 @@ namespace Cantrip
                 }
 
                 Value value = Interpreter.Evaluate(node, call.Context);
+
+                // `replay Strike` reads as if it repeated a Strike, and there is no Strike: it would
+                // run the printed effect for nothing — no card, no cost, no play — which is the one
+                // free lunch the other three verbs were closed against. A quoted name is text and
+                // lands in the same place, so both are refused as `copy`, `play` and `transform`
+                // refuse them.
+                if (value.Kind == ValueKind.Definition || value.Kind == ValueKind.Text)
+                {
+                    string named = value.Definition?.Name ?? value.Text!;
+                    if (value.Kind == ValueKind.Text && Content.Find(named) == null)
+                        throw call.Error($"nothing named `{named}` is defined.");
+
+                    string spelt = named.IndexOf(' ') >= 0 ? "\"" + named + "\"" : named;
+                    throw call.Error(
+                        $"`replay` resolves the effect of a card that is in the game, and `{named}` is content. " +
+                        $"Write `create {spelt} into hand` first, then `play created.first, free`.");
+                }
+
                 Entity? card = value.Kind == ValueKind.Entity ? value.Entity : null;
                 EntityDefinition? definition = card?.Definition ?? value.Definition;
                 if (definition?.Effect == null) throw call.Error($"{value} has no effect to replay.");
@@ -1358,7 +1393,7 @@ namespace Cantrip
             });
 
             // `use Bellow`: an enemy performs one of its own moves.
-            Interpreter.RegisterVerb("use", call =>
+            Interpreter.RegisterRuntimeVerb("use", call =>
             {
                 Entity self = call.Context.Self ?? throw call.Error("only enemies can use moves.");
                 string move = call.ArgumentNode(0) switch

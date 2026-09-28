@@ -60,6 +60,10 @@ namespace Cantrip.Linting
         public const string UnknownMeasurement = "CT319";
         public const string ContentWhereSomethingInPlayIsMeant = "CT320";
         public const string TransformInsideUntil = "CT321";
+        public const string EmitsBuiltinEvent = "CT322";
+        public const string ClauseNotRead = "CT323";
+        public const string PercentageWhereACountIsMeant = "CT324";
+        public const string WrongClock = "CT325";
 
         /// <summary>Below this many runs, a scenario's numbers move about from one run to the next (CT318).</summary>
         private const int FewRuns = 100;
@@ -183,6 +187,19 @@ namespace Cantrip.Linting
             public Facts Facts { get; } = new Facts();
         }
 
+        /// <summary>
+        /// The verbs whose <c>into</c> clause binds a name, rather than naming a zone. What a verb
+        /// achieved is not what it asked for — block absorbs damage, a heal stops at full health —
+        /// so these four bind what really happened.
+        /// </summary>
+        private static bool BindsIntoAName(string verb) =>
+            string.Equals(verb, "deal", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(verb, "damage", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(verb, "attack", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(verb, "heal", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(verb, "block", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(verb, "gain_block", StringComparison.OrdinalIgnoreCase);
+
         /// <summary>Everything a walk over one body turns up.</summary>
         private sealed class Facts : AstWalker
         {
@@ -193,12 +210,16 @@ namespace Cantrip.Linting
             public List<AssignNode> Assigns { get; } = new List<AssignNode>();
             public List<CallExpr> Calls { get; } = new List<CallExpr>();
             public List<BinaryExpr> OnExpressions { get; } = new List<BinaryExpr>();
+            public List<ScheduleNode> Schedules { get; } = new List<ScheduleNode>();
             public HashSet<string> Locals { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             public override void VisitStatement(StatementNode statement)
             {
                 switch (statement)
                 {
+                    case ScheduleNode schedule:
+                        Schedules.Add(schedule);
+                        break;
                     case CommandNode command:
                         Commands.Add(command);
                         if (command.Clause("as") is NameExpr alias
@@ -209,10 +230,7 @@ namespace Cantrip.Linting
                         // `deal 4 to all enemies into dealt` binds what landed, the way
                         // `choose ... as` binds what was chosen. Only the verbs that honour the
                         // clause bind anything, so a name written on one that ignores it still warns.
-                        if (command.Clause("into") is NameExpr bound
-                            && (string.Equals(command.Verb, "deal", StringComparison.OrdinalIgnoreCase)
-                                || string.Equals(command.Verb, "damage", StringComparison.OrdinalIgnoreCase)
-                                || string.Equals(command.Verb, "attack", StringComparison.OrdinalIgnoreCase)))
+                        if (command.Clause("into") is NameExpr bound && BindsIntoAName(command.Verb))
                             Locals.Add(bound.Name);
                         break;
                     case ForEachNode loop:
@@ -283,6 +301,8 @@ namespace Cantrip.Linting
             {
                 CheckVerbs(body);
                 CheckInPlay(body);
+                CheckEmits(body);
+                CheckClauses(body);
                 CheckUntilTransforms(body);
                 CheckScenario(body); // before CheckNames: `stalls` and `wins` are measurements, not names
                 CheckNames(body);
@@ -294,6 +314,7 @@ namespace Cantrip.Linting
             }
 
             CheckBlocks();
+            CheckClock();
             CheckIgnoredDurations();
             CheckTagProperties();
             CheckListenedEvents();
@@ -412,7 +433,10 @@ namespace Cantrip.Linting
                     switch (verb)
                     {
                         case "emit":
-                            if (WordAt(command, 0) is string emitted && !_emitted.ContainsKey(emitted)) _emitted[emitted] = command;
+                            // A built-in name here is CT322, not an event the content raises: it is
+                            // refused at run, so nothing downstream should count it as raised.
+                            if (WordAt(command, 0) is string emitted && !BuiltinEvents.IsBuiltin(emitted) && !_emitted.ContainsKey(emitted))
+                                _emitted[emitted] = command;
                             break;
 
                         case "gain":
@@ -488,10 +512,10 @@ namespace Cantrip.Linting
 
         /// <summary>
         /// CT320: a verb that acts on something already in the game, handed a name that is content.
-        /// <c>copy Strike</c>, <c>play Strike</c> and <c>transform Strike into Wound</c> all read as
-        /// if they would act on every Strike, and all three are runtime errors; the fix is a different
-        /// verb or a different word in the slot, so the message says which rather than guessing at a
-        /// spelling.
+        /// <c>copy Strike</c>, <c>play Strike</c>, <c>replay Strike</c> and <c>transform Strike into
+        /// Wound</c> all read as if they would act on every Strike, and all four are runtime errors;
+        /// the fix is a different verb or a different word in the slot, so the message says which
+        /// rather than guessing at a spelling.
         /// </summary>
         private void CheckInPlay(Body body)
         {
@@ -502,7 +526,7 @@ namespace Cantrip.Linting
                 // In a test, `play` is the test's own verb and naming a card is how it is written.
                 // In a scenario it is CT301, which already says where the verb belongs.
                 bool inRules = body.Kind != BodyKind.Test && body.Kind != BodyKind.Scenario;
-                if (verb != "copy" && verb != "transform" && !(verb == "play" && inRules)) continue;
+                if (verb != "copy" && verb != "transform" && verb != "replay" && verb != "create" && !(verb == "play" && inRules)) continue;
 
                 // A game may have had a verb of its own by one of these names before they were
                 // built in, in content or registered in C#. That one still runs, so this check has
@@ -518,6 +542,31 @@ namespace Cantrip.Linting
                 };
                 if (written == null || _content.Find(written) == null) continue;
 
+                // `create` is the other way round: content is exactly what it wants, but only the
+                // kinds that stand in a zone on their own. A status, keyword or ability is handed
+                // out, never made, so a name that is only one of those three is the same mistake in
+                // reverse — and it used to make orphans that raised `created` and went into saves.
+                if (verb == "create")
+                {
+                    if (_content.FindAny(written, "card", "enemy", "actor", "relic", "item") != null) continue;
+                    EntityDefinition? held = _content.FindAny(written, "status", "keyword", "ability");
+                    if (held == null) continue;
+
+                    // The count reads across from `create Poison 2` to `apply Poison 2`, so the fix
+                    // is the line the author meant rather than a line they have to edit again.
+                    string many = command.Arguments.Count > 1 && command.Arguments[1] is NumberExpr count
+                        ? count.Value.ToString()
+                        : "1";
+
+                    Error(ContentWhereSomethingInPlayIsMeant,
+                        $"`{written}` is {A(held.KindName)} and belongs to whoever has it, not to a zone. " +
+                        (held.Kind == EntityKind.Ability
+                            ? $"An ability is granted to an actor rather than made: a test writes `grant {Written(first!)}`, and a game calls `GrantAbility`."
+                            : $"Write `apply {Written(first!)} {many} to <who>` to give one."),
+                        command.Span);
+                    continue;
+                }
+
                 // The fix is a different verb, not a different spelling, so the message says it
                 // outright and no "did you mean" is offered to argue with it.
                 string spelt = Written(first!);
@@ -526,9 +575,145 @@ namespace Cantrip.Linting
                 {
                     "copy" => $"`copy` acts on something in the game, and `{written}` is content. Write `create {spelt}` for a fresh one.",
                     "transform" => $"`transform` changes something that is in the game, and `{written}` is content. Name what should change, as in `transform target into {becomes}`.",
+                    "replay" => $"`replay` resolves the effect of a card that is in the game, and `{written}` is content. Write `create {spelt} into hand` first, then `play created.first, free`.",
                     _ => $"`play` acts on a card that is in a pile, and `{written}` is content. Write `create {spelt} into hand` first, then `play created.first`.",
                 },
                     command.Span);
+            }
+        }
+
+        /// <summary>
+        /// CT325: a length written in units the game's clock cannot measure. Seconds belong to a
+        /// tick clock and turns to a turn clock, and the two do not convert into each other; content
+        /// says which it is written for with <c>clock turns</c> or <c>clock ticks</c> in its
+        /// <c>ruleset</c> block.
+        /// </summary>
+        /// <remarks>
+        /// The two halves used to fail differently and neither said so: <c>on every 1s:</c> in a
+        /// turn game registered nothing at all, in silence, while <c>apply Weak 1 for 3s</c> in the
+        /// same game threw when the line ran. Content that says nothing is unchanged, so this only
+        /// ever fires where the author has stated the clock.
+        /// </remarks>
+        private void CheckClock()
+        {
+            ClockKind declared = _content.BuildRuleset(new DiagnosticBag()).Clock;
+            if (declared == ClockKind.Unstated) return;
+
+            IGameClock clock = declared == ClockKind.Ticks ? new TickClock() : (IGameClock)new TurnClock();
+            string stated = declared == ClockKind.Ticks ? "ticks" : "turns";
+            string measures = declared == ClockKind.Ticks
+                ? "This game says `clock ticks`, so it measures time in ticks, seconds and milliseconds."
+                : "This game says `clock turns`, so it measures time in turns.";
+
+            void Check(Num amount, string? unit, SourceSpan span, string what)
+            {
+                if (string.IsNullOrEmpty(unit)) return;   // no unit: whatever the clock counts in
+                if (clock.TryConvert(amount, unit, out _)) return;
+
+                Error(WrongClock,
+                    $"{what} is written in `{unit}`, which a `{stated}` clock cannot measure. {measures} " +
+                    (declared == ClockKind.Ticks
+                        ? "Write it in seconds (`3s`), milliseconds (`250ms`) or ticks, or say `clock turns` in the ruleset."
+                        : "Write it in turns (`2 turns`), or say `clock ticks` in the ruleset."),
+                    span);
+            }
+
+            foreach (EntityDefinition definition in _content.Definitions)
+            {
+                if (definition.Property("cooldown") is PropertyNode cooldown
+                    && cooldown.Values.FirstOrDefault() is NumberExpr wait)
+                    Check(wait.Value, wait.Unit, cooldown.Span, $"The cooldown of `{definition.Name}`");
+            }
+
+            foreach (Body body in _bodies)
+            {
+                if (body.Listener is ListenerNode listener && !listener.Interval.IsZero)
+                    Check(listener.Interval, listener.IntervalUnit, listener.Span, "This `on every ...:` interval");
+
+                foreach (CommandNode command in body.Facts.Commands)
+                {
+                    if (command.Clause("for") is NumberExpr length)
+                        Check(length.Value, length.Unit, length.Span, $"The `for` on this `{command.Verb.ToLowerInvariant()}`");
+                }
+
+                foreach (ScheduleNode schedule in body.Facts.Schedules)
+                {
+                    if (schedule.Delay is NumberExpr delay) Check(delay.Value, delay.Unit, delay.Span, "This delay");
+                }
+            }
+        }
+
+        /// <summary>
+        /// CT323: a named clause a built-in verb does not read. The parser knows the clause words
+        /// and attaches no meaning to them, so one a verb does not read used to be dropped in
+        /// silence: <c>block 8 for 2 turns</c> gave ordinary block, <c>apply Poison 3 at target</c>
+        /// ignored the <c>at</c>, and <c>deal 5 against enemy2</c> hit the card's own target.
+        /// </summary>
+        /// <remarks>
+        /// Only built-in verbs are checked. A flag after a comma is not a clause and is never
+        /// reported, because a verb a game registers in C# reads its own flags — that is exactly
+        /// what <c>--suppress CT301</c> content does.
+        /// </remarks>
+        private void CheckClauses(Body body)
+        {
+            foreach (CommandNode command in body.Facts.Commands)
+            {
+                if (!BuiltinClauses.IsKnownVerb(command.Verb)) continue;
+
+                // A game whose own verb has one of these names runs that instead, and it may read
+                // any clause it likes. In a test, `play` is the test runner's own verb.
+                if (_content.FindVerb(command.Verb) != null || _options.HostVerbs.Contains(command.Verb)) continue;
+                if (body.Kind == BodyKind.Test && BlockVerbs(body).Contains(command.Verb, StringComparer.OrdinalIgnoreCase)) continue;
+
+                foreach (ClauseNode clause in BuiltinClauses.Unread(command))
+                    Error(ClauseNotRead, BuiltinClauses.NotRead(command.Verb, clause.Keyword), clause.Span);
+
+                CheckPercentages(command);
+            }
+        }
+
+        /// <summary>
+        /// CT324: a bare percentage where a built-in verb counts whole things. <c>apply Slow 40%</c>
+        /// applied forty stacks and printed "Apply 40% Slow", so the generated text stated a
+        /// percentage the engine does not implement. A percentage inside a sum is a fraction by the
+        /// time the verb sees it, so only one written on its own is reported.
+        /// </summary>
+        private void CheckPercentages(CommandNode command)
+        {
+            foreach (ExprNode argument in command.Arguments)
+            {
+                Num percent;
+                switch (argument)
+                {
+                    case NumberExpr { Unit: "%" } number: percent = number.Value; break;
+                    case UnaryExpr { Operator: UnaryOperator.Negate, Operand: NumberExpr { Unit: "%" } negative }: percent = -negative.Value; break;
+                    default: continue;
+                }
+
+                Error(PercentageWhereACountIsMeant,
+                    VerbCall.PercentageMessage(command.Verb, AstPrinter.Print(argument), percent),
+                    argument.Span);
+            }
+        }
+
+        /// <summary>
+        /// CT322: <c>emit</c> handed the name of a built-in event. <c>emit damaged 99 to player</c>
+        /// dispatched to every <c>on damaged</c> listener although nothing was damaged, and no
+        /// history counter moved with it — the event was forged and the record was not. <c>emit</c>
+        /// raises a <em>custom</em> event, and the runtime refuses this too.
+        /// </summary>
+        private void CheckEmits(Body body)
+        {
+            // A game whose own `emit` verb predates the built-in one runs that instead, and nothing
+            // here is true of it.
+            if (_content.FindVerb("emit") != null || _options.HostVerbs.Contains("emit")) return;
+
+            foreach (CommandNode command in body.Facts.Commands)
+            {
+                if (!string.Equals(command.Verb, "emit", StringComparison.OrdinalIgnoreCase)) continue;
+                if (WordAt(command, 0) is not string name || !BuiltinEvents.IsBuiltin(name)) continue;
+
+                Error(EmitsBuiltinEvent, BuiltinEvents.CannotBeEmitted(name.ToLowerInvariant()), command.Span);
             }
         }
 

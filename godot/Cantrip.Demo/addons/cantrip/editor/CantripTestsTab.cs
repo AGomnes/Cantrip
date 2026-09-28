@@ -80,7 +80,9 @@ namespace Cantrip.GodotAdapter
             };
             bar.AddChild(_traceFailures);
 
-            _summary = new Label { ClipText = true };
+            // The filter beside it expands, so without a width of its own the summary is clipped to
+            // a few pixels at every dock size: "3 passed, 1 failed of 4 block(s)" read as "3".
+            _summary = new Label { ClipText = true, CustomMinimumSize = new Vector2(220, 0) };
             bar.AddChild(_summary);
 
             var split = new VSplitContainer { SizeFlagsVertical = SizeFlags.ExpandFill };

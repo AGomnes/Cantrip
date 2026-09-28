@@ -61,6 +61,16 @@ test "hs Taunt leaves the chooser nothing else to pick"
   play "Arcane Shot"
   expect enemy.hp == 20 and enemy2.hp == 18
 
+test "hs a Taunt binds a minion's swing as well as a card"
+  enemy hp 20
+  enemy hp 3 attack 2
+  apply Taunt 1 to enemy2
+  create Footman
+  trade created.first enemy
+  expect enemy.hp == 20
+  trade created.first enemy2
+  expect enemy2.hp == 2 and created.first.dead
+
 test "hs two Taunts leave each other available"
   enemy hp 20
   enemy hp 20

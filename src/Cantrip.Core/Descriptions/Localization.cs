@@ -65,6 +65,7 @@ namespace Cantrip.Descriptions
             ["transform"] = "Transform {thing} into {into}.",
             ["shuffle"] = "Shuffle your discard pile into your draw pile.",
             ["shuffle.cards"] = "Shuffle {amount} {card} into your draw pile.",
+            ["shuffle.cards.zone"] = "Shuffle {amount} {card} into your {zone}.",
             ["discard.one"] = "Discard {amount} card.",
             ["discard.many"] = "Discard {amount} cards.",
             ["discard.thing"] = "Discard {thing}.",

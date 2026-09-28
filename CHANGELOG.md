@@ -11,7 +11,35 @@ When a release changes any of the following, its section says so under that name
 
 ## [Unreleased]
 
-Nothing yet.
+Work towards 1.0. Three audits went through the C# API, the Godot addon's script surface and the language and save format, asking of each frozen thing: would we regret this in five years? What follows is the first round of answers. Everything here is a change that stops being free once 1.0 is out.
+
+### Added
+
+- **`clock turns` or `clock ticks` in a `ruleset` block**, so content says which clock it is written for. A length in the other clock's units — a cooldown, a `for`, an `in N ...:` delay, an `on every ...:` interval — is then error **CT325** at lint, and a runtime built with the other clock refuses as it is built. Both halves used to fail differently and neither said so: `on every 1s:` in a turn game registered nothing at all, in silence, while `apply Weak 1 for 3s` in the same game threw only when the line ran. Content that says nothing is unchanged and still runs on turns.
+- **`new_listeners: hear_the_event` or `miss_the_event` in a `ruleset` block**: whether a listener that comes into play during an event hears that event. The default is `hear_the_event`, which is what it has always done, so nothing moves; content that would rather a minion did not hear its own summoning says so and drops the `not target:self` filter. Both are real rules in real games, which is why it is a setting rather than a fix. This closes [coverage](docs/coverage.md) gap 6 and lets the default move later without breaking anyone.
+- **A save says what it is and who made it.** `GameSnapshot.WrittenBy` is the version that wrote it, `MinimumReader` the oldest build that can be trusted with it, and `RngGenerator` the generator its random state came from. `GameSnapshot.ReaderNeededBy` answers "can this build read this save?" before a restore, so a game can tell the player it needs a newer version rather than catch an exception.
+- **`into` binds what `heal` and `block` really did**, as it already did for `deal` and `attack`: `heal 30 into restored` is what was restored after the heal stopped at full health. **`shuffle ... into <zone>`** now puts the cards where it says; `shuffle hand into discard`, a form the reference already listed, used to shuffle into the draw pile whatever the clause said.
+
+### Changed
+
+- **Four verbs refuse a name that is content, not three.** `replay Strike` ran a card's printed effect for nothing — no card, no cost, no play — which is the free lunch `copy`, `play` and `transform` were closed against in 0.1.0-preview.5. Now **CT320**, naming the way to a real card. `create` is refused the other way round: `create Poison 2` made two Poisons attached to nobody, which raised `created` and persisted into saves. Also **CT320**, naming `apply Poison 2 to <who>`.
+- **`emit` cannot forge a built-in event (CT322).** `emit damaged 99 to player` dispatched to every `on damaged` listener although nothing was damaged, and no history counter moved with it: the event was forged and the record was not.
+- **A clause a built-in verb does not read is an error (CT323).** The parser knows thirteen clause words, so one a verb did not read was dropped in silence: `block 8 for 2 turns` gave ordinary block that vanished at the next turn start, `apply Poison 3 at target` ignored the `at`, and `deal 5 against enemy2` hit the card's own target. Which verb reads which is now a table, in the reference and in the code, and the message names the clause that works. A flag after a comma is not a clause and is never checked, and neither is a verb content declares or a game registers in C#.
+- **A bare percentage where a verb counts whole things is an error (CT324).** `apply Slow 40%` applied forty stacks while the card's own generated text said "Apply 40% Slow": a percentage stated to the player that the engine does not implement. Write the number, or a share of something: `target.max_hp * 40%`.
+- **Enemy moves and the `attack` verb ask the `targetable` channel**, as a card's target already did, so a taunt and a stealth mean one thing wherever something is pointed at somebody. Area and random effects are deliberately unchanged, including inside a move: a taunt constrains what may be aimed at it, not what a blast reaches. This changes what existing content does. No sample moved, because none combined a taunt with an `attack` or a move; `samples/corpus` gains the test that was missing, and [coverage](docs/coverage.md) gap 3 loses the sentence about it.
+- `Restore` refuses a snapshot whose two records of where a card is disagree, before it takes the running game apart, and refuses a random state from a generator this build does not have rather than feeding four numbers to a generator that reads them differently.
+
+### Fixed
+
+- **One entity answers the group words.** `.count`, `.first`, `.last`, `.empty` and `.any` work on a single entity as they do on a group. `choose 1 from hand as picked` binds an entity where `choose 2` binds a group, so `picked.first` used to fall through to "a stat nothing has" and read 0 — on the one-card path, which is the path an author tries last.
+- **`modify damage: -stacks` described as "Damage dealt +-stacks"**, because a negated name is not a negative literal. It reads "Damage dealt -X." now, as `+stacks` reads "+X".
+- The Godot dock's Tests tab clipped its own summary to a few pixels at every width, so "3 passed, 1 failed of 4 block(s)" read as "3".
+
+### Breaking changes and save format
+
+- **Breaking changes.** The five refusals above (CT320 on `replay` and `create`, CT322, CT323, CT324) reject content that used to load, and each rejected line did nothing or something other than it said. Enemy moves and `attack` now ask the `targetable` channel. `ScheduledSnapshot.Block` is now `BlockAddress` and `Deadline` is now `UntilEvent`: both old names remain as write-only properties, so an older save still restores, but code reading either from a `GameSnapshot` must use the new name.
+- **Save format.** Saves are now **format 2**, and this is the release that makes "an older save still loads" true rather than merely unbroken. `Restore` used to refuse any format that was not exactly its own, so the first release to bump the number would have broken every save before it; it now refuses only a save that needs a newer reader and upgrades anything older, and the Godot node and `SaveEnvelope` do the same. A save made by 0.1.0-preview.5 loads here — there is one checked into the tests, restored on every CI run — and a save made here is refused by preview.5 with a clear message instead of being restored with its waiting work silently dropped.
+- **Same-seed results.** Unchanged: the simulator plays the same seeds identically, and `describe` over every sample folder is byte-identical apart from the two text fixes above.
 
 ## [0.1.0-preview.5] - 2026-09-24
 

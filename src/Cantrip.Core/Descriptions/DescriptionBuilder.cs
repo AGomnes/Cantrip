@@ -625,10 +625,23 @@ namespace Cantrip.Descriptions
                     }
 
                     case "shuffle":
+                    {
                         if (first == null) return Phrase("shuffle");
-                        return Phrase("shuffle.cards",
-                            ("amount", Amount(second ?? One, "shuffle", "none", command)),
-                            ("card", Text(FirstWord(first) ?? AstPrinter.Print(first))));
+
+                        // The draw pile is where a shuffle goes unless the line says otherwise, so
+                        // the usual wording stays exactly as it was and only a written zone moves.
+                        ExprNode? shuffleInto = command.Clause("into") ?? command.Clause("to");
+                        string shuffleZone = shuffleInto == null ? "draw" : FirstWord(shuffleInto) ?? "draw";
+                        List<DescriptionSegment> shuffleAmount = Amount(second ?? One, "shuffle", "none", command);
+                        List<DescriptionSegment> shuffleWhat = Text(FirstWord(first) ?? AstPrinter.Print(first));
+
+                        return shuffleZone == "draw" || shuffleZone == "draw_pile"
+                            ? Phrase("shuffle.cards", ("amount", shuffleAmount), ("card", shuffleWhat))
+                            : Phrase("shuffle.cards.zone",
+                                ("amount", shuffleAmount),
+                                ("card", shuffleWhat),
+                                ("zone", Text(Word("zone." + shuffleZone) ?? shuffleZone)));
+                    }
 
                     case "discard":
                     case "exhaust":
@@ -782,7 +795,10 @@ namespace Cantrip.Descriptions
                 switch (modify.Layer)
                 {
                     case ModifierLayer.Add:
-                        if (!(Literal(modify.Amount, out _) is Num signed && signed.IsNegative)) amount.Add(DescriptionSegment.Plain("+"));
+                        // The sign is only added where the amount does not carry one already.
+                        // `modify damage: -stacks` printed "Damage dealt +-stacks", because a
+                        // negated name is not a negative literal and nothing else looked.
+                        if (!ReadsAsNegative(modify.Amount)) amount.Add(DescriptionSegment.Plain("+"));
                         amount.AddRange(Amount(modify.Amount, "bonus", "none", null));
                         break;
                     case ModifierLayer.Multiply:
@@ -970,9 +986,19 @@ namespace Cantrip.Descriptions
             {
                 NameExpr { Name: var name } when string.Equals(name, "x", StringComparison.OrdinalIgnoreCase)
                                               || string.Equals(name, "stacks", StringComparison.OrdinalIgnoreCase) => "X",
+                UnaryExpr { Operator: UnaryOperator.Negate, Operand: var inner } => "-" + SymbolFor(inner),
                 RangeExpr range => AstPrinter.Print(range.Low) + "–" + AstPrinter.Print(range.High),
                 _ => AstPrinter.Print(expression),
             };
+
+            /// <summary>
+            /// True when an amount already reads with a minus on the front, whether it is a negative
+            /// literal or a negated name such as <c>-stacks</c>. A second sign in front of it is how
+            /// "Damage dealt +-stacks" was printed.
+            /// </summary>
+            private static bool ReadsAsNegative(ExprNode expression) =>
+                expression is UnaryExpr { Operator: UnaryOperator.Negate }
+                || (Literal(expression, out _) is Num signed && signed.IsNegative);
 
             private static bool IsOne(ExprNode expression) => Literal(expression, out _) is Num value && value == Num.One;
 

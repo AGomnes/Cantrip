@@ -93,8 +93,8 @@ test "Frost Nova slows every enemy for three seconds"
   enemy hp 10
   grant "Frost Nova"
   cast "Frost Nova"
-  expect enemy.Slow == 40 and enemy2.Slow == 40
+  expect enemy.Slow == 2 and enemy2.Slow == 2
   tick 29
-  expect enemy.Slow == 40
+  expect enemy.Slow == 2
   tick 1
   expect enemy.Slow == 0

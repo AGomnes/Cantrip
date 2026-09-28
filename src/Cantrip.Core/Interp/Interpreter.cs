@@ -46,6 +46,35 @@ namespace Cantrip.Runtime
             return node == null ? fallback : Interpreter.EvaluateNumber(node, Context);
         }
 
+        /// <summary>
+        /// A number argument that is not a percentage: stacks, cards, damage, block. The built-in
+        /// verbs read their numbers through this.
+        /// </summary>
+        /// <remarks>
+        /// A bare percentage means nothing to any of them, and the unit used to be dropped: <c>apply
+        /// Slow 40%</c> applied forty stacks, and the card's generated text said "Apply 40% Slow" —
+        /// a percentage stated to the player that the engine does not implement. A percentage that
+        /// is part of a sum is already a fraction by the time it arrives (<c>target.max_hp * 50%</c>
+        /// is a number with no unit), so only one written on its own is refused.
+        /// </remarks>
+        public Num Amount(int index, Num fallback)
+        {
+            ExprNode? node = ArgumentNode(index);
+            if (node == null) return fallback;
+
+            Value value = Interpreter.Evaluate(node, Context);
+            if (value.Kind == ValueKind.Number && value.Unit == "%")
+                throw Error(PercentageMessage(Verb, AstPrinter.Print(node), value.Number));
+
+            return Interpreter.ToNumber(value, node.Span);
+        }
+
+        /// <summary>Why a bare percentage is refused, worded once for the linter and the runtime.</summary>
+        internal static string PercentageMessage(string verb, string written, Num percent) =>
+            $"`{written}` is a percentage, and `{verb.ToLowerInvariant()}` counts in whole things, not in per cent. " +
+            $"It read as {percent}, while the generated text said `{written}`: a percentage stated to the player that nothing implements. " +
+            $"Write the number (`{percent}`), or a share of something: `target.max_hp * {written}`.";
+
         public bool HasClause(string keyword) => Node.HasFlag(keyword);
 
         public Value Clause(string keyword)
@@ -82,6 +111,13 @@ namespace Cantrip.Runtime
     {
         private readonly Dictionary<string, VerbHandler> _verbs = new Dictionary<string, VerbHandler>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _builtinVerbs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// The handler each built-in verb started with, so the clause check can tell the engine's own
+        /// <c>deal</c> from a game's replacement for it by identity rather than by name.
+        /// </summary>
+        private readonly Dictionary<string, VerbHandler> _builtinHandlers = new Dictionary<string, VerbHandler>(StringComparer.OrdinalIgnoreCase);
+
         private int _steps;
         private int _callDepth;
 
@@ -92,6 +128,7 @@ namespace Cantrip.Runtime
             State.Modifiers.Evaluator = this;
             RegisterBuiltinVerbs();
             _builtinVerbs.UnionWith(_verbs.Keys);
+            foreach (KeyValuePair<string, VerbHandler> verb in _verbs) _builtinHandlers[verb.Key] = verb.Value;
         }
 
         public GameState State { get; }
@@ -117,9 +154,64 @@ namespace Cantrip.Runtime
         /// </summary>
         internal bool TryGetVerb(string name, out VerbHandler handler) => _verbs.TryGetValue(name, out handler!);
 
+        /// <summary>
+        /// Registers a verb the runtime layer owns — <c>play</c>, <c>replay</c>, <c>use</c> — as one
+        /// of the built-in ones, so that its clauses are checked like any other built-in verb's and
+        /// a game that registers its own over the top is left alone.
+        /// </summary>
+        internal void RegisterRuntimeVerb(string name, VerbHandler handler)
+        {
+            RegisterVerb(name, handler);
+            _builtinVerbs.Add(name);
+            _builtinHandlers[name] = handler;
+        }
+
         public IEnumerable<string> VerbNames => _verbs.Keys.Concat(Content.Verbs.Select(v => v.Name)).Distinct(StringComparer.OrdinalIgnoreCase);
 
         public bool IsBuiltinVerb(string name) => _builtinVerbs.Contains(name);
+
+        /// <summary>The channel content adds its own target rules to: a taunt, a stealth, a reach limit.</summary>
+        public const string TargetableChannel = "targetable";
+
+        /// <summary>
+        /// Whether one entity may be aimed at, over a base of 1: zero or less means "not this one".
+        /// A card's target asks this, and so do an enemy's move and the <c>attack</c> verb, so that
+        /// a taunt or a stealth means one thing wherever something is pointed at somebody.
+        /// </summary>
+        /// <remarks>
+        /// Area and random effects still resolve through the interpreter's own selectors, and do not
+        /// ask: a taunt constrains what something may be pointed at, not what a blast reaches. The
+        /// query carries the card when there is one, so a <c>where</c> on the group must say
+        /// <c>it.</c> to mean the candidate; a bare <c>tag:</c> tests the card.
+        /// </remarks>
+        public bool IsTargetable(Entity candidate, Entity? source, Entity? card)
+        {
+            if (candidate == null) return false;
+            if (!State.Modifiers.HasChannel(TargetableChannel)) return true;
+
+            var query = new ModifierQuery(TargetableChannel)
+            {
+                Subject = candidate,
+                Source = source,
+                Card = card,
+                Tags = card == null ? Array.Empty<string>() : card.Tags.ToArray(),
+            };
+            return State.Modifiers.Compute(query, Num.One) > Num.Zero;
+        }
+
+        /// <summary>Those of a group that may be aimed at, in the group's own order.</summary>
+        public IReadOnlyList<Entity> Targetable(IReadOnlyList<Entity> candidates, Entity? source, Entity? card)
+        {
+            if (candidates == null || candidates.Count == 0) return Array.Empty<Entity>();
+            if (!State.Modifiers.HasChannel(TargetableChannel)) return candidates;
+
+            var allowed = new List<Entity>();
+            foreach (Entity candidate in candidates)
+            {
+                if (IsTargetable(candidate, source, card)) allowed.Add(candidate);
+            }
+            return allowed;
+        }
 
         /// <summary>Resets the sandbox step counter. Called at the start of every top-level action.</summary>
         internal void ResetSteps() => _steps = 0;
@@ -224,6 +316,18 @@ namespace Cantrip.Runtime
 
             if (_verbs.TryGetValue(command.Verb, out VerbHandler? handler))
             {
+                // A clause a built-in verb does not read used to be dropped in silence, so
+                // `block 8 for 2 turns` gave ordinary block and `deal 5 against enemy2` hit whatever
+                // the card was aimed at. Only the engine's own handler is held to the table: a game
+                // that registers `deal` of its own reads what it likes.
+                if (command.Clauses.Count != 0
+                    && _builtinHandlers.TryGetValue(command.Verb, out VerbHandler? builtin)
+                    && ReferenceEquals(builtin, handler))
+                {
+                    foreach (ClauseNode clause in BuiltinClauses.Unread(command))
+                        throw new RuntimeError(BuiltinClauses.NotRead(command.Verb, clause.Keyword), clause.Span);
+                }
+
                 if (State.Trace.Enabled)
                 {
                     long id = State.Trace.Record(State.Clock.Now, "verb", command.Verb, context.Self?.ToString(), span: command.Span);

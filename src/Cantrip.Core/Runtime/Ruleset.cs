@@ -26,6 +26,51 @@ namespace Cantrip.Runtime
         ActivePlayer,
     }
 
+    /// <summary>
+    /// Which clock content is written for. A game with turns measures time in turns; a real-time
+    /// game measures it in seconds, milliseconds and ticks, and the two sets of units do not convert
+    /// into each other.
+    /// </summary>
+    /// <remarks>
+    /// Before this setting existed, content that disagreed with the clock it was run on failed in
+    /// two different ways: <c>on every 1s:</c> registered nothing at all, silently, and
+    /// <c>apply Weak 1 for 3s</c> was a runtime error when the line ran. Saying which clock the
+    /// content is for makes both of them one error, before anything runs.
+    /// </remarks>
+    public enum ClockKind
+    {
+        /// <summary>
+        /// Content has not said. Nothing is checked, and a runtime with no clock of its own still
+        /// uses turns, which is what every game written before the setting existed gets.
+        /// </summary>
+        Unstated,
+
+        /// <summary>One unit per turn. <c>3s</c> is then a length this game cannot measure.</summary>
+        Turns,
+
+        /// <summary>One unit per fixed-timestep tick. <c>2 turns</c> is then a length this game cannot measure.</summary>
+        Ticks,
+    }
+
+    /// <summary>
+    /// Whether a listener that comes into play during an event hears that event.
+    /// </summary>
+    /// <remarks>
+    /// The two answers are both defensible, which is why this is a setting rather than a fix. A
+    /// minion summoned by "whenever you summon a minion" hearing its own summoning is a bug in most
+    /// games, and the workaround is a filter on every listener of that shape (<c>not target:self</c>,
+    /// <c>not card:Reverb</c>). But "when this enters play, it also triggers on the thing that put it
+    /// there" is a real card in others, and the sample roguelite's Chill is written against it.
+    /// </remarks>
+    public enum NewListeners
+    {
+        /// <summary>Today's behaviour, and the default: it hears the event that brought it into play.</summary>
+        HearTheEvent,
+
+        /// <summary>It hears nothing until the next event: what was already here hears this one.</summary>
+        MissTheEvent,
+    }
+
     public enum TriggerResolution
     {
         /// <summary>After-phase listeners wait until the current action finishes. Slay the Spire style.</summary>
@@ -60,6 +105,19 @@ namespace Cantrip.Runtime
 
         public TriggerResolution Triggers { get; set; } = TriggerResolution.Queued;
 
+        /// <summary>
+        /// The clock this content is written for. <see cref="ClockKind.Unstated"/> by default, which
+        /// checks nothing and runs on turns, as content written before the setting existed does.
+        /// </summary>
+        public ClockKind Clock { get; set; } = ClockKind.Unstated;
+
+        /// <summary>
+        /// Whether a listener that comes into play during an event hears that event.
+        /// <see cref="NewListeners.HearTheEvent"/> by default, which is what content written before
+        /// the setting existed expects.
+        /// </summary>
+        public NewListeners NewListeners { get; set; } = NewListeners.HearTheEvent;
+
         /// <summary>Cards drawn at the start of each player turn.</summary>
         public int HandSize { get; set; } = 5;
 
@@ -91,6 +149,8 @@ namespace Cantrip.Runtime
             && Loops == other.Loops
             && MaxDepth == other.MaxDepth
             && Triggers == other.Triggers
+            && Clock == other.Clock
+            && NewListeners == other.NewListeners
             && HandSize == other.HandSize
             && MaxHandSize == other.MaxHandSize
             && MaxStepsPerAction == other.MaxStepsPerAction
@@ -145,6 +205,22 @@ namespace Cantrip.Runtime
                         rules.Triggers = words.Contains("immediate") ? TriggerResolution.Immediate : TriggerResolution.Queued;
                         break;
 
+                    case "new_listeners":
+                        if (words.Contains("miss_the_event") || words.Contains("miss")) rules.NewListeners = NewListeners.MissTheEvent;
+                        else if (words.Contains("hear_the_event") || words.Contains("hear")) rules.NewListeners = NewListeners.HearTheEvent;
+                        else
+                            diagnostics.Error("CT0202", $"Unknown value `{string.Join(" ", words)}` for `new_listeners`. Write `hear_the_event` or `miss_the_event`.", setting.Span,
+                                Suggest.Closest(words.FirstOrDefault() ?? string.Empty, new[] { "hear_the_event", "miss_the_event" }));
+                        break;
+
+                    case "clock":
+                        if (words.Contains("ticks") || words.Contains("tick") || words.Contains("real_time")) rules.Clock = ClockKind.Ticks;
+                        else if (words.Contains("turns") || words.Contains("turn")) rules.Clock = ClockKind.Turns;
+                        else
+                            diagnostics.Error("CT0202", $"Unknown value `{string.Join(" ", words)}` for `clock`. Write `clock turns` or `clock ticks`.", setting.Span,
+                                Suggest.Closest(words.FirstOrDefault() ?? string.Empty, new[] { "turns", "ticks" }));
+                        break;
+
                     case "hand_size":
                         rules.HandSize = FirstNumber(setting) ?? rules.HandSize;
                         break;
@@ -168,7 +244,7 @@ namespace Cantrip.Runtime
                             setting.Span,
                             Suggest.Closest(setting.Name, new[]
                             {
-                                "events", "loops", "ordering", "modifier_layers", "triggers", "hand_size", "max_hand_size", "max_steps", "max_call_depth",
+                                "events", "loops", "ordering", "modifier_layers", "triggers", "clock", "new_listeners", "hand_size", "max_hand_size", "max_steps", "max_call_depth",
                             }));
                         break;
                 }

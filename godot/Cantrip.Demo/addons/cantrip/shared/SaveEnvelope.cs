@@ -8,7 +8,10 @@ namespace Cantrip.GodotAdapter
     {
         None,
 
-        /// <summary>Written by a newer or older version of the addon.</summary>
+        /// <summary>
+        /// Written by a newer version of the addon than this one, which cannot know what is in it.
+        /// An older version's save is not this: it is read, through <see cref="SaveEnvelope.Upgraded"/>.
+        /// </summary>
         WrongFormat,
 
         /// <summary>The envelope carries no snapshot.</summary>
@@ -78,7 +81,12 @@ namespace Cantrip.GodotAdapter
     /// </remarks>
     public sealed class SaveEnvelope
     {
-        /// <summary>The envelope's own version, separate from the core's snapshot format.</summary>
+        /// <summary>
+        /// The envelope's own version, separate from the core's snapshot format. Like that one it
+        /// only ever increases, and this addon reads every envelope up to its own: an older one is
+        /// brought forward by <see cref="Upgraded"/>, and only one from a newer addon, whose shape
+        /// this addon cannot know, is refused.
+        /// </summary>
         public const int CurrentFormat = 1;
 
         public SaveEnvelope(int format, string? fingerprint, string? payload)
@@ -109,11 +117,12 @@ namespace Cantrip.GodotAdapter
         /// </summary>
         public SaveCheck Check(string? libraryFingerprint)
         {
-            if (Format != CurrentFormat)
+            if (Format > CurrentFormat)
             {
                 return new SaveCheck(
                     SaveRejection.WrongFormat,
-                    "This save is in format " + Format + "; this version of the addon writes format " + CurrentFormat + ".");
+                    "This save is in format " + Format + " and needs a newer version of the addon; this one reads up to format "
+                    + CurrentFormat + ".");
             }
 
             if (Payload.Length == 0)
@@ -132,6 +141,26 @@ namespace Cantrip.GodotAdapter
             }
 
             return new SaveCheck(SaveRejection.None, string.Empty);
+        }
+
+        /// <summary>
+        /// This envelope in the format this addon writes, so that the rest of the load path only
+        /// ever sees the current shape. It is itself when it is already current.
+        /// </summary>
+        /// <remarks>
+        /// Nothing moves here yet: format 1 is the only format there has been. The step exists
+        /// because it is what keeps "a save made by any 1.x release loads in every later 1.x" true
+        /// at the moment the number first changes. Refusing anything that is not exactly current
+        /// keeps that promise only by never changing the number, and the number then stops
+        /// describing the file. Each future format gets one step here, oldest first.
+        /// </remarks>
+        public SaveEnvelope Upgraded()
+        {
+            if (Format >= CurrentFormat) return this;
+
+            // 0 -> 1: there was no format 0.
+
+            return new SaveEnvelope(CurrentFormat, Fingerprint, Payload);
         }
 
         private static string Describe(string fingerprint) =>

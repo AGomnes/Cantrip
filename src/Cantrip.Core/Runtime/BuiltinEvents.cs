@@ -195,5 +195,63 @@ namespace Cantrip.Runtime
 
         /// <summary>True when a built-in verb can raise <c>&lt;stat&gt;_changed</c>.</summary>
         public static bool CanChangeStats(string verb) => verb != null && StatChangingVerbs.Contains(verb);
+
+        /// <summary>
+        /// The built-in verbs that raise <paramref name="eventName"/>, in the table's own order.
+        /// Empty for a custom event, and for an event only the engine's own lifecycle raises.
+        /// </summary>
+        /// <remarks>
+        /// This is <see cref="RaisedBy"/> read the other way round, and it exists so that a refusal
+        /// can name the verb that really does the thing: "`damaged` is raised by `deal`" is a fix,
+        /// where "do not emit that" is only a rule.
+        /// </remarks>
+        public static IReadOnlyList<string> VerbsThatRaise(string eventName)
+        {
+            if (string.IsNullOrEmpty(eventName)) return NoEvents;
+            if (!RaisedByVerb.TryGetValue(eventName, out List<string>? verbs)) return NoEvents;
+            return verbs;
+        }
+
+        /// <summary>
+        /// Why <c>emit damaged</c> is refused, worded once for the linter and the runtime.
+        /// </summary>
+        /// <remarks>
+        /// Emitting a built-in name dispatched to every listener of it while nothing had happened:
+        /// no hp moved, no history counter moved, and `on damaged` fired anyway. The event was
+        /// forged and the record was not, so a "whenever you take damage" card and a "damage taken
+        /// this turn" card disagreed about the same turn. `emit` raises a *custom* event.
+        /// </remarks>
+        internal static string CannotBeEmitted(string name)
+        {
+            IReadOnlyList<string> verbs = VerbsThatRaise(name);
+            string fix = verbs.Count > 0
+                ? "The verb that really does it raises it: " + string.Join(", ", verbs.Select(v => "`" + v + "`")) + "."
+                : "The engine raises it itself, as part of the turn or the battle.";
+
+            return $"`{name}` is a built-in event, and `emit` raises a custom one. Emitting it would tell every `on {name}` " +
+                   $"listener something happened that did not: no history counter moves with it. {fix} " +
+                   $"For an event of your own, pick a name the engine does not use, such as `my_{name}`.";
+        }
+
+        private static readonly Dictionary<string, List<string>> RaisedByVerb = BuildRaisedByVerb();
+
+        private static Dictionary<string, List<string>> BuildRaisedByVerb()
+        {
+            var map = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+            // The table is a dictionary, so its order is not a contract. Walking the declared event
+            // list on the outside gives one stated order, which is what a message can be tested on.
+            foreach (BuiltinEvent known in Events)
+            {
+                var verbs = new List<string>();
+                foreach (KeyValuePair<string, string[]> entry in VerbEvents.OrderBy(e => e.Key, StringComparer.Ordinal))
+                {
+                    if (Array.IndexOf(entry.Value, known.Name) >= 0) verbs.Add(entry.Key);
+                }
+                if (verbs.Count > 0) map[known.Name] = verbs;
+            }
+
+            return map;
+        }
     }
 }

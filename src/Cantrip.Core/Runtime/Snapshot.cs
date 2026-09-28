@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Cantrip.Content;
 using Cantrip.Syntax;
 
@@ -18,9 +19,54 @@ namespace Cantrip.Runtime
     /// </remarks>
     public sealed class GameSnapshot
     {
-        public const int CurrentFormat = 1;
+        /// <summary>
+        /// The save format this build writes. It only ever increases, and a build reads every
+        /// format up to its own: a save made by an earlier release loads here, brought forward by
+        /// <see cref="Upgrade"/>, and only a save that needs a reader this build is not is refused.
+        /// </summary>
+        public const int CurrentFormat = 2;
 
+        /// <summary>
+        /// The oldest reader a save this build writes can be given to, which a reader compares
+        /// against its own <see cref="CurrentFormat"/>. It moves only when a change would make an
+        /// older reader get the game wrong rather than merely miss something it never knew about,
+        /// so that adding an optional field can bump <see cref="CurrentFormat"/> — saying honestly
+        /// that the shape changed — without locking every earlier build out of the save.
+        /// </summary>
+        public const int CurrentMinimumReader = 2;
+
+        /// <summary>
+        /// The generator behind <see cref="Rng"/> in a save this build writes. A save that names
+        /// another one is refused rather than read as four meaningless numbers; an empty name is
+        /// this one, which is what a save made before the name was recorded carries.
+        /// </summary>
+        public const string CurrentRng = "xoshiro256**";
+
+        /// <summary>The version of Cantrip.Core doing the writing, as <see cref="WrittenBy"/> records it.</summary>
+        public static readonly string CurrentWriter = ReadVersion();
+
+        /// <summary>
+        /// The format this save is written in. A hand-built snapshot is in this build's format,
+        /// which is why this is the one field of the four that defaults to the current value.
+        /// </summary>
         public int FormatVersion { get; set; } = CurrentFormat;
+
+        /// <summary>
+        /// The oldest <see cref="CurrentFormat"/> that can read this save. Zero in a save made
+        /// before it was recorded, which is read as <see cref="FormatVersion"/>.
+        /// </summary>
+        public int MinimumReader { get; set; }
+
+        /// <summary>
+        /// The version of Cantrip.Core that wrote this save, such as <c>0.1.0-preview.6</c>. Empty
+        /// in a save made before it was recorded, and in one built by hand rather than captured.
+        /// </summary>
+        /// <remarks>
+        /// It is for people, not for rules: nothing branches on it, and a refusal quotes it so that
+        /// "this save needs a newer Cantrip" can say which one. Store it with a replay or a bug
+        /// report, as <c>docs/stability.md</c> asks.
+        /// </remarks>
+        public string WrittenBy { get; set; } = string.Empty;
 
         public int Turn { get; set; }
         public int BattleNumber { get; set; }
@@ -34,6 +80,15 @@ namespace Cantrip.Runtime
         public long NextChainRoot { get; set; }
 
         public long ClockNow { get; set; }
+
+        /// <summary>
+        /// The generator <see cref="Rng"/> came from, empty for <see cref="CurrentRng"/>. Four
+        /// numbers are only a game's random future while something says what reads them, and a
+        /// release may change the generator, which <c>docs/stability.md</c> allows.
+        /// </summary>
+        public string RngGenerator { get; set; } = string.Empty;
+
+        /// <summary>The generator's state, as <see cref="RngGenerator"/> means it.</summary>
         public ulong[] Rng { get; set; } = new ulong[4];
 
         public bool? Won { get; set; }
@@ -49,6 +104,49 @@ namespace Cantrip.Runtime
         public Dictionary<string, long> TurnHistory { get; set; } = new Dictionary<string, long>();
 
         public Dictionary<string, long> BattleHistory { get; set; } = new Dictionary<string, long>();
+
+        /// <summary>
+        /// The oldest <see cref="CurrentFormat"/> that can read this save, as a restore judges it:
+        /// what <see cref="MinimumReader"/> says, or, in a save from before it said, the format the
+        /// save is written in. A host can ask before restoring, to tell a player that a save needs
+        /// a newer version of the game rather than let the restore throw.
+        /// </summary>
+        public static int ReaderNeededBy(GameSnapshot snapshot) =>
+            snapshot.MinimumReader > 0 ? snapshot.MinimumReader : snapshot.FormatVersion;
+
+        /// <summary>
+        /// Brings a save written in an older format up to this one, in place. Each step is the work
+        /// of one format change; a save already in this format never reaches here.
+        /// </summary>
+        /// <remarks>
+        /// Nothing moves here yet. Format 1 became format 2 by renaming two fields of
+        /// <see cref="ScheduledSnapshot"/>, which that type reads under both names as it is
+        /// deserialized, and by recording who wrote the save, its minimum reader and the name of
+        /// its generator — three things a format 1 save cannot know, and whose absence means
+        /// exactly what it should: an unknown earlier writer, a reader as old as the format, and
+        /// the generator of the day. So this is a no-op with a place to put the next one, and the
+        /// tests that pin a format 1 save's restore are what prove that no-op is the truth.
+        /// </remarks>
+        internal static void Upgrade(GameSnapshot snapshot)
+        {
+            if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
+
+            // 1 -> 2: nothing to move.
+
+            snapshot.FormatVersion = CurrentFormat;
+            if (snapshot.MinimumReader > CurrentMinimumReader) snapshot.MinimumReader = CurrentMinimumReader;
+        }
+
+        private static string ReadVersion()
+        {
+            string version = typeof(GameSnapshot).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+
+            // Strip the build metadata SourceLink appends (`0.1.0-preview.6+<commit>`): the release
+            // is what a player, a bug report and a changelog line all name.
+            int build = version.IndexOf('+');
+            return build < 0 ? version : version.Substring(0, build);
+        }
     }
 
     public sealed class EntitySnapshot
@@ -65,7 +163,16 @@ namespace Cantrip.Runtime
         public int OwnerId { get; set; }
         public int SourceId { get; set; }
         public int Team { get; set; }
+
+        /// <summary>
+        /// The zone this entity is in, or empty for none. The same fact as the entity's place in a
+        /// <see cref="ZoneSnapshot.Entities"/> list, written here so that an entity can be read
+        /// without searching the zones; <see cref="ZoneSnapshot"/> is the one that decides, and a
+        /// restore refuses a save whose two accounts disagree.
+        /// </summary>
         public string Zone { get; set; } = string.Empty;
+
+        /// <summary>Slot on the board. Not a place in <see cref="ZoneSnapshot.Entities"/>.</summary>
         public int Position { get; set; }
         public bool IsDead { get; set; }
         public bool IsRemoved { get; set; }
@@ -84,10 +191,24 @@ namespace Cantrip.Runtime
         public List<int> Attached { get; set; } = new List<int>();
     }
 
+    /// <summary>One owner's zone and what is in it, in order.</summary>
+    /// <remarks>
+    /// This is where a card is. <see cref="EntitySnapshot.Zone"/> says the same thing from the
+    /// entity's side, and a capture always writes the two consistently, but only this one carries
+    /// the order — which for the draw pile is the next card the player will see. A restore checks
+    /// that every entity naming a zone is in that zone's list and in no other, and that every
+    /// entity naming none is in no list at all, and refuses the save before it touches the game
+    /// when they disagree, so that a future change cannot quietly let the two drift apart in a
+    /// format that has already been written to disk.
+    /// </remarks>
     public sealed class ZoneSnapshot
     {
+        /// <summary>The owner of the zone, which for an actor on the board is 0: one board per team.</summary>
         public int OwnerId { get; set; }
+
         public string Zone { get; set; } = string.Empty;
+
+        /// <summary>The entities in it, in order, by <see cref="EntitySnapshot.Id"/>.</summary>
         public List<int> Entities { get; set; } = new List<int>();
     }
 
@@ -101,11 +222,29 @@ namespace Cantrip.Runtime
         /// Where the block to run is: its place in content, such as <c>card:Prepare/effect/0.body</c>,
         /// or within <see cref="Statements"/> when those are set, such as <c>execute/0.body</c>.
         /// </summary>
-        public string? Block { get; set; }
+        /// <remarks>
+        /// It was called <c>Block</c> through format 1, which reads as a `block` — the stat, the
+        /// verb and the modifier channel — everywhere else in this language. Saves in format 1
+        /// still carry that name, and <see cref="Block"/> takes it.
+        /// </remarks>
+        public string? BlockAddress { get; set; }
+
+        /// <summary>
+        /// The name <see cref="BlockAddress"/> had in format 1, so that a save written before the
+        /// rename still restores. It has no getter on purpose: a serializer deserializes through
+        /// it but never writes it back, so a save this build makes carries the new name alone.
+        /// </summary>
+        public string? Block
+        {
+            set
+            {
+                if (value != null && BlockAddress == null) BlockAddress = value;
+            }
+        }
 
         /// <summary>
         /// A hash of the block's statements. A restore that finds other statements at
-        /// <see cref="Block"/> looks for these elsewhere in the same definition, and refuses the
+        /// <see cref="BlockAddress"/> looks for these elsewhere in the same definition, and refuses the
         /// snapshot if they are gone. Null in saves made before it was recorded, which are
         /// matched by place alone.
         /// </summary>
@@ -118,7 +257,30 @@ namespace Cantrip.Runtime
         public string? Statements { get; set; }
 
         public long DueAt { get; set; }
-        public string? Deadline { get; set; }
+
+        /// <summary>
+        /// The event an <c>until</c> block waits for, such as <c>turn_end</c>; null for work that
+        /// waits on <see cref="DueAt"/> instead.
+        /// </summary>
+        /// <remarks>
+        /// It was called <c>Deadline</c> through format 1, which reads as a time, beside a
+        /// <see cref="DueAt"/> that is one. Saves in format 1 carry that name, and
+        /// <see cref="Deadline"/> takes it.
+        /// </remarks>
+        public string? UntilEvent { get; set; }
+
+        /// <summary>
+        /// The name <see cref="UntilEvent"/> had in format 1, kept for reading as
+        /// <see cref="Block"/> is.
+        /// </summary>
+        public string? Deadline
+        {
+            set
+            {
+                if (value != null && UntilEvent == null) UntilEvent = value;
+            }
+        }
+
         public Dictionary<string, ValueSnapshot> Bindings { get; set; } = new Dictionary<string, ValueSnapshot>();
         public List<UndoSnapshot> Undo { get; set; } = new List<UndoSnapshot>();
     }
@@ -190,6 +352,10 @@ namespace Cantrip.Runtime
         {
             var snapshot = new GameSnapshot
             {
+                FormatVersion = GameSnapshot.CurrentFormat,
+                MinimumReader = GameSnapshot.CurrentMinimumReader,
+                WrittenBy = GameSnapshot.CurrentWriter,
+                RngGenerator = GameSnapshot.CurrentRng,
                 Turn = Turn,
                 BattleNumber = BattleNumber,
                 ActiveTeam = (int)ActiveTeam,
@@ -251,7 +417,7 @@ namespace Cantrip.Runtime
                     Timing = (int)action.Timing,
                     OwnerId = action.Owner.Id,
                     DueAt = action.DueAt,
-                    Deadline = action.Deadline,
+                    UntilEvent = action.Deadline,
                 };
                 if (action.Body != null) recordBlock(action, record);
                 foreach (var binding in action.Bindings) record.Bindings[binding.Key] = ToSnapshot(binding.Value);
@@ -283,12 +449,24 @@ namespace Cantrip.Runtime
         internal void Restore(GameSnapshot snapshot, Func<ScheduledSnapshot, BlockNode?> resolveBlock, Func<EntitySnapshot, EntityDefinition?>? keptDefinition = null)
         {
             if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
-            if (snapshot.FormatVersion != GameSnapshot.CurrentFormat)
-                throw new InvalidOperationException($"Snapshot format {snapshot.FormatVersion} is not supported (expected {GameSnapshot.CurrentFormat}).");
+
+            // Only a save this build cannot read is refused. A newer one says which reader it
+            // needs, and is welcome while this build is new enough; an older one is brought
+            // forward. The number only ever goes up, so "older" and "newer" are the whole of it.
+            int needs = GameSnapshot.ReaderNeededBy(snapshot);
+            if (needs > GameSnapshot.CurrentFormat)
+            {
+                throw new InvalidOperationException(
+                    $"This save is in format {snapshot.FormatVersion} and needs a Cantrip that reads format {needs}; " +
+                    $"this one reads up to format {GameSnapshot.CurrentFormat}. It was written by {Wrote(snapshot)}.");
+            }
+
+            if (snapshot.FormatVersion < GameSnapshot.CurrentFormat) GameSnapshot.Upgrade(snapshot);
 
             // Everything that can refuse the snapshot is looked up before the game is touched, so a
             // refused save leaves the game in progress exactly as it was.
             CheckComplete(snapshot);
+            CheckZonesAgree(snapshot);
             var definitions = new EntityDefinition?[snapshot.Entities.Count];
             var ids = new HashSet<int>(snapshot.Entities.Count);
             for (int i = 0; i < snapshot.Entities.Count; i++)
@@ -321,8 +499,20 @@ namespace Cantrip.Runtime
                 Require(record.OwnerId);
                 foreach (UndoSnapshot change in record.Undo) Require(change.EntityId);
             }
+            // The generator names itself, so that a release that changes it — which
+            // docs/stability.md allows — turns a save it cannot continue away instead of feeding
+            // another generator four numbers that mean nothing to it. An empty name is this
+            // generator: that is what a save written before the name was recorded carries.
+            string generator = snapshot.RngGenerator ?? string.Empty;
+            if (generator.Length != 0 && !string.Equals(generator, GameSnapshot.CurrentRng, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"This save's random numbers come from {generator}, which this Cantrip cannot continue; it has {GameSnapshot.CurrentRng}. " +
+                    $"The save was written by {Wrote(snapshot)}.");
+            }
+
             if (snapshot.Rng == null || snapshot.Rng.Length != 4)
-                throw new InvalidOperationException("The snapshot's random number generator state is not four numbers.");
+                throw new InvalidOperationException($"The snapshot's random number generator state is not four numbers, as {GameSnapshot.CurrentRng} needs.");
             // All zeros is the one state the generator never leaves, and one Capture never writes:
             // it is what an empty or truncated save deserialises to.
             if (snapshot.Rng.All(part => part == 0))
@@ -426,7 +616,7 @@ namespace Cantrip.Runtime
                 var action = new ScheduledAction(record.Id, (ScheduleTiming)record.Timing, Lookup(record.OwnerId) ?? throw Missing(record.OwnerId), bodies[i])
                 {
                     DueAt = record.DueAt,
-                    Deadline = record.Deadline,
+                    Deadline = record.UntilEvent,
                 };
                 foreach (var binding in record.Bindings) action.Bindings[binding.Key] = FromSnapshot(binding.Value);
                 foreach (UndoSnapshot change in record.Undo)
@@ -487,6 +677,58 @@ namespace Cantrip.Runtime
             }
             if (snapshot.ListenerLimits.Contains(null!)) throw Damaged("a listener limit");
             if (snapshot.ListenerDues.Contains(null!)) throw Damaged("a listener timer");
+        }
+
+        /// <summary>
+        /// Refuses a snapshot whose two accounts of where a card is disagree: the zone lists, which
+        /// decide, and each entity's own <see cref="EntitySnapshot.Zone"/>.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="Capture"/> always writes the two consistently, so this never fires on a save
+        /// this engine made. It is here because the format cannot be re-versioned freely once 1.0
+        /// has shipped, and two records of one fact are two things every later change has to keep
+        /// in step: if one ever stops matching the other, a restore says so, before it has taken
+        /// the running game apart, instead of building a game where a card is in the player's hand
+        /// and in the draw pile at once.
+        /// </remarks>
+        private void CheckZonesAgree(GameSnapshot snapshot)
+        {
+            static InvalidOperationException Disagrees(string what) =>
+                new InvalidOperationException($"The snapshot does not agree with itself about where a card is: {what}.");
+
+            // Reused rather than allocated: a restore is the bot's hot path in `cantrip sim`,
+            // which rolls one back for every play it tries, tens of thousands of times in a run.
+            Dictionary<int, string> listed = _zoneOfEntity;
+            listed.Clear();
+            foreach (ZoneSnapshot zone in snapshot.Zones)
+            {
+                foreach (int id in zone.Entities)
+                {
+                    if (!listed.TryGetValue(id, out string? already)) listed[id] = zone.Zone;
+                    else if (string.Equals(already, zone.Zone, StringComparison.Ordinal))
+                        throw Disagrees($"entity #{id} is in the \"{zone.Zone}\" zone twice");
+                    else
+                        throw Disagrees($"entity #{id} is in the \"{already}\" zone and in the \"{zone.Zone}\" zone");
+                }
+            }
+
+            foreach (EntitySnapshot record in snapshot.Entities)
+            {
+                string zone = record.Zone ?? string.Empty;
+                bool placed = listed.TryGetValue(record.Id, out string? where);
+                if (zone.Length == 0)
+                {
+                    if (placed) throw Disagrees($"entity #{record.Id} is in no zone, and the \"{where}\" zone lists it");
+                }
+                else if (!placed)
+                {
+                    throw Disagrees($"entity #{record.Id} is in the \"{zone}\" zone, which does not list it");
+                }
+                else if (!string.Equals(where, zone, StringComparison.Ordinal))
+                {
+                    throw Disagrees($"entity #{record.Id} is in the \"{zone}\" zone, and the \"{where}\" zone lists it");
+                }
+            }
         }
 
         /// <summary>
@@ -610,6 +852,13 @@ namespace Cantrip.Runtime
 
             return found;
         }
+
+        /// <summary>What a refusal calls the writer of a save, which an old save does not record.</summary>
+        private static string Wrote(GameSnapshot snapshot) =>
+            string.IsNullOrEmpty(snapshot.WrittenBy) ? "a version of Cantrip that did not record which" : "Cantrip " + snapshot.WrittenBy;
+
+        // Scratch for CheckZonesAgree, which runs on every restore.
+        private readonly Dictionary<int, string> _zoneOfEntity = new Dictionary<int, string>();
 
         private Entity? Lookup(int id) => id == 0 ? null : Find(id);
 

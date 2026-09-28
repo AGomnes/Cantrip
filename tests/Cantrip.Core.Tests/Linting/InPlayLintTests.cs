@@ -8,12 +8,14 @@ using Xunit;
 namespace Cantrip.Tests.Linting
 {
     /// <summary>
-    /// CT320: <c>copy</c>, <c>transform</c> and <c>play</c> act on something that is already in the
-    /// game, so a definition written there is a different verb, or a different word, waiting to be spelt.
+    /// CT320: <c>copy</c>, <c>transform</c>, <c>play</c> and <c>replay</c> act on something that is
+    /// already in the game, so a definition written there is a different verb, or a different word,
+    /// waiting to be spelt.
     /// </summary>
     /// <remarks>
-    /// All three lines read as if they would make or change something. They do not: at runtime each is
-    /// an error or, for <c>transform</c>, a statement that does nothing at all, so the message says
+    /// All four lines read as if they would make or change something already here. They do not: at
+    /// runtime each is an error or, for <c>transform</c>, a statement that does nothing at all — and
+    /// <c>replay</c> was worse than either, running the printed effect for free. The message says
     /// what to write rather than guessing at a spelling.
     /// </remarks>
     public sealed class InPlayLintTests
@@ -86,7 +88,91 @@ namespace Cantrip.Tests.Linting
         }
 
         /// <summary>
-        /// Everything the two verbs are actually for: a local, a zone word, a selector. None of these
+        /// <c>replay</c> was the one of the four that worked: it ran a definition's printed effect
+        /// for nothing, with no card and no cost behind it. It is refused here like the rest.
+        /// </summary>
+        [Fact]
+        [Trait("Regression", "replay-takes-a-definition")]
+        public void Replaying_a_definition_is_an_error_that_names_a_real_card()
+        {
+            Diagnostic error = Single(Lint("""
+                card "Cheat"
+                  cost 0
+                  effect:
+                    replay Strike
+                """));
+
+            Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+            Assert.Contains("`replay` resolves the effect of a card that is in the game", error.Message);
+            Assert.Contains("`Strike` is content", error.Message);
+            Assert.Contains("create Strike into hand", error.Message);
+            Assert.Contains("play created.first, free", error.Message);
+        }
+
+        /// <summary>
+        /// The same mistake in reverse: <c>create</c> wants content, but only the kinds that stand
+        /// in a zone on their own. <c>create Poison 2</c> made two Poisons attached to nobody, which
+        /// raised <c>created</c> and went into saves.
+        /// </summary>
+        [Fact]
+        [Trait("Regression", "create-makes-orphan-statuses")]
+        public void Creating_a_status_is_an_error_that_names_apply()
+        {
+            Diagnostic error = Single(Lint("""
+                card "Bad"
+                  cost 0
+                  effect:
+                    create Poison 2
+                """));
+
+            Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+            Assert.Contains("`Poison` is a status and belongs to whoever has it, not to a zone", error.Message);
+            Assert.Contains("Write `apply Poison 2 to <who>` to give one.", error.Message);
+        }
+
+        /// <summary>An ability is granted rather than applied, so the fix says the other thing.</summary>
+        [Fact]
+        [Trait("Regression", "create-makes-orphan-statuses")]
+        public void Creating_an_ability_names_how_an_ability_is_given()
+        {
+            Diagnostic error = Single(Lint("""
+                ability "Zap"
+                  cooldown 3
+                  target enemy
+                  effect:
+                    deal 7 to target
+
+                card "Bad"
+                  cost 0
+                  effect:
+                    create Zap
+                """));
+
+            Assert.Contains("`Zap` is an ability and belongs to whoever has it", error.Message);
+            Assert.Contains("grant Zap", error.Message);
+        }
+
+        /// <summary>
+        /// A name shared between a card and a status is the card here, because that is the
+        /// definition <c>create</c> itself prefers.
+        /// </summary>
+        [Fact]
+        public void A_name_that_is_also_a_card_is_the_card_create_makes()
+        {
+            None(Lint("""
+                card "Poison"
+                  cost 0
+                  tags unplayable
+
+                card "Fine"
+                  cost 0
+                  effect:
+                    create Poison 2 into draw
+                """));
+        }
+
+        /// <summary>
+        /// Everything these verbs are actually for: a local, a zone word, a selector. None of these
         /// is a definition, so none of them is reported.
         /// </summary>
         [Fact]
@@ -103,6 +189,8 @@ namespace Cantrip.Tests.Linting
                     copy hand.first into draw
                     play draw.first
                     play discard.first, free
+                    replay hand.first on target
+                    replay picked
                     copy
                 """);
 

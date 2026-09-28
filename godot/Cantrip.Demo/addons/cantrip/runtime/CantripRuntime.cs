@@ -623,9 +623,13 @@ namespace Cantrip.GodotAdapter
 
             if (file == null) return Refused("no_payload", "This save carries no game to restore.");
 
-            var envelope = new SaveEnvelope(file.Format, file.Fingerprint, file.Snapshot);
+            SaveEnvelope envelope = new SaveEnvelope(file.Format, file.Fingerprint, file.Snapshot);
             SaveCheck check = envelope.Check(Content.Fingerprint);
             if (!check.Accepted && check.Reason != SaveRejection.ContentChanged) return Refused(check.ReasonName, check.Message);
+
+            // An envelope from an older addon is read, not refused; only a newer one is refused,
+            // above, because this addon cannot know what is in it.
+            envelope = envelope.Upgraded();
 
             GameSnapshot? snapshot;
             try
@@ -640,11 +644,15 @@ namespace Cantrip.GodotAdapter
             if (snapshot == null) return Refused("no_payload", "This save carries no game to restore.");
 
             // The rules would refuse this too, but it is a save from another version of Cantrip.Core,
-            // not one from other content, and a game may want to tell the player so.
-            if (snapshot.FormatVersion != GameSnapshot.CurrentFormat)
+            // not one from other content, and a game may want to tell the player so. Only a save
+            // needing a reader newer than this build is turned away: an older save is restored,
+            // which is the whole of the promise in docs/stability.md.
+            int needs = GameSnapshot.ReaderNeededBy(snapshot);
+            if (needs > GameSnapshot.CurrentFormat)
             {
                 return Refused("wrong_format",
-                    "The game in this save is in format " + snapshot.FormatVersion + "; this version of Cantrip.Core reads format " + GameSnapshot.CurrentFormat + ".");
+                    "The game in this save is in format " + snapshot.FormatVersion + " and needs a Cantrip.Core that reads format "
+                    + needs + "; this one reads up to format " + GameSnapshot.CurrentFormat + ".");
             }
 
             try

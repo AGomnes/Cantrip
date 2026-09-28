@@ -154,13 +154,46 @@ namespace Cantrip.Tests.Descriptions
             Assert.Equal("Damage dealt ×1.5 (fire). Cost -1 for cards (fire).", text);
         }
 
+        /// <summary>
+        /// An amount that already reads with a minus does not get a second sign. <c>modify damage:
+        /// -stacks</c> printed "Damage dealt +-stacks": a negated name is not a negative literal, and
+        /// nothing else looked, so the sign went on and the name was spelt out as it was written.
+        /// </summary>
+        [Fact]
+        [Trait("Regression", "negated-modifier-amount")]
+        public void A_negated_modifier_amount_keeps_one_sign_and_reads_as_a_value()
+        {
+            ContentLibrary content = ContentLibrary.FromText("""
+                status "Sapped"
+                  tags debuff
+                  stacking intensity
+                  modify damage: -stacks
+
+                status "Strength"
+                  tags buff
+                  stacking intensity
+                  modify damage: +stacks
+
+                status "Brittle"
+                  tags debuff
+                  stacking intensity
+                  modify damage_taken: -2
+                """, "modifiers.cantrip");
+
+            Assert.False(content.Diagnostics.HasErrors, content.Diagnostics.ToString());
+
+            Assert.Equal("Damage dealt -X.", Describe(content, "Sapped", "status").ToPlainText());
+            Assert.Equal("Damage dealt +X.", Describe(content, "Strength", "status").ToPlainText());
+            Assert.Equal("Damage taken -2.", Describe(content, "Brittle", "status").ToPlainText());
+        }
+
         [Fact]
         public void Abilities_and_replacement_listeners_read_naturally()
         {
             ContentLibrary content = Samples();
 
             Description nova = Describe(content, "Frost Nova", "ability");
-            Assert.Equal("Apply 40% Slow to ALL enemies for 3s. Cooldown 8s.", nova.ToPlainText());
+            Assert.Equal("Apply 2 Slow to ALL enemies for 3s. Cooldown 8s.", nova.ToPlainText());
             Assert.Empty(nova.Tooltips); // Slow is a marker with no rules text of its own
 
             Assert.Equal("If you die, instead (once per combat): Heal 40 HP.", Describe(content, "Lizard Tail", "relic").ToPlainText());

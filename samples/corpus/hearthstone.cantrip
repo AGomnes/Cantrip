@@ -83,11 +83,13 @@ verb trade(minion, victim):
 
 # --- 8. ref Taunt: the other side must attack this minion -----------------------------------------------------
 # Target selection has rules content can add to: the `targetable` channel, asked over a base of 1
-# before a card accepts a target. While this is attached, the other side's single-target cards can
-# only be pointed at something that also has Taunt. The predicate is `not it.has(Taunt)` rather than
-# a comparison with the owner, so two taunting minions leave each other available instead of
-# cancelling out, and `source:enemies` is what keeps a taunt from constraining its own side. Area
-# and random effects are not filtered, which is the rule these games actually have.
+# before anything is pointed at somebody. While this is attached, the other side's single-target
+# cards can only be aimed at something that also has Taunt, and so can the other side's `attack`
+# and the other side's enemy moves: a taunt means one thing wherever something is aimed. The
+# predicate is `not it.has(Taunt)` rather than a comparison with the owner, so two taunting minions
+# leave each other available instead of cancelling out, and `source:enemies` is what keeps a taunt
+# from constraining its own side. Area and random effects are not filtered, which is the rule these
+# games actually have.
 
 status "Taunt"
   stacking none

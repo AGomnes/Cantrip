@@ -311,22 +311,22 @@ Commands: :state  :trace  :quit
 > apply Poison 4 to target
   Player       hp 80/80  block 0  energy 3
   Dummy        hp 100/100  block 0  [Poison 4]
-> emit turn_end to target
+> deal 6 to target
   Player       hp 80/80  block 0  energy 3
-  Dummy        hp 96/100  block 0  [Poison 3]
+  Dummy        hp 94/100  block 0  [Poison 4]
 > create Whetstone
   Player       hp 80/80  block 0  energy 3
-  Dummy        hp 96/100  block 0  [Poison 3]
+  Dummy        hp 94/100  block 0  [Poison 4]
 > create Strike
   Player       hp 80/80  block 0  energy 3
-  Dummy        hp 96/100  block 0  [Poison 3]
+  Dummy        hp 94/100  block 0  [Poison 4]
 > replay hand.first on target
   Player       hp 80/80  block 0  energy 3
-  Dummy        hp 88/100  block 0  [Poison 3]
+  Dummy        hp 86/100  block 0  [Poison 4]
 > log "The Dummy has" target.hp "hp"
-log: The Dummy has 88 hp
+log: The Dummy has 86 hp
   Player       hp 80/80  block 0  energy 3
-  Dummy        hp 88/100  block 0  [Poison 3]
+  Dummy        hp 86/100  block 0  [Poison 4]
 ```
 
 | Command | What it does |
@@ -343,7 +343,7 @@ Useful lines:
 | `create Whetstone`, `create Strike` | Gives the player a relic, or puts a card in the hand |
 | `play hand.first on target` | Really plays that card: it pays, it raises `card_played`, and it goes to the discard pile |
 | `replay hand.first on target` | Runs the first card in the hand's effect, for free, leaving the card where it is |
-| `emit turn_end to target` | Raises `turn_end` for the Dummy, so its statuses' `on turn_end` listeners run |
+| `emit sparked to target` | Raises an event of your own for the Dummy, so `on sparked` listeners run. A built-in name such as `turn_end` is refused (CT322): the engine raises those itself, and emitting one would run its listeners while nothing had happened. |
 | `create "Bog Troll"` | Adds one of your enemies. It never takes a turn here. |
 | `log "text" target.Poison` | Prints values. Separate them with spaces, not commas: text after a comma is read as a flag. |
 
@@ -704,7 +704,7 @@ test "Leech heals no more than the target had left"
   expect player.hp == 54
 ```
 
-`dealt` is the hp the target lost: after modifiers, after block, and no more than it had left. `into` works on `deal`, `damage` and `attack`. In the `text` line, `{damage}` is filled in with the damage, including modifiers such as the Whetstone's when a game shows the card. File: [heal-for-damage-dealt.cantrip](../samples/recipes/heal-for-damage-dealt.cantrip).
+`dealt` is the hp the target lost: after modifiers, after block, and no more than it had left. `into` works on `deal`, `damage`, `attack`, `heal` and `block`. It binds a new name, so do not reuse a stat name. In the `text` line, `{damage}` is filled in with the damage, including modifiers such as the Whetstone's when a game shows the card. File: [heal-for-damage-dealt.cantrip](../samples/recipes/heal-for-damage-dealt.cantrip).
 
 ### Discard, then draw
 

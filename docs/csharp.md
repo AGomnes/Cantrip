@@ -409,7 +409,30 @@ Work waiting in the save, such as the `next turn:` block of a card played before
 
 Listener limits and timers stay with their listener too. Which turn or battle a `once per` listener last fired in, and when an `on every` listener is next due, are saved with the listener's place among its definition's `on` blocks and a hash of the listener, so an edit that adds, removes or reorders `on` blocks, or only changes their layout or comments, is safe. So is an edit to the body of a listener that keeps its place, such as a new number: a `once per battle` listener that has fired stays used. A listener whose `on` line has changed (its event, filter, `once per`, `priority` or interval), or whose body changed as it moved, is not taken for the old one. It starts afresh, as a newly added listener would: it can fire once more in the turn, battle or run whose limit it had used, and an `on every` listener waits a full interval from the moment of the save. The save is never refused for this, and a record never goes to a listener with a different `on` line. A save made by 0.1.0-preview.2 or earlier records the place alone, so after an edit that adds, removes or reorders `on` blocks it can give a limit or timer to another listener.
 
-`Restore` also refuses a snapshot from a different save format, before touching anything. The Godot node's `LoadSave` treats the fingerprint the same way: a save whose fingerprint differs still goes to `Restore`, and is refused only when `Restore` refuses it (see [Saving](godot.md#saving)).
+The Godot node's `LoadSave` treats the fingerprint the same way: a save whose fingerprint differs still goes to `Restore`, and is refused only when `Restore` refuses it (see [Saving](godot.md#saving)).
+
+### What a save says about itself
+
+Four fields at the top of a `GameSnapshot` describe the save rather than the game.
+
+| Field | What it is |
+|---|---|
+| `FormatVersion` | The format the save is written in, `GameSnapshot.CurrentFormat` at the time it was written. It only ever increases, and it moves whenever the shape of a save changes at all, an added field included. |
+| `MinimumReader` | The oldest `CurrentFormat` that can be trusted with the save. It moves only when a change would make an older build get the game *wrong*, rather than merely miss something it never knew about. 0 in a save made before it was recorded, which is read as `FormatVersion`. |
+| `WrittenBy` | The version of Cantrip.Core that wrote the save, such as `0.1.0-preview.5`, as `cantrip --version` gives it. Nothing branches on it; a refusal quotes it, and [Stability](stability.md) asks you to keep it with a replay or a bug report, so the engine now keeps it for you. Empty in a save made before it was recorded, and in a `GameSnapshot` built by hand rather than captured. |
+| `RngGenerator` | The generator the saved random state came from, `xoshiro256**` today. Empty means that one: four numbers can only be a game's random future while something says what reads them, and a release may change the generator. |
+
+**Older saves keep loading.** `Restore` refuses a save only when it needs a reader this build is not — when `GameSnapshot.ReaderNeededBy(save)` is above `GameSnapshot.CurrentFormat` — and says so, naming the version that wrote it:
+
+> This save is in format 4 and needs a Cantrip that reads format 3; this one reads up to format 2. It was written by Cantrip 1.4.0.
+
+Anything older goes through an upgrade step first, which brings it into the current shape in place; the `GameSnapshot` you passed comes back at `CurrentFormat`. A save from a *newer* release is read whenever that release said it could be — that is what `MinimumReader` is for — and fields this build has never heard of are ignored. Call `GameSnapshot.ReaderNeededBy` yourself before restoring if you would rather tell the player that a save needs a newer version of your game than catch the exception.
+
+That is the promise in [Stability](stability.md): after 1.0, a save made by any 1.x release loads in every later 1.x. Bumping `FormatVersion` is how a release describes its saves honestly, not how it stops reading old ones.
+
+A save whose `RngGenerator` this build does not have is refused in the same way, before anything changes, rather than restored with four numbers another generator would read differently.
+
+**Format 2**, which this release writes, renamed two fields of `ScheduledSnapshot`, because a name on disk is frozen at 1.0 and these two said the wrong thing: `Block` is now `BlockAddress` (it holds an address such as `card:Prepare/effect/0.body`, while `block` in the language is a stat, a verb and a modifier channel), and `Deadline` is now `UntilEvent` (it holds the event an `until` block waits for, and sat beside `DueAt`, which is a time). Format 1 saves are still read under both old names, and are not written back with them.
 
 `Restore` abandons a pending choice, which belonged to the game being replaced. A save taken while a choice is pending holds the game as it was before the call that asked, so after loading, the player makes that move again.
 
