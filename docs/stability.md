@@ -30,6 +30,8 @@ Same-seed results are not on that list. A 1.x release may change what the same c
 - On every push to `main` and every pull request, on Linux and Windows x64: the unit tests, the content tests in `samples/`, `lint` on each sample folder with `--warnings-as-errors`, so that a new warning fails the build, and `cantrip sim` over both sample scenarios — the roguelite's gauntlet in `samples/slice` and the fight with no cards in `samples/abilities` — 100 runs of each by each of the two default bots, which fail on any run that throws, any battle that reaches the turn limit and any expectation that does not hold.
 - Among the unit tests, 100 seeded random battles are each played twice and compared step by step, and a saved and restored game is played beside the original, comparing state hashes after every step.
 - Every change to Cantrip.Core's public C# API must be recorded in `src/Cantrip.Core/PublicAPI.Unshipped.txt`, or the build fails.
+- [The API reference](api/README.md) is regenerated from the XML documentation comments on every push and the build fails if `docs/api/` disagrees (`tools/api-docs.sh --check`), so the reference for a frozen surface cannot drift from it.
+- On every push, the reference game is published trimmed and — on Linux — with Native AOT, with the trim and AOT analysers on and warnings as errors, and the published binary then plays its eight seeds with a save and a restore in each (`tools/publish-check.sh`). Publishing a game is a promise this page makes, so it is a thing CI does rather than a thing this page asserts.
 - On the same pushes and before every release, the [quickstart](quickstart.md) is followed word for word against freshly packed packages, and the Godot addon is installed from its zip into a blank Godot project and plays a battle from GDScript.
 - On the same pushes, the editor dock runs its own self-test inside a headless engine: it loads the project's content, runs its `test` blocks, describes every definition, drives the debugger's two tabs — and, since 0.1.0-preview.5, types into the Source tab, saves the file, parks the buffer, applies a suggested fix, follows a `.cantrip` file added and deleted outside the dock, checks that it indents with spaces at the buffer's own width, and prints what one check costs.
 - A release publishes nothing until all of that has passed at the tagged commit.
@@ -45,8 +47,19 @@ Same-seed results are not on that list. A 1.x release may change what the same c
 | macOS, and ARM on any system | Untested |
 | Godot exports to Windows, macOS, the web, Android and iOS | Untested. Godot's own limits on where a .NET game can be exported apply as well |
 | MonoGame, FNA and other plain .NET engines | Untried. They call the library as the [quickstart](quickstart.md)'s console app does |
-| NativeAOT, trimming, Unity and IL2CPP | Untested |
+| Trimming and Native AOT, .NET 9 | Tested in CI: the reference game is published `PublishTrimmed` with `TrimMode=full`, and Native AOT on Linux x64, with the trim and AOT analysers on and warnings as errors, and the binary then plays eight whole runs with saves and restores. `Cantrip.Core` is marked `IsTrimmable` and produces no trim or AOT warnings. See [Publishing a game](#publishing-a-game) |
+| Unity and IL2CPP | Untested |
 | .NET Framework | Not supported: the core targets `netstandard2.1` |
+
+## Publishing a game
+
+A shipped game is usually published trimmed, and sometimes with Native AOT, and a rules engine is the kind of library that dies there: reflection, `System.Text.Json` and dynamic dispatch are the usual casualties and this one has all three within reach. So it is checked rather than assumed. `tools/publish-check.sh` publishes [the reference game](../reference) both ways, with the trim and AOT analysers on and every trim and AOT warning an error, and then plays eight whole runs in what it built, saving each one part way and restoring it into a second game that has to agree hash for hash. On this machine a trimmed self-contained build is 21 MB and a Native AOT binary is 5.3 MB with no runtime beside it.
+
+**The engine needs nothing from you.** `Cantrip.Core` carries `[AssemblyMetadata("IsTrimmable", "True")]`, so a published game's trimmer removes what its game does not use rather than keeping the whole assembly, and it earns that: nothing in it reflects over its own types — the snapshot is plain data by design and the interpreter dispatches on syntax nodes rather than on names — and its only reflection is one read of its own version attribute, which is what stamps `GameSnapshot.WrittenBy`. The reference game checks that that read still answers in the published binary, because a trimmer taking it would leave every save from a shipped game with no record of what wrote it and nothing else would notice.
+
+**Your serializer does.** Reflection-based `System.Text.Json` works in a normal build and throws `Reflection-based serialization has been disabled for this application` the first time a trimmed or AOT build saves. `GameSnapshot` is plain data so that a source-generated `JsonSerializerContext` handles it with no converters of its own; [reference/host/RunState.cs](../reference/host/RunState.cs) is the four lines, and [troubleshooting.md](troubleshooting.md#publishing-a-game) has them inline.
+
+**Native AOT needs a platform linker** — the Desktop Development for C++ workload on Windows, `clang` and `zlib1g-dev` on Linux. Without one, `dotnet publish` reports `Platform linker not found` after compiling everything, and `tools/publish-check.sh` skips that half loudly rather than failing.
 
 ## Performance
 

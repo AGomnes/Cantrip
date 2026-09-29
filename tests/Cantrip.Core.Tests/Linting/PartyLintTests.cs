@@ -131,6 +131,128 @@ namespace Cantrip.Tests.Linting
                 """, Linter.PlayerWhereAMemberIsMeant));
         }
 
+        /// <summary>
+        /// A status's listener is where a real-time enemy's whole behaviour lives, and where damage
+        /// over time is spelled on any clock. <c>deal 5 to player</c> there burns the leader rather
+        /// than whoever the status is on, every tick, in silence — which is the exact shape CT326
+        /// exists to refuse.
+        /// </summary>
+        [Theory]
+        [InlineData("""
+            status "Burn"
+              stacking duration
+              on every 2s:
+                deal 5 to player
+            """, "a status's listener")]
+        [InlineData("""
+            status "Spite"
+              stacking intensity
+              on damaged:
+                deal 2 to player
+            """, "a status's listener")]
+        [InlineData("""
+            status "Vigil"
+              stacking duration
+              on turn_start:
+                block 2 to player
+            """, "a status's listener")]
+        [InlineData("""
+            relic "Thorns"
+              on damaged:
+                deal 2 to player
+            """, "a relic's listener")]
+        [InlineData("""
+            relic "Pulse"
+              on every 2s:
+                heal 1 to player
+            """, "a relic's listener")]
+        public void Player_in_a_carried_listener_is_an_error_too(string body, string place)
+        {
+            Diagnostic error = Assert.Single(Coded(Party + body, Linter.PlayerWhereAMemberIsMeant));
+
+            Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+            Assert.Contains(place, error.Message);
+
+            // `target` names nothing inside `on every 2s:`, so a carried listener is told the word
+            // that does mean "whoever this is on", and told the exception in the same breath.
+            Assert.Equal("owner", error.Suggestion);
+            Assert.Contains("`owner`", error.Message);
+            Assert.Contains("on owner.turn_start:", error.Message);
+        }
+
+        /// <summary>
+        /// The exception, in both of the two shapes that make it up: an event scoped to the holder,
+        /// and a run-level event where the leader is the only actor the engine puts in view.
+        /// </summary>
+        [Theory]
+        [InlineData("""
+            status "Guarded"
+              stacking duration
+              on owner.turn_start:
+                block 2 to player
+            """)]
+        [InlineData("""
+            status "Mirror"
+              stacking duration
+              on self.damaged:
+                block 2 to player
+            """)]
+        [InlineData("""
+            relic "Aegis"
+              on owner.turn_start:
+                block 2 to player
+            """)]
+        [InlineData("""
+            relic "Purse"
+              on battle_start:
+                gain 5 gold to player
+            """)]
+        [InlineData("""
+            relic "Ledger"
+              on battle_end:
+                gain 5 gold to player
+            """)]
+        [InlineData("""
+            relic "Trinket"
+              on obtained:
+                gain 2 max_hp to player
+            """)]
+        public void A_listener_about_its_own_owner_may_still_say_player(string body)
+        {
+            Assert.Empty(Coded(Party + body, Linter.PlayerWhereAMemberIsMeant));
+        }
+
+        /// <summary>
+        /// A scope is not the exception on its own: <c>controller</c> and <c>player</c> are scopes
+        /// the runtime resolves too, and they name somebody who is not the holder, so a member is
+        /// still in view and the word still has to be the right one.
+        /// </summary>
+        [Fact]
+        public void A_scope_that_is_not_the_holder_is_not_the_exception()
+        {
+            Assert.Single(Coded(Party + """
+                status "Echo"
+                  stacking duration
+                  on controller.turn_start:
+                    block 2 to player
+                """, Linter.PlayerWhereAMemberIsMeant));
+        }
+
+        /// <summary>
+        /// The widening is still bounded by the party: content with no <c>hero</c> is untouched,
+        /// which is why an error is affordable at all.
+        /// </summary>
+        [Fact]
+        public void A_carried_listener_with_no_hero_may_still_say_player()
+        {
+            Assert.Empty(Coded("""
+                status "Burn"
+                  stacking duration
+                  on every 2s:
+                    deal 5 to player
+                """, Linter.PlayerWhereAMemberIsMeant));
+        }
+
         [Fact]
         public void A_test_may_still_say_player()
         {

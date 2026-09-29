@@ -1030,4 +1030,6 @@ For more worked content with tests, [samples/basic](../samples/basic) has small 
 
 Looking for an effect you know from another game? [coverage.md](coverage.md) maps effects from nine games to working content in [samples/corpus](../samples/corpus), including power cards, and its [Sharp edges](coverage.md#sharp-edges) list the rules that most often catch authors out.
 
+When something will not load, or loads and then does the wrong thing, [troubleshooting.md](troubleshooting.md) is where the answers are: the diagnostics a new project meets first, how to read a trace, and the whole class of mistakes that run cleanly and quietly do the wrong thing.
+
 For the programmer on the team, [godot.md](godot.md) covers running battles, choices, saves and hot reload in a Godot game, and [csharp.md](csharp.md) does the same for a game that calls the library itself.

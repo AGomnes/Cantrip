@@ -46,4 +46,8 @@ GDScript that runs as written, and a reference for every method, signal and dict
 Two rules to know before writing any GDScript against it: members keep their C# PascalCase names,
 and a C# default argument is not a default in GDScript, so every parameter must be passed.
 
+When something goes wrong, https://github.com/AGomnes/Cantrip/blob/main/docs/troubleshooting.md#godot
+has the Godot half: a `Nonexistent function`, a stale `.godot` folder, content that will not load,
+the addon and the library out of step, and why the game will not speed up.
+
 MIT licensed.

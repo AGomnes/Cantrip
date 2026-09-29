@@ -1365,17 +1365,18 @@ namespace Cantrip.Linting
         }
 
         /// <summary>
-        /// CT326: <c>player</c> written inside an enemy's move or a card's or ability's effect, in
-        /// content that has a party.
+        /// CT326: <c>player</c> written where a party member could be meant — an enemy's move, a
+        /// card's or an ability's effect, or a listener on any of them, on a status or on a relic
+        /// — in content that has a party.
         /// </summary>
         /// <remarks>
         /// <para>
         /// <c>player</c> means exactly one entity and always will: the party's leader, the one
         /// <c>CreatePlayer</c> made, the one that holds the run's relics and gold. In a game with no
         /// <c>hero</c> that is the whole party, so the word is never wrong and this check never
-        /// fires. In a game with a party it is almost always the wrong word in these three places:
-        /// <c>deal 5 to player</c> in an enemy move hits the leader however carefully the enemy
-        /// telegraphed somebody else, and it does it quietly.
+        /// fires. In a game with a party it is almost always the wrong word wherever somebody is
+        /// being acted on: <c>deal 5 to player</c> in an enemy move hits the leader however
+        /// carefully the enemy telegraphed somebody else, and it does it quietly.
         /// </para>
         /// <para>
         /// So it is an error, not a warning. It costs nothing to content that has no party,
@@ -1385,9 +1386,11 @@ namespace Cantrip.Linting
         /// for all of them.
         /// </para>
         /// <para>
-        /// Everywhere else <c>player</c> stays legal and stays right: a relic's listener, a run's
-        /// gold, a test's own lines, a scenario's setup. The rule is about the three bodies where
-        /// somebody is being acted on, not about the word.
+        /// Everywhere else <c>player</c> stays legal and stays right: a run's gold, a test's own
+        /// lines, a scenario's setup, the game's own C#, and a status's or relic's listener that
+        /// is about its own owner. The whole rule is one sentence — <c>player</c> is refused
+        /// wherever a member could be meant — and the list of bodies below is only how that
+        /// sentence is spelled for a linter.
         /// </para>
         /// </remarks>
         private void CheckPlayerInAParty(Body body)
@@ -1402,12 +1405,22 @@ namespace Cantrip.Linting
                 if (!string.Equals(name.Name, "player", StringComparison.OrdinalIgnoreCase)) continue;
                 if (body.Facts.Locals.Contains(name.Name)) continue;
 
+                // A status and a relic are carried, so the word that means "whoever this is on" is
+                // `owner`, and `target` names nothing at all inside `on every 2s:`. The message
+                // also states the exception, because a rule is easier to keep than to look up.
+                bool carried = place == "a status's listener" || place == "a relic's listener";
+
                 Error(
                     PlayerWhereAMemberIsMeant,
-                    $"`player` in {place} means the party's leader, not the member being acted on, and this content has a party. " +
-                    "Write `target` for whoever this is aimed at, `leader` if the run's own actor really is meant, or `party` for all of them.",
+                    $"`player` in {place} means the party's leader, " +
+                    (carried ? "not whoever is carrying it" : "not the member being acted on") +
+                    ", and this content has a party. " +
+                    (carried
+                        ? "Write `owner` for whoever is carrying it, `leader` if the run's own actor really is meant, or `party` for all of them. " +
+                          "`player` stays right in a listener about its own owner, such as `on owner.turn_start:`."
+                        : "Write `target` for whoever this is aimed at, `leader` if the run's own actor really is meant, or `party` for all of them."),
                     name.Span,
-                    "target");
+                    carried ? "owner" : "target");
             }
         }
 
@@ -1427,10 +1440,17 @@ namespace Cantrip.Linting
         /// <c>on every 2s: deal 5 to player</c> on an enemy linted with zero errors.
         /// </para>
         /// <para>
-        /// A listener on a status, a card or an ability counts for the same reason: it fires for
-        /// whoever is carrying it, and <c>player</c> names the leader whoever that is. A relic's
-        /// listener does not: a relic belongs to the run, which is the leader's, so there
-        /// <c>player</c> is the right word and always was.
+        /// A listener on a status, a relic, a card or an ability counts for the same reason: it
+        /// fires for whoever is carrying it, and <c>player</c> names the leader whoever that is.
+        /// A status's listener was the last hole and the widest one, because a status is how
+        /// damage over time is spelled: <c>on every 2s: deal 5 to player</c> on a Burn burns the
+        /// leader rather than the member the Burn is on, in every fight, in silence.
+        /// </para>
+        /// <para>
+        /// A status's and a relic's listener carry one exception, which is what lets the whole
+        /// rule be a sentence rather than a list of five places: <c>player</c> stays legal where
+        /// the listener is about its own owner. <see cref="AboutItsOwner"/> says exactly what that
+        /// means, and why those are the two shapes in which no member can be meant.
         /// </para>
         /// </remarks>
         private static string? PartyBody(Body body)
@@ -1440,13 +1460,15 @@ namespace Cantrip.Linting
 
             if (body.Kind == BodyKind.Listener)
             {
-                return kind switch
+                switch (kind)
                 {
-                    "enemy" => "an enemy's listener",
-                    "card" => "a card's listener",
-                    "ability" => "an ability's listener",
-                    _ => null,
-                };
+                    case "enemy": return "an enemy's listener";
+                    case "card": return "a card's listener";
+                    case "ability": return "an ability's listener";
+                    case "status": return AboutItsOwner(body.Listener) ? null : "a status's listener";
+                    case "relic": return AboutItsOwner(body.Listener) ? null : "a relic's listener";
+                    default: return null;
+                }
             }
 
             if (body.Kind != BodyKind.Effect || !(body.Anchor is BlockMemberNode block)) return null;
@@ -1454,6 +1476,71 @@ namespace Cantrip.Linting
             if (kind == "enemy" && block.Name == "move") return "an enemy's move";
             if (block.Name != "effect") return null;
             return kind == "card" ? "a card's effect" : kind == "ability" ? "an ability's effect" : null;
+        }
+
+        /// <summary>
+        /// The events that put no actor in view but the leader, so that a <c>player</c> in a
+        /// listener for one of them cannot be a member said wrongly.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="BuiltinEvents"/> says what each one carries, and these three are the whole of
+        /// the list: <c>battle_start</c>'s source is the player, <c>battle_end</c>'s target is the
+        /// player, and <c>obtained</c>'s source is the player taking a relic. Every other built-in
+        /// event is about an actor, and in a party that actor can be a member.
+        /// </remarks>
+        private static readonly HashSet<string> RunLevelEvents = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            BuiltinEvents.BattleStart, BuiltinEvents.BattleEnd, BuiltinEvents.Obtained,
+        };
+
+        /// <summary>
+        /// Whether a <c>status</c>'s or <c>relic</c>'s listener is <em>about its own owner</em>:
+        /// the one shape in which <c>player</c> is refused nowhere, because no member is in view
+        /// to have been meant instead.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// It is true in exactly two cases, and the definition is the listener's header alone —
+        /// nothing about the body, so the same line is always read the same way:
+        /// </para>
+        /// <list type="number">
+        /// <item>
+        /// <description>
+        /// The event is <b>scoped to the holder</b>: <c>on owner.turn_start:</c> or
+        /// <c>on self.damaged:</c>. The scope word is the one the runtime resolves relative to the
+        /// listening entity (<c>Interpreter.ResolveScope</c>), and these two are the two that
+        /// resolve to the thing the declaration is attached to. <c>on controller.turn_start:</c>
+        /// and <c>on player.turn_start:</c> are scopes too and are <em>not</em> this, because they
+        /// name somebody other than the holder. This is the case the decision named:
+        /// <c>on owner.turn_start: block 2 to player</c> on a status worn by the leader.
+        /// </description>
+        /// </item>
+        /// <item>
+        /// <description>
+        /// The event is <b>run-level</b> — <see cref="RunLevelEvents"/> — where the only actor the
+        /// engine puts in view is the leader, so <c>player</c> is the only thing it could be.
+        /// <c>relic "Purse" / on battle_start: gain 5 gold to player</c> is this one.
+        /// </description>
+        /// </item>
+        /// </list>
+        /// <para>
+        /// Everything else is refused, and that is the point: <c>on every 2s:</c>,
+        /// <c>on damaged:</c>, <c>on turn_start:</c> and <c>on killed(target: enemies):</c> all
+        /// fire in a world where a member is standing right there.
+        /// </para>
+        /// </remarks>
+        private static bool AboutItsOwner(ListenerNode? listener)
+        {
+            if (listener == null) return false;
+
+            // `EventName` still carries the scope: `owner.damaged`, the way `Listener` reads it.
+            string name = listener.EventName;
+            int dot = name.LastIndexOf('.');
+            if (dot <= 0) return RunLevelEvents.Contains(name);
+
+            string scope = name.Substring(0, dot);
+            return string.Equals(scope, "owner", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(scope, "self", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>

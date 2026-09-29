@@ -5,7 +5,7 @@
 
 **Write your cards, abilities, statuses, relics and enemies as short scripts instead of code.**
 
-[Godot addon](docs/godot.md) · [Quickstart](docs/quickstart.md) · [Writing content](docs/writing-content.md) · [Language reference](docs/language.md) · [C# guide](docs/csharp.md) · [Stability](docs/stability.md) · [Changelog](CHANGELOG.md)
+[Godot addon](docs/godot.md) · [Quickstart](docs/quickstart.md) · [Writing content](docs/writing-content.md) · [Language reference](docs/language.md) · [C# guide](docs/csharp.md) · [API reference](docs/api/README.md) · [Troubleshooting](docs/troubleshooting.md) · [Stability](docs/stability.md) · [Changelog](CHANGELOG.md)
 
 Cantrip is a rules language and rules engine for the combat in single-player games, where one side fights AI enemies. It was written for deckbuilders and roguelites in the style of Slay the Spire, and neither cards nor turns are required: a roguelike whose actors use abilities on cooldowns is the same engine without cards, as [samples/abilities](samples/abilities) shows, and a game that says `clock ticks` measures time in seconds instead of turns and is driven from its own fixed timestep, as [realtime/](realtime) shows. You write cards, abilities, statuses, relics and enemies as short `.cantrip` files, with their own tests, and the rules engine works out how they interact. Your game drives the battles and keeps the rendering, input, map and rewards between battles in its own code.
 
@@ -172,6 +172,8 @@ Your game learns what happened, to animate it, from events: damage, cards moving
 - [Writing content](docs/writing-content.md): a tutorial and recipes for content authors
 - [Language reference](docs/language.md): every declaration, event, verb and modifier
 - [Using Cantrip from C#](docs/csharp.md): for a game that calls the library itself
+- [The API reference](docs/api/README.md): every public type and member, generated from the sources
+- [Troubleshooting](docs/troubleshooting.md): the errors and confusions a real user hits, and what to do
 - [Architecture](docs/architecture.md): how the library fits together, and where to extend it
 - [Coverage](docs/coverage.md): which effects from existing games the language can express
 - [Simulating](docs/simulating.md): playing a scenario many times with a bot, and what that measures

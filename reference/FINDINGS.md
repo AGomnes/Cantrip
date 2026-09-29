@@ -445,6 +445,14 @@ have cost me nothing to read and saved the whole detour.
 **Kept.** Deferred as design work rather than a fix: what "cannot reach" means depends on where a
 side may stand, which a summon changes mid-fight. The workaround stays, arithmetic and all.
 
+**Written down in packaging.** The lint note is still not written, so this is still a detour
+waiting to happen — but it is a detour with a map now.
+[troubleshooting.md](../docs/troubleshooting.md#invalidtarget-is-one-word-for-four-different-refusals)
+gives the cross-side arithmetic (`a.rank + b.rank + 1`), says outright that `range 1..2` on a board
+two ranks deep can be unable to reach half the enemies for ever with nothing warning, and
+[The fight never ends](../docs/troubleshooting.md#the-fight-never-ends) lists it first among the
+four things a stall usually turns out to be.
+
 ## 9. `InvalidTarget` is one word for four different refusals
 
 `play Censer by Warden on enemy2` answers `InvalidTarget` and nothing says why. On a `facing`
@@ -462,6 +470,14 @@ A `range` a card can never satisfy from where its own side stands is the same cl
 
 **Kept.** Deferred: splitting `InvalidTarget` adds vocabulary to a frozen enum, and which refusals
 are worth telling apart is a question the four answers here do not settle.
+
+**Documented in packaging, which is the other half of it.** The enum stays one word and the enum
+member now says so in its own documentation: `InvalidTarget` names all four refusals, says that
+`LegalTargets` is how they are told apart, and says that on a board it is most often `range`. That
+reaches a reader through the generated [API reference](../docs/api/Cantrip.md#actionresult) and
+through [troubleshooting.md](../docs/troubleshooting.md#a-card-or-ability-will-not-play), which
+turns "call `GetLegalTargets`" into four cases and what each one means. The hour this cost is the
+hour a reader now does not spend; the word is still one word.
 
 ---
 
@@ -636,6 +652,9 @@ actually names, and only `hp` kills. `reference/content` lints clean, and so doe
   it does elsewhere: the whole point of `range` and `target ... where` is what they *exclude*, and
   the only way to test exclusion is to play the card with no target and check which one it picked.
   Three of this game's board tests are written that way and read worse for it.
+  **Packaging wrote it down** rather than fixing it:
+  [troubleshooting.md](../docs/troubleshooting.md#a-card-or-ability-will-not-play) says a `test`
+  cannot assert a refusal and names playing the card with no target as what people do instead.
 
 ---
 

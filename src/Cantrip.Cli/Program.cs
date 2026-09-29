@@ -50,6 +50,12 @@ sim options:
   --turn-limit N     turns one battle may take before the run counts as a stall (default 50)
   --watch SEED       play one run of one scenario with the first bot, printing every turn, play
                      and statement
+  --against <path>   also play the scenarios in <path> with the same bots and the same seeds, and
+                     report the difference seed by seed: content before and after a change. May be
+                     given more than once, like a path
+  --against-name <text>
+                     which scenario in --against to compare with, when it is not called the same
+                     thing. With --name it pairs two decks stated in one folder
 
 exit codes: 0 success, 1 content errors, failing tests, a run that threw, a battle that hit the
 turn limit or a failed expectation (or lint warnings, with --warnings-as-errors), 2 bad usage";
@@ -73,6 +79,8 @@ turn limit or a failed expectation (or lint warnings, with --warnings-as-errors)
             var paths = new List<string>();
             string? filter = null;
             string? bot = null;
+            var against = new List<string>();
+            string? againstName = null;
             bool trace = false;
             bool warningsAsErrors = false;
             var suppressed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -85,6 +93,8 @@ turn limit or a failed expectation (or lint warnings, with --warnings-as-errors)
                     case "--filter" when i + 1 < args.Length: filter = args[++i]; break;
                     case "--name" when i + 1 < args.Length: filter = args[++i]; break;
                     case "--bot" when i + 1 < args.Length: bot = args[++i]; break;
+                    case "--against" when i + 1 < args.Length: against.Add(args[++i]); break;
+                    case "--against-name" when i + 1 < args.Length: againstName = args[++i]; break;
                     case "--trace": trace = true; break;
                     case "--warnings-as-errors": warningsAsErrors = true; break;
                     case "--runs" when i + 1 < args.Length:
@@ -123,7 +133,10 @@ turn limit or a failed expectation (or lint warnings, with --warnings-as-errors)
 
             // Only `sim` plays scenarios. Accepted by another command these would read as settings
             // that were being used, which is worse than being refused.
-            List<string> forSim = numbers.Keys.Concat(bot == null ? Enumerable.Empty<string>() : new[] { "--bot" })
+            List<string> forSim = numbers.Keys
+                .Concat(bot == null ? Enumerable.Empty<string>() : new[] { "--bot" })
+                .Concat(against.Count == 0 ? Enumerable.Empty<string>() : new[] { "--against" })
+                .Concat(againstName == null ? Enumerable.Empty<string>() : new[] { "--against-name" })
                 .OrderBy(o => o, StringComparer.Ordinal)
                 .ToList();
             if (forSim.Count > 0 && command != "sim")
@@ -140,7 +153,7 @@ turn limit or a failed expectation (or lint warnings, with --warnings-as-errors)
                 case "validate": return Validate(content, suppressed);
                 case "lint": return Lint(content, suppressed, warningsAsErrors);
                 case "test": return Test(content, filter, trace);
-                case "sim": return Sim(content, filter, bot, suppressed, numbers);
+                case "sim": return Sim(content, filter, bot, suppressed, numbers, against, againstName);
                 case "describe": return Describe(content, filter);
                 case "repl": return Repl(content);
                 default:
@@ -285,7 +298,14 @@ turn limit or a failed expectation (or lint warnings, with --warnings-as-errors)
         /// start on a content error, the linter's errors included, so a scenario that names an
         /// enemy nothing defines fails in milliseconds instead of after a hundred runs.
         /// </summary>
-        private static int Sim(ContentLibrary content, string? name, string? bot, ISet<string> suppressed, IReadOnlyDictionary<string, string> given)
+        private static int Sim(
+            ContentLibrary content,
+            string? name,
+            string? bot,
+            ISet<string> suppressed,
+            IReadOnlyDictionary<string, string> given,
+            IReadOnlyList<string> against,
+            string? againstName)
         {
             // The options first: bad usage is bad usage, whatever the content turns out to be.
             var options = new ScenarioOptions();
@@ -346,6 +366,51 @@ turn limit or a failed expectation (or lint warnings, with --warnings-as-errors)
                 return 2;
             }
 
+            // The baseline, loaded and checked before anything is played, so that a typo in
+            // `--against` costs a second rather than the length of two simulations.
+            ContentLibrary? baseline = null;
+            string baselineWhere = string.Join(", ", against);
+            if (against.Count > 0)
+            {
+                if (watch != null)
+                {
+                    Console.Error.WriteLine("--watch prints one run of one scenario, and --against compares two sets of many. Use one or the other.");
+                    return 2;
+                }
+
+                baseline = Load(against);
+                if (baseline == null) return 2;
+
+                Print(Loading(baseline, suppressed));
+                List<Diagnostic> wrong = Linter.Lint(baseline, Options(suppressed)).Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
+                Print(wrong);
+                if (baseline.Diagnostics.HasErrors || wrong.Count > 0)
+                {
+                    Console.Error.WriteLine($"the baseline at {baselineWhere} has errors, so nothing can be compared with it.");
+                    return 1;
+                }
+
+                if (baseline.BuildRuleset(new DiagnosticBag()).Clock == ClockKind.Ticks)
+                {
+                    Console.Error.WriteLine($"the baseline at {baselineWhere} says `clock ticks`, and `sim` plays a scenario by taking turns.");
+                    return 2;
+                }
+
+                string? theirName = againstName ?? name;
+                if (!baseline.Scenarios.Any(s => theirName == null || s.Name.IndexOf(theirName, StringComparison.OrdinalIgnoreCase) >= 0))
+                {
+                    Console.Error.WriteLine(theirName == null
+                        ? $"the baseline at {baselineWhere} has no `scenario` blocks, so there is nothing to compare with."
+                        : $"no scenario in the baseline at {baselineWhere} has a name containing \"{theirName}\".");
+                    return 2;
+                }
+            }
+            else if (againstName != null)
+            {
+                Console.Error.WriteLine("--against-name names a scenario in the baseline, and there is no --against to look in.");
+                return 2;
+            }
+
             List<ScenarioDefinition> scenarios = content.Scenarios
                 .Where(s => name == null || s.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0)
                 .ToList();
@@ -381,7 +446,75 @@ turn limit or a failed expectation (or lint warnings, with --warnings-as-errors)
             }
 
             SimReport.Summary(results);
+
+            if (baseline != null && !Compare(baseline, baselineWhere, results, options, againstName ?? name)) return 2;
+
             return results.Any(r => r.Failed) ? 1 : 0;
+        }
+
+        /// <summary>
+        /// Plays the baseline content with the same options and sets the two against each other,
+        /// scenario by scenario. It never changes the exit code: the comparison is a reading of
+        /// what a change did, and what fails <c>sim</c> is still what the content the command was
+        /// pointed at did on its own.
+        /// </summary>
+        /// <remarks>
+        /// Both sides are played here rather than in two commands so that they cannot disagree
+        /// about anything but the content: one <see cref="ScenarioOptions"/>, so the same bots in
+        /// the same order, the same first seed, the same turn limit and the same run count, and
+        /// run <c>n</c> is seeded identically on both sides. Two invocations of <c>sim</c> could
+        /// differ in any of those and the difference would land in the numbers unannounced.
+        /// </remarks>
+        private static bool Compare(
+            ContentLibrary baseline,
+            string baselineWhere,
+            IReadOnlyList<ScenarioOutcome> subject,
+            ScenarioOptions options,
+            string? name)
+        {
+            List<ScenarioDefinition> theirs = baseline.Scenarios
+                .Where(s => name == null || s.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0)
+                .ToList();
+
+            // Emptiness was refused before either side was played; reaching here with none would
+            // mean the content changed underneath the command.
+            if (theirs.Count == 0) return false;
+
+            var runner = new ScenarioRunner(baseline, options);
+            var played = new Dictionary<string, ScenarioOutcome>(StringComparer.OrdinalIgnoreCase);
+            foreach (ScenarioDefinition scenario in theirs)
+            {
+                if (!played.ContainsKey(scenario.Name)) played[scenario.Name] = runner.Run(scenario);
+            }
+
+            var comparisons = new List<ScenarioComparison>();
+            var unmatched = new List<string>();
+            var matched = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            // Two scenarios with different names pair when each side has been narrowed to exactly
+            // one, which is how two decks in the same folder are compared: `--name "Wide" and
+            // `--against-name "Tall"`. Anything else pairs by name, because a comparison of two
+            // scenarios that are not the same scenario is a number nobody can read.
+            bool oneToOne = subject.Count == 1 && played.Count == 1
+                && !played.ContainsKey(subject[0].Scenario.Name);
+
+            foreach (ScenarioOutcome ours in subject)
+            {
+                ScenarioOutcome? theirsOutcome = oneToOne
+                    ? played.Values.First()
+                    : played.TryGetValue(ours.Scenario.Name, out ScenarioOutcome? found) ? found : null;
+
+                if (theirsOutcome == null) { unmatched.Add(ours.Scenario.Name); continue; }
+
+                matched.Add(theirsOutcome.Scenario.Name);
+                ScenarioComparison comparison = Comparisons.Of(theirsOutcome, ours);
+                comparisons.Add(comparison);
+                SimCompareReport.Print(comparison, baselineWhere);
+            }
+
+            List<string> extra = played.Keys.Where(n => !matched.Contains(n)).OrderBy(n => n, StringComparer.Ordinal).ToList();
+            SimCompareReport.Summary(comparisons, unmatched, extra);
+            return true;
         }
 
         private static int Describe(ContentLibrary content, string? name)

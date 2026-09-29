@@ -26,10 +26,46 @@ namespace Cantrip
         /// </summary>
         NotACard,
 
+        /// <summary>
+        /// The card is not where it would have to be to be played: not in hand, or not in the pile
+        /// a <c>from</c> named. It is also what <see cref="CardRuntime.Play(string, Entity, Entity)"/>
+        /// answers when nothing in hand is called that.
+        /// </summary>
         NotInHand,
+
+        /// <summary>
+        /// The card is tagged <c>unplayable</c> — a curse, a wound, a status card — so no hand it is
+        /// in ever offers it. Never being playable is the whole of what it is, which is why
+        /// <c>cantrip sim</c> leaves one out of its "held but never playable" finding.
+        /// </summary>
         Unplayable,
+
+        /// <summary>
+        /// The card costs more of its resource than the actor has. An ability has no cost, so
+        /// <see cref="CardRuntime.UseAbility"/> never answers this; see <see cref="NotReady"/>.
+        /// </summary>
         NotEnoughEnergy,
+
+        /// <summary>
+        /// Nothing legal to aim at. It is one answer for four different refusals, and telling them
+        /// apart means asking <see cref="CardRuntime.LegalTargets"/> what was left: the target
+        /// given is not among them; the card's own <c>target ... where</c> excluded everything; a
+        /// taunt drew targeting elsewhere; or the side it asks for has nobody alive on it. On a
+        /// board it is most often <c>range</c>: the card cannot reach from where its side stands.
+        /// </summary>
+        /// <remarks>
+        /// It stays one word because the enum is frozen for the 1.x line and the four are not
+        /// equally worth telling apart; <c>reference/FINDINGS.md</c> #9 is the case for splitting
+        /// it, left on record. <c>docs/troubleshooting.md</c> has how to find out which of the four
+        /// it was.
+        /// </remarks>
         InvalidTarget,
+
+        /// <summary>
+        /// A <c>choose</c> or <c>discover</c> was answered with nothing, or the game called
+        /// <see cref="CardRuntime.CancelPending"/>. The action was rolled back, so nothing it had
+        /// already done stands.
+        /// </summary>
         Cancelled,
 
         /// <summary>

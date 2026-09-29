@@ -43,17 +43,36 @@ public sealed class ChapelSave
     public RunState Run { get; set; } = new();
     public GameSnapshot Game { get; set; } = new();
 
-    private static readonly JsonSerializerOptions Options = new()
-    {
-        WriteIndented = false,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    };
-
-    public string ToJson() => JsonSerializer.Serialize(this, Options);
+    public string ToJson() => JsonSerializer.Serialize(this, ChapelJson.Default.ChapelSave);
 
     public static ChapelSave FromJson(string json) =>
-        JsonSerializer.Deserialize<ChapelSave>(json, Options)
+        JsonSerializer.Deserialize(json, ChapelJson.Default.ChapelSave)
         ?? throw new InvalidOperationException("The save file is empty.");
+}
+
+/// <summary>
+/// The save's shape, worked out by <c>System.Text.Json</c>'s source generator at build time
+/// rather than by reflection at run time.
+/// </summary>
+/// <remarks>
+/// <para>
+/// This is the one thing a published game has to do differently, and it is four lines. Reflection
+/// -based <c>JsonSerializer.Serialize(value, options)</c> works perfectly in a normal build and
+/// throws <c>Reflection-based serialization has been disabled for this application</c> the first
+/// time a trimmed or AOT-published build saves — which is to say, after the player has already
+/// finished a floor. Naming the root type here makes the trimmer keep every property of
+/// <c>GameSnapshot</c> that it reaches, and makes the serializer use the generated code instead.
+/// </para>
+/// <para>
+/// Nothing in Cantrip.Core needs this: the snapshot is plain data by design, and the engine itself
+/// publishes trimmed and AOT with no warnings at all. It is the host's serializer that has to be
+/// told, and <c>docs/stability.md</c> says so under Publishing a game.
+/// </para>
+/// </remarks>
+[JsonSourceGenerationOptions(WriteIndented = false, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+[JsonSerializable(typeof(ChapelSave))]
+internal sealed partial class ChapelJson : JsonSerializerContext
+{
 }
 
 /// <summary>

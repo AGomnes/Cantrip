@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Generates docs/api/ from the XML documentation comments in the sources. It is a build-time
+    tool, never shipped and never referenced by the library, so it is free to use a newer language
+    version and a package the engine itself must not take.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <AssemblyName>cantrip-apidoc</AssemblyName>
+    <RootNamespace>Cantrip.ApiDoc</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+  </ItemGroup>
+
+</Project>

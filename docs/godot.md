@@ -1392,6 +1392,11 @@ trip, like the dock in use, is checked by hand.
   with `dotnet cantrip test`. The tool needs the .NET 9 SDK and is installed as its step 1 shows;
   the dock's Tests tab runs the same tests without it.
 - [csharp.md](csharp.md) is for a game that uses the rules from C# through `Core`.
+- [troubleshooting.md](troubleshooting.md#godot) collects what goes wrong in a Godot project: a
+  `Nonexistent function`, a stale `.godot` folder, content that will not load, the addon and the
+  library out of step, and why the game will not speed up.
+- [The API reference](api/Cantrip.GodotAdapter.md) is the node's whole script surface, generated
+  from the sources, beside [the rest of the library](api/README.md).
 - [stability.md](stability.md) says what may change between previews, where it has been tested,
   its known limitations and how to report a problem.
 

@@ -250,6 +250,18 @@ those two would be a language change rather than closing the hole the real-time 
 `Assert.Single() Failure: The collection was empty`. `enemies.cantrip`'s comment saying nothing
 would have told me now says the opposite.
 
+**Widened in packaging, and the two left out are in now.** The status hole was the one this
+finding's own reasoning left open: a real-time enemy's behaviour is listeners, and so is damage
+over time, so `status "Burn" / on every 2s: deal 5 to player` was the same silent wrong answer
+one declaration to the left. It is CT326 on a `status` and a `relic` listener too, with one
+exception — a listener *about its own owner*, meaning an event scoped to the holder
+(`on owner.turn_start:`, `on self.damaged:`) or a run-level event whose only actor is the leader
+(`battle_start`, `battle_end`, `obtained`). The exception is what turns the rule from a list of
+five places into a sentence: **`player` is refused wherever a member could be meant.** A carried
+listener is told `owner` rather than `target`, because `target` names nothing inside
+`on every 2s:`. Five more cases in `PartyLintTests`, each failing against `cd5101b` with
+`Assert.Single() Failure: The collection was empty`; no content in the repository changed.
+
 ---
 
 ## 4. `cantrip sim` cannot play a real-time game, does not say so, and reports confidently wrong numbers
@@ -402,6 +414,11 @@ call (`Place`) rather than a string. csharp.md's [Placing what arrives](../docs/
 says that writing a taken slot swaps and that a slot off the board is refused rather than clamped,
 and points at `before_moved` for a game that wants a queue instead. Deferred as design work: a
 "blocked" outcome on `moved`, and a way to say how a board fills.
+
+**And in packaging, put where somebody surprised by it will look.**
+[troubleshooting.md](../docs/troubleshooting.md#everybody-stands-in-one-lane) is titled
+"Everybody stands in one lane", because that is what a person types into a search box in their
+first hour with a board, and it says both halves: the single-file fill and the swap.
 
 ---
 
@@ -687,6 +704,10 @@ in stability.md's known limitations, because "there is no speed control" is a th
 you build a replay viewer. `emberline.gd` keeps pumping `Tick(1)` under `--emberline-auto`, which
 is now the documented path rather than a workaround.
 
+**Also in packaging.** "The game will not speed up" is a heading in
+[troubleshooting.md](../docs/troubleshooting.md#the-game-will-not-speed-up), which is where
+somebody who has just tried `Engine.time_scale` and watched nothing happen will actually look.
+
 ---
 
 ## 13. `cost` on an ability parses, lints clean and does nothing
@@ -824,6 +845,11 @@ affect the surface 1.0 is promising, so it costs nothing to leave. A game that w
 consecutive ticks, or gives each member a randomised `in <n>s:` warm-up. Emberline's schedule is
 unchanged.
 
+**Packaging wrote down the workaround, with the symptom as its heading.** "A wave of enemies acts
+in lockstep" in [troubleshooting.md](../docs/troubleshooting.md#a-wave-of-enemies-acts-in-lockstep)
+says that five drones read as one drone with five times the damage, which is the sentence that
+makes somebody recognise what they are watching.
+
 ---
 
 ## 16. Small things, each cheap to fix
@@ -863,7 +889,12 @@ unchanged.
   recovery rather than in real time, and guessing "you meant a verb" from `(` after a name would
   fire on every genuine function call written with a bad argument. Deferred, with the note that
   language.md's only verb example takes one argument and so distinguishes nothing; a second
-  example with two is the cheap half and is not worth a round of its own.
+  example with two is the cheap half and is not worth a round of its own. **Packaging did the
+  cheapest half of all**: CT0010's row in
+  [troubleshooting.md](../docs/troubleshooting.md#the-first-five-diagnostics-and-what-they-really-mean)
+  says that `Expected ')' but found ,` is usually a verb called like a function, and that verbs are
+  commands and functions are not. The parser still does not say it; the page a person reads next
+  does.
 - **`Execute` throws on a parse error.** Kept, deliberately. The reason it mattered was that a
   real-time host executed strings constantly, and it does not any more: `Place` is a typed call,
   so Emberline executes no string anywhere. A statement that does not parse is a programming

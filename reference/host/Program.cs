@@ -59,6 +59,13 @@ void Check(string what, bool ok, string detail = "")
     if (!ok) failures++;
 }
 
+// The version stamped into every save is read from an assembly attribute, and that read is the
+// only reflection left anywhere in the engine. A trimmed or AOT-published game is where it would
+// quietly come back empty, and nothing else in this file would notice: the hashes would still
+// match, and every save a shipped game wrote would have forgotten which version wrote it.
+Check("the save records the version that wrote it", Cantrip.Runtime.GameSnapshot.CurrentWriter.Length > 0,
+    "empty: a trimmer has taken the assembly's version attribute");
+
 int wins = 0;
 foreach (int s in new[] { 1, 2, 3, 5, 8, 13, 21, 34 })
 {

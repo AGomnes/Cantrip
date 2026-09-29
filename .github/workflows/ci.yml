@@ -40,6 +40,14 @@ jobs:
       - name: Adapter tests
         run: dotnet test tests/Cantrip.Godot.Tests -c Release --no-build
 
+      # docs/api/ is generated from the XML documentation comments in the sources. This regenerates
+      # it and fails if what is committed disagrees, so the reference for a surface frozen for the
+      # whole 1.x line cannot drift from the surface. Linux only: the generator reads text files
+      # and gives the same answer on both.
+      - name: The API reference matches the sources
+        if: runner.os == 'Linux'
+        run: bash tools/api-docs.sh --check
+
       # Each sample folder is its own game with its own definitions, so they are linted separately.
       # Every folder is free of warnings, so a new warning fails the build rather than scrolling by.
       - name: Lint samples/basic
@@ -138,6 +146,23 @@ jobs:
         run: |
           dotnet build reference/host/Cantrip.Reference.csproj -c Release
           dotnet run --project reference/host -c Release --no-build -- --check
+
+      # Native AOT needs a platform linker. The Windows runner has one in Visual Studio; the Linux
+      # one needs clang, and zlib for the compression the runtime links statically.
+      - name: Prerequisites for Native AOT
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+
+      # docs/stability.md says Cantrip is usable from a published game, and nothing proved it until
+      # this step: every other test here runs the engine from an ordinary build, with the whole
+      # framework present and a JIT underneath. This publishes the reference game trimmed and with
+      # Native AOT, with the trim and AOT analysers on and every one of their warnings an error,
+      # and then plays eight whole runs with a save and a restore in each *in the binary that came
+      # out*. Reflection, System.Text.Json and dynamic dispatch are where a rules engine dies when
+      # it is published, and this is what would notice.
+      - name: The reference game plays itself from a published build
+        shell: bash
+        run: bash tools/publish-check.sh
 
       # Emberline: the real-time game. Nothing else in the repository drives the tick clock as a
       # game -- no turns anywhere, cooldowns in seconds, enemies that act from their own

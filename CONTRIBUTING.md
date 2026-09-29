@@ -27,7 +27,8 @@ Godot is Cantrip's primary engine, so the addon comes first here even though the
 | `samples/slice` | The sample roguelite: a witch climbing a tower, fire against frost, with a boss that changes its moves at half health |
 | `samples/recipes` | The recipes from [docs/writing-content.md](docs/writing-content.md), with their tests |
 | `tests` | Unit tests for the library and for the addon's engine-free layer |
-| `tools` | Packaging the addon, and checking the quickstart and the addon install against freshly built packages |
+| `tools` | Packaging the addon, checking the quickstart and the addon install against freshly built packages, generating `docs/api` from the sources (`tools/api-docs.sh`, `tools/Cantrip.ApiDoc`), and publishing the reference game trimmed and AOT and playing it (`tools/publish-check.sh`) |
+| `docs/api` | The API reference. Generated: never edit it by hand, and CI fails when it disagrees with the sources |
 
 ## Pull requests
 

@@ -11,6 +11,32 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
+  <!--
+    Published two more ways than an ordinary game needs, because docs/stability.md says Cantrip is
+    usable from a published game and this is the only game in the repository that can prove it.
+    tools/publish-check.sh drives both; docs/stability.md says what each one is worth.
+
+    The switch is a property of this project rather than a `-p:` on the command line, because a
+    global property flows into Cantrip.Core, which targets netstandard2.1 and refuses to be
+    trimmed (NETSDK1124). Only the application is trimmed; the library it links is trimmed *by*
+    it, which is exactly the arrangement a real game has.
+  -->
+  <PropertyGroup Condition="'$(CantripPublish)' == 'trimmed' or '$(CantripPublish)' == 'aot'">
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>full</TrimMode>
+    <SelfContained>true</SelfContained>
+    <!-- One warning per offending call site rather than one per assembly: the point is the list. -->
+    <TrimmerSingleWarn>false</TrimmerSingleWarn>
+    <SuppressTrimAnalysisWarnings>false</SuppressTrimAnalysisWarnings>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(CantripPublish)' == 'aot'">
+    <PublishAot>true</PublishAot>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
   <ItemGroup>
     <!--
       The content ships beside the binary, as docs/csharp.md says to, so the game runs from its

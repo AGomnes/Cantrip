@@ -292,6 +292,8 @@ cantrip sim <path>... [options]
 | `--bot <name>` | `both` | `cautious`, `patient`, `random`, or `both` for the cautious and patient bots together. |
 | `--turn-limit N` | 50 | Turns one battle may take before the run counts as a stall. |
 | `--watch SEED` | | Play one run of one scenario, with the first bot, and print every statement, turn and play, instead of the report. |
+| `--against <path>` | | Also play the scenarios in `<path>`, with the same bots and the same seeds, and report the difference seed by seed. May be given more than once, like a path. See [Comparing two things](#comparing-two-things). |
+| `--against-name <text>` | `--name` | Which scenario in `--against` to compare with, when it is not called the same thing. |
 | `--suppress <codes>` | | Leave out diagnostic codes, as `lint` does. |
 
 **Two bots cost about twice as long as one**, because each one plays every run. On one core of a
@@ -322,6 +324,70 @@ On a build server, one line is usually enough:
 ```
 dotnet cantrip sim samples/slice --runs 100
 ```
+
+## Comparing two things
+
+A level cannot be quoted, and the page above says so four times. A *difference* between two levels
+can, as long as nothing but the content moved: the same bot, playing run *n* from seed *n* on both
+sides, with the same turn limit and the same number of runs. That is what `--against` does, and it
+is the only comparison the tool makes.
+
+```
+cantrip sim content --against ../old-content       # before and after a change
+cantrip sim content --name Tall --against content --against-name Wide     # two decks
+```
+
+Both sides are played by one command, on purpose. Two separate runs of `sim` could differ in the
+bot, the first seed, the turn limit or the run count, and any of those differences would land in
+the numbers with nothing to say so.
+
+### What it prints, in the order it is worth reading
+
+**What the content allows.** A card that was playable and is not any more; an enemy move that
+fired and no longer does. These are true whoever plays, they are usually the half that was not
+intended, and they come first for that reason. A card whose cost went from 2 to 9 shows up here as
+`1 card(s) that were playable and are not any more: Ruin` and needs no statistics at all.
+
+**The seeds that changed hands.** Not a delta: the paired counts.
+
+```
+  cautious bot, 200 seed(s) played by both
+    seeds that changed hands             101
+      lost before, won now                85
+      won before, lost now                16
+      came out the same way               99
+
+    85 of the 101 went your way. A change that decided nothing would split 101 seeds at least this
+    unevenly about once in more than a million tries.
+```
+
+Two percentages cannot tell 101 seeds moving apart from 16, and the difference between those two
+readings is the difference between "this changed the game" and "this is noise". The last line is
+the only statistic in the tool: every seed is an independent game, so it is the exact two-sided
+tail of a fair coin tossed once per seed that changed hands, stated as odds rather than as a
+*p*-value. Twelve seeds all going one way is once in 2,048 tries. Six and six is what a change
+that decided nothing does.
+
+**Turns, hp lost, stalls and throws**, before and after, over the paired seeds.
+
+**The two levels**, last and smallest, carrying the same warning they carry anywhere else.
+
+### What it still will not tell you
+
+It will not tell you the change is **good**. The bots weigh the party's hp against the enemies',
+so they are wrong in a known direction about a card that draws and about anything that pays off
+several turns later; a change these numbers like may be the change that made the game duller. The
+honest reading of a comparison is *this bot finished more runs of this scenario*, and the block
+about what the content allows is the part that is true whoever plays.
+
+**A comparison never changes the exit code.** It is a reading, not a check. What fails `cantrip
+sim` is what always failed it — a run that threw, a battle that hit the turn limit, an expectation
+that did not hold — in the content the command was pointed at. A baseline that does not load, or
+has no scenario to compare with, is refused before either side is played.
+
+Scenarios pair by name. One that is only on one side is named and skipped rather than dropped. Two
+scenarios called different things pair when `--name` and `--against-name` narrow each side to
+exactly one, which is how two decks stated in one folder are compared.
 
 ## Watching one run
 
@@ -395,3 +461,5 @@ Ghast does move. A trial is not play, and the first block counts only what was p
 - [Tests](language.md#tests) — a single fight, played the way you say.
 - [The edit, lint and test loop](writing-content.md#5-the-edit-lint-and-test-loop) — where `sim`
   fits beside `test` and `lint`.
+- [Troubleshooting](troubleshooting.md#the-fight-never-ends) — what a stall usually turns out to
+  be, and how to find out which kind you have.

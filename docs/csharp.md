@@ -793,5 +793,7 @@ IReadOnlyList<DslTestResult> results = new DslTestRunner(content).RunAll();
 - [godot.md](godot.md) is the same ground for a Godot game: the node that wraps these calls, the dictionaries it hands GDScript, and the editor dock.
 - [language.md](language.md) describes everything content can say; its [Built-in events](language.md#built-in-events) table lists each event's fields.
 - [architecture.md](architecture.md) explains how the library fits together, and [Extending](architecture.md#extending) lists every seam a game can plug into.
+- [The API reference](api/README.md) lists every public type and member of `Cantrip.Core`, generated from the sources. This page teaches the twenty calls a game needs; that one is the list of everything.
+- [troubleshooting.md](troubleshooting.md) is the other end of this page: what each refusal means, how to read a `RuntimeError` and a trace, what every save refusal is telling you, and what a published game has to do differently.
 - [stability.md](stability.md) says what may change between previews, which platforms are tested, and what is known not to work yet.
 - [src/Cantrip.Sim](../src/Cantrip.Sim) is what `cantrip sim` runs: a scenario runner, three bots that play through this API, and a meter that records what the engine raised.

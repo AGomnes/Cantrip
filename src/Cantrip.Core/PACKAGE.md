@@ -48,5 +48,7 @@ This is a **preview**. The API and the save format may change between previews; 
 - [The Godot addon](https://github.com/AGomnes/Cantrip/blob/main/docs/godot.md): installing it, and a first battle from GDScript
 - [Quickstart](https://github.com/AGomnes/Cantrip/blob/main/docs/quickstart.md): from nothing to a playable battle in a terminal, for a game that is not in Godot
 - [Language reference](https://github.com/AGomnes/Cantrip/blob/main/docs/language.md)
+- [API reference](https://github.com/AGomnes/Cantrip/blob/main/docs/api/README.md): every public type and member of this package, generated from its own documentation comments
+- [Troubleshooting](https://github.com/AGomnes/Cantrip/blob/main/docs/troubleshooting.md): what each refusal means, how to read a `RuntimeError` and a trace, every save refusal, and what a trimmed or AOT-published game has to do differently
 - The companion command-line tool, for testing and linting content: run `dotnet new tool-manifest`, then `dotnet tool install Cantrip.Cli --prerelease`, and use it as `dotnet cantrip`
 - [Source, issues and changelog](https://github.com/AGomnes/Cantrip)

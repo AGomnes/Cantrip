@@ -16,7 +16,7 @@ You need the **.NET edition of Godot 4.6.x** (tested on 4.6.1 and 4.6.2) and the
 3. Build the C# project, with the editor's Build button or `dotnet build`, then enable *Cantrip* in Project Settings → Plugins.
 4. Put your `.cantrip` files in `res://content` and add a `CantripRuntime` node to a scene.
 
-The full guide is [docs/godot.md](https://github.com/AGomnes/Cantrip/blob/main/docs/godot.md) in the main repository: installing step by step, a first battle in GDScript that runs as written, a reference for every method of the node and every dictionary it returns, and player choices, rewards and upgrades between battles, saving and exports.
+The full guide is [docs/godot.md](https://github.com/AGomnes/Cantrip/blob/main/docs/godot.md) in the main repository: installing step by step, a first battle in GDScript that runs as written, a reference for every method of the node and every dictionary it returns, and player choices, rewards and upgrades between battles, saving and exports. [Troubleshooting](https://github.com/AGomnes/Cantrip/blob/main/docs/troubleshooting.md#godot) is what to read when one of those does not go as written.
 
 ## License
 
