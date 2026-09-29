@@ -68,10 +68,19 @@ namespace Cantrip.Runtime
         /// </remarks>
         public string WrittenBy { get; set; } = string.Empty;
 
+        /// <summary>The turn within the battle, or 0 between battles and in a real-time game.</summary>
         public int Turn { get; set; }
+
+        /// <summary>How many battles the run had started. It carries across battles, so it is part of the run and not of the fight.</summary>
         public int BattleNumber { get; set; }
+
+        /// <summary><see cref="Cantrip.Team"/> as a number. The enum's numbers are fixed for the whole 1.x line, which is what makes this safe to store.</summary>
         public int ActiveTeam { get; set; }
+
+        /// <summary>Whether a battle was running. False for a save taken in a shop, a rest or a map screen.</summary>
         public bool InBattle { get; set; }
+
+        /// <summary>The leader's <see cref="EntitySnapshot.Id"/>, or 0 for a game saved before a player was created.</summary>
         public int PlayerId { get; set; }
 
         /// <summary>
@@ -96,11 +105,22 @@ namespace Cantrip.Runtime
         /// </summary>
         public List<int> ActedIds { get; set; } = new List<int>();
 
+        /// <summary>The next entity id to hand out. It is saved because an id has to stay unique across a restore, not only within one session.</summary>
         public int NextEntityId { get; set; }
+
+        /// <summary>The next activation number to hand out, which is what the "play order" listener tie-break compares.</summary>
         public long NextSequence { get; set; }
+
+        /// <summary>The next <c>ScheduledAction.Id</c> to hand out.</summary>
         public long NextScheduleId { get; set; }
+
+        /// <summary>The next causal-chain root to hand out, which is what <c>once per chain</c> counts by.</summary>
         public long NextChainRoot { get; set; }
 
+        /// <summary>
+        /// The clock's time in its own units. On a tick clock the rate is <em>not</em> saved, so a
+        /// restore into a clock at another rate reinterprets every duration in the game.
+        /// </summary>
         public long ClockNow { get; set; }
 
         /// <summary>
@@ -113,7 +133,10 @@ namespace Cantrip.Runtime
         /// <summary>The generator's state, as <see cref="RngGenerator"/> means it.</summary>
         public ulong[] Rng { get; set; } = new ulong[4];
 
+        /// <summary>How the last battle went, or null while one is running or before the first.</summary>
         public bool? Won { get; set; }
+
+        /// <summary>Whether the next battle should skip its opening hand, as a test that sets the hand itself asks for.</summary>
         public bool SkipNextDraw { get; set; }
 
         /// <summary>
@@ -130,15 +153,32 @@ namespace Cantrip.Runtime
         /// </summary>
         public BoardSnapshot? Board { get; set; }
 
+        /// <summary>Every entity, the dead and the removed included. It is the whole cast; the zones say where each one is.</summary>
         public List<EntitySnapshot> Entities { get; set; } = new List<EntitySnapshot>();
+
+        /// <summary>
+        /// Where everything is, in order — and the order matters: a draw pile's is the sequence the
+        /// player will see. A restore refuses a save whose zones and entities disagree.
+        /// </summary>
         public List<ZoneSnapshot> Zones { get; set; } = new List<ZoneSnapshot>();
+
+        /// <summary>Deferred work: <c>next turn:</c> blocks, timed work, and <c>until</c> blocks waiting to be put back.</summary>
         public List<ScheduledSnapshot> Scheduled { get; set; } = new List<ScheduledSnapshot>();
+
+        /// <summary>Which <c>once per ...</c> windows are already used, so a saved battle cannot get a second use of a once-per-battle listener.</summary>
         public List<ListenerLimitSnapshot> ListenerLimits { get; set; } = new List<ListenerLimitSnapshot>();
+
+        /// <summary>When each <c>on every ...:</c> listener next fires, so a reload does not silently reset every periodic effect.</summary>
         public List<ListenerDueSnapshot> ListenerDues { get; set; } = new List<ListenerDueSnapshot>();
 
         /// <summary>History counters, as raw <see cref="Num"/> values.</summary>
         public Dictionary<string, long> TurnHistory { get; set; } = new Dictionary<string, long>();
 
+        /// <summary>
+        /// The same counters kept for the whole battle rather than the turn, as raw <see cref="Num"/>
+        /// values. A raw value is not the number content reads: divide by <see cref="Num.Scale"/>, or
+        /// use <see cref="Num.FromRaw"/>.
+        /// </summary>
         public Dictionary<string, long> BattleHistory { get; set; } = new Dictionary<string, long>();
 
         /// <summary>
@@ -213,19 +253,44 @@ namespace Cantrip.Runtime
         }
     }
 
+    /// <summary>
+    /// One entity as plain data. It is a record of what the entity <em>is</em>, not of what it
+    /// computes: stats are stored before modifiers, since the modifiers are restored with it and
+    /// would otherwise be applied twice.
+    /// </summary>
     public sealed class EntitySnapshot
     {
+        /// <summary>
+        /// The id this entity had, and will have again. Ids are what a game should remember between
+        /// sessions, because the objects are new after a restore and only the numbers survive.
+        /// </summary>
         public int Id { get; set; }
+
+        /// <summary>
+        /// The name the entity had, which a <c>transform</c> may have changed from its definition's.
+        /// It is restored as it is, not looked up again.
+        /// </summary>
         public string Name { get; set; } = string.Empty;
+
+        /// <summary><see cref="EntityKind"/> as a number, whose values are fixed for the whole 1.x line.</summary>
         public int Kind { get; set; }
 
         /// <summary>Kind and name of the definition, or null for definition-less entities such as the player.</summary>
         public string? DefinitionKind { get; set; }
 
+        /// <summary>
+        /// The definition's name, paired with <see cref="DefinitionKind"/>. A restore looks the two up
+        /// in the content it is given, and refuses the save when it cannot find one.
+        /// </summary>
         public string? DefinitionName { get; set; }
 
+        /// <summary>Whose this is — whose hand the card is in, whose relic it is — or 0 for something nobody owns.</summary>
         public int OwnerId { get; set; }
+
+        /// <summary>Who put it here: the applier of a status, so that a <c>source:</c> filter still reads right after a restore. 0 when nobody did.</summary>
         public int SourceId { get; set; }
+
+        /// <summary><see cref="Cantrip.Team"/> as a number.</summary>
         public int Team { get; set; }
 
         /// <summary>
@@ -244,11 +309,26 @@ namespace Cantrip.Runtime
 
         /// <summary>Slot across the board. Zero in a save from before boards had two axes.</summary>
         public int Lane { get; set; }
+
+        /// <summary>Whether this actor was dead but not yet buried, which is the state a revive can still reach.</summary>
         public bool IsDead { get; set; }
+
+        /// <summary>
+        /// Whether it had left the game. Removed entities are still written, because ids must not be
+        /// reused and because something may still refer to one.
+        /// </summary>
         public bool IsRemoved { get; set; }
+
+        /// <summary>When it came into play, which is what the "play order" listener tie-break compares — so restoring it is what keeps listener order stable across a save.</summary>
         public long Sequence { get; set; }
+
+        /// <summary>How far through its move pattern this enemy was, so a restored fight carries on rather than starting the cycle again.</summary>
         public int PatternIndex { get; set; }
+
+        /// <summary>The move it used last, which a <c>random, no repeat</c> pattern needs in order not to repeat it.</summary>
         public string? LastMove { get; set; }
+
+        /// <summary>The move it has telegraphed, or null when intents have not been rolled. A save mid-battle keeps the promise the player was shown.</summary>
         public string? Intent { get; set; }
 
         /// <summary>
@@ -261,11 +341,13 @@ namespace Cantrip.Runtime
         /// <summary>True for an actor the game asks for input: the leader, and every <c>hero</c>.</summary>
         public bool IsPartyMember { get; set; }
 
+        /// <summary>The behaviour phase it was in, or null for an enemy with no phases and for one whose intent has not been rolled.</summary>
         public string? Phase { get; set; }
 
         /// <summary>Base stats, as raw <see cref="Num"/> values.</summary>
         public Dictionary<string, long> Stats { get; set; } = new Dictionary<string, long>();
 
+        /// <summary>Its tags as they stood, which includes any an effect added — not only the definition's.</summary>
         public List<string> Tags { get; set; } = new List<string>();
 
         /// <summary>Attached statuses and keywords, in attachment order.</summary>
@@ -279,6 +361,7 @@ namespace Cantrip.Runtime
     /// </summary>
     public sealed class BoardSnapshot
     {
+        /// <summary>Slots across. One in a save from before boards had two axes, which is what every such game was played on.</summary>
         public int Lanes { get; set; } = 1;
 
         /// <summary>Zero for unbounded, as <see cref="BoardShape.Unbounded"/> means it.</summary>
@@ -321,16 +404,27 @@ namespace Cantrip.Runtime
         /// <summary>The owner of the zone, which for an actor on the board is 0: one board per team.</summary>
         public int OwnerId { get; set; }
 
+        /// <summary>The zone's name, from <see cref="Zones"/> or one the game invented.</summary>
         public string Zone { get; set; } = string.Empty;
 
         /// <summary>The entities in it, in order, by <see cref="EntitySnapshot.Id"/>.</summary>
         public List<int> Entities { get; set; } = new List<int>();
     }
 
+    /// <summary>
+    /// One piece of deferred work as plain data. The block itself is not written: it is found again
+    /// by its address in content, which is why content that has changed underneath a save can make a
+    /// restore refuse.
+    /// </summary>
     public sealed class ScheduledSnapshot
     {
+        /// <summary>The id the action had, so that work cancelled by id still refers to the same thing after a restore.</summary>
         public long Id { get; set; }
+
+        /// <summary><see cref="ScheduleTiming"/> as a number, whose values are fixed for the whole 1.x line.</summary>
         public int Timing { get; set; }
+
+        /// <summary>Whose block this is: whose turn ends it, and what <c>self</c> will mean when it runs.</summary>
         public int OwnerId { get; set; }
 
         /// <summary>
@@ -371,6 +465,7 @@ namespace Cantrip.Runtime
         /// </summary>
         public string? Statements { get; set; }
 
+        /// <summary>The absolute clock time it is due at. Meaningless for work that waits on <see cref="UntilEvent"/> instead.</summary>
         public long DueAt { get; set; }
 
         /// <summary>
@@ -396,29 +491,72 @@ namespace Cantrip.Runtime
             }
         }
 
+        /// <summary>
+        /// The names the block captured when it was scheduled — <c>target</c>, <c>source</c> — so that
+        /// the block still means what it meant, whatever has happened since.
+        /// </summary>
         public Dictionary<string, ValueSnapshot> Bindings { get; set; } = new Dictionary<string, ValueSnapshot>();
+
+        /// <summary>What an <c>until</c> block has to put back, in the order it was done. Empty for every other timing.</summary>
         public List<UndoSnapshot> Undo { get; set; } = new List<UndoSnapshot>();
     }
 
+    /// <summary>
+    /// One <see cref="Value"/> as plain data. Entities are stored as ids, definitions as kind and
+    /// name, and numbers as raw <see cref="Num"/> longs, so nothing in here is a live object.
+    /// </summary>
     public sealed class ValueSnapshot
     {
+        /// <summary><see cref="ValueKind"/> as a number, whose values are fixed for the whole 1.x line. It says which of the fields below mean anything.</summary>
         public int Kind { get; set; }
+
+        /// <summary>The raw <see cref="Num"/> payload: the number, the 1 or 0 of a bool, or the low end of a range. Not the decimal value.</summary>
         public long Number { get; set; }
+
+        /// <summary>The raw high end of a range. Zero for every other kind.</summary>
         public long High { get; set; }
+
+        /// <summary>The unit a number was written with, such as <c>%</c> or <c>s</c>. It is carried unconverted, as the live value carries it.</summary>
         public string? Unit { get; set; }
+
+        /// <summary>The text of a text value, or the name half of a <c>qualifier:name</c> pair.</summary>
         public string? Text { get; set; }
+
+        /// <summary>
+        /// The ids of a list or single entity value. An id whose entity is gone is dropped on restore,
+        /// so a list can come back shorter than it was written.
+        /// </summary>
         public List<int>? Entities { get; set; }
+
+        /// <summary>The declaring keyword of a definition value, paired with <see cref="DefinitionName"/>.</summary>
         public string? DefinitionKind { get; set; }
+
+        /// <summary>The name of a definition value, looked up in the content the restore is given.</summary>
         public string? DefinitionName { get; set; }
+
+        /// <summary>The part before the colon of a <c>qualifier:name</c> pair; <see cref="Text"/> holds the rest.</summary>
         public string? Qualifier { get; set; }
     }
 
+    /// <summary>
+    /// One reversible change an <c>until</c> block made, as plain data — the saved form of
+    /// <see cref="TemporaryChange"/>.
+    /// </summary>
     public sealed class UndoSnapshot
     {
+        /// <summary>What was changed, by id.</summary>
         public int EntityId { get; set; }
+
+        /// <summary>The tag that was added, or null when this change is not about a tag.</summary>
         public string? Tag { get; set; }
+
+        /// <summary>The status or keyword that was attached, by id, or 0 when this change is not an attachment.</summary>
         public int AttachedId { get; set; }
+
+        /// <summary>The stat that moved, or null when this change is not about a stat.</summary>
         public string? Stat { get; set; }
+
+        /// <summary>How far the stat moved, as a raw <see cref="Num"/>. The undo subtracts it rather than restoring the old number.</summary>
         public long Delta { get; set; }
 
         /// <summary>
@@ -427,13 +565,17 @@ namespace Cantrip.Runtime
         /// </summary>
         public int? Lane { get; set; }
 
-        /// <inheritdoc cref="Lane"/>
+        /// <summary>
+        /// The rank of the slot the actor stood on, paired with <see cref="Lane"/>. Both are set together
+        /// or neither is, and neither being set is what says this change is not a move.
+        /// </summary>
         public int? Rank { get; set; }
     }
 
     /// <summary>A <c>once per ...</c> window already used by one listener of one entity.</summary>
     public sealed class ListenerLimitSnapshot
     {
+        /// <summary>The entity whose listener this window belongs to.</summary>
         public int OwnerId { get; set; }
 
         /// <summary>Index of the listener among its owner's listeners, in definition order.</summary>
@@ -448,12 +590,17 @@ namespace Cantrip.Runtime
         /// </summary>
         public string? ListenerHash { get; set; }
 
+        /// <summary>
+        /// The window already used, as a clock time: the turn, battle or run the listener last fired in.
+        /// Restoring it is what stops a save reload buying a second use of a <c>once per battle</c>.
+        /// </summary>
         public long Window { get; set; }
     }
 
     /// <summary>When an <c>on every ...:</c> listener of one entity is next due to fire.</summary>
     public sealed class ListenerDueSnapshot
     {
+        /// <summary>The entity whose periodic listener this is.</summary>
         public int OwnerId { get; set; }
 
         /// <summary>Index of the listener among its owner's listeners, in definition order.</summary>
@@ -462,6 +609,7 @@ namespace Cantrip.Runtime
         /// <summary>The listener's hash, matched as <see cref="ListenerLimitSnapshot.ListenerHash"/> is.</summary>
         public string? ListenerHash { get; set; }
 
+        /// <summary>The absolute clock time it next fires at, so a restored game does not reset every interval to the moment it loaded.</summary>
         public long DueAt { get; set; }
     }
 

@@ -11,15 +11,35 @@ namespace Cantrip.Content
     [Flags]
     public enum StatusFlags
     {
+        /// <summary>No flags. What a status has unless its declaration says otherwise.</summary>
         None = 0,
+
+        /// <summary>Good for whoever has it. Read by <c>dispel</c>-style effects and by a UI choosing a colour.</summary>
         Buff = 1 << 0,
+
+        /// <summary>Bad for whoever has it. A status may be neither, and nothing sets one from the other automatically.</summary>
         Debuff = 1 << 1,
+
+        /// <summary>May be removed by an effect that strips statuses. Without it, a status stays through a cleanse.</summary>
         Dispellable = 1 << 2,
+
+        /// <summary>Survives the end of a battle instead of being cleared with everything else.</summary>
         Persistent = 1 << 3,
+
+        /// <summary>Not to be shown to the player. The rules treat it like any other status; this is a note for the UI.</summary>
         Hidden = 1 << 4,
+
+        /// <summary>
+        /// One instance per applying source rather than one per holder, so two enemies each keep their
+        /// own copy on the same target.
+        /// </summary>
         UniquePerSource = 1 << 5,
     }
 
+    /// <summary>
+    /// How an enemy picks its next move. It is rolled once per turn, when the intent is telegraphed,
+    /// not when the move runs.
+    /// </summary>
     public enum EnemyPatternKind
     {
         /// <summary>Moves in order, then loop.</summary>
@@ -38,6 +58,14 @@ namespace Cantrip.Content
     /// </summary>
     public sealed class PhaseDefinition
     {
+        /// <summary>
+        /// A phase built in C#, for a test or a tool. Content declares them with
+        /// <c>phase Broken when ...</c>.
+        /// </summary>
+        /// <param name="name">What moves tag themselves with to belong to this phase.</param>
+        /// <param name="condition">Evaluated against the enemy each time its intent is rolled.</param>
+        /// <param name="span">Where it was written, for diagnostics.</param>
+        /// <param name="retelegraph">Whether entering the phase re-rolls the intent there and then.</param>
         public PhaseDefinition(string name, ExprNode condition, SourceSpan span, bool retelegraph = false)
         {
             Name = name;
@@ -46,11 +74,13 @@ namespace Cantrip.Content
             Retelegraph = retelegraph;
         }
 
+        /// <summary>The phase's name, which is what a <c>move</c> tags itself with to belong to it.</summary>
         public string Name { get; }
 
         /// <summary>Evaluated against the enemy each time its intent is rolled.</summary>
         public ExprNode Condition { get; }
 
+        /// <summary>Where the <c>phase</c> line was written, so a diagnostic about it can point somewhere.</summary>
         public SourceSpan Span { get; }
 
         /// <summary>
@@ -65,6 +95,7 @@ namespace Cantrip.Content
         /// </remarks>
         public bool Retelegraph { get; }
 
+        /// <summary>The phase's name.</summary>
         public override string ToString() => Name;
     }
 
@@ -81,6 +112,12 @@ namespace Cantrip.Content
     /// </remarks>
     public readonly struct Reach : IEquatable<Reach>
     {
+        /// <summary>
+        /// A reach from two step counts. A negative <paramref name="min"/> is clamped to 0 rather than
+        /// refused, so a <c>range</c> modifier that drives the near end below zero still names a reach.
+        /// </summary>
+        /// <param name="min">The nearest slot reached. 0 means "from where I stand outwards".</param>
+        /// <param name="max">The furthest slot reached.</param>
         public Reach(int min, int max)
         {
             Min = min < 0 ? 0 : min;
@@ -96,18 +133,30 @@ namespace Cantrip.Content
         /// <summary>Whether something that many steps away is within this reach.</summary>
         public bool Reaches(int distance) => distance >= Min && distance <= Max;
 
+        /// <summary>Both ends, exactly.</summary>
         public bool Equals(Reach other) => Min == other.Min && Max == other.Max;
 
+        /// <summary>The boxing form of <see cref="Equals(Reach)"/>.</summary>
         public override bool Equals(object? obj) => obj is Reach other && Equals(other);
 
+        /// <summary>Hashes both ends.</summary>
         public override int GetHashCode() => (Min * 397) ^ Max;
 
+        /// <summary>The form content writes: <c>1</c> for a reach that starts where the user stands, <c>2..3</c> otherwise.</summary>
         public override string ToString() => Min == 0 ? Max.ToString(CultureInfo.InvariantCulture) : $"{Min}..{Max}";
     }
 
     /// <summary>A named enemy move: <c>move "Chomp": deal 11 to player</c>.</summary>
     public sealed class MoveDefinition
     {
+        /// <summary>
+        /// A move built in C#, for a test or a tool. Content declares them with
+        /// <c>move "Chomp": ...</c>.
+        /// </summary>
+        /// <param name="name">What the intent panel shows and what <c>use</c> names.</param>
+        /// <param name="body">The statements the move runs.</param>
+        /// <param name="weight">Its share of a <c>random</c> pattern. Ignored by a <c>cycle</c> pattern.</param>
+        /// <param name="phase">The phase it belongs to, or null for a move available in every phase.</param>
         public MoveDefinition(string name, BlockNode body, Num weight, string? phase = null)
         {
             Name = name;
@@ -116,8 +165,16 @@ namespace Cantrip.Content
             Phase = phase;
         }
 
+        /// <summary>The move's name, as the intent panel shows it and as <c>use "Chomp"</c> names it.</summary>
         public string Name { get; }
+
+        /// <summary>The statements the move runs. They are run in the enemy's turn, not when the intent is rolled.</summary>
         public BlockNode Body { get; }
+
+        /// <summary>
+        /// This move's share of a <c>random</c> pattern, relative to the other moves'. A <c>cycle</c>
+        /// pattern takes every move in order and ignores it.
+        /// </summary>
         public Num Weight { get; }
 
         /// <summary>The phase this move belongs to, or null when it is available in every phase.</summary>
@@ -230,7 +287,13 @@ namespace Cantrip.Content
             ValidateMovePhases(diagnostics);
         }
 
+        /// <summary>
+        /// The declaration this was built from, for a tool that needs the text, the spans or a member
+        /// this class does not surface.
+        /// </summary>
         public EntityDeclNode Syntax { get; }
+
+        /// <summary>The name in the declaration, as content wrote it. Two definitions of different kinds may share one.</summary>
         public string Name { get; }
 
         /// <summary>The keyword it was declared with: <c>card</c>, <c>status</c>, <c>relic</c>...</summary>
@@ -256,17 +319,52 @@ namespace Cantrip.Content
         /// </summary>
         public bool IsThing => KindName != "resource" && KindName != "board";
 
+        /// <summary>
+        /// What the engine treats this as. Several keywords land on one kind — <c>enemy</c>,
+        /// <c>actor</c> and <c>hero</c> are all <see cref="EntityKind.Actor"/> — so
+        /// <see cref="KindName"/> is what tells them apart.
+        /// </summary>
         public EntityKind Kind { get; }
+
+        /// <summary>
+        /// The words on the <c>tags</c> line, lower-cased and deduplicated. A tag written on a line of
+        /// its own is not here: it is a property nothing reads, which is CT316.
+        /// </summary>
         public IReadOnlyList<string> Tags { get; }
+
+        /// <summary>
+        /// Every <c>on ...:</c> block, in declaration order. A line that only looks like a listener —
+        /// <c>when card_played:</c> — is in <see cref="Blocks"/> instead and never runs, which is CT313.
+        /// </summary>
         public IReadOnlyList<ListenerNode> Listeners { get; }
+
+        /// <summary>Every <c>modify</c> line, in declaration order. They are live while the entity is, and the pipeline decides their order, not this list.</summary>
         public IReadOnlyList<ModifyNode> Modifiers { get; }
+
+        /// <summary>
+        /// Labelled blocks by name, case-insensitively. The engine runs only <c>effect</c> and the
+        /// <c>move</c>s; anything else here is a block the game runs itself, or a typo that never runs.
+        /// A game that does run one names it in <c>LintOptions.HostBlocks</c> so the linter stops
+        /// reporting it.
+        /// </summary>
         public IReadOnlyDictionary<string, BlockMemberNode> Blocks { get; }
+
+        /// <summary>Every <c>move</c>, in declaration order — which is also the order a <c>cycle</c> pattern takes them in when no <c>pattern</c> line names them.</summary>
         public IReadOnlyList<MoveDefinition> Moves { get; }
+
+        /// <summary>
+        /// Every property line as it was parsed, by name. It holds the configuration lines as well as the
+        /// numbers, so <see cref="Stats"/> is the narrower question and usually the one meant.
+        /// </summary>
         public IReadOnlyDictionary<string, PropertyNode> Properties => _properties;
 
         /// <summary>Numeric properties that become base stats on instantiation (<c>cost</c>, <c>hp</c>...).</summary>
         public IReadOnlyDictionary<string, Num> Stats => _stats;
 
+        /// <summary>
+        /// The <c>effect:</c> block, or null when the definition has none. A card with no effect is
+        /// legal: its whole behaviour may be its listeners, its modifiers or a tag.
+        /// </summary>
         public BlockNode? Effect => Blocks.TryGetValue("effect", out BlockMemberNode? block) ? block.Body : null;
 
         /// <summary>
@@ -279,8 +377,20 @@ namespace Cantrip.Content
 
         // Status configuration ------------------------------------------------------------
 
+        /// <summary>
+        /// How a second application combines with the first. The default is
+        /// <see cref="StackingMode.Intensity"/>, which has no timer at all, so a status meant to run out
+        /// has to say so.
+        /// </summary>
         public StackingMode Stacking { get; private set; } = StackingMode.Intensity;
+
+        /// <summary>
+        /// The cap on <c>stacks</c>, or null for none. It is the <c>max_stacks</c> line: misspell it and
+        /// the status silently has no cap, since any other property is just a stat.
+        /// </summary>
         public int? MaxStacks { get; private set; }
+
+        /// <summary>What kind of status this is and how it behaves, from the words on its declaration. <see cref="StatusFlags.None"/> for everything that is not a status.</summary>
         public StatusFlags Flags { get; private set; }
 
         /// <summary>How many stacks are lost when <see cref="DecayOn"/> fires. Zero means no decay.</summary>
@@ -297,6 +407,10 @@ namespace Cantrip.Content
 
         // Enemy configuration -------------------------------------------------------------
 
+        /// <summary>
+        /// How this enemy picks its next move. The default takes the moves in order, which is what makes
+        /// an enemy readable; only a <c>pattern</c> line changes it.
+        /// </summary>
         public EnemyPatternKind Pattern { get; private set; } = EnemyPatternKind.Cycle;
 
         /// <summary>Move names in pattern order. Empty means "all moves, in declaration order".</summary>
@@ -316,10 +430,23 @@ namespace Cantrip.Content
         /// <summary>Plain text with no live values (description level 3).</summary>
         public string? TextOverride => ReadString("text_override");
 
+        /// <summary>
+        /// The flavour line, or null. Both spellings are read, <c>flavour</c> first, so content written
+        /// either way works and a definition that has both shows the British one.
+        /// </summary>
         public string? Flavour => ReadString("flavour") ?? ReadString("flavor");
 
+        /// <summary>
+        /// Whether the <c>tags</c> line carries this word, ignoring case. It asks about the definition,
+        /// so a tag an effect added to one live entity is <c>Entity.HasTag(string)</c> instead.
+        /// </summary>
         public bool HasTag(string tag) => Tags.Contains(tag, StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// One property line as it was parsed, or null when it was not written. The parsed node is what a
+        /// tool wants; <see cref="Stats"/>, <see cref="ReadString"/> and <see cref="Word"/> are the
+        /// shortcuts for reading a value out of one.
+        /// </summary>
         public PropertyNode? Property(string name) => _properties.TryGetValue(name, out PropertyNode? node) ? node : null;
 
         /// <summary>
@@ -341,6 +468,10 @@ namespace Cantrip.Content
             return ReadWords(node.Values[0]).FirstOrDefault()?.ToLowerInvariant();
         }
 
+        /// <summary>
+        /// A property's value when it was written as a quoted string, or null — which also covers a
+        /// property that was written without quotes. Use <see cref="Word"/> for a bare word.
+        /// </summary>
         public string? ReadString(string property)
         {
             PropertyNode? node = Property(property);
@@ -348,6 +479,7 @@ namespace Cantrip.Content
             return node.Values.Count > 0 && node.Values[0] is StringExpr text ? text.Value : null;
         }
 
+        /// <summary>The declaration's first line, as content wrote it: <c>card "Strike"</c>. This is what diagnostics name it by.</summary>
         public override string ToString() => $"{KindName} \"{Name}\"";
 
         private static EntityKind ParseKind(string kind) => kind switch
@@ -648,9 +780,16 @@ namespace Cantrip.Content
             Syntax = syntax;
         }
 
+        /// <summary>The parsed <c>verb</c> declaration, for a tool that needs the spans.</summary>
         public VerbDeclNode Syntax { get; }
+
+        /// <summary>What content calls this verb. It shadows nothing: a name that is already a built-in is CT301 at every use.</summary>
         public string Name => Syntax.Name;
+
+        /// <summary>The parameter names, in order, as the body reads them. A call with the wrong count is a runtime error, not a load error.</summary>
         public IReadOnlyList<string> Parameters => Syntax.Parameters;
+
+        /// <summary>The statements the verb runs, with its parameters bound as locals.</summary>
         public BlockNode Body => Syntax.Body;
     }
 
@@ -660,8 +799,14 @@ namespace Cantrip.Content
     /// </summary>
     public sealed class ResourceRule
     {
+        /// <summary>
+        /// An unbounded rule for a stat: no floor, no ceiling and no reset until one is set. Content
+        /// declares these with <c>resource "energy"</c>; a game builds one only to add a resource the
+        /// content did not.
+        /// </summary>
         public ResourceRule(string stat) => Stat = stat;
 
+        /// <summary>The stat this governs, lower-cased. Every actor's stat of that name is bound by it; a resource is not owned by anybody.</summary>
         public string Stat { get; }
 
         /// <summary>Lower bound, or null for none.</summary>

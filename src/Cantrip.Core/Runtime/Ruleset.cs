@@ -6,6 +6,10 @@ using Cantrip.Syntax;
 
 namespace Cantrip.Runtime
 {
+    /// <summary>
+    /// What stops a chain of reactions from running for ever. It is a ruleset setting because the
+    /// two answers suit different games, not because one is a bug.
+    /// </summary>
     public enum LoopProtection
     {
         /// <summary>Only the depth cap applies.</summary>
@@ -19,10 +23,20 @@ namespace Cantrip.Runtime
         OncePerChain,
     }
 
+    /// <summary>
+    /// One tie-break in the order listeners run. The ruleset lists several, applied in turn, and an
+    /// id comparison settles whatever is left — so the order never depends on a dictionary and a
+    /// replay always agrees.
+    /// </summary>
     public enum ListenerOrdering
     {
+        /// <summary>Higher <c>priority</c> first. It is the first tie-break by default, so a listener that has to go first says so.</summary>
         Priority,
+
+        /// <summary>Whoever came into play first, then whichever listener was registered first. The usual "oldest relic wins" rule.</summary>
         PlayOrder,
+
+        /// <summary>The side whose turn it is goes first. It decides nothing in a real-time game, where the active side never changes.</summary>
         ActivePlayer,
     }
 
@@ -71,6 +85,10 @@ namespace Cantrip.Runtime
         MissTheEvent,
     }
 
+    /// <summary>
+    /// When an after-phase listener runs: at the end of the action that set it off, or in the middle
+    /// of it. It changes the order everything happens in, so it is not a setting to change mid-project.
+    /// </summary>
     public enum TriggerResolution
     {
         /// <summary>After-phase listeners wait until the current action finishes. Slay the Spire style.</summary>
@@ -157,21 +175,48 @@ namespace Cantrip.Runtime
         /// </summary>
         public static Ruleset CreateDefault() => new Ruleset();
 
+        /// <summary>
+        /// Whether <c>before_</c> listeners run at all. Turning it off makes every one of them silently
+        /// dead, and with it every <c>cancel</c> — it is a performance switch for content that uses none.
+        /// </summary>
         public bool BeforeEvents { get; set; } = true;
+
+        /// <summary>Whether <c>instead_of_</c> listeners run. Off, every replacement effect in the content quietly stops replacing anything.</summary>
         public bool InsteadEvents { get; set; } = true;
+
+        /// <summary>Whether <c>on</c> listeners run. This is the common phase, so turning it off disables most of what content does.</summary>
         public bool AfterEvents { get; set; } = true;
 
+        /// <summary>
+        /// What stops a chain of reactions. The default lets fan-out through but never re-triggers a
+        /// listener from its own consequences, which is why two listeners that set each other off is a
+        /// note (CT306) rather than a hang.
+        /// </summary>
         public LoopProtection Loops { get; set; } = LoopProtection.OncePerChain;
 
         /// <summary>Maximum depth of a causal chain before it is cut off with a warning trace.</summary>
         public int MaxDepth { get; set; } = 50;
 
+        /// <summary>
+        /// The tie-breaks that decide listener order, applied in this order until one settles it. The
+        /// default is priority, then play order, then the active side; an id comparison settles the rest,
+        /// so the result never depends on a hash.
+        /// </summary>
         public IReadOnlyList<ListenerOrdering> Ordering { get; set; } =
             new[] { ListenerOrdering.Priority, ListenerOrdering.PlayOrder, ListenerOrdering.ActivePlayer };
 
+        /// <summary>
+        /// The order a value passes through the modifier layers. The default is add, multiply, clamp,
+        /// override — so an override beats a clamp, and reordering these two changes which of a pair of
+        /// modifiers has the last word.
+        /// </summary>
         public IReadOnlyList<ModifierLayer> ModifierLayers { get; set; } =
             new[] { ModifierLayer.Add, ModifierLayer.Multiply, ModifierLayer.Clamp, ModifierLayer.Override };
 
+        /// <summary>
+        /// When an after-phase listener runs. The default queues them until the action finishes, which
+        /// is what makes a card's whole effect resolve before anything reacts to its first line.
+        /// </summary>
         public TriggerResolution Triggers { get; set; } = TriggerResolution.Queued;
 
         /// <summary>

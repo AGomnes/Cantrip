@@ -66,6 +66,11 @@ namespace Cantrip.GodotAdapter
 
         // Entities -------------------------------------------------------------------------------
 
+        /// <summary>
+        /// One entity as a dictionary: id, name, kind, team, zone, place, its tracked stats, its statuses
+        /// and its ability ids. The keys are a contract — a game reads them by name — so they do not
+        /// change within 1.x.
+        /// </summary>
         public static Godot.Collections.Dictionary Entity(EntityView view)
         {
             if (view == null) throw new ArgumentNullException(nameof(view));
@@ -101,6 +106,7 @@ namespace Cantrip.GodotAdapter
             };
         }
 
+        /// <summary>One status on an actor, as a dictionary: what it is, how many stacks and how long it has left.</summary>
         public static Godot.Collections.Dictionary Status(StatusView view)
         {
             if (view == null) throw new ArgumentNullException(nameof(view));
@@ -123,6 +129,10 @@ namespace Cantrip.GodotAdapter
         /// Who the description is aimed at, for an intent. <see cref="NoEntity"/> everywhere else,
         /// so every description dictionary has the same keys whatever made it.
         /// </param>
+        /// <summary>
+        /// Rules text as a dictionary, with the values kept apart from the words so a UI can colour a
+        /// buffed number. Every description has the same keys, whatever made it.
+        /// </summary>
         public static Godot.Collections.Dictionary Description(DescriptionView view, int targetId = NoEntity)
         {
             if (view == null) throw new ArgumentNullException(nameof(view));
@@ -162,6 +172,10 @@ namespace Cantrip.GodotAdapter
             return description;
         }
 
+        /// <summary>
+        /// One run of a description: its text, whether it is a value, and — when it is — the printed
+        /// number beside the current one, so "~~6~~ 9" can be drawn.
+        /// </summary>
         public static Godot.Collections.Dictionary Segment(SegmentView view)
         {
             if (view == null) throw new ArgumentNullException(nameof(view));
@@ -203,6 +217,7 @@ namespace Cantrip.GodotAdapter
             };
         }
 
+        /// <summary>Every diagnostic as a dictionary with its code, severity, message and place, in the order they were found.</summary>
         public static Godot.Collections.Array Diagnostics(IEnumerable<Diagnostic> diagnostics)
         {
             var array = new Godot.Collections.Array();
@@ -444,6 +459,7 @@ namespace Cantrip.GodotAdapter
 
         // Lists ----------------------------------------------------------------------------------
 
+        /// <summary>A list of ids as a Godot array. A null list gives an empty array rather than null, so script never has to check.</summary>
         public static Godot.Collections.Array Ids(IEnumerable<int> ids)
         {
             var array = new Godot.Collections.Array();
@@ -453,6 +469,7 @@ namespace Cantrip.GodotAdapter
             return array;
         }
 
+        /// <summary>The entities' ids as a Godot array, in order. Entities never cross the boundary themselves; only their ids do.</summary>
         public static Godot.Collections.Array Ids(IEnumerable<Entity> entities)
         {
             var array = new Godot.Collections.Array();
@@ -475,6 +492,7 @@ namespace Cantrip.GodotAdapter
             return result.ToArray();
         }
 
+        /// <summary>A list of strings as a Godot array. Null gives an empty array.</summary>
         public static Godot.Collections.Array Strings(IEnumerable<string> values)
         {
             var array = new Godot.Collections.Array();
@@ -484,6 +502,11 @@ namespace Cantrip.GodotAdapter
             return array;
         }
 
+        /// <summary>
+        /// A Godot array read back as strings, for a call that takes a list of names. Entries that are
+        /// not strings are skipped rather than refused, so a mistyped element shortens the list instead
+        /// of failing the call.
+        /// </summary>
         public static string[] ToStrings(Godot.Collections.Array? values)
         {
             if (values == null || values.Count == 0) return new string[0];
@@ -499,13 +522,23 @@ namespace Cantrip.GodotAdapter
         /// </summary>
         public sealed class Marshal : IValueMarshal
         {
+            /// <summary>
+            /// The addon's own conversion between rules values and Variants. The state is what turns ids back
+            /// into entities; without one, anything naming entities reads as empty.
+            /// </summary>
             public Marshal(GameState? state = null) => State = state;
 
             /// <summary>Needed to turn ids back into entities; without it an id list reads as empty.</summary>
             public GameState? State { get; set; }
 
+            /// <summary>A rules value as a Variant. Entities become ids, so nothing a script receives holds an engine object.</summary>
             public Variant ToVariant(Value value) => VariantMap.ToVariant(value);
 
+            /// <summary>
+            /// A Variant read back as a rules value, resolving ids through <paramref name="state"/> or, when
+            /// that is null, through <see cref="State"/>. With neither, anything naming entities comes back
+            /// empty rather than wrong.
+            /// </summary>
             public Value ToValue(Variant variant, GameState? state) => VariantMap.ToValue(variant, state ?? State);
         }
     }

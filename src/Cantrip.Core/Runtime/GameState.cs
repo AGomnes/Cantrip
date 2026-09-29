@@ -9,19 +9,41 @@ namespace Cantrip.Runtime
     /// <summary>Well-known zone names. Games may use any other string as well.</summary>
     public static class Zones
     {
+        /// <summary>Nowhere. What an entity that has been removed, or never placed, reports.</summary>
         public const string None = "";
+
+        /// <summary>Where actors stand. An actor is in here while it has a slot, alive or dead, until it is buried.</summary>
         public const string Board = "board";
+
+        /// <summary>Cards held. A card listens from here, which is what a curse that hurts while held relies on.</summary>
         public const string Hand = "hand";
+
+        /// <summary>The pile drawn from, and where deck building puts cards. A card here is inert: it neither listens nor modifies.</summary>
         public const string Draw = "draw";
+
+        /// <summary>Where played and discarded cards go, and what a shuffle pulls back into the draw pile.</summary>
         public const string Discard = "discard";
+
+        /// <summary>Out of the battle. A shuffle does not reach it, which is the whole point of exhausting a card.</summary>
         public const string Exhaust = "exhaust";
+
+        /// <summary>Where a card sits while its effect resolves. A card is here only for the length of its own play.</summary>
         public const string Play = "play";
 
         /// <summary>Played cards that stay in effect for the rest of the battle.</summary>
         public const string Powers = "powers";
 
+        /// <summary>Where an actor's relics and items live, from the moment they are obtained until the run ends.</summary>
         public const string Relics = "relics";
+
+        /// <summary>
+        /// Statuses, keywords and abilities hanging off an actor. It is the zone that is easiest to
+        /// miss: nothing in the C# guide's list of piles holds an ability, and
+        /// <c>CardRuntime.AbilitiesOf(Entity)</c> exists so no game has to learn that.
+        /// </summary>
         public const string Attached = "attached";
+
+        /// <summary>Where the buried go. A fallen party member is here, which is how <c>CardRuntime.Fallen</c> can list one to revive.</summary>
         public const string Dead = "dead";
 
         /// <summary>
@@ -43,6 +65,10 @@ namespace Cantrip.Runtime
         private static readonly HashSet<string> Known = new HashSet<string>(WellKnown, StringComparer.Ordinal);
     }
 
+    /// <summary>
+    /// What makes a piece of deferred work come due. It is saved with the game, so the numbers are
+    /// fixed for the whole 1.x line.
+    /// </summary>
     public enum ScheduleTiming
     {
         // Saved games store these as numbers: never renumber or reuse one, only add.
@@ -60,6 +86,16 @@ namespace Cantrip.Runtime
     /// <summary>One thing an <c>until</c> block did, so it can be reverted at the deadline.</summary>
     public sealed class TemporaryChange
     {
+        /// <summary>
+        /// Records one reversible change made inside an <c>until</c> block. Exactly one of the three
+        /// optional halves is meant per change: a tag added, an entity attached, or a stat moved by
+        /// <paramref name="delta"/>.
+        /// </summary>
+        /// <param name="entity">What was changed.</param>
+        /// <param name="tag">The tag that was added, to be taken off again.</param>
+        /// <param name="attached">The status or keyword that was attached, to be removed again.</param>
+        /// <param name="stat">The stat that moved.</param>
+        /// <param name="delta">How far it moved, to be subtracted back off. Undoing a stat puts the delta back rather than restoring the old number, so a change made in between survives.</param>
         public TemporaryChange(Entity entity, string? tag = null, Entity? attached = null, string? stat = null, Num delta = default)
         {
             Entity = entity;
@@ -76,10 +112,19 @@ namespace Cantrip.Runtime
             Slot = slot;
         }
 
+        /// <summary>What was changed, and what the undo will be applied to.</summary>
         public Entity Entity { get; }
+
+        /// <summary>The tag that was added, or null when this change is not about a tag.</summary>
         public string? Tag { get; }
+
+        /// <summary>The status or keyword that was attached, or null when this change is not an attachment.</summary>
         public Entity? Attached { get; }
+
+        /// <summary>The stat that moved, or null when this change is not about a stat.</summary>
         public string? Stat { get; }
+
+        /// <summary>How far the stat moved. The undo subtracts this rather than restoring the old value, so anything that changed the stat in between is kept.</summary>
         public Num Delta { get; }
 
         /// <summary>
@@ -104,16 +149,35 @@ namespace Cantrip.Runtime
             Bindings = new Dictionary<string, Value>(StringComparer.OrdinalIgnoreCase);
         }
 
+        /// <summary>A number unique within this game, kept in the save, so a scheduled block survives a round trip and can be cancelled by id.</summary>
         public long Id { get; }
+
+        /// <summary>What makes it come due, which decides whether <see cref="DueAt"/> or <see cref="Deadline"/> is the one to read.</summary>
         public ScheduleTiming Timing { get; }
+
+        /// <summary>Whose block this is: whose turn ends it, and what <c>self</c> means when it runs.</summary>
         public Entity Owner { get; }
+
+        /// <summary>
+        /// The statements to run, or null for an <see cref="ScheduleTiming.Until"/> entry, whose whole
+        /// job is to put <see cref="Undo"/> back. A body the game itself parsed is also null after a
+        /// save, which is why such a block blocks <c>CardRuntime.Capture</c> until it has run.
+        /// </summary>
         public BlockNode? Body { get; }
+
+        /// <summary>The absolute clock time this is due at, for <see cref="ScheduleTiming.AtTime"/>. Meaningless for the other two timings.</summary>
         public long DueAt { get; internal set; }
+
+        /// <summary>The event that ends an <c>until</c> block, such as <c>turn_end</c>. Null for the other timings.</summary>
         public string? Deadline { get; internal set; }
 
         /// <summary>Names captured when the block was scheduled (<c>target</c>, <c>source</c>...).</summary>
         public Dictionary<string, Value> Bindings { get; }
 
+        /// <summary>
+        /// What to put back when the deadline fires, in the order it was done — it is reverted from the
+        /// end. Empty for a plain <c>next turn:</c> block, which changes nothing that has to be undone.
+        /// </summary>
         public List<TemporaryChange> Undo { get; } = new List<TemporaryChange>();
     }
 
@@ -150,6 +214,14 @@ namespace Cantrip.Runtime
         private long _nextSequence = 1;
         private long _nextScheduleId = 1;
 
+        /// <summary>
+        /// Builds the rules state for one game. <c>CardRuntime</c> does this; a game builds one directly
+        /// only when it drives the interpreter itself.
+        /// </summary>
+        /// <param name="content">The library the game is played from.</param>
+        /// <param name="rules">The effective ruleset, usually <c>ContentLibrary.BuildRuleset(DiagnosticBag)</c>.</param>
+        /// <param name="clock">Turns or ticks. It is not checked against the ruleset here; <c>CardRuntime</c> is where that mismatch is caught.</param>
+        /// <param name="seed">The run's seed. Every roll in the game comes from it.</param>
         public GameState(ContentLibrary content, Ruleset rules, IGameClock clock, ulong seed)
         {
             Content = content ?? throw new ArgumentNullException(nameof(content));
@@ -165,12 +237,32 @@ namespace Cantrip.Runtime
             clock.Advanced += _ => Touch();
         }
 
+        /// <summary>The library this game is played from. Reloading into it needs <c>CardRuntime.ApplyContentChanges</c> to take effect on live entities.</summary>
         public ContentLibrary Content { get; }
+
+        /// <summary>
+        /// The rules this game started with. A game keeps them for its whole life: content reloaded with
+        /// a different ruleset does not change a game in progress, which is what the reload report says
+        /// out loud.
+        /// </summary>
         public Ruleset Rules { get; }
+
+        /// <summary>Time. Whether it is a <see cref="TurnClock"/> or a <see cref="TickClock"/> is what makes this a turn-based or a real-time game.</summary>
         public IGameClock Clock { get; }
+
+        /// <summary>
+        /// The game's own generator, and the one every roll in the rules comes out of. Drawing from it
+        /// directly shifts every later shuffle, so a game that wants a number of its own forks it.
+        /// </summary>
         public Rng Rng { get; }
+
+        /// <summary>Every live <c>modify</c>, and what computes a value from them. <c>Entity.Get(string)</c> is the usual way in.</summary>
         public ModifierPipeline Modifiers { get; }
+
+        /// <summary>Every live listener, and who hears what in which order. It does not run anything; the interpreter does.</summary>
         public EventBus Events { get; }
+
+        /// <summary>The causality log. Disabled unless <c>RuntimeOptions.Trace</c> asked for it, and free while disabled.</summary>
         public TraceLog Trace { get; }
 
         /// <summary>Incremented by every mutation. Caches compare against it instead of tracking dependencies.</summary>
@@ -187,30 +279,45 @@ namespace Cantrip.Runtime
 
         // Modifiers can read `turn` and friends, so each of these bumps the version when it changes.
 
+        /// <summary>
+        /// The turn number within the current battle, counting from 1, and 0 before the first one. A
+        /// real-time game has no turns, so it stays at 0 for the whole fight — which is a battle in
+        /// progress, not one that has not started.
+        /// </summary>
         public int Turn
         {
             get => _turn;
             internal set { if (_turn != value) { _turn = value; Touch(); } }
         }
 
+        /// <summary>How many battles this run has started, counting from 1. It survives a battle ending, which is what a run's difficulty curve reads.</summary>
         public int BattleNumber
         {
             get => _battleNumber;
             internal set { if (_battleNumber != value) { _battleNumber = value; Touch(); } }
         }
 
+        /// <summary>Whose turn it is. In a real-time game it stays on <see cref="Team.Player"/>, since nothing hands it over.</summary>
         public Team ActiveTeam
         {
             get => _activeTeam;
             internal set { if (_activeTeam != value) { _activeTeam = value; Touch(); } }
         }
 
+        /// <summary>
+        /// Whether a battle is running. It is false between battles and during a run's shops and rests,
+        /// where most of the battle vocabulary means nothing.
+        /// </summary>
         public bool InBattle
         {
             get => _inBattle;
             internal set { if (_inBattle != value) { _inBattle = value; Touch(); } }
         }
 
+        /// <summary>
+        /// The run's leader, or null before <c>CardRuntime.CreatePlayer(string, int, int)</c>.
+        /// <c>CardRuntime.Player</c> is the same actor without the null.
+        /// </summary>
         public Entity? Player
         {
             get => _player;
@@ -389,9 +496,20 @@ namespace Cantrip.Runtime
             }
         }
 
+        /// <summary>
+        /// Every entity ever made in this game, in creation order, the removed and the dead included.
+        /// Filter it: <c>Actors(Team?)</c>, <c>ZoneOf(Entity, string)</c> and <c>Party</c> are the
+        /// questions usually meant.
+        /// </summary>
         public IReadOnlyList<Entity> Entities => _entities;
+
+        /// <summary>Everything waiting to run or to be undone, in the order it was scheduled. It is saved with the game.</summary>
         public IReadOnlyList<ScheduledAction> Scheduled => _scheduled;
 
+        /// <summary>
+        /// The entity with that id, or null. Ids are stable across a save and restore, which is why a
+        /// game that has to remember one entity between sessions remembers the id and not the object.
+        /// </summary>
         public Entity? Find(int id) => _byId.TryGetValue(id, out Entity? entity) ? entity : null;
 
         /// <summary>Finds a live entity by name, preferring actors on the board.</summary>
@@ -963,6 +1081,11 @@ namespace Cantrip.Runtime
 
         // Activation ---------------------------------------------------------------------------
 
+        /// <summary>
+        /// Whether this entity's listeners and modifiers are live, which depends on where it is: an
+        /// actor on the board and alive, a card in hand (or, for a power, in play), a relic held, a
+        /// status whose host is itself active. A card in the draw pile is in the game and does nothing.
+        /// </summary>
         public bool IsActive(Entity entity) => _active.Contains(entity.Id);
 
         /// <summary>

@@ -75,73 +75,73 @@ public const string AbilityCost = "CT339"
 public const string CancelAfterEvent = "CT308"
 ```
 
-*Undocumented.*
+Error: `cancel` in a listener that runs after its event, which cannot undo what has already happened. Listen to `before_<event>`.
 
 ```csharp
 public const string ClauseNotRead = "CT323"
 ```
 
-*Undocumented.*
+Error: a named clause a built-in verb does not read, such as `block 8 for 2 turns`. The clause was dropped in silence, so the line read as one thing and did another. A flag after a comma is not a clause and is never reported.
 
 ```csharp
 public const string ContentWhereSomethingInPlayIsMeant = "CT320"
 ```
 
-*Undocumented.*
+Error: a verb that acts on something already in the game, handed the name of a definition instead — `copy Strike`, `transform Strike into Wound` — or `create` given a status or ability, which belong to whoever has them rather than to a zone. Each of these is a runtime error too.
 
 ```csharp
 public const string EmitsBuiltinEvent = "CT322"
 ```
 
-*Undocumented.*
+Error: `emit` handed the name of a built-in event. Every listener of it would run while nothing had happened and no history counter had moved — the event forged and the record not.
 
 ```csharp
 public const string EventCycle = "CT306"
 ```
 
-*Undocumented.*
+Note: listeners that can set each other off. Loop protection already stops each after one pass, so this is a question rather than a fault.
 
 ```csharp
 public const string EventOutsideListener = "CT307"
 ```
 
-*Undocumented.*
+Error: `event` read outside an `on ...:` listener, where there is no event to read.
 
 ```csharp
 public const string ForOnDurationStatus = "CT314"
 ```
 
-*Undocumented.*
+Warning: `for N turns` on a status that already ticks down on turns, with N longer than the amount applied. `for` can only end such a status sooner, so the length has to be the amount: `apply Weak 2`.
 
 ```csharp
 public const string IgnoredDuration = "CT315"
 ```
 
-*Undocumented.*
+Warning: a `duration` line on a status that takes its duration from whoever applies it, so the line does nothing.
 
 ```csharp
 public const string NothingToFight = "CT317"
 ```
 
-*Undocumented.*
+Warning: a scenario with no `battle` line, or a `battle` naming no enemy. There is nothing to play and nothing to measure.
 
 ```csharp
 public const string OffTheBoard = "CT327"
 ```
 
-*Undocumented.*
+Warning: a lane or rank no board this game declares can hold. Compared against, it is the same answer for every actor before the game even runs; moved to, the move stops at the edge of the board instead.
 
 ```csharp
 public const string PercentageWhereACountIsMeant = "CT324"
 ```
 
-*Undocumented.*
+Error: a bare percentage where a verb counts whole things. `apply Slow 40%` dropped the unit and applied forty stacks, while the generated rules text still said "40%".
 
 ```csharp
 public const string PlaceAssigned = "CT328"
 ```
 
-*Undocumented.*
+Error: `position` assigned. It reads a rank and always will, but it names one axis of a place that has two, so a move written with it would have to guess which. Write `rank`.
 
 ```csharp
 public const string PlayerWhereAMemberIsMeant = "CT326"
@@ -153,31 +153,31 @@ public const string PlayerWhereAMemberIsMeant = "CT326"
 public const string PositionIsNowRank = "CT329"
 ```
 
-*Undocumented.*
+Note: `position` read. It is the older name for `rank`, reads the same number and keeps working for the whole 1.x line.
 
 ```csharp
 public const string ReachLimitsNothing = "CT332"
 ```
 
-*Undocumented.*
+Warning: a `range` that decides nothing — as wide as the widest board declared, written backwards, or `range 0` at an enemy, which on a facing board is a slot no enemy stands on. `range 1` is what melee is written as.
 
 ```csharp
 public const string ReachWithoutATarget = "CT331"
 ```
 
-*Undocumented.*
+Warning: `range` on something that points at nobody, so nothing ever reads it.
 
 ```csharp
 public const string RowOfOne = "CT333"
 ```
 
-*Undocumented.*
+Warning: `lane(...)` on a board one rank deep, or `rank(...)` on a board one lane wide, where the row is one actor and nobody else.
 
 ```csharp
 public const string RunCount = "CT318"
 ```
 
-*Undocumented.*
+A scenario's `runs` count: an error when it is not a whole number of one or more, and a note below 100, where the same content answers differently each time.
 
 ```csharp
 public const string ScenarioWithoutTurns = "CT338"
@@ -195,25 +195,25 @@ An `of` group that can never hold the one the value belongs to: a pile of cards 
 public const string SpatialSelector = "CT330"
 ```
 
-*Undocumented.*
+A `within` that will not be answered the way it reads: a plain number, which counts slots, in a game with no board (warning); or a length with a unit, which is a question about the world and goes to the game's `IEffectHost.TryCall` (note). The unit is what tells the two apart.
 
 ```csharp
 public const string StacksOutsideStatus = "CT311"
 ```
 
-*Undocumented.*
+Warning: `stacks` read somewhere that is not a status, where it is a stat nothing ever sets. Read the status by name instead, as in `target.Poison`.
 
 ```csharp
 public const string TagWrittenAsProperty = "CT316"
 ```
 
-*Undocumented.*
+Warning: a tag with behaviour of its own — `exhaust`, `retain`, `unplayable` and the rest — written on a line of its own instead of on the `tags` line, where it is a property nothing reads and the behaviour never happens.
 
 ```csharp
 public const string TransformInsideUntil = "CT321"
 ```
 
-*Undocumented.*
+Error: a `transform` inside an `until` block. `until` puts back what it did, and what a transform replaced is gone.
 
 ```csharp
 public const string TurnMachineryWithoutTurns = "CT337"
@@ -233,67 +233,67 @@ A turn order written into a game whose clock has no turns. CT334 was the `turns:
 public const string UnheardEvent = "CT305"
 ```
 
-*Undocumented.*
+Note: an event content emits that no content listens for. Harmless when the game listens in its own code, which is why it is a note.
 
 ```csharp
 public const string UnknownBlock = "CT313"
 ```
 
-*Undocumented.*
+Warning: a line in a declaration ending in `:` that is not `effect:`, a `move ...:` or a listener — `when card_played:`, or `once per battle` written before the `on`. It loads as a label and never runs. A block the game runs itself goes in `LintOptions.HostBlocks`.
 
 ```csharp
 public const string UnknownEvent = "CT304"
 ```
 
-*Undocumented.*
+Warning: a listener on an event nothing raises — not built in, not emitted by content, and not `<stat>_changed` for a stat this content has. Events the game raises from C# go in `LintOptions.HostEvents`.
 
 ```csharp
 public const string UnknownMeasurement = "CT319"
 ```
 
-*Undocumented.*
+Error: an `expect` a scenario cannot check. A scenario plays hundreds of games and measures them in aggregate, so a condition about one game — `expect enemy.hp == 3` — has nothing to read.
 
 ```csharp
 public const string UnknownMove = "CT312"
 ```
 
-*Undocumented.*
+Error: `use` names a move the enemy does not have, or is written in something with no moves at all.
 
 ```csharp
 public const string UnknownName = "CT302"
 ```
 
-*Undocumented.*
+An unknown name. An error where a definition has to be named (`apply Posion`, `card:Strke`, a `board` that is not declared); a warning elsewhere, since the game may be supplying the name at runtime.
 
 ```csharp
 public const string UnknownTag = "CT303"
 ```
 
-*Undocumented.*
+Warning: a `tag:` test for a tag no definition has, so it never matches.
 
 ```csharp
 public const string UnknownVerb = "CT301"
 ```
 
-*Undocumented.*
+Error: an unknown verb, or one written in the wrong kind of block — a test verb such as `cast` outside a test, `play` inside a scenario. A verb the game registers from C# looks unknown too until it is named in `LintOptions.HostVerbs`.
 
 ```csharp
 public const string UnusedTarget = "CT309"
 ```
 
-*Undocumented.*
+Warning: a card asks the player to pick a target and then never reads `target`.
 
 ```csharp
 public const string UnusedVerb = "CT310"
 ```
 
-*Undocumented.*
+Note: a verb declared in content that nothing calls.
 
 ```csharp
 public const string WrongClock = "CT325"
 ```
 
-*Undocumented.*
+Error: a length in units this game's clock cannot measure — `for 3s` under `clock turns`, or `2 turns` under `clock ticks`. Only content that states its clock is checked. See `Linter.TurnMachineryWithoutTurns` for the declarations, as opposed to the units.
 
 ### Methods
 

@@ -36,7 +36,13 @@ namespace Cantrip.Runtime
 
         private static readonly IReadOnlyDictionary<string, object> EmptyValues = new Dictionary<string, object>();
 
+        /// <summary>This entry's number, unique within the log and increasing. <see cref="TraceLog.Find"/> takes it.</summary>
         public long Id { get; }
+
+        /// <summary>
+        /// What caused this step, or null for a top-level action. An entry whose parent has been dropped
+        /// by the ring buffer keeps its id, so a viewer has to treat a parent it cannot find as a root.
+        /// </summary>
         public long? ParentId { get; }
 
         /// <summary>Clock time when the step happened.</summary>
@@ -45,6 +51,7 @@ namespace Cantrip.Runtime
         /// <summary>Category: <c>action</c>, <c>event</c>, <c>listener</c>, <c>verb</c>, <c>modifier</c>, <c>warning</c>...</summary>
         public string Kind { get; }
 
+        /// <summary>What happened, in one line, for a person to read.</summary>
         public string Description { get; }
 
         /// <summary>The entity responsible, formatted as <c>Name#id</c>.</summary>
@@ -56,8 +63,14 @@ namespace Cantrip.Runtime
         /// <summary>Content location, so tools can jump from any number to the line that produced it.</summary>
         public SourceSpan Span { get; }
 
+        /// <summary>
+        /// The numbers behind the step — the amount, the before and after, whatever the site recorded —
+        /// so a tool can show a breakdown instead of parsing <see cref="Description"/>. Empty rather
+        /// than null when there are none.
+        /// </summary>
         public IReadOnlyDictionary<string, object> Values { get; }
 
+        /// <summary>The kind, the description, the values and the source location on one line, as the tree view prints it.</summary>
         public override string ToString()
         {
             var text = new StringBuilder();
@@ -83,6 +96,11 @@ namespace Cantrip.Runtime
         private readonly Stack<long> _scope = new Stack<long>();
         private long _nextId = 1;
 
+        /// <summary>
+        /// Whether anything is recorded. Off by default and free when off: every recording site checks
+        /// this before allocating. Turning it on mid-game starts a log from that moment, with no history
+        /// behind it.
+        /// </summary>
         public bool Enabled { get; set; }
 
         /// <summary>
@@ -91,6 +109,10 @@ namespace Cantrip.Runtime
         /// </summary>
         public int? Capacity { get; set; }
 
+        /// <summary>
+        /// Everything recorded, oldest first. It is the live list, so its count is also the mark
+        /// <see cref="TruncateTo"/> takes.
+        /// </summary>
         public IReadOnlyList<TraceEntry> Entries => _entries;
 
         /// <summary>
@@ -102,6 +124,18 @@ namespace Cantrip.Runtime
         /// <summary>The entry new records attach to as children.</summary>
         public long? CurrentParent => _scope.Count > 0 ? _scope.Peek() : (long?)null;
 
+        /// <summary>
+        /// Records one step and returns its id, or 0 when the log is disabled — and 0 is never a real
+        /// id, so it can be passed to <see cref="Scope"/> without checking.
+        /// </summary>
+        /// <param name="time">The clock time the step happened at.</param>
+        /// <param name="kind">A category: <c>action</c>, <c>event</c>, <c>listener</c>, <c>verb</c>, <c>modifier</c>, <c>warning</c>.</param>
+        /// <param name="description">One line, for a person.</param>
+        /// <param name="source">The entity responsible, formatted as <c>Name#id</c>.</param>
+        /// <param name="listener">The listener that ran, when this step is a trigger.</param>
+        /// <param name="span">The line of content behind it.</param>
+        /// <param name="values">The numbers behind it, for a tool that would rather not parse the description.</param>
+        /// <param name="parentOverride">Attaches this to a parent other than the open scope — how work queued earlier is recorded under what queued it.</param>
         public long Record(
             long time,
             string kind,
@@ -135,6 +169,7 @@ namespace Cantrip.Runtime
             return new PopScope(this);
         }
 
+        /// <summary>Drops every entry, every open scope and the dropped count. Ids are not reused, so an id from before a clear finds nothing rather than something else.</summary>
         public void Clear()
         {
             _entries.Clear();
@@ -154,6 +189,10 @@ namespace Cantrip.Runtime
             _scope.Clear();
         }
 
+        /// <summary>
+        /// The entry with that id, or null when it never existed or the ring buffer has dropped it. It
+        /// searches from the newest backwards, so recent entries are cheap and old ones are not.
+        /// </summary>
         public TraceEntry? Find(long id)
         {
             for (int i = _entries.Count - 1; i >= 0; i--)
@@ -175,6 +214,11 @@ namespace Cantrip.Runtime
             }
         }
 
+        /// <summary>
+        /// The steps one entry caused, oldest first — one level, not the whole subtree. It scans the
+        /// whole log per call, so building a tree from it is quadratic; <see cref="FormatTree"/> does it
+        /// in one pass.
+        /// </summary>
         public IEnumerable<TraceEntry> Children(long id) => _entries.Where(e => e.ParentId == id);
 
         /// <summary>Renders the log as an indented tree, the text form of the causality view.</summary>

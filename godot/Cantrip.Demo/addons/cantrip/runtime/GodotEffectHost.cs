@@ -16,6 +16,7 @@ namespace Cantrip.GodotAdapter
     /// </remarks>
     public interface IValueMarshal
     {
+        /// <summary>A rules value as a Variant, for handing to a game Callable.</summary>
         Variant ToVariant(Value value);
 
         /// <summary>
@@ -64,6 +65,11 @@ namespace Cantrip.GodotAdapter
         private IValueMarshal _marshal = DefaultMarshal;
         private int _depth;
 
+        /// <summary>
+        /// The host the runtime node installs. A game rarely builds one: the node owns its host, and what
+        /// a game registers goes through the node.
+        /// </summary>
+        /// <param name="buffer">Where resolved events wait. Null makes one, which is what a host of its own wants.</param>
         public GodotEffectHost(EventBuffer? buffer = null)
         {
             Buffer = buffer ?? new EventBuffer();
@@ -85,6 +91,10 @@ namespace Cantrip.GodotAdapter
             set => _trackedStats = value ?? EventBuffer.DefaultTrackedStats;
         }
 
+        /// <summary>
+        /// How values cross the boundary. Setting it to null puts <see cref="DefaultMarshal"/> back
+        /// rather than leaving the host unable to convert anything.
+        /// </summary>
         public IValueMarshal Marshal
         {
             get => _marshal;
@@ -116,6 +126,10 @@ namespace Cantrip.GodotAdapter
             Store(_names, name, Checked(name, callable));
         }
 
+        /// <summary>
+        /// Removes a name the game answered, disposing the Callable it held. False when nothing was
+        /// registered under it, which is not an error.
+        /// </summary>
         public bool UnregisterName(string name) => Remove(_names, name);
 
         /// <summary>
@@ -129,6 +143,10 @@ namespace Cantrip.GodotAdapter
             Store(_functions, name, Checked(name, callable));
         }
 
+        /// <summary>
+        /// Removes a function the game answered, disposing the Callable it held. False when nothing was
+        /// registered under it.
+        /// </summary>
         public bool UnregisterFunction(string name) => Remove(_functions, name);
 
         /// <summary>
@@ -145,6 +163,12 @@ namespace Cantrip.GodotAdapter
 
         // IEffectHost ----------------------------------------------------------------------------
 
+        /// <summary>
+        /// Calls the game's Callable for a name content used, as <c>f(context)</c>. A Callable that
+        /// returns nothing falls through to the engine's own answer, so a script can answer some cases
+        /// and leave the rest.
+        /// </summary>
+        /// <remarks>This really does run script in the middle of resolution, because the rules are waiting for the answer. Do not act on the game from it.</remarks>
         public bool TryResolveName(string name, EvalContext context, out Value value)
         {
             value = Value.None;
@@ -157,6 +181,11 @@ namespace Cantrip.GodotAdapter
             return true;
         }
 
+        /// <summary>
+        /// Calls the game's Callable for a function content called, with the arguments converted. Like
+        /// <see cref="TryResolveName"/>, returning nothing falls through, and like it this runs script
+        /// mid-resolution.
+        /// </summary>
         public bool TryCall(string function, IReadOnlyList<Value> arguments, EvalContext context, out Value value)
         {
             value = Value.None;

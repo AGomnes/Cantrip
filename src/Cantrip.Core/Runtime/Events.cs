@@ -10,6 +10,12 @@ namespace Cantrip.Runtime
     /// </summary>
     public sealed class GameEvent
     {
+        /// <summary>
+        /// An event a verb or a game is about to raise. Building one does nothing; the interpreter
+        /// raises it. A game raising an event of its own names it something the engine does not use, or
+        /// it is forging a built-in one, which is CT322.
+        /// </summary>
+        /// <param name="name">The event name as content listens for it, without a phase prefix.</param>
         public GameEvent(string name)
         {
             Name = name;
@@ -17,6 +23,10 @@ namespace Cantrip.Runtime
             Tags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// The event name without a phase prefix: <c>damaged</c>, not <c>before_damaged</c>. The phase
+        /// is <see cref="Phase"/>, and content writes it as the prefix.
+        /// </summary>
         public string Name { get; }
 
         /// <summary>The phase currently being dispatched.</summary>
@@ -56,6 +66,7 @@ namespace Cantrip.Runtime
         /// </summary>
         internal long ListenersAtRaise { get; set; } = long.MaxValue;
 
+        /// <summary>The phase and the name, as in <c>before damaged</c>. For a log, not for matching.</summary>
         public override string ToString() => $"{Phase.ToString().ToLowerInvariant()} {Name}";
     }
 
@@ -83,8 +94,17 @@ namespace Cantrip.Runtime
             }
         }
 
+        /// <summary>A number unique within this game, stable while the listener is registered. It is not saved, so it does not survive a restore.</summary>
         public int Id { get; }
+
+        /// <summary>
+        /// The entity whose declaration this came from — the relic, the status, the card. Inside the
+        /// listener's body, that is what <c>self</c> and a bare <c>source</c> mean;
+        /// <c>event.source</c> is who caused the event, which is the other thing entirely.
+        /// </summary>
         public Entity Owner { get; }
+
+        /// <summary>The parsed <c>on ...:</c> block, for a tool that needs the filter, the body or the span.</summary>
         public ListenerNode Syntax { get; }
 
         /// <summary>Event name without phase prefix or scope, e.g. <c>damaged</c>.</summary>
@@ -93,7 +113,13 @@ namespace Cantrip.Runtime
         /// <summary>The dotted prefix, e.g. <c>owner</c> in <c>owner.damaged</c>. Null when unscoped.</summary>
         public string? Scope { get; }
 
+        /// <summary>Which of the three phases it listens in, from the prefix content wrote.</summary>
         public EventPhase Phase => Syntax.Phase;
+
+        /// <summary>
+        /// The <c>priority</c> written on the listener, 0 unless stated. Higher runs first, and only
+        /// while the ruleset's ordering puts priority first, which the default does.
+        /// </summary>
         public int Priority => Syntax.Priority;
 
         /// <summary>Registration order, the "play order" tie-break.</summary>
@@ -114,6 +140,7 @@ namespace Cantrip.Runtime
         /// </summary>
         public long NextDueAt { get; internal set; }
 
+        /// <summary>The owner and the event, for a log or an inspector.</summary>
         public override string ToString() => $"{Owner.Name}: on {Syntax.EventName}";
     }
 
@@ -137,6 +164,10 @@ namespace Cantrip.Runtime
         private int _nextId = 1;
         private long _nextOrder = 1;
 
+        /// <summary>
+        /// How many listeners are registered. It counts every phase and every owner, so it moves as
+        /// statuses come and go rather than being a property of the content.
+        /// </summary>
         public int Count { get; private set; }
 
         /// <summary>
@@ -194,6 +225,11 @@ namespace Cantrip.Runtime
         /// <summary>Every periodic listener, for the clock to pump. Empty in a game with none.</summary>
         public IReadOnlyList<Listener> Periodic => _periodic;
 
+        /// <summary>
+        /// Every listener one entity declared, in registration order. With
+        /// <c>ModifierPipeline.OwnedBy(Entity)</c> it is what an inspector needs to say what a single
+        /// thing is doing to a game. The list is live: it changes as the entity gains or loses listeners.
+        /// </summary>
         public IReadOnlyList<Listener> OwnedBy(Entity owner) =>
             _byOwner.TryGetValue(owner.Id, out List<Listener>? owned) ? owned : (IReadOnlyList<Listener>)Array.Empty<Listener>();
 

@@ -13,11 +13,13 @@ namespace Cantrip.Runtime
             Description = description;
         }
 
+        /// <summary>The name a listener writes, without a phase prefix.</summary>
         public string Name { get; }
 
         /// <summary>What <c>event.target</c>, <c>event.source</c>, <c>event.amount</c> and friends carry.</summary>
         public string Description { get; }
 
+        /// <summary>The event's name.</summary>
         public override string ToString() => Name;
     }
 
@@ -35,33 +37,108 @@ namespace Cantrip.Runtime
     /// </remarks>
     public static class BuiltinEvents
     {
+        /// <summary>A hit landed. <c>target</c> took it, <c>source</c> dealt it, and <c>amount</c> is hp actually lost <em>after</em> block — not what the card said.</summary>
         public const string Damaged = "damaged";
+
+        /// <summary>Block absorbed part of a hit. <c>amount</c> is how much was blocked, not what got through.</summary>
         public const string Blocked = "blocked";
+
+        /// <summary>A hit killed with damage to spare. <c>amount</c> is only the excess.</summary>
         public const string Overkill = "overkill";
+
+        /// <summary>An actor is dying, and can still be saved: <c>instead_of_died</c> prevents it. The dying actor's own listeners still hear this.</summary>
         public const string Died = "died";
+
+        /// <summary>An actor died and it is settled. <c>source</c> is the killer; <see cref="Died"/> is the one that can be refused.</summary>
         public const string Killed = "killed";
+
+        /// <summary>An actor is being brought back. Raised only for one that really was dead, so a heal on the living never reaches it.</summary>
         public const string Revived = "revived";
+
+        /// <summary><c>amount</c> is hp actually restored, so a heal at full hp raises this with 0 rather than not at all.</summary>
         public const string Healed = "healed";
+
+        /// <summary><c>amount</c> is block actually gained, after any modifier.</summary>
         public const string GainedBlock = "gained_block";
+
+        /// <summary>A card reached the hand. Its tags are the event's tags, so <c>on drawn(tag:curse)</c> works.</summary>
         public const string Drawn = "drawn";
+
+        /// <summary>A discard pile went back into the draw pile. It fires on the automatic reshuffle mid-draw as well as on a written <c>shuffle</c>.</summary>
         public const string Shuffled = "shuffled";
+
+        /// <summary>A card went to the discard pile — including one drawn into a hand that was already full.</summary>
         public const string Discarded = "discarded";
+
+        /// <summary>A card left the battle for good. A shuffle will not bring it back.</summary>
         public const string Exhausted = "exhausted";
+
+        /// <summary>
+        /// Something changed where it is: a card its zone, or an actor its slot. <c>data.kind</c> says
+        /// which, and the two carry different data. A row closing under <c>on_vacated close_ranks</c>
+        /// raises it after the fact, so <c>before_moved</c> cannot refuse that one.
+        /// </summary>
         public const string Moved = "moved";
+
+        /// <summary>
+        /// Something arrived: <c>create</c>, <c>copy</c>, or a spawn the host made. It is an
+        /// announcement and not a gate — the thing is already in the game — which is what an enemy's own
+        /// arrival effect is written on.
+        /// </summary>
         public const string Created = "created";
+
+        /// <summary>Something was taken out of the game. Not the same as <see cref="Killed"/>, which is about an actor's hp.</summary>
         public const string Destroyed = "destroyed";
+
+        /// <summary>
+        /// Something became something else and kept its id, owner, side and place. Raised once, and the
+        /// statuses it sheds raise nothing — which is why <c>until</c> refuses to hold a transform.
+        /// </summary>
         public const string Transformed = "transformed";
+
+        /// <summary>A status landed on <c>target</c>, which is its host. <c>amount</c> is stacks, and <c>data.status</c> is the definition at the before phase and the entity after it.</summary>
         public const string StatusApplied = "status_applied";
+
+        /// <summary>A status did not land because the target was immune. Nothing was applied, so no <see cref="StatusApplied"/> follows.</summary>
         public const string StatusResisted = "status_resisted";
+
+        /// <summary>A status left its host. <c>amount</c> is the stacks it had when it went.</summary>
         public const string StatusRemoved = "status_removed";
+
+        /// <summary>
+        /// A card was played. <c>source</c> is the member who performed it, which in a party is not
+        /// necessarily the leader who paid for it; <c>amount</c> is the energy paid.
+        /// </summary>
         public const string CardPlayed = "card_played";
+
+        /// <summary>
+        /// <c>target</c>'s turn began. An unscoped listener on a status or relic hears only its own
+        /// controller's turn, not everybody's. It never fires in a real-time game.
+        /// </summary>
         public const string TurnStart = "turn_start";
+
+        /// <summary><c>target</c>'s turn is ending, with the same scoping as <see cref="TurnStart"/>. It never fires in a real-time game.</summary>
         public const string TurnEnd = "turn_end";
+
+        /// <summary>A battle began. It fires in a real-time game too, unlike the turn events.</summary>
         public const string BattleStart = "battle_start";
+
+        /// <summary>The battle ended. <c>target</c> is the player and <c>data.won</c> says which way it went.</summary>
         public const string BattleEnd = "battle_end";
+
+        /// <summary>An enemy is performing a named move. <c>data.move</c> is which — not to be confused with <see cref="Moved"/>, which is about position.</summary>
         public const string Move = "move";
+
+        /// <summary>An ability was used. <c>data.ability</c> is which one; this is the real-time counterpart of <see cref="CardPlayed"/>.</summary>
         public const string AbilityUsed = "ability_used";
+
+        /// <summary><c>source</c> obtained <c>target</c>, a relic. It fires during setup as well as mid-run, since <c>CardRuntime.AddRelic(string, Entity)</c> raises it.</summary>
         public const string Obtained = "obtained";
+
+        /// <summary>
+        /// The interval of an <c>on every ...:</c> listener elapsed. Raised only for the listener whose
+        /// time has come and never broadcast, so <c>on every</c> in one place cannot be heard in another.
+        /// </summary>
         public const string Every = "every";
 
         /// <summary>Suffix of the per-stat events such as <c>energy_changed</c>.</summary>
@@ -168,8 +245,17 @@ namespace Cantrip.Runtime
         /// <summary>Built-in event names, in the same order as <see cref="All"/>.</summary>
         public static IReadOnlyList<string> Names { get; } = Events.Select(e => e.Name).ToArray();
 
+        /// <summary>
+        /// Whether the engine owns this event name, ignoring case. It is the check behind CT322: a game
+        /// raising an event of its own has to pick a name this answers false for.
+        /// </summary>
         public static bool IsBuiltin(string name) => name != null && ByName.ContainsKey(name);
 
+        /// <summary>
+        /// The entry for a built-in event, or null for a custom one. Its <c>Description</c> is where the
+        /// meaning of <c>event.target</c>, <c>event.source</c> and <c>event.amount</c> is written down
+        /// for that event.
+        /// </summary>
         public static BuiltinEvent? Find(string name) =>
             name != null && ByName.TryGetValue(name, out BuiltinEvent? found) ? found : null;
 

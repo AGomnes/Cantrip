@@ -31,6 +31,7 @@ namespace Cantrip.Runtime
         /// <summary>The line of content behind it, when it has one.</summary>
         public SourceSpan Span { get; }
 
+        /// <summary>The description, which is what a debugger's "next step" line shows.</summary>
         public override string ToString() => Description;
     }
 
@@ -47,6 +48,7 @@ namespace Cantrip.Runtime
         private readonly HashSet<string> _lines = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _events = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>How many breakpoints are set, by line and by event together.</summary>
         public int Count => _lines.Count + _events.Count;
 
         /// <summary>Whether anything is set at all, checked before a drain does any extra work.</summary>
@@ -58,6 +60,7 @@ namespace Cantrip.Runtime
             if (!string.IsNullOrEmpty(file)) _lines.Add(Key(file, line));
         }
 
+        /// <summary>Takes a line breakpoint off. False when there was none there, which is not an error.</summary>
         public bool Remove(string file, int line) => !string.IsNullOrEmpty(file) && _lines.Remove(Key(file, line));
 
         /// <summary>
@@ -69,9 +72,11 @@ namespace Cantrip.Runtime
             if (!string.IsNullOrWhiteSpace(eventName)) _events.Add(eventName.Trim());
         }
 
+        /// <summary>Takes an event breakpoint off. False when there was none, which is not an error.</summary>
         public bool RemoveEvent(string eventName) =>
             !string.IsNullOrWhiteSpace(eventName) && _events.Remove(eventName.Trim());
 
+        /// <summary>Removes every breakpoint, by line and by event.</summary>
         public void Clear()
         {
             _lines.Clear();

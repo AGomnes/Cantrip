@@ -78,6 +78,17 @@ namespace Cantrip
         NotReady,
     }
 
+    /// <summary>
+    /// Everything about a runtime that is decided before it is built, and cannot be changed
+    /// afterwards: the seed, the clock, the host, the chooser and the ruleset. A game that passes
+    /// none of it gets the run described by its content.
+    /// </summary>
+    /// <remarks>
+    /// The two worth setting deliberately are <see cref="Seed"/>, which is the whole of what makes a
+    /// run reproducible, and <see cref="Clock"/>, which decides whether this is a turn-based or a
+    /// real-time game — and which the content's own <c>clock</c> setting has to agree with, or the
+    /// constructor refuses the pair.
+    /// </remarks>
     public sealed class RuntimeOptions
     {
         /// <summary>
@@ -94,14 +105,35 @@ namespace Cantrip
         /// <summary>Defaults to a <see cref="TurnClock"/>. Pass a <see cref="TickClock"/> for real-time games.</summary>
         public IGameClock? Clock { get; set; }
 
+        /// <summary>
+        /// The bridge back to the game: what hears every event, and what resolves the names and
+        /// functions content calls that the engine does not know. Null means content can reach nothing
+        /// outside itself, which is the right setting for a simulation and for untrusted content.
+        /// </summary>
         public IEffectHost? Host { get; set; }
+
+        /// <summary>
+        /// Who answers a <c>choose</c> or a <c>discover</c>. Null installs a
+        /// <see cref="FirstOptionChooser"/>, which always takes the first option — fine for a headless
+        /// run and wrong for a game, which wants <see cref="CardRuntime.Pending"/> and
+        /// <see cref="CardRuntime.Answer(int[])"/> instead.
+        /// </summary>
         public IChoiceProvider? Chooser { get; set; }
 
         /// <summary>Overrides the ruleset declared in content.</summary>
         public Ruleset? Rules { get; set; }
 
+        /// <summary>
+        /// Records every step into <c>State.Trace</c> for the debugger and <c>cantrip sim --explain</c>.
+        /// Off by default because it keeps every entry of every battle in memory.
+        /// </summary>
         public bool Trace { get; set; }
 
+        /// <summary>
+        /// The pacing this runtime records. It is carried through to
+        /// <see cref="CardRuntime.Execution"/> and nothing reads it yet; see
+        /// <see cref="ExecutionMode"/>.
+        /// </summary>
         public ExecutionMode Execution { get; set; } = ExecutionMode.Headless;
     }
 
@@ -112,6 +144,22 @@ namespace Cantrip
     /// </summary>
     public sealed class CardRuntime : IDisposable
     {
+        /// <summary>
+        /// Builds a runtime over already-loaded content. Nothing is running yet: call
+        /// <see cref="CreatePlayer"/>, add cards, then <see cref="StartBattle"/>.
+        /// </summary>
+        /// <param name="content">
+        /// The library to play. It is not re-checked here, so load it through
+        /// <see cref="ContentLibrary.FromText"/> or <see cref="FromText"/> and look at its diagnostics
+        /// first — content with errors in it builds a runtime that fails one battle in.
+        /// </param>
+        /// <param name="options">Null takes the defaults, which is the run the content describes.</param>
+        /// <exception cref="InvalidOperationException">
+        /// The content says <c>clock turns</c> and <see cref="RuntimeOptions.Clock"/> is a
+        /// <see cref="TickClock"/>, or the other way round. It is caught here rather than at the line
+        /// that would have gone wrong, which would have been an <c>on every 1s:</c> listener quietly
+        /// registering nothing.
+        /// </exception>
         public CardRuntime(ContentLibrary content, RuntimeOptions? options = null)
         {
             Content = content ?? throw new ArgumentNullException(nameof(content));
@@ -176,9 +224,32 @@ namespace Cantrip
             return new CardRuntime(content, options);
         }
 
+        /// <summary>
+        /// The library this runtime plays. It is the object that was handed in, not a copy, so loading
+        /// further files into it and then calling <see cref="ApplyContentChanges"/> is how hot reload
+        /// works.
+        /// </summary>
         public ContentLibrary Content { get; }
+
+        /// <summary>
+        /// Everything the game currently is: entities, zones, the board, the event bus, the modifier
+        /// pipeline, the clock and the trace. This class is the short way to do the common things;
+        /// anything it has no call for is here.
+        /// </summary>
         public GameState State { get; }
+
+        /// <summary>
+        /// The thing that runs content. A game needs it to register verbs, to run a block it read out of
+        /// a definition itself, and to reach the primitives a C# verb is written against.
+        /// </summary>
         public Interpreter Interpreter { get; }
+
+        /// <summary>
+        /// The pacing this runtime was built with, settable at any time. <b>Nothing in the engine
+        /// reads it.</b> Only the tree-walking interpreter exists and it always drains the queue,
+        /// so a game that wants an animation between actions paces its own presentation; see
+        /// <see cref="ExecutionMode"/>.
+        /// </summary>
         public ExecutionMode Execution { get; set; }
 
         /// <summary>
@@ -381,10 +452,38 @@ namespace Cantrip
         /// <summary>Null while a battle is running or before the first one; then whether the player won.</summary>
         public bool? Won { get; private set; }
 
+        /// <summary>
+        /// Gives content a verb written in C#. Registering a name twice replaces the first handler
+        /// rather than chaining, and a host verb shadows a built-in of the same name.
+        /// </summary>
+        /// <remarks>
+        /// The linter does not know about it: every use is reported as CT301, and every listener on an
+        /// event the verb raises as CT304, until the names are added to <c>LintOptions.HostVerbs</c> and
+        /// <c>LintOptions.HostEvents</c>. Verbs survive <see cref="Restore"/>, since they belong to the
+        /// runtime rather than to the saved game.
+        /// </remarks>
         public void RegisterVerb(string name, VerbHandler handler) => Interpreter.RegisterVerb(name, handler);
 
         // Setup --------------------------------------------------------------------------------
 
+        /// <summary>
+        /// Makes the run's leader: the actor that holds the deck, the relics and the gold, and the first
+        /// member of the party. Every game calls it once, before anything else.
+        /// </summary>
+        /// <param name="name">
+        /// What the leader is called. It is not looked up in content — the leader is built from these
+        /// three numbers rather than from a declaration, which is why a game that wants the leader to
+        /// have a stat of its own, such as <c>speed</c>, sets it afterwards with
+        /// <see cref="SetStat"/>.
+        /// </param>
+        /// <param name="hp">Starting and maximum hp.</param>
+        /// <param name="maxEnergy">
+        /// Energy the leader refills to each turn. A real-time game pays for nothing, so it is unused there.
+        /// </param>
+        /// <exception cref="InvalidOperationException">
+        /// A player already exists. There is one per runtime; further party members are
+        /// <see cref="AddHero"/>.
+        /// </exception>
         public Entity CreatePlayer(string name = "Player", int hp = 80, int maxEnergy = 3)
         {
             if (State.Player != null) throw new InvalidOperationException("A player already exists.");
@@ -433,6 +532,22 @@ namespace Cantrip
             return hero;
         }
 
+        /// <summary>
+        /// Puts one copy of a <c>card</c> declaration into a pile. This is the run's deck being built,
+        /// not a card being drawn or obtained: nothing is announced, so no listener hears it.
+        /// </summary>
+        /// <param name="name">A <c>card</c> declared in content.</param>
+        /// <param name="zone">
+        /// Which pile, from <see cref="Zones"/>. The default is the draw pile, which is where deck
+        /// building puts things; <see cref="Zones.Hand"/> is what a test usually wants.
+        /// </param>
+        /// <param name="owner">
+        /// Whose card it is. Null means the leader, which is right for a party sharing one deck and
+        /// wrong for a game where each member draws from its own.
+        /// </param>
+        /// <exception cref="ArgumentException">
+        /// No <c>card</c> of that name is loaded. The message suggests the closest name that is.
+        /// </exception>
         public Entity AddCard(string name, string zone = Zones.Draw, Entity? owner = null)
         {
             EntityDefinition definition = Require(name, "card");
@@ -440,8 +555,20 @@ namespace Cantrip
             return State.Instantiate(definition, owner, Team.Neutral, zone);
         }
 
+        /// <summary>
+        /// <see cref="AddCard"/> for a whole list, into the leader's draw pile, in the order given —
+        /// which is the order they are drawn in if the battle starts without a shuffle. Repeating a name
+        /// is how a deck holds five Strikes.
+        /// </summary>
         public IReadOnlyList<Entity> AddDeck(params string[] names) => names.Select(n => AddCard(n)).ToList();
 
+        /// <summary>
+        /// Gives an actor a relic and announces it with <c>obtained</c> — unlike <see cref="AddCard"/>,
+        /// which is silent. A relic whose whole effect is an <c>on obtained:</c> block therefore fires
+        /// here, during setup, before any battle has started.
+        /// </summary>
+        /// <param name="name">A <c>relic</c> declaration, or an <c>item</c> if no relic has that name.</param>
+        /// <param name="owner">Who holds it. Null means the leader, which is where a run's relics live.</param>
         public Entity AddRelic(string name, Entity? owner = null)
         {
             EntityDefinition definition = Content.Find(name, "relic") ?? Require(name, "item");
@@ -577,6 +704,11 @@ namespace Cantrip
         /// shapes: a name no <c>board</c> declaration matches is refused rather than invented,
         /// because the linter has to know how deep a board is to check what reaches across it.
         /// </param>
+        /// <summary>
+        /// Opens a battle against whatever enemies are already on the board, raising <c>battle_start</c>
+        /// and dealing the opening hand. Spawn the enemies first: a battle that starts with none is over
+        /// as soon as it has begun, won.
+        /// </summary>
         public ActionResult StartBattle(bool shuffle = true, bool drawOpeningHand = true, string? board = null) =>
             Attempt(
                 () => { StartBattleCore(shuffle, drawOpeningHand, board); return ActionResult.Played; },
@@ -1049,6 +1181,10 @@ namespace Cantrip
 
         // Cards --------------------------------------------------------------------------------
 
+        /// <summary>
+        /// Whether this card's cost is <c>X</c>: it spends everything the actor has rather than a fixed
+        /// amount. A UI has to ask, because such a card shows no number and is never refused for cost.
+        /// </summary>
         public bool IsXCost(Entity card) =>
             card.Definition?.Property("cost")?.First is NameExpr { Name: var name } && string.Equals(name, "x", StringComparison.OrdinalIgnoreCase);
 
@@ -1417,6 +1553,15 @@ namespace Cantrip
             }
         }
 
+        /// <summary>
+        /// Whether an ability's cooldown has run out. True both when it has come back and when it has
+        /// never been used, which is what a button wants; <see cref="ReadyIn"/> is the number behind it.
+        /// </summary>
+        /// <remarks>
+        /// It answers the cooldown and nothing else. An ability whose actor is dead, or which has
+        /// nothing legal to aim at, is still ready by this; <see cref="CanUse"/> is the question that
+        /// takes those in too.
+        /// </remarks>
         public bool IsReady(Entity ability) => ability.GetBase("ready_at") <= Num.FromInt(State.Clock.Now);
 
         /// <summary>
@@ -1670,8 +1815,20 @@ namespace Cantrip
         /// </summary>
         public ActionResult Answer(params int[] entityIds) => Answer((IEnumerable<int>)entityIds);
 
+        /// <summary>
+        /// <see cref="Answer(int[])"/> for a caller holding the entities rather than their ids — a UI
+        /// that kept what the player clicked. Null counts as an empty selection, which cancels.
+        /// </summary>
         public ActionResult Answer(IEnumerable<Entity> entities) => Answer((entities ?? Enumerable.Empty<Entity>()).Select(e => e.Id));
 
+        /// <summary>
+        /// <see cref="Answer(int[])"/> for a caller holding a sequence rather than an array. Answering
+        /// with nothing cancels the action, which comes back as <see cref="ActionResult.Cancelled"/>.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">
+        /// Nothing is pending, or what is pending is an offer of content rather than a choice between
+        /// entities — answer that one with <see cref="Answer(EntityDefinition)"/>.
+        /// </exception>
         public ActionResult Answer(IEnumerable<int> entityIds)
         {
             if (Pending == null) throw new InvalidOperationException("No choice is pending.");
@@ -1859,6 +2016,7 @@ namespace Cantrip
             /// <summary>The ruleset changed; a running game keeps the rules it started with.</summary>
             public bool RulesetChanged { get; internal set; }
 
+            /// <summary>A one-line form for a log: how many were rebound, how many went missing, and whether the ruleset moved.</summary>
             public override string ToString() =>
                 $"{Rebound} rebound, {Missing.Count} missing" + (RulesetChanged ? ", ruleset changed (needs a new game)" : string.Empty);
         }

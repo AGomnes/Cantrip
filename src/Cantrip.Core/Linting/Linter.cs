@@ -39,30 +39,134 @@ namespace Cantrip.Linting
     /// </summary>
     public sealed class Linter
     {
+        /// <summary>
+        /// Error: an unknown verb, or one written in the wrong kind of block — a test verb such as
+        /// <c>cast</c> outside a test, <c>play</c> inside a scenario. A verb the game registers from C#
+        /// looks unknown too until it is named in <see cref="LintOptions.HostVerbs"/>.
+        /// </summary>
         public const string UnknownVerb = "CT301";
+
+        /// <summary>
+        /// An unknown name. An error where a definition has to be named (<c>apply Posion</c>,
+        /// <c>card:Strke</c>, a <c>board</c> that is not declared); a warning elsewhere, since the game
+        /// may be supplying the name at runtime.
+        /// </summary>
         public const string UnknownName = "CT302";
+
+        /// <summary>Warning: a <c>tag:</c> test for a tag no definition has, so it never matches.</summary>
         public const string UnknownTag = "CT303";
+
+        /// <summary>
+        /// Warning: a listener on an event nothing raises — not built in, not emitted by content, and
+        /// not <c>&lt;stat&gt;_changed</c> for a stat this content has. Events the game raises from C#
+        /// go in <see cref="LintOptions.HostEvents"/>.
+        /// </summary>
         public const string UnknownEvent = "CT304";
+
+        /// <summary>
+        /// Note: an event content emits that no content listens for. Harmless when the game listens in
+        /// its own code, which is why it is a note.
+        /// </summary>
         public const string UnheardEvent = "CT305";
+
+        /// <summary>
+        /// Note: listeners that can set each other off. Loop protection already stops each after one
+        /// pass, so this is a question rather than a fault.
+        /// </summary>
         public const string EventCycle = "CT306";
+
+        /// <summary>Error: <c>event</c> read outside an <c>on ...:</c> listener, where there is no event to read.</summary>
         public const string EventOutsideListener = "CT307";
+
+        /// <summary>Error: <c>cancel</c> in a listener that runs after its event, which cannot undo what has already happened. Listen to <c>before_&lt;event&gt;</c>.</summary>
         public const string CancelAfterEvent = "CT308";
+
+        /// <summary>Warning: a card asks the player to pick a target and then never reads <c>target</c>.</summary>
         public const string UnusedTarget = "CT309";
+
+        /// <summary>Note: a verb declared in content that nothing calls.</summary>
         public const string UnusedVerb = "CT310";
+
+        /// <summary>Warning: <c>stacks</c> read somewhere that is not a status, where it is a stat nothing ever sets. Read the status by name instead, as in <c>target.Poison</c>.</summary>
         public const string StacksOutsideStatus = "CT311";
+
+        /// <summary>Error: <c>use</c> names a move the enemy does not have, or is written in something with no moves at all.</summary>
         public const string UnknownMove = "CT312";
+
+        /// <summary>
+        /// Warning: a line in a declaration ending in <c>:</c> that is not <c>effect:</c>, a
+        /// <c>move ...:</c> or a listener — <c>when card_played:</c>, or <c>once per battle</c> written
+        /// before the <c>on</c>. It loads as a label and never runs. A block the game runs itself goes in
+        /// <see cref="LintOptions.HostBlocks"/>.
+        /// </summary>
         public const string UnknownBlock = "CT313";
+
+        /// <summary>
+        /// Warning: <c>for N turns</c> on a status that already ticks down on turns, with N longer than
+        /// the amount applied. <c>for</c> can only end such a status sooner, so the length has to be the
+        /// amount: <c>apply Weak 2</c>.
+        /// </summary>
         public const string ForOnDurationStatus = "CT314";
+
+        /// <summary>Warning: a <c>duration</c> line on a status that takes its duration from whoever applies it, so the line does nothing.</summary>
         public const string IgnoredDuration = "CT315";
+
+        /// <summary>
+        /// Warning: a tag with behaviour of its own — <c>exhaust</c>, <c>retain</c>, <c>unplayable</c>
+        /// and the rest — written on a line of its own instead of on the <c>tags</c> line, where it is a
+        /// property nothing reads and the behaviour never happens.
+        /// </summary>
         public const string TagWrittenAsProperty = "CT316";
+
+        /// <summary>Warning: a scenario with no <c>battle</c> line, or a <c>battle</c> naming no enemy. There is nothing to play and nothing to measure.</summary>
         public const string NothingToFight = "CT317";
+
+        /// <summary>A scenario's <c>runs</c> count: an error when it is not a whole number of one or more, and a note below 100, where the same content answers differently each time.</summary>
         public const string RunCount = "CT318";
+
+        /// <summary>
+        /// Error: an <c>expect</c> a scenario cannot check. A scenario plays hundreds of games and
+        /// measures them in aggregate, so a condition about one game — <c>expect enemy.hp == 3</c> — has
+        /// nothing to read.
+        /// </summary>
         public const string UnknownMeasurement = "CT319";
+
+        /// <summary>
+        /// Error: a verb that acts on something already in the game, handed the name of a definition
+        /// instead — <c>copy Strike</c>, <c>transform Strike into Wound</c> — or <c>create</c> given a
+        /// status or ability, which belong to whoever has them rather than to a zone. Each of these is a
+        /// runtime error too.
+        /// </summary>
         public const string ContentWhereSomethingInPlayIsMeant = "CT320";
+
+        /// <summary>Error: a <c>transform</c> inside an <c>until</c> block. <c>until</c> puts back what it did, and what a transform replaced is gone.</summary>
         public const string TransformInsideUntil = "CT321";
+
+        /// <summary>
+        /// Error: <c>emit</c> handed the name of a built-in event. Every listener of it would run while
+        /// nothing had happened and no history counter had moved — the event forged and the record not.
+        /// </summary>
         public const string EmitsBuiltinEvent = "CT322";
+
+        /// <summary>
+        /// Error: a named clause a built-in verb does not read, such as <c>block 8 for 2 turns</c>. The
+        /// clause was dropped in silence, so the line read as one thing and did another. A flag after a
+        /// comma is not a clause and is never reported.
+        /// </summary>
         public const string ClauseNotRead = "CT323";
+
+        /// <summary>
+        /// Error: a bare percentage where a verb counts whole things. <c>apply Slow 40%</c> dropped the
+        /// unit and applied forty stacks, while the generated rules text still said "40%".
+        /// </summary>
         public const string PercentageWhereACountIsMeant = "CT324";
+
+        /// <summary>
+        /// Error: a length in units this game's clock cannot measure — <c>for 3s</c> under
+        /// <c>clock turns</c>, or <c>2 turns</c> under <c>clock ticks</c>. Only content that states its
+        /// clock is checked. See <see cref="TurnMachineryWithoutTurns"/> for the declarations, as
+        /// opposed to the units.
+        /// </summary>
         public const string WrongClock = "CT325";
 
         /// <summary>
@@ -73,12 +177,38 @@ namespace Cantrip.Linting
         /// </summary>
         public const string PlayerWhereAMemberIsMeant = "CT326";
 
+        /// <summary>
+        /// Warning: a lane or rank no board this game declares can hold. Compared against, it is the
+        /// same answer for every actor before the game even runs; moved to, the move stops at the edge
+        /// of the board instead.
+        /// </summary>
         public const string OffTheBoard = "CT327";
+
+        /// <summary>Error: <c>position</c> assigned. It reads a rank and always will, but it names one axis of a place that has two, so a move written with it would have to guess which. Write <c>rank</c>.</summary>
         public const string PlaceAssigned = "CT328";
+
+        /// <summary>Note: <c>position</c> read. It is the older name for <c>rank</c>, reads the same number and keeps working for the whole 1.x line.</summary>
         public const string PositionIsNowRank = "CT329";
+
+        /// <summary>
+        /// A <c>within</c> that will not be answered the way it reads: a plain number, which counts
+        /// slots, in a game with no board (warning); or a length with a unit, which is a question about
+        /// the world and goes to the game's <c>IEffectHost.TryCall</c> (note). The unit is what tells
+        /// the two apart.
+        /// </summary>
         public const string SpatialSelector = "CT330";
+
+        /// <summary>Warning: <c>range</c> on something that points at nobody, so nothing ever reads it.</summary>
         public const string ReachWithoutATarget = "CT331";
+
+        /// <summary>
+        /// Warning: a <c>range</c> that decides nothing — as wide as the widest board declared, written
+        /// backwards, or <c>range 0</c> at an enemy, which on a facing board is a slot no enemy stands
+        /// on. <c>range 1</c> is what melee is written as.
+        /// </summary>
         public const string ReachLimitsNothing = "CT332";
+
+        /// <summary>Warning: <c>lane(...)</c> on a board one rank deep, or <c>rank(...)</c> on a board one lane wide, where the row is one actor and nobody else.</summary>
         public const string RowOfOne = "CT333";
 
         /// <summary>

@@ -580,6 +580,20 @@ namespace Cantrip.Runtime
             return true;
         }
 
+        /// <summary>
+        /// Heals as content's own <c>heal</c> does: the hp is clamped to the maximum, <c>healed</c> is
+        /// raised, and the history counter moves. Writing hp with <c>Entity.SetBase(string, Num)</c>
+        /// does none of that.
+        /// </summary>
+        /// <param name="source">Who is healing, for <c>event.source</c> and <c>source:</c> filters. Null for a heal nobody did.</param>
+        /// <param name="target">Who is healed.</param>
+        /// <param name="amount">How much to try to heal. A before listener may change it.</param>
+        /// <param name="context">The effect this is part of.</param>
+        /// <param name="span">The line responsible, for traces and errors.</param>
+        /// <returns>
+        /// The hp actually restored, which is 0 at full hp and 0 when a listener cancelled the heal —
+        /// the two are not distinguished here.
+        /// </returns>
         public Num Heal(Entity? source, Entity target, Num amount, EvalContext context, SourceSpan span = default)
         {
             if (!target.IsAlive) return Num.Zero;
@@ -602,6 +616,16 @@ namespace Cantrip.Runtime
             return healed;
         }
 
+        /// <summary>
+        /// Gives block as content's own <c>block</c> does, raising <c>gained_block</c> and moving the
+        /// history counter.
+        /// </summary>
+        /// <param name="source">Who is giving it. Null for block nobody gave.</param>
+        /// <param name="target">Who gains it.</param>
+        /// <param name="amount">How much, before modifiers and before any before listener changes it.</param>
+        /// <param name="context">The effect this is part of.</param>
+        /// <param name="span">The line responsible, for traces and errors.</param>
+        /// <returns>The block actually gained, which is 0 when a listener cancelled it.</returns>
         public Num GainBlock(Entity? source, Entity target, Num amount, EvalContext context, SourceSpan span = default)
         {
             if (!target.IsAlive) return Num.Zero;

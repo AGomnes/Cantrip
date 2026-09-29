@@ -23,23 +23,55 @@ namespace Cantrip.Runtime
             Context = context;
         }
 
+        /// <summary>
+        /// The interpreter running this verb, which is where a C# verb reaches the primitives —
+        /// <c>ChangeStat</c>, <see cref="Interpreter.Heal"/>, <see cref="Interpreter.Raise"/> — that do
+        /// the same bookkeeping content's own verbs do.
+        /// </summary>
         public Interpreter Interpreter { get; }
+
+        /// <summary>The parsed call, for a verb that needs more than the arguments and clauses this class offers.</summary>
         public CommandNode Node { get; }
+
+        /// <summary>
+        /// Who is acting and on whom. Pass it on to any primitive called from here, or the effects this
+        /// verb causes will be attributed to nobody.
+        /// </summary>
         public EvalContext Context { get; }
+
+        /// <summary>The game this is running in, for a verb that needs to look something up.</summary>
         public GameState State => Interpreter.State;
+
+        /// <summary>Where this call is written, for a diagnostic or a trace entry. <see cref="Error"/> attaches it for you.</summary>
         public SourceSpan Span => Node.Span;
+
+        /// <summary>The name this was called by, as content wrote it. A handler registered for two names can tell which one was used.</summary>
         public string Verb => Node.Verb;
 
+        /// <summary>How many positional arguments were written. Nothing checks it, so a verb that needs one has to say so itself.</summary>
         public int ArgumentCount => Node.Arguments.Count;
 
+        /// <summary>
+        /// The unevaluated argument, or null when it was not written. It is what to print in a message
+        /// about an argument, since the value alone does not say how it was spelled.
+        /// </summary>
         public ExprNode? ArgumentNode(int index) => index < Node.Arguments.Count ? Node.Arguments[index] : null;
 
+        /// <summary>
+        /// Evaluates a positional argument, or <see cref="Value.None"/> when it was not written.
+        /// Arguments are evaluated on demand, so reading one twice runs it twice — including any roll in it.
+        /// </summary>
         public Value Argument(int index)
         {
             ExprNode? node = ArgumentNode(index);
             return node == null ? Value.None : Interpreter.Evaluate(node, Context);
         }
 
+        /// <summary>
+        /// A numeric argument, or <paramref name="fallback"/> when it was not written. It accepts a bare
+        /// percentage; <see cref="Amount"/> is the one that refuses one, and is what the built-in verbs
+        /// use for counts.
+        /// </summary>
         public Num Number(int index, Num fallback)
         {
             ExprNode? node = ArgumentNode(index);
@@ -75,8 +107,16 @@ namespace Cantrip.Runtime
             $"It read as {percent}, while the generated text said `{written}`: a percentage stated to the player that nothing implements. " +
             $"Write the number (`{percent}`), or a share of something: `target.max_hp * {written}`.";
 
+        /// <summary>
+        /// Whether a named clause was written, without evaluating it. It also answers true for a bare
+        /// flag of that name, so it is "was this word written", not "was a value given for it".
+        /// </summary>
         public bool HasClause(string keyword) => Node.HasFlag(keyword);
 
+        /// <summary>
+        /// Evaluates a named clause such as <c>to</c> or <c>from</c>, or <see cref="Value.None"/> when it
+        /// was not written. A clause a verb never reads is silently dropped, which is what CT323 reports.
+        /// </summary>
         public Value Clause(string keyword)
         {
             ExprNode? node = Node.Clause(keyword);
@@ -98,6 +138,10 @@ namespace Cantrip.Runtime
             return Array.Empty<Entity>();
         }
 
+        /// <summary>
+        /// Builds the error to throw from a verb, with the verb's name and this call's location already
+        /// on it. Throw it: returning one does nothing.
+        /// </summary>
         public RuntimeError Error(string message) => new RuntimeError($"`{Verb}`: {message}", Span);
     }
 
@@ -121,6 +165,13 @@ namespace Cantrip.Runtime
         private int _steps;
         private int _callDepth;
 
+        /// <summary>
+        /// Builds the interpreter for a game and installs itself as the state's modifier evaluator — so
+        /// a state without one computes every value unmodified. <c>CardRuntime</c> does this; a game
+        /// builds one directly only when it drives the rules itself.
+        /// </summary>
+        /// <param name="state">The game to run. It is left as it is; nothing starts here.</param>
+        /// <param name="host">The game's side of the integration. Null installs one that answers nothing, which is right for a simulation.</param>
         public Interpreter(GameState state, IEffectHost? host = null)
         {
             State = state ?? throw new ArgumentNullException(nameof(state));
@@ -131,9 +182,19 @@ namespace Cantrip.Runtime
             foreach (KeyValuePair<string, VerbHandler> verb in _verbs) _builtinHandlers[verb.Key] = verb.Value;
         }
 
+        /// <summary>The game this interpreter runs.</summary>
         public GameState State { get; }
+
+        /// <summary>The library being played, which is the state's. Loading into it does not rebind live entities on its own.</summary>
         public ContentLibrary Content => State.Content;
+
+        /// <summary>The rules this game started with, which is the state's.</summary>
         public Ruleset Rules => State.Rules;
+
+        /// <summary>
+        /// The game's side of the integration. Never null: a runtime given none gets one that answers
+        /// nothing, so a call here needs no guard.
+        /// </summary>
         public IEffectHost Host { get; }
 
         private IChoiceProvider _chooser = new FirstOptionChooser();
@@ -152,6 +213,11 @@ namespace Cantrip.Runtime
             _verbs[name] = handler ?? throw new ArgumentNullException(nameof(handler));
         }
 
+        /// <summary>
+        /// Whether anything answers to this name: a built-in, a verb the game registered, or one content
+        /// declares. It is the question the linter cannot answer on its own, which is why host verbs have
+        /// to be named in <c>LintOptions.HostVerbs</c>.
+        /// </summary>
         public bool IsVerb(string name) => _verbs.ContainsKey(name) || Content.FindVerb(name) != null;
 
         /// <summary>
@@ -173,6 +239,10 @@ namespace Cantrip.Runtime
             _builtinHandlers[name] = handler;
         }
 
+        /// <summary>
+        /// Every verb that can be called: built-ins, host verbs and content verbs, deduplicated without
+        /// case. It is what a "did you mean?" and an editor's completion list are built from.
+        /// </summary>
         public IEnumerable<string> VerbNames => _verbs.Keys.Concat(Content.Verbs.Select(v => v.Name)).Distinct(StringComparer.OrdinalIgnoreCase);
 
         internal bool IsBuiltinVerb(string name) => _builtinVerbs.Contains(name);
@@ -231,6 +301,17 @@ namespace Cantrip.Runtime
 
         // Statements ------------------------------------------------------------------------
 
+        /// <summary>
+        /// Runs a block of statements. It is how a game runs a block of its own that it read out of
+        /// <c>EntityDefinition.Blocks</c> — and such a block has to be named in
+        /// <c>LintOptions.HostBlocks</c>, or the linter reports it as a line that never runs (CT313).
+        /// </summary>
+        /// <remarks>
+        /// It runs the statements and nothing else: the trigger queue is drained by whoever started the
+        /// action, which is why content run this way from inside a host callback resolves at a different
+        /// moment than content run through <c>CardRuntime.Execute(string, Entity, Entity)</c>.
+        /// </remarks>
+        /// <exception cref="RuntimeError">A statement failed, with the line it failed on.</exception>
         public void Execute(BlockNode block, EvalContext context)
         {
             foreach (StatementNode statement in block.Statements) ExecuteStatement(statement, context);

@@ -27,6 +27,10 @@ namespace Cantrip.Runtime
             Zone = string.Empty;
         }
 
+        /// <summary>
+        /// The game this belongs to. An entity is not portable between games: it carries its state, and
+        /// reading a stat goes through that state's modifier pipeline.
+        /// </summary>
         public GameState State { get; }
 
         /// <summary>Stable identifier, unique within a <see cref="GameState"/> and preserved by snapshots.</summary>
@@ -40,6 +44,10 @@ namespace Cantrip.Runtime
         /// </summary>
         public string Name { get; internal set; }
 
+        /// <summary>
+        /// What the engine treats this as, fixed when it was made — except by <c>transform</c>, which
+        /// replaces what an entity is while keeping who it is.
+        /// </summary>
         public EntityKind Kind { get; }
 
         /// <summary>
@@ -129,6 +137,11 @@ namespace Cantrip.Runtime
         /// <summary>The slot an actor stands on, as a pair. Zero for anything not on the board.</summary>
         public (int Lane, int Rank) Slot => (Lane, Rank);
 
+        /// <summary>
+        /// Whether this actor has been killed but not yet removed. A dead actor is still in
+        /// <c>GameState.Entities</c> and still standing in its slot, which is what lets a revive find it
+        /// and what makes <see cref="IsAlive"/>, not this, the usual question.
+        /// </summary>
         public bool IsDead
         {
             get => _isDead;
@@ -221,13 +234,27 @@ namespace Cantrip.Runtime
         /// </summary>
         public IReadOnlyCollection<string> Tags => _tagsView ??= new ReadOnlySetView<string>(_tags);
 
+        /// <summary>
+        /// Whether this entity carries a tag right now, including ones an effect added. Tags are stored
+        /// lower-cased, so ask in lower case; <c>EntityDefinition.HasTag(string)</c> is the
+        /// case-insensitive question about the declaration.
+        /// </summary>
         public bool HasTag(string tag) => _tags.Contains(tag);
 
+        /// <summary>
+        /// Adds a tag, lower-cased, and tells the state — which matters, because modifier scopes and the
+        /// stat cache are keyed on tags and one added behind their back would leave stale numbers in
+        /// play. Adding a tag that is already there does nothing.
+        /// </summary>
         public void AddTag(string tag)
         {
             if (_tags.Add(tag.ToLowerInvariant())) State.Touch();
         }
 
+        /// <summary>
+        /// Takes a tag off and tells the state. It is case-sensitive, matching how tags are stored, so
+        /// pass the lower-cased form.
+        /// </summary>
         public void RemoveTag(string tag)
         {
             if (_tags.Remove(tag)) State.Touch();
@@ -235,8 +262,17 @@ namespace Cantrip.Runtime
 
         // Stats ----------------------------------------------------------------------------
 
+        /// <summary>
+        /// The stats this entity actually has a stored value for. A stat that has never been written is
+        /// not here even though reading it gives 0 — an ability that has never been used has no
+        /// <c>ready_at</c>, which is why "absent" has to read as ready rather than as zero left.
+        /// </summary>
         public IEnumerable<string> StatNames => _base.Keys;
 
+        /// <summary>
+        /// Whether a stat has ever been written. It is how to tell a real 0 from an absent stat, since
+        /// <c>Get(string)</c> answers 0 for both.
+        /// </summary>
         public bool HasStat(string stat) => _base.ContainsKey(stat);
 
         /// <summary>The stored value, before modifiers.</summary>
@@ -373,8 +409,14 @@ namespace Cantrip.Runtime
             return total.ToInt();
         }
 
+        /// <summary>
+        /// Whether this is still in the game and still standing: not dead and not removed. It is the
+        /// check almost everything wants, because <see cref="IsDead"/> alone is false for something that
+        /// has left the game entirely.
+        /// </summary>
         public bool IsAlive => !IsDead && !IsRemoved;
 
+        /// <summary>The name and the id, as traces and diagnostics write it: <c>Cinder Imp#4</c>.</summary>
         public override string ToString() => $"{Name}#{Id}";
     }
 

@@ -64,6 +64,20 @@ namespace Cantrip.Content
         /// <summary><see cref="Ranks"/> when a lane goes on for as long as anything is put in it.</summary>
         public const int Unbounded = 0;
 
+        /// <summary>
+        /// A board shape built in C#, for a test or a tool. A game does not build one: shapes come from
+        /// <c>board</c> declarations, because the linter has to know them to check what reaches across
+        /// them.
+        /// </summary>
+        /// <param name="name">What content calls this board. Names compare case-insensitively.</param>
+        /// <param name="lanes">Slots across, at least one.</param>
+        /// <param name="ranks">Slots deep, or <see cref="Unbounded"/> for a lane with no floor.</param>
+        /// <param name="sides">Whether the two sides stand on mirrored grids or on one shared grid.</param>
+        /// <param name="metric">How the distance between two slots is measured.</param>
+        /// <param name="onVacated">What happens to the actors behind a slot when its occupant leaves.</param>
+        /// <param name="laneWord">What rules text calls a lane. Null or blank keeps <c>lane</c>.</param>
+        /// <param name="rankWord">What rules text calls a rank. Null or blank keeps <c>rank</c>.</param>
+        /// <exception cref="ArgumentOutOfRangeException">Fewer than one lane, or a negative number of ranks.</exception>
         public BoardShape(
             string name,
             int lanes = 1,
@@ -94,6 +108,7 @@ namespace Cantrip.Content
         /// </summary>
         public static BoardShape Default { get; } = new BoardShape(DefaultName);
 
+        /// <summary>What content calls this board, and what <c>CardRuntime.StartBattle(bool, bool, string)</c> is given to pick it.</summary>
         public string Name { get; }
 
         /// <summary>Slots across. One or more.</summary>
@@ -102,10 +117,19 @@ namespace Cantrip.Content
         /// <summary>Slots deep, or <see cref="Unbounded"/> for a lane with no floor.</summary>
         public int Ranks { get; }
 
+        /// <summary>
+        /// Whether the two sides stand on mirrored grids or share one. It decides what a rank number
+        /// means, so it is the setting most likely to be behind a fight where the distances look wrong.
+        /// </summary>
         public BoardSides Sides { get; }
 
+        /// <summary>How a distance across both axes is added up, which is what decides whether a diagonal step counts as one or two.</summary>
         public BoardMetric Metric { get; }
 
+        /// <summary>
+        /// What the board does with the hole an actor leaves behind. It is the difference between a back
+        /// rank that stays safe once the front rank dies and one that does not.
+        /// </summary>
         public OnVacated OnVacated { get; }
 
         /// <summary>What this game calls a lane, for rules text. <c>lane</c> unless content says.</summary>
@@ -114,6 +138,11 @@ namespace Cantrip.Content
         /// <summary>What this game calls a rank, for rules text. <c>rank</c> unless content says.</summary>
         public string RankWord { get; }
 
+        /// <summary>
+        /// Whether a lane goes on for as long as anything is put in it. A wave game wants this; it also
+        /// means <see cref="MaxDistance"/> has no answer, so nothing can say that a reach covers the
+        /// whole board.
+        /// </summary>
         public bool RanksAreUnbounded => Ranks == Unbounded;
 
         /// <summary>Whether a lane number is one this board has.</summary>
@@ -122,6 +151,7 @@ namespace Cantrip.Content
         /// <summary>Whether a rank number is one this board has. Every rank from 0 up, when unbounded.</summary>
         public bool HasRank(int rank) => rank >= 0 && (RanksAreUnbounded || rank < Ranks);
 
+        /// <summary>Whether a slot is one this board has at all, which is both <see cref="HasLane"/> and <see cref="HasRank"/>.</summary>
         public bool Holds(int lane, int rank) => HasLane(lane) && HasRank(rank);
 
         /// <summary>
@@ -177,6 +207,7 @@ namespace Cantrip.Content
             + ", "
             + (RanksAreUnbounded ? "unbounded ranks" : Ranks == 1 ? "1 rank" : Ranks.ToString(CultureInfo.InvariantCulture) + " ranks");
 
+        /// <summary>The declaration form, for a diagnostic or a log: <c>board "front" (2 lanes, 3 ranks, facing)</c>.</summary>
         public override string ToString() => $"board \"{Name}\" ({Describe()})";
 
         internal const string Diagnostic = "CT0114";

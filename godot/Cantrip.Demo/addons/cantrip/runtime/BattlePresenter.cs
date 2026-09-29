@@ -38,6 +38,10 @@ namespace Cantrip.GodotAdapter
         private bool _pumping;
         private bool _active;
 
+        /// <summary>
+        /// Godot builds this; a scene adds the node and the runtime node is pointed at it. Nothing is
+        /// queued until the runtime hands it events.
+        /// </summary>
         public BattlePresenter() => _pacing = new Pacing(this);
 
         /// <summary>

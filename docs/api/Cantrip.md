@@ -13,11 +13,11 @@ Part of [the API reference](README.md). The guides are [docs/csharp.md](../cshar
 | [`CardRuntime.ReloadReport`](#cardruntimereloadreport) | What `CardRuntime.ApplyContentChanges` did, for tools and logs. |
 | [`EntityKind`](#entitykind) | What an entity is. Everything in the game is an entity; this only affects defaults. |
 | [`EventPhase`](#eventphase) | The three phases every verb emits: before, instead and after. |
-| [`ExecutionMode`](#executionmode) | Pacing of the action queue. |
+| [`ExecutionMode`](#executionmode) | Pacing of the action queue — a setting the engine carries and does not act on. |
 | [`ModifierLayer`](#modifierlayer) | Fixed layers of the modifier pipeline. Values pass through them in the order the ruleset declares (add, multiply, clamp, override by default), which is what keeps a stack of modifiers from depending on the order they happened to be applied in. |
 | [`Num`](#num) | Fixed-point number used for every value the rules engine computes. |
 | [`Rng`](#rng) | Deterministic random number generator (xoshiro256** seeded through splitmix64). |
-| [`RuntimeOptions`](#runtimeoptions) | *Undocumented.* |
+| [`RuntimeOptions`](#runtimeoptions) | Everything about a runtime that is decided before it is built, and cannot be changed afterwards: the seed, the clock, the host, the chooser and the ruleset. A game that passes none of it gets the run described by its content. |
 | [`StackingMode`](#stackingmode) | How repeated applications of the same status combine. |
 | [`Team`](#team) | Which side an actor is on. Kept deliberately simple; games can layer factions on top. |
 
@@ -59,7 +59,16 @@ The entry point for games: load content, set up actors and decks, then drive bat
 public CardRuntime(ContentLibrary content, RuntimeOptions? options = null)
 ```
 
-*Undocumented.*
+Builds a runtime over already-loaded content. Nothing is running yet: call `CardRuntime.CreatePlayer(string, int, int)`, add cards, then `CardRuntime.StartBattle(bool, bool, string)`.
+
+**Parameters.**
+
+- `content` — The library to play. It is not re-checked here, so load it through `ContentLibrary.FromText(string, string)` or `CardRuntime.FromText(string, RuntimeOptions)` and look at its diagnostics first — content with errors in it builds a runtime that fails one battle in.
+- `options` — Null takes the defaults, which is the run the content describes.
+
+**Throws.**
+
+- `InvalidOperationException` — The content says `clock turns` and `RuntimeOptions.Clock` is a `TickClock`, or the other way round. It is caught here rather than at the line that would have gone wrong, which would have been an `on every 1s:` listener quietly registering nothing.
 
 ### Properties
 
@@ -85,13 +94,13 @@ Who answers a choice content asks for. Setting it to null throws rather than qui
 public ContentLibrary Content { get; }
 ```
 
-*Undocumented.*
+The library this runtime plays. It is the object that was handed in, not a copy, so loading further files into it and then calling `CardRuntime.ApplyContentChanges` is how hot reload works.
 
 ```csharp
 public ExecutionMode Execution { get; set; }
 ```
 
-*Undocumented.*
+The pacing this runtime was built with, settable at any time. **Nothing in the engine reads it.** Only the tree-walking interpreter exists and it always drains the queue, so a game that wants an animation between actions paces its own presentation; see `ExecutionMode`.
 
 ```csharp
 public IReadOnlyList<Entity> Fallen { get; }
@@ -111,7 +120,7 @@ Whether `CardRuntime.CreatePlayer(string, int, int)` has been called. False only
 public Interpreter Interpreter { get; }
 ```
 
-*Undocumented.*
+The thing that runs content. A game needs it to register verbs, to run a block it read out of a definition itself, and to reach the primitives a C# verb is written against.
 
 ```csharp
 public IReadOnlyList<Entity> Party { get; }
@@ -141,7 +150,7 @@ Not nullable, deliberately. It used to be, and a host with `<Nullable>enable</Nu
 public GameState State { get; }
 ```
 
-*Undocumented.*
+Everything the game currently is: entities, zones, the board, the event bus, the modifier pipeline, the clock and the trace. This class is the short way to do the common things; anything it has no call for is here.
 
 ```csharp
 public bool? Won { get; private set; }
@@ -163,13 +172,23 @@ An ability is an entity in `Zones.Attached` whose `Entity.Kind` is `EntityKind.A
 public Entity AddCard(string name, string zone = "draw", Entity? owner = null)
 ```
 
-*Undocumented.*
+Puts one copy of a `card` declaration into a pile. This is the run's deck being built, not a card being drawn or obtained: nothing is announced, so no listener hears it.
+
+**Parameters.**
+
+- `name` — A `card` declared in content.
+- `zone` — Which pile, from `Zones`. The default is the draw pile, which is where deck building puts things; `Zones.Hand` is what a test usually wants.
+- `owner` — Whose card it is. Null means the leader, which is right for a party sharing one deck and wrong for a game where each member draws from its own.
+
+**Throws.**
+
+- `ArgumentException` — No `card` of that name is loaded. The message suggests the closest name that is.
 
 ```csharp
 public IReadOnlyList<Entity> AddDeck(params string[] names)
 ```
 
-*Undocumented.*
+`CardRuntime.AddCard(string, string, Entity)` for a whole list, into the leader's draw pile, in the order given — which is the order they are drawn in if the battle starts without a shuffle. Repeating a name is how a deck holds five Strikes.
 
 ```csharp
 public Entity AddHero(string name, int? hp = null)
@@ -188,7 +207,12 @@ The leader `CardRuntime.CreatePlayer(string, int, int)` made is already a member
 public Entity AddRelic(string name, Entity? owner = null)
 ```
 
-*Undocumented.*
+Gives an actor a relic and announces it with `obtained` — unlike `CardRuntime.AddCard(string, string, Entity)`, which is silent. A relic whose whole effect is an `on obtained:` block therefore fires here, during setup, before any battle has started.
+
+**Parameters.**
+
+- `name` — A `relic` declaration, or an `item` if no relic has that name.
+- `owner` — Who holds it. Null means the leader, which is where a run's relics live.
 
 ```csharp
 public ActionResult Answer(EntityDefinition chosen)
@@ -200,13 +224,17 @@ Answers a pending offer of content, as `discover` makes, with the candidate the 
 public ActionResult Answer(IEnumerable<Entity> entities)
 ```
 
-*Undocumented.*
+`CardRuntime.Answer(int[])` for a caller holding the entities rather than their ids — a UI that kept what the player clicked. Null counts as an empty selection, which cancels.
 
 ```csharp
 public ActionResult Answer(IEnumerable<int> entityIds)
 ```
 
-*Undocumented.*
+`CardRuntime.Answer(int[])` for a caller holding a sequence rather than an array. Answering with nothing cancels the action, which comes back as `ActionResult.Cancelled`.
+
+**Throws.**
+
+- `InvalidOperationException` — Nothing is pending, or what is pending is an offer of content rather than a choice between entities — answer that one with `CardRuntime.Answer(EntityDefinition)`.
 
 ```csharp
 public ActionResult Answer(params int[] entityIds)
@@ -280,7 +308,17 @@ The resource a card's cost is paid in: `energy`, or whatever its `cost` names.
 public Entity CreatePlayer(string name = "Player", int hp = 80, int maxEnergy = 3)
 ```
 
-*Undocumented.*
+Makes the run's leader: the actor that holds the deck, the relics and the gold, and the first member of the party. Every game calls it once, before anything else.
+
+**Parameters.**
+
+- `name` — What the leader is called. It is not looked up in content — the leader is built from these three numbers rather than from a declaration, which is why a game that wants the leader to have a stat of its own, such as `speed`, sets it afterwards with `CardRuntime.SetStat(Entity, string, long)`.
+- `hp` — Starting and maximum hp.
+- `maxEnergy` — Energy the leader refills to each turn. A real-time game pays for nothing, so it is unused there.
+
+**Throws.**
+
+- `InvalidOperationException` — A player already exists. There is one per runtime; further party members are `CardRuntime.AddHero(string, Nullable<int>)`.
 
 ```csharp
 public void Dispose()
@@ -342,13 +380,15 @@ Who `enemy` is telegraphing its next move against as things stand: the member it
 public bool IsReady(Entity ability)
 ```
 
-*Undocumented.*
+Whether an ability's cooldown has run out. True both when it has come back and when it has never been used, which is what a button wants; `CardRuntime.ReadyIn(Entity)` is the number behind it.
+
+It answers the cooldown and nothing else. An ability whose actor is dead, or which has nothing legal to aim at, is still ready by this; `CardRuntime.CanUse(Entity)` is the question that takes those in too.
 
 ```csharp
 public bool IsXCost(Entity card)
 ```
 
-*Undocumented.*
+Whether this card's cost is `X`: it spends everything the actor has rather than a fixed amount. A UI has to ask, because such a card shows no number and is never refused for cost.
 
 ```csharp
 public IReadOnlyList<Entity> LegalTargets(Entity action)
@@ -424,7 +464,9 @@ The number a cooldown sweep is drawn from, and the whole of how a real-time game
 public void RegisterVerb(string name, VerbHandler handler)
 ```
 
-*Undocumented.*
+Gives content a verb written in C#. Registering a name twice replaces the first handler rather than chaining, and a host verb shadows a built-in of the same name.
+
+The linter does not know about it: every use is reported as CT301, and every listener on an event the verb raises as CT304, until the names are added to `LintOptions.HostVerbs` and `LintOptions.HostEvents`. Verbs survive `CardRuntime.Restore(GameSnapshot)`, since they belong to the runtime rather than to the saved game.
 
 ```csharp
 public bool RemoveCard(Entity card)
@@ -480,7 +522,7 @@ The event is an announcement rather than a gate: the enemy is already in the gam
 public ActionResult StartBattle(bool shuffle = true, bool drawOpeningHand = true, string? board = null)
 ```
 
-*Undocumented.*
+Opens a battle against whatever enemies are already on the board, raising `battle_start` and dealing the opening hand. Spawn the enemies first: a battle that starts with none is over as soon as it has begun, won.
 
 **Parameters.**
 
@@ -556,7 +598,7 @@ The ruleset changed; a running game keeps the rules it started with.
 public override string ToString()
 ```
 
-*Undocumented.*
+A one-line form for a log: how many were rebound, how many went missing, and whether the ruleset moved.
 
 ---
 
@@ -570,14 +612,14 @@ What an entity is. Everything in the game is an entity; this only affects defaul
 
 | Member | |
 |---|---|
-| `Actor = 0` | *Undocumented.* |
-| `Card = 1` | *Undocumented.* |
-| `Status = 2` | *Undocumented.* |
-| `Relic = 3` | *Undocumented.* |
-| `Ability = 4` | *Undocumented.* |
-| `Keyword = 5` | *Undocumented.* |
-| `Item = 6` | *Undocumented.* |
-| `Global = 7` | *Undocumented.* |
+| `Actor = 0` | Something that takes part in the fight and has hp: the leader, a `hero`, an `enemy`, a summon. Both `hero` and `enemy` declarations land here — the side is `Team`, not the kind. |
+| `Card = 1` | Something played from a hand and paid for. The only kind `CardRuntime.Play(Entity, Entity, Entity)` accepts. |
+| `Status = 2` | A timed or stacking effect attached to an actor. Its count is the `stacks` stat, not a separate number. |
+| `Relic = 3` | A permanent held by an actor, live from the moment it is obtained until the run ends. |
+| `Ability = 4` | Something an actor uses directly rather than playing from hand: the real-time verb. It has a cooldown instead of a cost, which is why `ActionResult.NotEnoughEnergy` never comes back from using one. |
+| `Keyword = 5` | A named rule with a tooltip, attached like a status but with no stacks or duration of its own. |
+| `Item = 6` | A consumable. It behaves as a relic does in every way the engine cares about; the distinction is the game's. |
+| `Global = 7` | Anything else, and what an unrecognised declaration becomes rather than failing to load. A definition that ended up here when it should not have is usually a misspelled kind word. |
 
 ---
 
@@ -603,12 +645,14 @@ The three phases every verb emits: before, instead and after.
 public enum ExecutionMode
 ```
 
-Pacing of the action queue.
+Pacing of the action queue — a setting the engine carries and does not act on.
+
+Only the tree-walking interpreter exists in 1.0, and it always drains the queue. The value is kept on `RuntimeOptions.Execution` and `CardRuntime.Execution` so a game can record what it meant and a later release can honour it without a breaking change, but today the two modes run identically. A game that wants an animation between actions paces its own presentation from the events it hears.
 
 | Member | |
 |---|---|
-| `Headless = 0` | Drain the queue as fast as possible. Used by simulations and tests. |
-| `Live = 1` | Yield between actions so presentation can keep up. |
+| `Headless = 0` | Drain the queue as fast as possible. What simulations and tests want, and what every runtime does. |
+| `Live = 1` | Yield between actions so presentation can keep up. Recorded, not yet honoured. |
 
 ---
 
@@ -622,10 +666,10 @@ Fixed layers of the modifier pipeline. Values pass through them in the order the
 
 | Member | |
 |---|---|
-| `Add = 0` | *Undocumented.* |
-| `Multiply = 1` | *Undocumented.* |
-| `Clamp = 2` | *Undocumented.* |
-| `Override = 3` | *Undocumented.* |
+| `Add = 0` | Flat addition: `+2`. Everything on this layer sums, in no particular order. |
+| `Multiply = 1` | Scaling: `x150%`. Applied to whatever the add layer left, so a flat bonus is scaled too. |
+| `Clamp = 2` | A floor or a ceiling. It runs after the arithmetic, so it is the last word on the number — unless something overrides it. |
+| `Override = 3` | A fixed result that replaces everything before it, clamp included. Last in the default order and therefore the strongest thing a modifier can say; two overrides on one value is a content bug the linter cannot see, and the later one wins. |
 
 ---
 
@@ -647,19 +691,21 @@ Values are stored as a `Int64` scaled by `Num.Scale` (one millionth), which make
 public static readonly Num MaxValue
 ```
 
-*Undocumented.*
+The largest value this type carries — half of what its `Int64` could hold, so that adding or subtracting any two values in range cannot overflow the underlying integer.
+
+It is not a limit game numbers meet: this is roughly 4.6 trillion, and damage is a two-digit number. It is the headroom that lets `+` and `-` stay unchecked, which is what keeps arithmetic identical on every platform rather than throwing on one and not another.
 
 ```csharp
 public static readonly Num MinValue
 ```
 
-*Undocumented.*
+The most negative value this type carries. It is half of what a `Int64` would hold, which is deliberate: see `Num.MaxValue`.
 
 ```csharp
 public static readonly Num One
 ```
 
-*Undocumented.*
+1.0. Worth naming because a multiplier that should leave a value alone is this and not `Num.FromInt(1)` spelled out at every call site; the two are the same value.
 
 ```csharp
 public const long Scale = 1000000
@@ -671,7 +717,7 @@ Number of raw units in 1.0.
 public static readonly Num Zero
 ```
 
-*Undocumented.*
+Zero, and what `default(Num)` is: a field or array element that has never been assigned already holds this, so nothing has to initialise a `Num` to be valid.
 
 ### Properties
 
@@ -679,13 +725,13 @@ public static readonly Num Zero
 public bool IsNegative { get; }
 ```
 
-*Undocumented.*
+Strictly below zero. Zero itself is neither negative nor positive, which matters for the usual "did this heal do anything" check: use `Num.IsZero` for that.
 
 ```csharp
 public bool IsZero { get; }
 ```
 
-*Undocumented.*
+Exactly zero. It is an integer comparison, not a tolerance, so unlike a `Double` this can be trusted after arithmetic: a value that should have cancelled out has.
 
 ```csharp
 public long Raw { get; }
@@ -699,7 +745,7 @@ The raw scaled representation. Serialize this, not the decimal form.
 public static Num Abs(Num a)
 ```
 
-*Undocumented.*
+Magnitude without the sign. Total and exact: there is no value whose absolute value is out of range.
 
 ```csharp
 public Num Ceiling()
@@ -711,7 +757,7 @@ Rounds towards positive infinity.
 public static Num Clamp(Num value, Num min, Num max)
 ```
 
-*Undocumented.*
+Holds a value between two bounds. It does not check that they are the right way round: given a `min` above `max` it answers `min` for everything, rather than throwing, because a resource whose bounds a modifier has crossed should pin to a number and not stop the battle.
 
 ```csharp
 public int CompareTo(Num other)
@@ -751,7 +797,7 @@ A whole number as a `Num`. The parameter is a `Int64` for the convenience of cal
 public static Num FromRaw(long raw)
 ```
 
-*Undocumented.*
+Rebuilds a value from its `Num.Raw` form, for loading a save. It does not scale: `FromRaw(3)` is three millionths, and the whole number 3 is `Num.FromInt(long)` or the implicit conversion from `Int32`.
 
 ```csharp
 public override int GetHashCode()
@@ -763,19 +809,23 @@ public override int GetHashCode()
 public static Num Max(Num a, Num b)
 ```
 
-*Undocumented.*
+The larger of two values. Not to be confused with `Num.MaxValue`, which is the extreme this type can hold.
 
 ```csharp
 public static Num Min(Num a, Num b)
 ```
 
-*Undocumented.*
+The smaller of two values. Not to be confused with `Num.MinValue`, which is the extreme this type can hold.
 
 ```csharp
 public static Num Parse(string text)
 ```
 
-*Undocumented.*
+`Num.TryParse(string, Num)` for callers that would rather not check, such as a loader that has already validated its input.
+
+**Throws.**
+
+- `FormatException` — The text is not a number this type can hold.
 
 ```csharp
 public static Num Percent(Num percent)
@@ -793,7 +843,7 @@ Rounds half away from zero, which is what players expect from damage numbers.
 public double ToDouble()
 ```
 
-*Undocumented.*
+The value as a `Double`, for drawing a bar or a sweep. It is a one-way door: arithmetic done on the result is no longer arithmetic the rules would agree with, so nothing that feeds back into the game should go through it. `Num.ToInt` and `Num.ToLong` are the ones that stay exact.
 
 ```csharp
 public int ToInt()
@@ -813,19 +863,21 @@ A cast does not work and cannot be made to: `(long)entity.Get("ready_at")` is `C
 public override string ToString()
 ```
 
-*Undocumented.*
+The value in invariant culture, with trailing zeros trimmed, so `1.5` prints as `1.5` and not `1.500000`. Always invariant, whatever the thread is set to: this form round-trips through `Num.Parse(string)` and ends up in traces, saves and test failures, where a comma for a decimal point would be a bug.
 
 ```csharp
 public string ToString(string? format, IFormatProvider? formatProvider)
 ```
 
-*Undocumented.*
+The `IFormattable` form, which **ignores `format`**: there is one representation of a `Num` and this is it, so `$"{damage:F2}"` gives the same text as `$"{damage}"`. A caller that wants a fixed number of decimals formats `Num.ToDouble` instead, having read what that costs.
 
 ```csharp
 public static bool TryParse(string text, out Num value)
 ```
 
-*Undocumented.*
+Reads the form `Num.ToString` writes, plus a leading sign and `_` as a digit separator. False for anything else, with `value` left at `Num.Zero` — including for a number too large to scale, which is refused rather than wrapped round to a negative one nobody would think to look for.
+
+Decimal digits past the sixth are dropped, not rounded and not rejected, because `Num.Scale` cannot hold them: `0.1234567` parses, as `0.123456`.
 
 ### Operators and conversions
 
@@ -833,7 +885,7 @@ public static bool TryParse(string text, out Num value)
 public static Num operator +(Num a, Num b)
 ```
 
-*Undocumented.*
+Addition. Unchecked, which is safe for anything in range because `Num.MaxValue` leaves a bit of headroom for exactly this; two values near the limit will wrap rather than throw, and no game number comes near it.
 
 ```csharp
 public static Num operator /(Num a, Num b)
@@ -845,7 +897,7 @@ Division. Dividing by zero yields `Num.Zero` rather than throwing, because a con
 public static bool operator ==(Num a, Num b)
 ```
 
-*Undocumented.*
+Exact equality, with no epsilon and none needed: two values built the same way from the same inputs have the same bits on every platform. This is the whole reason the rules do not use `Double`.
 
 ```csharp
 public static bool operator >(Num a, Num b)
@@ -863,13 +915,13 @@ public static bool operator >=(Num a, Num b)
 public static implicit operator Num(int value)
 ```
 
-*Undocumented.*
+Whole numbers convert on their own, so `entity.SetBase("hp", 40)` compiles. A `Int64` does not, and a `Double` never will: both would have to decide what to do with a value this type cannot hold, and silently doing something is what fixed point exists to avoid. Use `Num.FromInt(long)` and `Num.Parse(string)` for those.
 
 ```csharp
 public static bool operator !=(Num a, Num b)
 ```
 
-*Undocumented.*
+The negation of equality, and exact for the same reason.
 
 ```csharp
 public static bool operator <(Num a, Num b)
@@ -887,19 +939,19 @@ public static bool operator <=(Num a, Num b)
 public static Num operator *(Num a, Num b)
 ```
 
-*Undocumented.*
+Multiplication, truncated towards zero at the sixth decimal place rather than rounded. That is what makes `x50%` on an odd number land where a designer expects and land there on every machine; a game that wants the other half of the point rounds the result itself with `Num.Round` or `Num.Ceiling`.
 
 ```csharp
 public static Num operator -(Num a, Num b)
 ```
 
-*Undocumented.*
+Subtraction, unchecked on the same terms as addition.
 
 ```csharp
 public static Num operator -(Num a)
 ```
 
-*Undocumented.*
+Negation. Exact and always in range, since `Num.MinValue` is the negative of `Num.MaxValue`.
 
 ---
 
@@ -925,7 +977,7 @@ Restores a generator from a previously captured `Rng.GetState`.
 public Rng(ulong seed)
 ```
 
-*Undocumented.*
+A generator at the start of the stream a seed names. Two generators built from the same seed give the same numbers for ever, on every machine and every build.
 
 ### Fields and constants
 
@@ -941,7 +993,7 @@ How many words `Rng.GetState` gives and `Rng.SetState(ulong[])` wants.
 public ulong Seed { get; private set; }
 ```
 
-*Undocumented.*
+The seed this generator was last started from — a label, not its position. It does not move as numbers are drawn and `Rng.SetState(ulong[])` does not change it, so `new Rng(saved.Seed)` rewinds to the beginning of the run rather than restoring where that generator had got to. `Rng.GetState` is what restores a generator.
 
 ### Methods
 
@@ -981,13 +1033,17 @@ Uniform value in `[min, max]`, inclusive of both ends.
 public ulong NextUInt64()
 ```
 
-*Undocumented.*
+The raw draw every other method is built on. Calling it advances the same stream the game's shuffles and rolls come out of, so a host that borrows a number here changes every later shuffle — `Rng.Fork(ulong)` is the way to take numbers without disturbing the game.
 
 ```csharp
 public T Pick<T>(IReadOnlyList<T> items)
 ```
 
-*Undocumented.*
+One item, uniformly. An empty list throws rather than answering `default`, because a caller that picks from nothing has a bug one line earlier and a silent null is a worse place to find it.
+
+**Throws.**
+
+- `ArgumentException` — `items` is null or empty.
 
 ```csharp
 public int PickWeighted(IReadOnlyList<Num> weights)
@@ -999,7 +1055,7 @@ Picks an index proportionally to `weights`. Returns -1 if every weight is zero.
 public void Reseed(ulong seed)
 ```
 
-*Undocumented.*
+Throws away the current position and starts the stream this seed names, as the constructor does. It is for starting a new run, not for restoring one: see `Rng.SetState(ulong[])`.
 
 ```csharp
 public void SetState(ulong[] state)
@@ -1021,7 +1077,9 @@ In-place Fisher-Yates. Deterministic for a given state and list order.
 public sealed class RuntimeOptions
 ```
 
-*Undocumented.*
+Everything about a runtime that is decided before it is built, and cannot be changed afterwards: the seed, the clock, the host, the chooser and the ruleset. A game that passes none of it gets the run described by its content.
+
+The two worth setting deliberately are `RuntimeOptions.Seed`, which is the whole of what makes a run reproducible, and `RuntimeOptions.Clock`, which decides whether this is a turn-based or a real-time game — and which the content's own `clock` setting has to agree with, or the constructor refuses the pair.
 
 ### Properties
 
@@ -1029,7 +1087,7 @@ public sealed class RuntimeOptions
 public IChoiceProvider? Chooser { get; set; }
 ```
 
-*Undocumented.*
+Who answers a `choose` or a `discover`. Null installs a `FirstOptionChooser`, which always takes the first option — fine for a headless run and wrong for a game, which wants `CardRuntime.Pending` and `CardRuntime.Answer(int[])` instead.
 
 ```csharp
 public IGameClock? Clock { get; set; }
@@ -1041,13 +1099,13 @@ Defaults to a `TurnClock`. Pass a `TickClock` for real-time games.
 public ExecutionMode Execution { get; set; }
 ```
 
-*Undocumented.*
+The pacing this runtime records. It is carried through to `CardRuntime.Execution` and nothing reads it yet; see `ExecutionMode`.
 
 ```csharp
 public IEffectHost? Host { get; set; }
 ```
 
-*Undocumented.*
+The bridge back to the game: what hears every event, and what resolves the names and functions content calls that the engine does not know. Null means content can reach nothing outside itself, which is the right setting for a simulation and for untrusted content.
 
 ```csharp
 public Ruleset? Rules { get; set; }
@@ -1067,7 +1125,7 @@ It used to be `ulong`, which compiled for the literal the guide shows and for no
 public bool Trace { get; set; }
 ```
 
-*Undocumented.*
+Records every step into `State.Trace` for the debugger and `cantrip sim --explain`. Off by default because it keeps every entry of every battle in memory.
 
 ---
 
@@ -1100,7 +1158,7 @@ Which side an actor is on. Kept deliberately simple; games can layer factions on
 
 | Member | |
 |---|---|
-| `Neutral = 0` | *Undocumented.* |
-| `Player = 1` | *Undocumented.* |
-| `Enemy = 2` | *Undocumented.* |
+| `Neutral = 0` | On nobody's side. It is the default for cards, statuses and relics, which take their side from whoever holds them rather than carrying one; an actor on this team is fought by neither side and ends no battle by dying. |
+| `Player = 1` | The party's side: the leader, the heroes beside it, and anything they summon that fights for them. |
+| `Enemy = 2` | The other side. A battle ends when this side has no living actor left on the board. |
 

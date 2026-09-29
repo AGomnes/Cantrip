@@ -13,11 +13,11 @@ Part of [the API reference](README.md). The guides are [docs/csharp.md](../cshar
 | [`BattlePresenter.SettledEventHandler`](#battlepresentersettledeventhandler) | Everything queued has been presented; the game is idle again. |
 | [`CantripContentFile`](#cantripcontentfile) | One imported `.cantrip` file: its text, and the `res://` path it was written at. |
 | [`CantripRuntime`](#cantripruntime) | The node a game drops into a scene, and the only surface script touches. It owns the rules engine, loads content the way an exported game must, and turns everything crossing the boundary into ids and dictionaries. |
-| [`CantripRuntime.BattleEndedEventHandler`](#cantripruntimebattleendedeventhandler) | *Undocumented.* |
-| [`CantripRuntime.BattleStartedEventHandler`](#cantripruntimebattlestartedeventhandler) | *Undocumented.* |
-| [`CantripRuntime.ChoiceRequestedEventHandler`](#cantripruntimechoicerequestedeventhandler) | *Undocumented.* |
+| [`CantripRuntime.BattleEndedEventHandler`](#cantripruntimebattleendedeventhandler) | The battle is over, and the action that ended it has finished. It is safe to act from here — hand out a reward, start the next battle — and the next battle will announce its own end when it comes. |
+| [`CantripRuntime.BattleStartedEventHandler`](#cantripruntimebattlestartedeventhandler) | A battle has begun. It is emitted only if the battle is still running once `battle_start` has resolved. |
+| [`CantripRuntime.ChoiceRequestedEventHandler`](#cantripruntimechoicerequestedeventhandler) | The rules stopped to ask the player something. The game has been rolled back to before the action, so nothing has happened yet; answer with `Answer` and the action replays. |
 | [`CantripRuntime.ContentReloadedEventHandler`](#cantripruntimecontentreloadedeventhandler) | Carries the whole report `CantripRuntime.ReloadContent(Nullable<Array>)` returns, not only its problems. |
-| [`CantripRuntime.EffectEventEventHandler`](#cantripruntimeeffecteventeventhandler) | *Undocumented.* |
+| [`CantripRuntime.EffectEventEventHandler`](#cantripruntimeeffecteventeventhandler) | One resolved event, as a dictionary with snake_case keys. It arrives *after* the whole action has finished, never during it, so a handler may call back into the node — and `after` carries the stats as they were at that event, which is what an animation should show rather than the live values. |
 | [`GodotContentLoader`](#godotcontentloader) | Finds content files and reads them the way the engine wants, then hands the text to the rules library. |
 | [`GodotEffectHost`](#godoteffecthost) | The adapter's `IEffectHost`: it records resolved events for the game to animate later, and answers the names and functions the rules cannot know from Callables the game registered. |
 | [`IValueMarshal`](#ivaluemarshal) | Converts between the rules engine's values and Godot's, for the two places they meet: the arguments a host function is called with, and the answer it gives back. |
@@ -46,7 +46,7 @@ The rules have already run by the time anything reaches here, so this node decid
 public BattlePresenter()
 ```
 
-*Undocumented.*
+Godot builds this; a scene adds the node and the runtime node is pointed at it. Nothing is queued until the runtime hands it events.
 
 ### Properties
 
@@ -196,7 +196,7 @@ No helper method may be added to this class. Godot's source generator publishes 
 public CantripRuntime()
 ```
 
-*Undocumented.*
+Godot builds this; a scene adds the node. Nothing is loaded and no runtime exists until the node enters the tree, so the exported properties can all be set from the inspector first.
 
 ### Properties
 
@@ -210,7 +210,7 @@ Loads content when the node enters the tree, reporting any errors and warnings i
 public ContentLibrary Content { get; private set; }
 ```
 
-*Undocumented.*
+The loaded content, for a game written in C#. It is replaced by a load, so hold the node rather than this.
 
 ```csharp
 public string ContentFolder { get; set; }
@@ -282,13 +282,13 @@ Under `turns: initiative` it is binding and a game drives its turn off it. Under
 public int AddCard(string name, string zone = null)
 ```
 
-*Undocumented.*
+Puts one copy of a `card` into one of the leader's piles and returns its id. Nothing is announced, so no `drawn` or `obtained` listener hears it: this is deck building. A zone that is not one Cantrip knows is warned about in the Output panel and used anyway.
 
 ```csharp
 public Godot.Collections.Array AddDeck(Godot.Collections.Array names)
 ```
 
-*Undocumented.*
+Adds a card for each name into the draw pile and returns their ids, in order. Repeating a name is how a deck holds five Strikes.
 
 ```csharp
 public int AddHero(string name, int hp = 0)
@@ -306,7 +306,7 @@ The leader `CantripRuntime.CreatePlayer(string, int, int)` made is already a mem
 public int AddRelic(string name)
 ```
 
-*Undocumented.*
+Gives the leader a relic and returns its id. Unlike `CantripRuntime.AddCard(string, string)` this announces `obtained`, so a relic whose whole effect is an `on obtained:` block fires here, during setup.
 
 ```csharp
 public Godot.Collections.Dictionary AnswerChoice(int request_id, Godot.Collections.Array chosen)
@@ -368,7 +368,7 @@ Seconds until an ability comes back, for a cooldown sweep: 0 when it is ready no
 public int CostOf(int card_id)
 ```
 
-*Undocumented.*
+What this card costs to play right now, after modifiers — not its printed number. 0 for an id that names nothing, and 0 for a card that really is free, which is the same answer for two different things.
 
 ```csharp
 public int CounterOf(int entity_id, string status)
@@ -382,7 +382,9 @@ Content reads this as `Warden.Fervour` and C# as `entity.CounterOf("Fervour")`. 
 public int CreatePlayer(string name = "Player", int hp = 80, int max_energy = 3)
 ```
 
-*Undocumented.*
+Makes the run's leader and returns its id. Every game calls it once, before anything else.
+
+The defaults are C# defaults, and GDScript does not see them: a script has to pass all three. A leader that needs a stat of its own, such as `speed` under `order: speed`, gets it afterwards from `SetStat` — there is no fourth argument and no declaration this reads.
 
 ```csharp
 public Godot.Collections.Dictionary Describe(int entity_id, int target_id = 0)
@@ -432,13 +434,13 @@ Runs statements as content would, as the player unless `self_id` names someone e
 public Godot.Collections.Array GetActors()
 ```
 
-*Undocumented.*
+Every living actor on the board, both sides, as ids.
 
 ```csharp
 public Godot.Collections.Array GetAllies()
 ```
 
-*Undocumented.*
+Everyone on the player's side, as ids — which includes summoned minions that take no step. `GetParty` is the narrower list of who the game asks for input.
 
 ```csharp
 public Godot.Collections.Array GetDefinitions(string kind, string tag = "")
@@ -452,7 +454,7 @@ The kind is the declaring keyword, as `CantripRuntime.DescribeDefinition(string,
 public Godot.Collections.Array GetEnemies()
 ```
 
-*Undocumented.*
+The living enemies on the board, as ids, in the order they stand.
 
 ```csharp
 public Godot.Collections.Dictionary GetEntity(int entity_id)
@@ -518,7 +520,7 @@ This is the game's own clock and not the driver's count, which is what `TickDriv
 public int GetTurn()
 ```
 
-*Undocumented.*
+The turn within the current battle, counting from 1. It is 0 between battles — and 0 for the whole of a real-time battle, which has no turns at all.
 
 ```csharp
 public Variant GetWon()
@@ -544,13 +546,13 @@ Attaches an ability to an actor. Returns its id, or 0 when the owner is unknown 
 public bool HasPendingChoice()
 ```
 
-*Undocumented.*
+Whether the rules are waiting on the player. While this is true the game has been rolled back to before the action, so nothing the pending action would have done has happened yet.
 
 ```csharp
 public bool IsInBattle()
 ```
 
-*Undocumented.*
+Whether a battle is running. False in a shop, a rest or a map screen, where most of the battle calls mean nothing.
 
 ```csharp
 public bool IsRealTime()
@@ -628,7 +630,7 @@ The same, by a named member: the card is looked for in that member's own hand fi
 public int PlayerId()
 ```
 
-*Undocumented.*
+The leader's id, or 0 before `CantripRuntime.CreatePlayer(string, int, int)`. Ids start at 1, so 0 is always "none".
 
 ```csharp
 public void RegisterFunction(string name, Variant callable)
@@ -692,7 +694,9 @@ Adds an enemy, with the health its content declares unless `hp` is positive. A n
 public void StartBattle(bool shuffle = true, bool draw_opening_hand = true)
 ```
 
-*Undocumented.*
+Opens a battle against whatever enemies are on the board and emits `BattleStarted`. Spawn the enemies first: a battle with none is over as soon as it has begun.
+
+The defaults are C# defaults, which GDScript does not see, so a script passes both. `CantripRuntime.StartBattleOn(string, bool, bool)` is the one that names a board.
 
 ```csharp
 public void StartBattleOn(string board, bool shuffle, bool draw_opening_hand)
@@ -712,7 +716,7 @@ The rules state as one number, for checking that two runs agree, as replay tests
 public void Tick(int count = 1)
 ```
 
-*Undocumented.*
+Advances a real-time game by whole ticks. Call it from the physics step, or let a `CantripRuntime.Driver` do it; driving it from `_Process` makes the game depend on the frame rate. It throws on a turn-based runtime, which has no tick clock to advance.
 
 ```csharp
 public string UseAbility(int ability_id, int target_id = 0)
@@ -726,19 +730,19 @@ It used to answer a bool, so a cooldown, a question the rules stopped to ask, an
 public override void _ExitTree()
 ```
 
-*Undocumented.*
+Uninstalls the editor debug agent. The runtime itself keeps working: a node that is only being moved in the tree has lost nothing.
 
 ```csharp
 public override void _Notification(int what)
 ```
 
-*Undocumented.*
+Releases the Callables the game registered, on predelete rather than on leaving the tree. A GDScript lambda still held when Godot shuts down is freed after GDScript has gone, and the process crashes on exit.
 
 ```csharp
 public override void _Ready()
 ```
 
-*Undocumented.*
+Puts a `CantripRuntime.Driver` on this node's tick rate and, when `CantripRuntime.AutoLoad` is on, loads the content — reporting any problems to the Output panel, since nothing receives what an automatic load returns.
 
 ### Other
 
@@ -746,19 +750,19 @@ public override void _Ready()
 public CantripRuntime.BattleEndedEventHandler
 ```
 
-*Undocumented.*
+The battle is over, and the action that ended it has finished. It is safe to act from here — hand out a reward, start the next battle — and the next battle will announce its own end when it comes.
 
 ```csharp
 public CantripRuntime.BattleStartedEventHandler
 ```
 
-*Undocumented.*
+A battle has begun. It is emitted only if the battle is still running once `battle_start` has resolved.
 
 ```csharp
 public CantripRuntime.ChoiceRequestedEventHandler
 ```
 
-*Undocumented.*
+The rules stopped to ask the player something. The game has been rolled back to before the action, so nothing has happened yet; answer with `Answer` and the action replays.
 
 ```csharp
 public CantripRuntime.ContentReloadedEventHandler
@@ -770,7 +774,7 @@ Carries the whole report `CantripRuntime.ReloadContent(Nullable<Array>)` returns
 public CantripRuntime.EffectEventEventHandler
 ```
 
-*Undocumented.*
+One resolved event, as a dictionary with snake_case keys. It arrives *after* the whole action has finished, never during it, so a handler may call back into the node — and `after` carries the stats as they were at that event, which is what an animation should show rather than the live values.
 
 ---
 
@@ -780,7 +784,7 @@ public CantripRuntime.EffectEventEventHandler
 public delegate CantripRuntime.BattleEndedEventHandler : MulticastDelegate
 ```
 
-*Undocumented.*
+The battle is over, and the action that ended it has finished. It is safe to act from here — hand out a reward, start the next battle — and the next battle will announce its own end when it comes.
 
 ---
 
@@ -790,7 +794,7 @@ public delegate CantripRuntime.BattleEndedEventHandler : MulticastDelegate
 public delegate CantripRuntime.BattleStartedEventHandler : MulticastDelegate
 ```
 
-*Undocumented.*
+A battle has begun. It is emitted only if the battle is still running once `battle_start` has resolved.
 
 ---
 
@@ -800,7 +804,7 @@ public delegate CantripRuntime.BattleStartedEventHandler : MulticastDelegate
 public delegate CantripRuntime.ChoiceRequestedEventHandler : MulticastDelegate
 ```
 
-*Undocumented.*
+The rules stopped to ask the player something. The game has been rolled back to before the action, so nothing has happened yet; answer with `Answer` and the action replays.
 
 ---
 
@@ -820,7 +824,7 @@ Carries the whole report `CantripRuntime.ReloadContent(Nullable<Array>)` returns
 public delegate CantripRuntime.EffectEventEventHandler : MulticastDelegate
 ```
 
-*Undocumented.*
+One resolved event, as a dictionary with snake_case keys. It arrives *after* the whole action has finished, never during it, so a handler may call back into the node — and `after` carries the stats as they were at that event, which is what an animation should show rather than the live values.
 
 ---
 
@@ -920,7 +924,11 @@ The host owns each Variant it is given and disposes it when the registration is 
 public GodotEffectHost(EventBuffer? buffer = null)
 ```
 
-*Undocumented.*
+The host the runtime node installs. A game rarely builds one: the node owns its host, and what a game registers goes through the node.
+
+**Parameters.**
+
+- `buffer` — Where resolved events wait. Null makes one, which is what a host of its own wants.
 
 ### Fields and constants
 
@@ -954,7 +962,7 @@ True while a game Callable is running, so entry points can refuse to re-enter.
 public IValueMarshal Marshal { get; set; }
 ```
 
-*Undocumented.*
+How values cross the boundary. Setting it to null puts `GodotEffectHost.DefaultMarshal` back rather than leaving the host unable to convert anything.
 
 ```csharp
 public IReadOnlyCollection<string> Names { get; }
@@ -1004,25 +1012,27 @@ Answers a name the content uses but the rules cannot know, such as a spatial gro
 public bool TryCall(string function, IReadOnlyList<Value> arguments, EvalContext context, out Value value)
 ```
 
-*Undocumented.*
+Calls the game's Callable for a function content called, with the arguments converted. Like `GodotEffectHost.TryResolveName(string, EvalContext, Value)`, returning nothing falls through, and like it this runs script mid-resolution.
 
 ```csharp
 public bool TryResolveName(string name, EvalContext context, out Value value)
 ```
 
-*Undocumented.*
+Calls the game's Callable for a name content used, as `f(context)`. A Callable that returns nothing falls through to the engine's own answer, so a script can answer some cases and leave the rest.
+
+This really does run script in the middle of resolution, because the rules are waiting for the answer. Do not act on the game from it.
 
 ```csharp
 public bool UnregisterFunction(string name)
 ```
 
-*Undocumented.*
+Removes a function the game answered, disposing the Callable it held. False when nothing was registered under it.
 
 ```csharp
 public bool UnregisterName(string name)
 ```
 
-*Undocumented.*
+Removes a name the game answered, disposing the Callable it held. False when nothing was registered under it, which is not an error.
 
 ---
 
@@ -1048,7 +1058,7 @@ Reads a value back. Entity ids need `state` to resolve; without one, anything th
 Variant ToVariant(Value value)
 ```
 
-*Undocumented.*
+A rules value as a Variant, for handing to a game Callable.
 
 ---
 
@@ -1118,13 +1128,13 @@ Ticks run since the last reset, for a HUD or for checking that two runs agree.
 public override void _PhysicsProcess(double delta)
 ```
 
-*Undocumented.*
+Converts the frame into whole ticks and runs them through `TickDriver.Drive`, then emits `Ticked`. A frame after a stall runs at most `TickDriver.MaxCatchUp` ticks and abandons the rest; a tick that throws stops the driver and reports once, rather than failing sixty times a second.
 
 ```csharp
 public override void _Ready()
 ```
 
-*Undocumented.*
+Turns `_Process` off and `_PhysicsProcess` on, said out loud because driving the rules from the render frame is the mistake this node exists to prevent.
 
 ### Other
 
@@ -1186,7 +1196,7 @@ What loading or reloading content came to: `ok`, the number of `errors` and `war
 public static Godot.Collections.Dictionary Description(DescriptionView view, int targetId = 0)
 ```
 
-*Undocumented.*
+Rules text as a dictionary, with the values kept apart from the words so a UI can colour a buffed number. Every description has the same keys, whatever made it.
 
 **Parameters.**
 
@@ -1202,13 +1212,13 @@ One problem, with its location kept as the `res://` path the editor can open. A 
 public static Godot.Collections.Array Diagnostics(IEnumerable<Diagnostic> diagnostics)
 ```
 
-*Undocumented.*
+Every diagnostic as a dictionary with its code, severity, message and place, in the order they were found.
 
 ```csharp
 public static Godot.Collections.Dictionary Entity(EntityView view)
 ```
 
-*Undocumented.*
+One entity as a dictionary: id, name, kind, team, zone, place, its tracked stats, its statuses and its ability ids. The keys are a contract — a game reads them by name — so they do not change within 1.x.
 
 ```csharp
 public static Godot.Collections.Dictionary Event(EventRecord record)
@@ -1220,13 +1230,13 @@ One resolved event. `amount` is the whole number a UI prints; `amount_raw` is th
 public static Godot.Collections.Array Ids(IEnumerable<Entity> entities)
 ```
 
-*Undocumented.*
+The entities' ids as a Godot array, in order. Entities never cross the boundary themselves; only their ids do.
 
 ```csharp
 public static Godot.Collections.Array Ids(IEnumerable<int> ids)
 ```
 
-*Undocumented.*
+A list of ids as a Godot array. A null list gives an empty array rather than null, so script never has to check.
 
 ```csharp
 public static Godot.Collections.Dictionary Refused(string reason, string message, string alsoKey = "", Variant alsoValue = null)
@@ -1238,19 +1248,19 @@ The shape every refusal crosses in: `accepted` false, a snake_case `reason` and 
 public static Godot.Collections.Dictionary Segment(SegmentView view)
 ```
 
-*Undocumented.*
+One run of a description: its text, whether it is a value, and — when it is — the printed number beside the current one, so "~~6~~ 9" can be drawn.
 
 ```csharp
 public static Godot.Collections.Dictionary Status(StatusView view)
 ```
 
-*Undocumented.*
+One status on an actor, as a dictionary: what it is, how many stacks and how long it has left.
 
 ```csharp
 public static Godot.Collections.Array Strings(IEnumerable<string> values)
 ```
 
-*Undocumented.*
+A list of strings as a Godot array. Null gives an empty array.
 
 ```csharp
 public static int[] ToIds(Godot.Collections.Array? ids)
@@ -1262,7 +1272,7 @@ Reads entity ids a game passed in, ignoring anything that is not a number.
 public static string[] ToStrings(Godot.Collections.Array? values)
 ```
 
-*Undocumented.*
+A Godot array read back as strings, for a call that takes a list of names. Entries that are not strings are skipped rather than refused, so a mistyped element shortens the list instead of failing the call.
 
 ```csharp
 public static Value ToValue(Variant variant, GameState? state)
@@ -1308,7 +1318,7 @@ The marshal the host uses for game-supplied names and functions, so the addon co
 public Marshal(GameState? state = null)
 ```
 
-*Undocumented.*
+The addon's own conversion between rules values and Variants. The state is what turns ids back into entities; without one, anything naming entities reads as empty.
 
 ### Properties
 
@@ -1324,11 +1334,11 @@ Needed to turn ids back into entities; without it an id list reads as empty.
 public Value ToValue(Variant variant, GameState? state)
 ```
 
-*Undocumented.*
+A Variant read back as a rules value, resolving ids through `state` or, when that is null, through `Marshal.State`. With neither, anything naming entities comes back empty rather than wrong.
 
 ```csharp
 public Variant ToVariant(Value value)
 ```
 
-*Undocumented.*
+A rules value as a Variant. Entities become ids, so nothing a script receives holds an engine object.
 

@@ -18,8 +18,16 @@ namespace Cantrip.Descriptions
     /// </summary>
     public sealed class DescriptionBuilder
     {
+        /// <summary>Warning: a <c>{placeholder}</c> in a writer's <c>text:</c> that matches nothing in the effect, so it is shown as written.</summary>
         public const string UnknownPlaceholder = "CT401";
+
+        /// <summary>
+        /// Warning: the effect has changed since the <c>text_checked</c> hash was recorded, so the
+        /// hand-written text may now describe something the card no longer does.
+        /// </summary>
         public const string StaleText = "CT402";
+
+        /// <summary>Note: a <c>text:</c> that is never shown, because the same definition also sets <c>text_override:</c>.</summary>
         public const string IgnoredText = "CT403";
 
         /// <summary>Card tags that read as keywords at the end of the rules text, in display order.</summary>
@@ -30,6 +38,16 @@ namespace Cantrip.Descriptions
         private readonly ContentLibrary _content;
         private readonly IDescriptionLocalizer _localizer;
 
+        /// <summary>
+        /// A builder over a loaded library. It is reusable and holds no per-description state, so a game
+        /// makes one and keeps it.
+        /// </summary>
+        /// <param name="content">The library whose definitions will be described.</param>
+        /// <param name="localizer">
+        /// Where names, rules text and phrases come from. Null uses
+        /// <see cref="EnglishDescriptions.Instance"/>. The localizer is consulted on every build, so
+        /// switching language means making a new builder rather than rebuilding the content.
+        /// </param>
         public DescriptionBuilder(ContentLibrary content, IDescriptionLocalizer? localizer = null)
         {
             _content = content ?? throw new ArgumentNullException(nameof(content));

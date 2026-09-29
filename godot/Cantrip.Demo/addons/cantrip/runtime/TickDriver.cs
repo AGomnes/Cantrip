@@ -47,6 +47,10 @@ namespace Cantrip.GodotAdapter
         /// <summary>The frames-to-ticks conversion, exposed for tests and for a game that saves it.</summary>
         public TickAccumulator Accumulator => _accumulator;
 
+        /// <summary>
+        /// Turns <c>_Process</c> off and <c>_PhysicsProcess</c> on, said out loud because driving the
+        /// rules from the render frame is the mistake this node exists to prevent.
+        /// </summary>
         public override void _Ready()
         {
             // Said out loud, because driving the rules from the render frame is the mistake this
@@ -55,6 +59,12 @@ namespace Cantrip.GodotAdapter
             SetPhysicsProcess(true);
         }
 
+        /// <summary>
+        /// Converts the frame into whole ticks and runs them through <see cref="Drive"/>, then emits
+        /// <c>Ticked</c>. A frame after a stall runs at most <see cref="MaxCatchUp"/> ticks and abandons
+        /// the rest; a tick that throws stops the driver and reports once, rather than failing sixty
+        /// times a second.
+        /// </summary>
         public override void _PhysicsProcess(double delta)
         {
             if (!Running || Drive == null) return;

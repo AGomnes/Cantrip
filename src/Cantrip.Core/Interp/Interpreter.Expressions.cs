@@ -27,6 +27,11 @@ namespace Cantrip.Runtime
             "discard_pile", "exhaust", "exhaust_pile", "powers", "relics", "deck", "cards", "statuses", "stacks", "event",
         };
 
+        /// <summary>
+        /// Evaluates one expression in a context. Evaluating is not free of side effects: a range rolls,
+        /// so the same node evaluated twice can give two numbers.
+        /// </summary>
+        /// <exception cref="RuntimeError">The expression could not be evaluated, with the line it is written on.</exception>
         public Value Evaluate(ExprNode node, EvalContext context)
         {
             switch (node)
@@ -81,6 +86,11 @@ namespace Cantrip.Runtime
         /// <summary>Evaluates as a condition. Qualifiers such as <c>tag:fire</c> are tested against the focus.</summary>
         public bool EvaluateCondition(ExprNode node, EvalContext context) => IsTrue(Evaluate(node, context), context);
 
+        /// <summary>
+        /// Truthiness as the language means it: a non-zero number, a non-empty text or list, a live
+        /// entity. A qualifier such as <c>tag:fire</c> is tested against the context's focus rather than
+        /// being simply true, which is why this takes a context where <c>Value.AsBool</c> does not.
+        /// </summary>
         public bool IsTrue(Value value, EvalContext context) =>
             value.Kind == ValueKind.Qualified ? TestQualified(value.Qualified!, context) : value.AsBool();
 

@@ -8,6 +8,10 @@ using Cantrip.Syntax;
 
 namespace Cantrip.Testing
 {
+    /// <summary>
+    /// What one <c>test</c> block did. A result always exists, even for a test that could not build
+    /// a runtime at all: that is a failure with a reason, not an exception thrown at the caller.
+    /// </summary>
     public sealed class DslTestResult
     {
         internal DslTestResult(TestDefinition test, bool passed, string? failure, SourceSpan failureSpan, string? trace)
@@ -19,15 +23,39 @@ namespace Cantrip.Testing
             Trace = trace;
         }
 
+        /// <summary>The test this is about, with its file, its span and its parsed body.</summary>
         public TestDefinition Test { get; }
+
+        /// <summary>
+        /// The name in the <c>test</c> line. Names are not required to be unique across a library, so a
+        /// report that groups by this may merge two different tests.
+        /// </summary>
         public string Name => Test.Name;
+
+        /// <summary>
+        /// Whether every <c>expect</c> in the test held. False also covers a test that never reached its
+        /// expectations — a runtime error, or content the runner could not set up — so a failure is not
+        /// necessarily a failed assertion.
+        /// </summary>
         public bool Passed { get; }
+
+        /// <summary>
+        /// Why it failed, in one line, or null when it passed. It is prose for a person: nothing should
+        /// match on it.
+        /// </summary>
         public string? Failure { get; }
+
+        /// <summary>
+        /// The line that failed, so an editor can jump to it. It is the <c>test</c> line itself, not a
+        /// statement inside it, when the failure was setting the test up rather than running it; and
+        /// <see cref="SourceSpan.None"/> is possible, so check <see cref="SourceSpan.IsNone"/>.
+        /// </summary>
         public SourceSpan FailureSpan { get; }
 
         /// <summary>The causality tree, when the runner was asked to trace.</summary>
         public string? Trace { get; }
 
+        /// <summary>One line, as the CLI prints it. It leaves out <see cref="Trace"/>, which is the long part.</summary>
         public override string ToString() => Passed ? $"PASS {Name}" : $"FAIL {Name}: {Failure} ({FailureSpan})";
     }
 
@@ -53,6 +81,11 @@ namespace Cantrip.Testing
 
         private readonly ContentLibrary _content;
 
+        /// <summary>
+        /// A runner over a loaded library. It does not check the library first: content with errors in
+        /// it gives tests that fail for reasons that are really load errors, so look at
+        /// <c>content.Diagnostics</c> before running.
+        /// </summary>
         public DslTestRunner(ContentLibrary content) => _content = content ?? throw new ArgumentNullException(nameof(content));
 
         /// <summary>Verbs that only exist inside <c>test</c> blocks.</summary>
@@ -86,12 +119,32 @@ namespace Cantrip.Testing
         /// </summary>
         public Action<CardRuntime>? ConfigureRuntime { get; set; }
 
+        /// <summary>
+        /// Runs every test in the library, in the order they were loaded, and returns a result for each
+        /// — nothing stops at the first failure.
+        /// </summary>
+        /// <param name="nameFilter">
+        /// Keeps only the tests whose name contains this, ignoring case. It is a substring match and not
+        /// a pattern, and null runs everything. A filter that matches nothing gives an empty list rather
+        /// than an error, which is worth checking for in a CI script that would otherwise report success.
+        /// </param>
         public IReadOnlyList<DslTestResult> RunAll(string? nameFilter = null) =>
             _content.Tests
                 .Where(t => nameFilter == null || t.Name.IndexOf(nameFilter, StringComparison.OrdinalIgnoreCase) >= 0)
                 .Select(Run)
                 .ToList();
 
+        /// <summary>
+        /// Runs one test in a runtime of its own: a fresh player at 80 hp and 3 energy, seed 1, and a
+        /// tick clock only if the test says <c>realtime</c>. Nothing carries over between tests, which
+        /// is why the order they run in cannot matter.
+        /// </summary>
+        /// <remarks>
+        /// It does not throw. Anything that goes wrong — content that will not load into a runtime, a
+        /// runtime error mid-test, a choice the test did not answer — comes back as a result with
+        /// <see cref="DslTestResult.Passed"/> false and the reason in
+        /// <see cref="DslTestResult.Failure"/>.
+        /// </remarks>
         public DslTestResult Run(TestDefinition test)
         {
             BlockNode body = test.Syntax.Body;

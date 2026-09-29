@@ -19,6 +19,10 @@ namespace Cantrip.Descriptions
         Override,
     }
 
+    /// <summary>
+    /// Whether a run of a description is fixed words or a number the rules worked out. It is the
+    /// distinction a UI needs to colour one and not the other.
+    /// </summary>
     public enum SegmentKind
     {
         /// <summary>Words, punctuation and anything else that never changes.</summary>
@@ -31,6 +35,7 @@ namespace Cantrip.Descriptions
     /// <summary>How the modifier pipeline moved a value, from the point of view of whoever uses the entity.</summary>
     public enum ValueTrend
     {
+        /// <summary>No modifier touched this value, so the printed number is the real one.</summary>
         Unchanged,
 
         /// <summary>Better than printed: more damage, or a lower cost.</summary>
@@ -66,6 +71,10 @@ namespace Cantrip.Descriptions
             LowerIsBetter = lowerIsBetter;
         }
 
+        /// <summary>
+        /// A run of fixed words. Games build these when they assemble text of their own around a
+        /// description; everything inside a description is built by the description builder.
+        /// </summary>
         public static DescriptionSegment Plain(string text) =>
             new DescriptionSegment(SegmentKind.Text, text ?? string.Empty, null, false, Num.Zero, Num.Zero, null, false);
 
@@ -80,6 +89,10 @@ namespace Cantrip.Descriptions
         public static DescriptionSegment Symbol(string text, string? placeholder = null) =>
             new DescriptionSegment(SegmentKind.Value, text ?? string.Empty, placeholder, false, Num.Zero, Num.Zero, null, false);
 
+        /// <summary>
+        /// Whether this run is words or a value. Note that a value is not always a number — see
+        /// <see cref="HasNumber"/>, which is false for symbolic ones such as <c>X</c>.
+        /// </summary>
         public SegmentKind Kind { get; }
 
         /// <summary>What is shown: the words, or the current value formatted for display.</summary>
@@ -88,6 +101,11 @@ namespace Cantrip.Descriptions
         /// <summary>The placeholder this value is linked to (<c>damage</c>, <c>Poison</c>...), if any.</summary>
         public string? Placeholder { get; }
 
+        /// <summary>
+        /// Whether this value is tied to a named part of the effect, and can therefore be looked up with
+        /// <see cref="Description.Find"/>. Automatic text links everything it generates; a writer's
+        /// <c>text:</c> links whatever its <c>{placeholders}</c> name.
+        /// </summary>
         public bool IsLinked => Placeholder != null;
 
         /// <summary>False for symbolic values such as <c>X</c>, which carry only their <see cref="Text"/>.</summary>
@@ -105,8 +123,19 @@ namespace Cantrip.Descriptions
         /// <summary>True for costs, where a smaller number is the good direction.</summary>
         public bool LowerIsBetter { get; }
 
+        /// <summary>
+        /// Whether a modifier has moved this number away from the printed one, which is what
+        /// <see cref="Description.ToMarkup"/> strikes through. Always false for a symbolic value, which
+        /// has no number to compare.
+        /// </summary>
         public bool IsChanged => HasNumber && Base != Current;
 
+        /// <summary>
+        /// Which way the change went for whoever holds the entity, with costs already accounted for: a
+        /// cost that went down is <see cref="ValueTrend.Buffed"/>, not decreased. Colour from this
+        /// rather than from comparing <see cref="Current"/> with <see cref="Base"/>, which gets a cost
+        /// backwards.
+        /// </summary>
         public ValueTrend Trend
         {
             get
@@ -120,6 +149,7 @@ namespace Cantrip.Descriptions
         /// <summary>The printed value, for "~~6~~ 9" style displays.</summary>
         public string BaseText => HasNumber ? Format(Base, Unit) : Text;
 
+        /// <summary>What is shown, which for a value is the current number and not the printed one.</summary>
         public override string ToString() => Text;
 
         internal static string Format(Num value, string? unit) =>
@@ -135,8 +165,10 @@ namespace Cantrip.Descriptions
             Description = description;
         }
 
+        /// <summary>The keyword or status this explains, so a UI can key an icon or a lookup off it.</summary>
         public EntityDefinition Definition { get; }
 
+        /// <summary>The keyword's display name, localized. This is what the text being explained says.</summary>
         public string Name => Description.Name;
 
         /// <summary>
@@ -146,6 +178,7 @@ namespace Cantrip.Descriptions
         /// </summary>
         public Description Description { get; }
 
+        /// <summary>The tooltip on one line, for a log or a test. A UI wants <see cref="Description"/>, which keeps the values apart.</summary>
         public override string ToString() => Name + ": " + Description.ToPlainText();
     }
 
@@ -189,15 +222,33 @@ namespace Cantrip.Descriptions
         /// </remarks>
         public string? Against { get; }
 
+        /// <summary>
+        /// What this describes, or null for a description built from something other than a definition,
+        /// such as an enemy's rolled intent.
+        /// </summary>
         public EntityDefinition? Definition { get; }
 
+        /// <summary>
+        /// Which of the three levels produced this text. Worth checking before offering a designer's
+        /// tooling: at <see cref="DescriptionLevel.Override"/> the values are not live, so nothing in
+        /// <see cref="Values"/> will change however the game goes.
+        /// </summary>
         public DescriptionLevel Level { get; }
 
+        /// <summary>
+        /// The text in order, split so that values can be drawn differently from the words around them.
+        /// Concatenating their <see cref="DescriptionSegment.Text"/> is <see cref="ToPlainText"/>.
+        /// </summary>
         public IReadOnlyList<DescriptionSegment> Segments { get; }
 
         /// <summary>The flavour line. Never mixed into the rules text.</summary>
         public string? Flavour { get; }
 
+        /// <summary>
+        /// One entry for every keyword or status the text relies on, flattened: a keyword that mentions
+        /// another appears once here rather than nested, so a UI can show them as a flat list without
+        /// walking a tree or guarding against a cycle.
+        /// </summary>
         public IReadOnlyList<KeywordTooltip> Tooltips { get; }
 
         /// <summary>
@@ -206,8 +257,16 @@ namespace Cantrip.Descriptions
         /// </summary>
         public DescriptionSegment? Cost { get; }
 
+        /// <summary>
+        /// Just the values, in order — the numbers a tooltip or a comparison view wants without the
+        /// prose. Evaluated on each enumeration.
+        /// </summary>
         public IEnumerable<DescriptionSegment> Values => Segments.Where(s => s.Kind == SegmentKind.Value);
 
+        /// <summary>
+        /// Whether there is anything to show. True for a definition with no effect, no listeners and no
+        /// modifiers — a vanilla card — so a UI can leave the rules box out rather than draw an empty one.
+        /// </summary>
         public bool IsEmpty => Segments.All(s => s.Text.Length == 0);
 
         /// <summary>The first value in the text linked to <paramref name="placeholder"/>, if any.</summary>
@@ -252,6 +311,7 @@ namespace Cantrip.Descriptions
             return text.ToString();
         }
 
+        /// <summary>The same as <see cref="ToPlainText"/>: the current values, no markup, no name and no target.</summary>
         public override string ToString() => ToPlainText();
     }
 }

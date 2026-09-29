@@ -22,9 +22,20 @@ namespace Cantrip
     /// </summary>
     public enum ModifierLayer
     {
+        /// <summary>Flat addition: <c>+2</c>. Everything on this layer sums, in no particular order.</summary>
         Add,
+
+        /// <summary>Scaling: <c>x150%</c>. Applied to whatever the add layer left, so a flat bonus is scaled too.</summary>
         Multiply,
+
+        /// <summary>A floor or a ceiling. It runs after the arithmetic, so it is the last word on the number — unless something overrides it.</summary>
         Clamp,
+
+        /// <summary>
+        /// A fixed result that replaces everything before it, clamp included. Last in the default order
+        /// and therefore the strongest thing a modifier can say; two overrides on one value is a
+        /// content bug the linter cannot see, and the later one wins.
+        /// </summary>
         Override,
     }
 
@@ -53,8 +64,17 @@ namespace Cantrip
     /// <summary>Which side an actor is on. Kept deliberately simple; games can layer factions on top.</summary>
     public enum Team
     {
+        /// <summary>
+        /// On nobody's side. It is the default for cards, statuses and relics, which take their side
+        /// from whoever holds them rather than carrying one; an actor on this team is fought by neither
+        /// side and ends no battle by dying.
+        /// </summary>
         Neutral = 0,
+
+        /// <summary>The party's side: the leader, the heroes beside it, and anything they summon that fights for them.</summary>
         Player = 1,
+
+        /// <summary>The other side. A battle ends when this side has no living actor left on the board.</summary>
         Enemy = 2,
     }
 
@@ -62,23 +82,58 @@ namespace Cantrip
     public enum EntityKind
     {
         // Saved games store these as numbers: never renumber or reuse one, only add.
+        /// <summary>
+        /// Something that takes part in the fight and has hp: the leader, a <c>hero</c>, an
+        /// <c>enemy</c>, a summon. Both <c>hero</c> and <c>enemy</c> declarations land here — the side
+        /// is <see cref="Team"/>, not the kind.
+        /// </summary>
         Actor = 0,
+
+        /// <summary>Something played from a hand and paid for. The only kind <c>CardRuntime.Play(Entity, Entity, Entity)</c> accepts.</summary>
         Card = 1,
+
+        /// <summary>A timed or stacking effect attached to an actor. Its count is the <c>stacks</c> stat, not a separate number.</summary>
         Status = 2,
+
+        /// <summary>A permanent held by an actor, live from the moment it is obtained until the run ends.</summary>
         Relic = 3,
+
+        /// <summary>
+        /// Something an actor uses directly rather than playing from hand: the real-time verb. It has a
+        /// cooldown instead of a cost, which is why <c>ActionResult.NotEnoughEnergy</c> never comes back
+        /// from using one.
+        /// </summary>
         Ability = 4,
+
+        /// <summary>A named rule with a tooltip, attached like a status but with no stacks or duration of its own.</summary>
         Keyword = 5,
+
+        /// <summary>A consumable. It behaves as a relic does in every way the engine cares about; the distinction is the game's.</summary>
         Item = 6,
+
+        /// <summary>
+        /// Anything else, and what an unrecognised declaration becomes rather than failing to load.
+        /// A definition that ended up here when it should not have is usually a misspelled kind word.
+        /// </summary>
         Global = 7,
     }
 
-    /// <summary>Pacing of the action queue.</summary>
+    /// <summary>
+    /// Pacing of the action queue — a setting the engine carries and does not act on.
+    /// </summary>
+    /// <remarks>
+    /// Only the tree-walking interpreter exists in 1.0, and it always drains the queue. The value
+    /// is kept on <see cref="RuntimeOptions.Execution"/> and <see cref="CardRuntime.Execution"/>
+    /// so a game can record what it meant and a later release can honour it without a breaking
+    /// change, but today the two modes run identically. A game that wants an animation between
+    /// actions paces its own presentation from the events it hears.
+    /// </remarks>
     public enum ExecutionMode
     {
-        /// <summary>Drain the queue as fast as possible. Used by simulations and tests.</summary>
+        /// <summary>Drain the queue as fast as possible. What simulations and tests want, and what every runtime does.</summary>
         Headless,
 
-        /// <summary>Yield between actions so presentation can keep up.</summary>
+        /// <summary>Yield between actions so presentation can keep up. Recorded, not yet honoured.</summary>
         Live,
     }
 }

@@ -15,7 +15,7 @@ Part of [the API reference](README.md). The guides are [docs/csharp.md](../cshar
 | [`EnglishDescriptions`](#englishdescriptions) | The built-in English phrases. Subclass it to change a few phrases, or implement `IDescriptionLocalizer` directly for a full translation. |
 | [`IDescriptionLocalizer`](#idescriptionlocalizer) | Supplies descriptions in another language. The library owns the templates and placeholders; a game owns the translations. Return null from any member to fall back to the content's own text or the built-in English phrase. |
 | [`KeywordTooltip`](#keywordtooltip) | A generated explanation of a status or keyword the described entity refers to. |
-| [`SegmentKind`](#segmentkind) | *Undocumented.* |
+| [`SegmentKind`](#segmentkind) | Whether a run of a description is fixed words or a number the rules worked out. It is the distinction a UI needs to colour one and not the other. |
 | [`ValueTrend`](#valuetrend) | How the modifier pipeline moved a value, from the point of view of whoever uses the entity. |
 
 ---
@@ -48,7 +48,7 @@ The card's cost as a live value, for the corner of the card frame, or null when 
 public EntityDefinition? Definition { get; }
 ```
 
-*Undocumented.*
+What this describes, or null for a description built from something other than a definition, such as an enemy's rolled intent.
 
 ```csharp
 public string? Flavour { get; }
@@ -60,13 +60,13 @@ The flavour line. Never mixed into the rules text.
 public bool IsEmpty { get; }
 ```
 
-*Undocumented.*
+Whether there is anything to show. True for a definition with no effect, no listeners and no modifiers — a vanilla card — so a UI can leave the rules box out rather than draw an empty one.
 
 ```csharp
 public DescriptionLevel Level { get; }
 ```
 
-*Undocumented.*
+Which of the three levels produced this text. Worth checking before offering a designer's tooling: at `DescriptionLevel.Override` the values are not live, so nothing in `Description.Values` will change however the game goes.
 
 ```csharp
 public string Name { get; }
@@ -78,19 +78,19 @@ Display name, localized when the localizer supplies one.
 public IReadOnlyList<DescriptionSegment> Segments { get; }
 ```
 
-*Undocumented.*
+The text in order, split so that values can be drawn differently from the words around them. Concatenating their `DescriptionSegment.Text` is `Description.ToPlainText`.
 
 ```csharp
 public IReadOnlyList<KeywordTooltip> Tooltips { get; }
 ```
 
-*Undocumented.*
+One entry for every keyword or status the text relies on, flattened: a keyword that mentions another appears once here rather than nested, so a UI can show them as a flat list without walking a tree or guarding against a cycle.
 
 ```csharp
 public IEnumerable<DescriptionSegment> Values { get; }
 ```
 
-*Undocumented.*
+Just the values, in order — the numbers a tooltip or a comparison view wants without the prose. Evaluated on each enumeration.
 
 ### Methods
 
@@ -122,7 +122,7 @@ The text with current values, for logs, tests and plain labels.
 public override string ToString()
 ```
 
-*Undocumented.*
+The same as `Description.ToPlainText`: the current values, no markup, no name and no target.
 
 ---
 
@@ -140,7 +140,12 @@ Builds descriptions for every kind of entity. One walk over a definition's effec
 public DescriptionBuilder(ContentLibrary content, IDescriptionLocalizer? localizer = null)
 ```
 
-*Undocumented.*
+A builder over a loaded library. It is reusable and holds no per-description state, so a game makes one and keeps it.
+
+**Parameters.**
+
+- `content` — The library whose definitions will be described.
+- `localizer` — Where names, rules text and phrases come from. Null uses `EnglishDescriptions.Instance`. The localizer is consulted on every build, so switching language means making a new builder rather than rebuilding the content.
 
 ### Fields and constants
 
@@ -148,19 +153,19 @@ public DescriptionBuilder(ContentLibrary content, IDescriptionLocalizer? localiz
 public const string IgnoredText = "CT403"
 ```
 
-*Undocumented.*
+Note: a `text:` that is never shown, because the same definition also sets `text_override:`.
 
 ```csharp
 public const string StaleText = "CT402"
 ```
 
-*Undocumented.*
+Warning: the effect has changed since the `text_checked` hash was recorded, so the hand-written text may now describe something the card no longer does.
 
 ```csharp
 public const string UnknownPlaceholder = "CT401"
 ```
 
-*Undocumented.*
+Warning: a `{placeholder}` in a writer's `text:` that matches nothing in the effect, so it is shown as written.
 
 ### Methods
 
@@ -264,19 +269,19 @@ False for symbolic values such as `X`, which carry only their `DescriptionSegmen
 public bool IsChanged { get; }
 ```
 
-*Undocumented.*
+Whether a modifier has moved this number away from the printed one, which is what `Description.ToMarkup` strikes through. Always false for a symbolic value, which has no number to compare.
 
 ```csharp
 public bool IsLinked { get; }
 ```
 
-*Undocumented.*
+Whether this value is tied to a named part of the effect, and can therefore be looked up with `Description.Find(string)`. Automatic text links everything it generates; a writer's `text:` links whatever its `{placeholders}` name.
 
 ```csharp
 public SegmentKind Kind { get; }
 ```
 
-*Undocumented.*
+Whether this run is words or a value. Note that a value is not always a number — see `DescriptionSegment.HasNumber`, which is false for symbolic ones such as `X`.
 
 ```csharp
 public bool LowerIsBetter { get; }
@@ -300,7 +305,7 @@ What is shown: the words, or the current value formatted for display.
 public ValueTrend Trend { get; }
 ```
 
-*Undocumented.*
+Which way the change went for whoever holds the entity, with costs already accounted for: a cost that went down is `ValueTrend.Buffed`, not decreased. Colour from this rather than from comparing `DescriptionSegment.Current` with `DescriptionSegment.Base`, which gets a cost backwards.
 
 ```csharp
 public string? Unit { get; }
@@ -320,7 +325,7 @@ A computed value. `baseValue` is what it is before any modifier applies.
 public static DescriptionSegment Plain(string text)
 ```
 
-*Undocumented.*
+A run of fixed words. Games build these when they assemble text of their own around a description; everything inside a description is built by the description builder.
 
 ```csharp
 public static DescriptionSegment Symbol(string text, string? placeholder = null)
@@ -332,7 +337,7 @@ A value that cannot be known until the effect runs, such as the stacks of a stat
 public override string ToString()
 ```
 
-*Undocumented.*
+What is shown, which for a value is the current number and not the printed one.
 
 ---
 
@@ -350,7 +355,7 @@ The built-in English phrases. Subclass it to change a few phrases, or implement 
 public static readonly EnglishDescriptions Instance
 ```
 
-*Undocumented.*
+The shared instance, which a builder given no localizer uses. It holds no state, so one is enough; a subclass that overrides a few phrases makes its own.
 
 ### Properties
 
@@ -366,25 +371,25 @@ Every phrase key, for translators.
 public virtual string? Flavour(EntityDefinition definition)
 ```
 
-*Undocumented.*
+Null, so the definition's own flavour line is used.
 
 ```csharp
 public virtual string? Name(EntityDefinition definition)
 ```
 
-*Undocumented.*
+Null, so the definition's own name is used. Override it to rename things without touching content.
 
 ```csharp
 public virtual string? Phrase(string key)
 ```
 
-*Undocumented.*
+The built-in English phrase for a key, or null for a key that has none. This is the one member that does not default to null, which is why subclassing this class rather than implementing the interface gives a translation that still reads correctly where it is incomplete.
 
 ```csharp
 public virtual string? Text(EntityDefinition definition)
 ```
 
-*Undocumented.*
+Null, so the definition's own `text:` or generated text is used.
 
 ---
 
@@ -404,7 +409,7 @@ Every member defaults to null, which is "I have no translation for this", so a l
 virtual string? Flavour(EntityDefinition definition)
 ```
 
-*Undocumented.*
+The flavour line in this language. It is kept apart from the rules text and never mixed into it, so a translation can drop it entirely by returning an empty string.
 
 ```csharp
 virtual string? Name(EntityDefinition definition)
@@ -442,7 +447,7 @@ A generated explanation of a status or keyword the described entity refers to.
 public EntityDefinition Definition { get; }
 ```
 
-*Undocumented.*
+The keyword or status this explains, so a UI can key an icon or a lookup off it.
 
 ```csharp
 public Description Description { get; }
@@ -454,7 +459,7 @@ The keyword's own description. Its `Description.Tooltips` is empty: keywords it 
 public string Name { get; }
 ```
 
-*Undocumented.*
+The keyword's display name, localized. This is what the text being explained says.
 
 ### Methods
 
@@ -462,7 +467,7 @@ public string Name { get; }
 public override string ToString()
 ```
 
-*Undocumented.*
+The tooltip on one line, for a log or a test. A UI wants `KeywordTooltip.Description`, which keeps the values apart.
 
 ---
 
@@ -472,7 +477,7 @@ public override string ToString()
 public enum SegmentKind
 ```
 
-*Undocumented.*
+Whether a run of a description is fixed words or a number the rules worked out. It is the distinction a UI needs to colour one and not the other.
 
 | Member | |
 |---|---|
@@ -491,7 +496,7 @@ How the modifier pipeline moved a value, from the point of view of whoever uses 
 
 | Member | |
 |---|---|
-| `Unchanged = 0` | *Undocumented.* |
+| `Unchanged = 0` | No modifier touched this value, so the printed number is the real one. |
 | `Buffed = 1` | Better than printed: more damage, or a lower cost. |
 | `Debuffed = 2` | Worse than printed: less damage, or a higher cost. |
 

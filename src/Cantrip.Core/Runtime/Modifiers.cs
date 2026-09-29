@@ -16,15 +16,28 @@ namespace Cantrip.Runtime
             Order = order;
         }
 
+        /// <summary>A number unique within this game, stable while the modifier is registered. It is not saved.</summary>
         public int Id { get; }
+
+        /// <summary>The entity whose declaration this came from. Its controller is what the bare, unscoped form of the modifier is anchored to.</summary>
         public Entity Owner { get; }
+
+        /// <summary>The parsed <c>modify</c> line, for a tool that needs the scope, the filter or the span.</summary>
         public ModifyNode Syntax { get; }
+
+        /// <summary>
+        /// What this modifies: a stat name, or an action channel such as <c>damage</c> or <c>cost</c>.
+        /// Which end of an action an <c>of</c> group names is the channel's decision, not the modifier's.
+        /// </summary>
         public string Channel => Syntax.Channel;
+
+        /// <summary>Which layer of the pipeline it applies in, taken from how the amount was written: <c>+2</c> adds, <c>x150%</c> multiplies, <c>set 1</c> overrides.</summary>
         public ModifierLayer Layer => Syntax.Layer;
 
         /// <summary>Registration order. Within the override layer the latest modifier wins.</summary>
         public long Order { get; }
 
+        /// <summary>The owner and the channel, for a log or an inspector.</summary>
         public override string ToString() => $"{Owner.Name}: modify {Channel}";
     }
 
@@ -36,8 +49,14 @@ namespace Cantrip.Runtime
     {
         private static readonly IReadOnlyCollection<string> NoTags = new string[0];
 
+        /// <summary>
+        /// A question for the pipeline. Set <see cref="Subject"/> at least; for an action channel set
+        /// <see cref="Source"/>, <see cref="Card"/> and <see cref="Tags"/> too, or filters that look at
+        /// them will not match.
+        /// </summary>
         public ModifierQuery(string channel) => Channel = channel;
 
+        /// <summary>The stat or action channel being computed.</summary>
         public string Channel { get; }
 
         /// <summary>The entity whose value this is: the stat holder, the damage target, the card whose cost is read.</summary>
@@ -46,14 +65,20 @@ namespace Cantrip.Runtime
         /// <summary>Who is acting: the attacker for <c>damage</c>, the healer for <c>heal</c>.</summary>
         public Entity? Source { get; set; }
 
+        /// <summary>The card the action came from, when there is one, so a <c>card:</c> filter has something to read.</summary>
         public Entity? Card { get; set; }
 
+        /// <summary>
+        /// The action's own tags — <c>fire</c> on fire damage — which a <c>tag:</c> filter tests. Empty
+        /// rather than null by default, so a filter never has to guard.
+        /// </summary>
         public IReadOnlyCollection<string> Tags { get; set; } = NoTags;
     }
 
     /// <summary>One step of a modifier breakdown, for the "base 6 → +3 Strength → ×1.5 Codex → 13" view.</summary>
     public readonly struct ModifierStep
     {
+        /// <summary>Records one modifier's effect on a value. Built by the pipeline; a game reads these rather than making them.</summary>
         public ModifierStep(Modifier modifier, Num amount, Num before, Num after)
         {
             Modifier = modifier;
@@ -62,11 +87,19 @@ namespace Cantrip.Runtime
             After = after;
         }
 
+        /// <summary>Which modifier this step was, so a breakdown can name the relic or status responsible.</summary>
         public Modifier Modifier { get; }
+
+        /// <summary>What the modifier said, in its own terms: the addend, the multiplier, the override value. Not the difference it made.</summary>
         public Num Amount { get; }
+
+        /// <summary>The running value going in.</summary>
         public Num Before { get; }
+
+        /// <summary>The running value coming out. <c>After - Before</c> is the difference this step actually made, which for a clamp may be zero.</summary>
         public Num After { get; }
 
+        /// <summary>The step as a breakdown line: <c>+3 Strength</c>, <c>×1.5 Codex</c>, <c>clamp Ward</c>.</summary>
         public override string ToString()
         {
             string op = Modifier.Layer switch
@@ -81,6 +114,10 @@ namespace Cantrip.Runtime
         }
     }
 
+    /// <summary>
+    /// A value and everything that was done to it: what a "base 6 → +3 Strength → ×1.5 Codex → 13"
+    /// tooltip is drawn from.
+    /// </summary>
     public sealed class ModifierResult
     {
         internal ModifierResult(Num baseValue, Num final, IReadOnlyList<ModifierStep> steps)
@@ -90,10 +127,20 @@ namespace Cantrip.Runtime
             Steps = steps;
         }
 
+        /// <summary>The value before any modifier: the printed number.</summary>
         public Num Base { get; }
+
+        /// <summary>The value after every step, which is what the rules use.</summary>
         public Num Final { get; }
+
+        /// <summary>
+        /// Every modifier that applied, in the order they were applied. A modifier whose filter did not
+        /// match is not here at all, which is why an empty list and an unchanged value mean the same
+        /// thing to a reader and different things to a designer hunting a rule that is not firing.
+        /// </summary>
         public IReadOnlyList<ModifierStep> Steps { get; }
 
+        /// <summary>The whole breakdown on one line, as a trace prints it.</summary>
         public override string ToString()
         {
             var text = new StringBuilder("base ").Append(Base);
@@ -106,8 +153,13 @@ namespace Cantrip.Runtime
     /// <summary>Evaluates a modifier's scope, filter and amount. Implemented by the interpreter.</summary>
     public interface IModifierEvaluator
     {
+        /// <summary>Whether this modifier's scope and filter match the value being computed.</summary>
         bool Applies(Modifier modifier, ModifierQuery query);
 
+        /// <summary>
+        /// What the modifier's right-hand side evaluates to for this query. It is evaluated per query,
+        /// not once, because an amount may read the owner's stats.
+        /// </summary>
         Value Amount(Modifier modifier, ModifierQuery query);
     }
 
@@ -136,6 +188,7 @@ namespace Cantrip.Runtime
         /// </summary>
         public IModifierEvaluator? Evaluator { get; internal set; }
 
+        /// <summary>How many modifiers are registered, across every channel and owner.</summary>
         public int Count { get; private set; }
 
         /// <summary>Stat reads served from the cache. Exposed for profiling and tests.</summary>
@@ -184,9 +237,17 @@ namespace Cantrip.Runtime
         public IReadOnlyList<Modifier> OwnedBy(Entity owner) =>
             _byOwner.TryGetValue(owner.Id, out List<Modifier>? owned) ? owned : (IReadOnlyList<Modifier>)Array.Empty<Modifier>();
 
+        /// <summary>
+        /// Every modifier registered on a channel, in registration order — not the order they are
+        /// applied in, which the layers decide. Empty for a channel nothing modifies.
+        /// </summary>
         public IReadOnlyList<Modifier> OnChannel(string channel) =>
             _byChannel.TryGetValue(channel, out List<Modifier>? list) ? list : (IReadOnlyList<Modifier>)Array.Empty<Modifier>();
 
+        /// <summary>
+        /// Whether anything at all modifies this channel, which is the cheap pre-check before building a
+        /// query. It says nothing about whether any of them would match.
+        /// </summary>
         public bool HasChannel(string channel) => _byChannel.TryGetValue(channel, out List<Modifier>? list) && list.Count > 0;
 
         /// <summary>Computes a stat through the pipeline, using the cache when state has not changed.</summary>

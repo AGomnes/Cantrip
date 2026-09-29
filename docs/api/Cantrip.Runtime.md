@@ -21,7 +21,7 @@ Part of [the API reference](README.md). The guides are [docs/csharp.md](../cshar
 | [`DefinitionChoice`](#definitionchoice) | An offer of content that does not exist yet: the three cards a Discover shows before one of them is made. Kept apart from `ChoiceRequest`, whose options are live entities addressed by id all the way out to the editor bridge. |
 | [`EffectHostBase`](#effecthostbase) | A host that adds nothing. The default, and a convenience: since every member of `IEffectHost` has a default of its own, a host can implement the interface directly and override only what it needs. |
 | [`Entity`](#entity) | Everything in the game is an entity: actors, cards, relics, statuses and keywords all share tags, stats and listeners. A status on an actor is itself an entity, attached to that actor, whose `stacks` is an ordinary stat. That is what lets `stacks -1` and `remove tag:dot` work without special cases. |
-| [`EntitySnapshot`](#entitysnapshot) | *Undocumented.* |
+| [`EntitySnapshot`](#entitysnapshot) | One entity as plain data. It is a record of what the entity *is*, not of what it computes: stats are stored before modifiers, since the modifiers are restored with it and would otherwise be applied twice. |
 | [`EvalContext`](#evalcontext) | Everything an expression or statement can see while it runs: who is acting, on whom, which event triggered it, and its local variables. |
 | [`EventBus`](#eventbus) | Holds every active listener and answers "who hears this event, in what order". It does not execute anything; the interpreter does, which keeps dispatch policy in one place. |
 | [`FirstOptionChooser`](#firstoptionchooser) | Always takes the first options offered. Deterministic, and the default. |
@@ -36,12 +36,12 @@ Part of [the API reference](README.md). The guides are [docs/csharp.md](../cshar
 | [`Listener`](#listener) | A registered `on ...:` block, bound to the entity that declared it. |
 | [`ListenerDueSnapshot`](#listenerduesnapshot) | When an `on every ...:` listener of one entity is next due to fire. |
 | [`ListenerLimitSnapshot`](#listenerlimitsnapshot) | A `once per ...` window already used by one listener of one entity. |
-| [`ListenerOrdering`](#listenerordering) | *Undocumented.* |
-| [`LoopProtection`](#loopprotection) | *Undocumented.* |
+| [`ListenerOrdering`](#listenerordering) | One tie-break in the order listeners run. The ruleset lists several, applied in turn, and an id comparison settles whatever is left — so the order never depends on a dictionary and a replay always agrees. |
+| [`LoopProtection`](#loopprotection) | What stops a chain of reactions from running for ever. It is a ruleset setting because the two answers suit different games, not because one is a bug. |
 | [`Modifier`](#modifier) | An active `modify` line, bound to the entity that declared it. |
 | [`ModifierPipeline`](#modifierpipeline) | The modifier pipeline. Values pass through fixed layers in ruleset order (add, multiply, clamp, override by default). Stat reads are cached and the cache is dropped whenever `GameState.Version` moves, which covers every mutation that could change a modifier's scope, filter or amount. |
 | [`ModifierQuery`](#modifierquery) | What a value is being computed for. Stats use only `ModifierQuery.Subject`; action channels such as `damage` also carry the source, the card and the action's tags. |
-| [`ModifierResult`](#modifierresult) | *Undocumented.* |
+| [`ModifierResult`](#modifierresult) | A value and everything that was done to it: what a "base 6 → +3 Strength → ×1.5 Codex → 13" tooltip is drawn from. |
 | [`ModifierStep`](#modifierstep) | One step of a modifier breakdown, for the "base 6 → +3 Strength → ×1.5 Codex → 13" view. |
 | [`NewListeners`](#newlisteners) | Whether a listener that comes into play during an event hears that event. |
 | [`OfferPendingException`](#offerpendingexception) | Raised by `DeferredChooser` when content offers a choice of content that does not exist yet, as `discover` does, and the game has not answered it. Handled exactly like `ChoicePendingException`. |
@@ -52,22 +52,22 @@ Part of [the API reference](README.md). The guides are [docs/csharp.md](../cshar
 | [`RandomChooser`](#randomchooser) | Picks uniformly at random from its own forked RNG stream, so it never disturbs game rolls. |
 | [`Ruleset`](#ruleset) | Rules that content is written against. These change results, so they live in content where mod authors can see them, unlike execution speed which lives in code. |
 | [`RuntimeError`](#runtimeerror) | Raised for errors in content at runtime, carrying the offending source location. |
-| [`ScheduleTiming`](#scheduletiming) | *Undocumented.* |
+| [`ScheduleTiming`](#scheduletiming) | What makes a piece of deferred work come due. It is saved with the game, so the numbers are fixed for the whole 1.x line. |
 | [`ScheduledAction`](#scheduledaction) | Deferred work from `next turn:`, `in 2 turns:` and `until turn_end:`. |
-| [`ScheduledSnapshot`](#scheduledsnapshot) | *Undocumented.* |
+| [`ScheduledSnapshot`](#scheduledsnapshot) | One piece of deferred work as plain data. The block itself is not written: it is found again by its address in content, which is why content that has changed underneath a save can make a restore refuse. |
 | [`ScriptedChooser`](#scriptedchooser) | Answers from a queue of names, for tests and replays. Each answer is a comma-separated list of entity names; when the queue runs dry it falls back to the first options. |
 | [`TemporaryChange`](#temporarychange) | One thing an `until` block did, so it can be reverted at the deadline. |
 | [`TickClock`](#tickclock) | Fixed-timestep clock for real-time games. Advance it from the engine's physics step, never from the render frame, so that simulation results do not depend on frame rate. |
 | [`TraceEntry`](#traceentry) | One recorded step. Every action records what caused it, which is the foundation for the causality tree, modifier breakdowns and replays. |
 | [`TraceLog`](#tracelog) | Causality log. Disabled by default and free when disabled: every recording site checks `TraceLog.Enabled` before allocating anything. |
 | [`TriggerBreakpoints`](#triggerbreakpoints) | Where a game should stop before resolving a queued trigger. |
-| [`TriggerResolution`](#triggerresolution) | *Undocumented.* |
+| [`TriggerResolution`](#triggerresolution) | When an after-phase listener runs: at the end of the action that set it off, or in the middle of it. It changes the order everything happens in, so it is not a setting to change mid-project. |
 | [`TurnClock`](#turnclock) | One unit per turn. The default for turn-based games. |
 | [`TurnMode`](#turnmode) | Whether the party takes one turn between them or every combatant takes its own step in one interleaved order. |
-| [`UndoSnapshot`](#undosnapshot) | *Undocumented.* |
+| [`UndoSnapshot`](#undosnapshot) | One reversible change an `until` block made, as plain data — the saved form of `TemporaryChange`. |
 | [`Value`](#value) | The dynamically typed value the interpreter passes around. Numbers are always `Num` so that evaluation stays deterministic. |
-| [`ValueKind`](#valuekind) | *Undocumented.* |
-| [`ValueSnapshot`](#valuesnapshot) | *Undocumented.* |
+| [`ValueKind`](#valuekind) | What a `Value` is holding. Worth branching on rather than guessing: several kinds carry a number and only `ValueKind.Number` is one. |
+| [`ValueSnapshot`](#valuesnapshot) | One `Value` as plain data. Entities are stored as ids, definitions as kind and name, and numbers as raw `Num` longs, so nothing in here is a live object. |
 | [`VerbCall`](#verbcall) | A verb invocation as seen by its implementation: lazy access to the positional arguments and named clauses written in content, plus the context it runs in. |
 | [`VerbHandler`](#verbhandler) | Implementation of a built-in or host-registered verb. |
 | [`ZoneSnapshot`](#zonesnapshot) | One owner's zone and what is in it, in order. |
@@ -106,7 +106,7 @@ The shape of the board a save was written on, as `BoardShape` means it. Written 
 public int Lanes { get; set; }
 ```
 
-*Undocumented.*
+Slots across. One in a save from before boards had two axes, which is what every such game was played on.
 
 ```csharp
 public int Metric { get; set; }
@@ -202,7 +202,7 @@ What `event.target`, `event.source`, `event.amount` and friends carry.
 public string Name { get; }
 ```
 
-*Undocumented.*
+The name a listener writes, without a phase prefix.
 
 ### Methods
 
@@ -210,7 +210,7 @@ public string Name { get; }
 public override string ToString()
 ```
 
-*Undocumented.*
+The event's name.
 
 ---
 
@@ -230,133 +230,133 @@ Two families are open-ended and therefore not listed by name: `<stat>_changed`, 
 public const string AbilityUsed = "ability_used"
 ```
 
-*Undocumented.*
+An ability was used. `data.ability` is which one; this is the real-time counterpart of `BuiltinEvents.CardPlayed`.
 
 ```csharp
 public const string BattleEnd = "battle_end"
 ```
 
-*Undocumented.*
+The battle ended. `target` is the player and `data.won` says which way it went.
 
 ```csharp
 public const string BattleStart = "battle_start"
 ```
 
-*Undocumented.*
+A battle began. It fires in a real-time game too, unlike the turn events.
 
 ```csharp
 public const string Blocked = "blocked"
 ```
 
-*Undocumented.*
+Block absorbed part of a hit. `amount` is how much was blocked, not what got through.
 
 ```csharp
 public const string CardPlayed = "card_played"
 ```
 
-*Undocumented.*
+A card was played. `source` is the member who performed it, which in a party is not necessarily the leader who paid for it; `amount` is the energy paid.
 
 ```csharp
 public const string Created = "created"
 ```
 
-*Undocumented.*
+Something arrived: `create`, `copy`, or a spawn the host made. It is an announcement and not a gate — the thing is already in the game — which is what an enemy's own arrival effect is written on.
 
 ```csharp
 public const string Damaged = "damaged"
 ```
 
-*Undocumented.*
+A hit landed. `target` took it, `source` dealt it, and `amount` is hp actually lost *after* block — not what the card said.
 
 ```csharp
 public const string Destroyed = "destroyed"
 ```
 
-*Undocumented.*
+Something was taken out of the game. Not the same as `BuiltinEvents.Killed`, which is about an actor's hp.
 
 ```csharp
 public const string Died = "died"
 ```
 
-*Undocumented.*
+An actor is dying, and can still be saved: `instead_of_died` prevents it. The dying actor's own listeners still hear this.
 
 ```csharp
 public const string Discarded = "discarded"
 ```
 
-*Undocumented.*
+A card went to the discard pile — including one drawn into a hand that was already full.
 
 ```csharp
 public const string Drawn = "drawn"
 ```
 
-*Undocumented.*
+A card reached the hand. Its tags are the event's tags, so `on drawn(tag:curse)` works.
 
 ```csharp
 public const string Every = "every"
 ```
 
-*Undocumented.*
+The interval of an `on every ...:` listener elapsed. Raised only for the listener whose time has come and never broadcast, so `on every` in one place cannot be heard in another.
 
 ```csharp
 public const string Exhausted = "exhausted"
 ```
 
-*Undocumented.*
+A card left the battle for good. A shuffle will not bring it back.
 
 ```csharp
 public const string GainedBlock = "gained_block"
 ```
 
-*Undocumented.*
+`amount` is block actually gained, after any modifier.
 
 ```csharp
 public const string Healed = "healed"
 ```
 
-*Undocumented.*
+`amount` is hp actually restored, so a heal at full hp raises this with 0 rather than not at all.
 
 ```csharp
 public const string Killed = "killed"
 ```
 
-*Undocumented.*
+An actor died and it is settled. `source` is the killer; `BuiltinEvents.Died` is the one that can be refused.
 
 ```csharp
 public const string Move = "move"
 ```
 
-*Undocumented.*
+An enemy is performing a named move. `data.move` is which — not to be confused with `BuiltinEvents.Moved`, which is about position.
 
 ```csharp
 public const string Moved = "moved"
 ```
 
-*Undocumented.*
+Something changed where it is: a card its zone, or an actor its slot. `data.kind` says which, and the two carry different data. A row closing under `on_vacated close_ranks` raises it after the fact, so `before_moved` cannot refuse that one.
 
 ```csharp
 public const string Obtained = "obtained"
 ```
 
-*Undocumented.*
+`source` obtained `target`, a relic. It fires during setup as well as mid-run, since `CardRuntime.AddRelic(string, Entity)` raises it.
 
 ```csharp
 public const string Overkill = "overkill"
 ```
 
-*Undocumented.*
+A hit killed with damage to spare. `amount` is only the excess.
 
 ```csharp
 public const string Revived = "revived"
 ```
 
-*Undocumented.*
+An actor is being brought back. Raised only for one that really was dead, so a heal on the living never reaches it.
 
 ```csharp
 public const string Shuffled = "shuffled"
 ```
 
-*Undocumented.*
+A discard pile went back into the draw pile. It fires on the automatic reshuffle mid-draw as well as on a written `shuffle`.
 
 ```csharp
 public const string StatChangedSuffix = "_changed"
@@ -368,37 +368,37 @@ Suffix of the per-stat events such as `energy_changed`.
 public const string StatusApplied = "status_applied"
 ```
 
-*Undocumented.*
+A status landed on `target`, which is its host. `amount` is stacks, and `data.status` is the definition at the before phase and the entity after it.
 
 ```csharp
 public const string StatusRemoved = "status_removed"
 ```
 
-*Undocumented.*
+A status left its host. `amount` is the stacks it had when it went.
 
 ```csharp
 public const string StatusResisted = "status_resisted"
 ```
 
-*Undocumented.*
+A status did not land because the target was immune. Nothing was applied, so no `BuiltinEvents.StatusApplied` follows.
 
 ```csharp
 public const string Transformed = "transformed"
 ```
 
-*Undocumented.*
+Something became something else and kept its id, owner, side and place. Raised once, and the statuses it sheds raise nothing — which is why `until` refuses to hold a transform.
 
 ```csharp
 public const string TurnEnd = "turn_end"
 ```
 
-*Undocumented.*
+`target`'s turn is ending, with the same scoping as `BuiltinEvents.TurnStart`. It never fires in a real-time game.
 
 ```csharp
 public const string TurnStart = "turn_start"
 ```
 
-*Undocumented.*
+`target`'s turn began. An unscoped listener on a status or relic hears only its own controller's turn, not everybody's. It never fires in a real-time game.
 
 ### Properties
 
@@ -426,13 +426,13 @@ True when a built-in verb can raise `<stat>_changed`.
 public static BuiltinEvent? Find(string name)
 ```
 
-*Undocumented.*
+The entry for a built-in event, or null for a custom one. Its `Description` is where the meaning of `event.target`, `event.source` and `event.amount` is written down for that event.
 
 ```csharp
 public static bool IsBuiltin(string name)
 ```
 
-*Undocumented.*
+Whether the engine owns this event name, ignoring case. It is the check behind CT322: a game raising an event of its own has to pick a name this answers false for.
 
 ```csharp
 public static bool IsKnownVerb(string verb)
@@ -482,7 +482,7 @@ The causal chain an effect is running in: which listeners are its ancestors and 
 public int Depth { get; }
 ```
 
-*Undocumented.*
+How many listeners deep this is. The ruleset's call-depth limit is checked against it, which is what stops a chain of reactions from running out of stack.
 
 ```csharp
 public int ListenerId { get; }
@@ -494,7 +494,7 @@ The listener that extended the chain to this link; 0 for the root.
 public Chain? Parent { get; }
 ```
 
-*Undocumented.*
+The link this one was extended from, or null at the root. Walking up it is how `Chain.Contains(int)` and the depth limit are answered.
 
 ```csharp
 public long RootId { get; }
@@ -508,13 +508,13 @@ Identifies the whole chain, for `once per chain` limits.
 public bool Contains(int listenerId)
 ```
 
-*Undocumented.*
+Whether a listener is already somewhere up this chain — the check that keeps a listener from re-triggering itself through its own effect. A listener id of 0 is the root and is never contained.
 
 ```csharp
 public Chain Extend(int listenerId)
 ```
 
-*Undocumented.*
+A new link for a listener about to run, one deeper and keeping the same `Chain.RootId` — so everything set off by one action shares a root, which is what `once per chain` counts.
 
 ---
 
@@ -532,7 +532,7 @@ Raised by `DeferredChooser` when content asks for a decision the game has not an
 public ChoicePendingException(ChoiceRequest request)
 ```
 
-*Undocumented.*
+Signals that content has asked a question the game has not answered. It is the engine's own control flow: catching it outside `CardRuntime` means the action was not rolled back and the game is mid-effect, which nothing should try to carry on from.
 
 ### Properties
 
@@ -540,7 +540,7 @@ public ChoicePendingException(ChoiceRequest request)
 public ChoiceRequest Request { get; }
 ```
 
-*Undocumented.*
+The question, so whoever catches this can ask it. Its options are entities in the game as it was before the action started.
 
 ---
 
@@ -558,7 +558,16 @@ A pending player decision: choose a target, choose N cards, discover.
 public ChoiceRequest(string prompt, IReadOnlyList<Entity> options, int min, int max, Entity? chooser, SourceSpan span)
 ```
 
-*Undocumented.*
+A question about entities in the game. Content builds these; a game builds one only when it drives the interpreter itself.
+
+**Parameters.**
+
+- `prompt` — What to ask, as content wrote it.
+- `options` — What may be picked. An answer outside this list is ignored.
+- `min` — The fewest that must be picked.
+- `max` — The most that may be.
+- `chooser` — The actor deciding, or null when nobody in the game is.
+- `span` — The line of content that asked.
 
 ### Properties
 
@@ -572,31 +581,31 @@ The actor making the choice.
 public int Max { get; }
 ```
 
-*Undocumented.*
+The most that may be picked.
 
 ```csharp
 public int Min { get; }
 ```
 
-*Undocumented.*
+The fewest that must be picked. Content may ask for more than `ChoiceRequest.Options` holds, in which case everything on offer is taken.
 
 ```csharp
 public IReadOnlyList<Entity> Options { get; }
 ```
 
-*Undocumented.*
+What may be picked, in the order the selector produced them. A chooser that answers with anything not in here has that part of its answer dropped rather than refused.
 
 ```csharp
 public string Prompt { get; }
 ```
 
-*Undocumented.*
+What content wrote as the prompt. Not localized.
 
 ```csharp
 public SourceSpan Span { get; }
 ```
 
-*Undocumented.*
+The line of content that asked, so a tool can jump to it.
 
 ---
 
@@ -642,7 +651,11 @@ Answers already collected for the action being replayed.
 public IReadOnlyList<Entity> Choose(ChoiceRequest request, GameState state)
 ```
 
-*Undocumented.*
+Replays an answer already given, or stops the action so the game can ask. Outside an action the runtime can roll back it takes the first options instead, since there is nothing to replay into.
+
+**Throws.**
+
+- `ChoicePendingException` — No answer for this question yet, and an action is running that can be rolled back. It is caught by `CardRuntime`, not by the game.
 
 ```csharp
 public EntityDefinition? ChooseDefinition(DefinitionChoice request, GameState state)
@@ -666,7 +679,14 @@ An offer of content that does not exist yet: the three cards a Discover shows be
 public DefinitionChoice(string prompt, IReadOnlyList<EntityDefinition> options, Entity? chooser, SourceSpan span)
 ```
 
-*Undocumented.*
+An offer of content that does not exist yet. Always one pick from the list, which is why it carries no min or max.
+
+**Parameters.**
+
+- `prompt` — What to ask, as content wrote it.
+- `options` — The candidates. They are definitions: nothing has been made from any of them.
+- `chooser` — The actor deciding, or null when nobody in the game is.
+- `span` — The line of content that asked.
 
 ### Properties
 
@@ -680,19 +700,19 @@ The actor making the choice.
 public IReadOnlyList<EntityDefinition> Options { get; }
 ```
 
-*Undocumented.*
+The candidates on offer, drawn from content when the offer was made. A replay draws them again, so a reload between asking and answering can change this list.
 
 ```csharp
 public string Prompt { get; }
 ```
 
-*Undocumented.*
+What content wrote as the prompt. Not localized.
 
 ```csharp
 public SourceSpan Span { get; }
 ```
 
-*Undocumented.*
+The line of content that asked, so a tool can jump to it.
 
 ---
 
@@ -710,19 +730,19 @@ A host that adds nothing. The default, and a convenience: since every member of 
 public virtual void OnEvent(GameEvent gameEvent)
 ```
 
-*Undocumented.*
+Does nothing. Override to drive presentation from what happened. **Never call back into the runtime from here**: this runs while the action is still resolving, and an action started inside it re-enters the one that is running.
 
 ```csharp
 public virtual bool TryCall(string function, IReadOnlyList<Value> arguments, EvalContext context, out Value value)
 ```
 
-*Undocumented.*
+Answers nothing. Override to supply a function content calls, such as a `within(target, 5m)` the world has to measure.
 
 ```csharp
 public virtual bool TryResolveName(string name, EvalContext context, out Value value)
 ```
 
-*Undocumented.*
+Answers nothing. Override to supply a name content uses that the engine does not know, returning true only for the names this host owns; returning true for a name the engine also resolves shadows it.
 
 ---
 
@@ -776,13 +796,13 @@ The party member this enemy telegraphed its next move against, rolled when the i
 public bool IsAlive { get; }
 ```
 
-*Undocumented.*
+Whether this is still in the game and still standing: not dead and not removed. It is the check almost everything wants, because `Entity.IsDead` alone is false for something that has left the game entirely.
 
 ```csharp
 public bool IsDead { get; internal set; }
 ```
 
-*Undocumented.*
+Whether this actor has been killed but not yet removed. A dead actor is still in `GameState.Entities` and still standing in its slot, which is what lets a revive find it and what makes `Entity.IsAlive`, not this, the usual question.
 
 ```csharp
 public bool IsPartyMember { get; internal set; }
@@ -800,7 +820,7 @@ True once the entity has left the game entirely. Removed entities never fire lis
 public EntityKind Kind { get; }
 ```
 
-*Undocumented.*
+What the engine treats this as, fixed when it was made — except by `transform`, which replaces what an entity is while keeping who it is.
 
 ```csharp
 public int Lane { get; internal set; }
@@ -860,13 +880,13 @@ The entity that created or applied this one, when that matters (status sources).
 public IEnumerable<string> StatNames { get; }
 ```
 
-*Undocumented.*
+The stats this entity actually has a stored value for. A stat that has never been written is not here even though reading it gives 0 — an ability that has never been used has no `ready_at`, which is why "absent" has to read as ready rather than as zero left.
 
 ```csharp
 public GameState State { get; }
 ```
 
-*Undocumented.*
+The game this belongs to. An entity is not portable between games: it carries its state, and reading a stat goes through that state's modifier pipeline.
 
 ```csharp
 public IReadOnlyCollection<string> Tags { get; }
@@ -892,7 +912,7 @@ Where the entity lives: `hand`, `draw`, `discard`, `exhaust`, `board`, `relics`,
 public void AddTag(string tag)
 ```
 
-*Undocumented.*
+Adds a tag, lower-cased, and tells the state — which matters, because modifier scopes and the stat cache are keyed on tags and one added behind their back would leave stale numbers in play. Adding a tag that is already there does nothing.
 
 ```csharp
 public int CounterOf(string statusName)
@@ -928,19 +948,19 @@ Stat value rounded to an integer, for the common case of reading hp, block or co
 public bool HasStat(string stat)
 ```
 
-*Undocumented.*
+Whether a stat has ever been written. It is how to tell a real 0 from an absent stat, since `Get(string)` answers 0 for both.
 
 ```csharp
 public bool HasTag(string tag)
 ```
 
-*Undocumented.*
+Whether this entity carries a tag right now, including ones an effect added. Tags are stored lower-cased, so ask in lower case; `EntityDefinition.HasTag(string)` is the case-insensitive question about the declaration.
 
 ```csharp
 public void RemoveTag(string tag)
 ```
 
-*Undocumented.*
+Takes a tag off and tells the state. It is case-sensitive, matching how tags are stored, so pass the lower-cased form.
 
 ```csharp
 public void SetBase(string stat, Num value)
@@ -958,7 +978,7 @@ Total stacks of a named status, summed across separate instances.
 public override string ToString()
 ```
 
-*Undocumented.*
+The name and the id, as traces and diagnostics write it: `Cinder Imp#4`.
 
 ---
 
@@ -968,7 +988,7 @@ public override string ToString()
 public sealed class EntitySnapshot
 ```
 
-*Undocumented.*
+One entity as plain data. It is a record of what the entity *is*, not of what it computes: stats are stored before modifiers, since the modifiers are restored with it and would otherwise be applied twice.
 
 ### Properties
 
@@ -988,19 +1008,19 @@ Kind and name of the definition, or null for definition-less entities such as th
 public string? DefinitionName { get; set; }
 ```
 
-*Undocumented.*
+The definition's name, paired with `EntitySnapshot.DefinitionKind`. A restore looks the two up in the content it is given, and refuses the save when it cannot find one.
 
 ```csharp
 public int Id { get; set; }
 ```
 
-*Undocumented.*
+The id this entity had, and will have again. Ids are what a game should remember between sessions, because the objects are new after a restore and only the numbers survive.
 
 ```csharp
 public string? Intent { get; set; }
 ```
 
-*Undocumented.*
+The move it has telegraphed, or null when intents have not been rolled. A save mid-battle keeps the promise the player was shown.
 
 ```csharp
 public int IntentTargetId { get; set; }
@@ -1012,7 +1032,7 @@ Who this enemy telegraphed `EntitySnapshot.Intent` against, or 0 for nobody. A s
 public bool IsDead { get; set; }
 ```
 
-*Undocumented.*
+Whether this actor was dead but not yet buried, which is the state a revive can still reach.
 
 ```csharp
 public bool IsPartyMember { get; set; }
@@ -1024,13 +1044,13 @@ True for an actor the game asks for input: the leader, and every `hero`.
 public bool IsRemoved { get; set; }
 ```
 
-*Undocumented.*
+Whether it had left the game. Removed entities are still written, because ids must not be reused and because something may still refer to one.
 
 ```csharp
 public int Kind { get; set; }
 ```
 
-*Undocumented.*
+`EntityKind` as a number, whose values are fixed for the whole 1.x line.
 
 ```csharp
 public int Lane { get; set; }
@@ -1042,31 +1062,31 @@ Slot across the board. Zero in a save from before boards had two axes.
 public string? LastMove { get; set; }
 ```
 
-*Undocumented.*
+The move it used last, which a `random, no repeat` pattern needs in order not to repeat it.
 
 ```csharp
 public string Name { get; set; }
 ```
 
-*Undocumented.*
+The name the entity had, which a `transform` may have changed from its definition's. It is restored as it is, not looked up again.
 
 ```csharp
 public int OwnerId { get; set; }
 ```
 
-*Undocumented.*
+Whose this is — whose hand the card is in, whose relic it is — or 0 for something nobody owns.
 
 ```csharp
 public int PatternIndex { get; set; }
 ```
 
-*Undocumented.*
+How far through its move pattern this enemy was, so a restored fight carries on rather than starting the cycle again.
 
 ```csharp
 public string? Phase { get; set; }
 ```
 
-*Undocumented.*
+The behaviour phase it was in, or null for an enemy with no phases and for one whose intent has not been rolled.
 
 ```csharp
 public int Position { get; set; }
@@ -1078,13 +1098,13 @@ Slot along the facing axis. Not a place in `ZoneSnapshot.Entities`. It keeps the
 public long Sequence { get; set; }
 ```
 
-*Undocumented.*
+When it came into play, which is what the "play order" listener tie-break compares — so restoring it is what keeps listener order stable across a save.
 
 ```csharp
 public int SourceId { get; set; }
 ```
 
-*Undocumented.*
+Who put it here: the applier of a status, so that a `source:` filter still reads right after a restore. 0 when nobody did.
 
 ```csharp
 public Dictionary<string, long> Stats { get; set; }
@@ -1096,13 +1116,13 @@ Base stats, as raw `Num` values.
 public List<string> Tags { get; set; }
 ```
 
-*Undocumented.*
+Its tags as they stood, which includes any an effect added — not only the definition's.
 
 ```csharp
 public int Team { get; set; }
 ```
 
-*Undocumented.*
+`Team` as a number.
 
 ```csharp
 public string Zone { get; set; }
@@ -1126,7 +1146,11 @@ Everything an expression or statement can see while it runs: who is acting, on w
 public EvalContext(Entity? self)
 ```
 
-*Undocumented.*
+A root context for running content outside a listener. It starts a fresh chain, so anything it sets off is counted as its own action for `once per chain` purposes.
+
+**Parameters.**
+
+- `self` — The entity whose content is about to run, or null for statements that belong to nothing.
 
 ### Properties
 
@@ -1140,7 +1164,7 @@ The card being played, if any. Its tags become the tags of the damage it deals.
 public Chain Chain { get; set; }
 ```
 
-*Undocumented.*
+The causal chain this is running in. Replacing it rather than extending it starts a new chain, which resets what `once per chain` has counted.
 
 ```csharp
 public Entity? Controller { get; }
@@ -1194,7 +1218,7 @@ Who is acting: the card's player, the status's applier, the relic's holder.
 public Entity? Target { get; set; }
 ```
 
-*Undocumented.*
+What the effect is aimed at. Inside a listener this is the event's target unless the body changed it, and it is null for an effect that targets nothing.
 
 ```csharp
 public ScheduledAction? UndoScope { get; set; }
@@ -1220,13 +1244,13 @@ Names of every local visible from this scope, for "did you mean" suggestions.
 public void SetLocal(string name, Value value)
 ```
 
-*Undocumented.*
+Binds a local in this scope, shadowing any of the same name in a parent. Names are compared without case, as everywhere else, and the binding lasts as long as this context does.
 
 ```csharp
 public bool TryGetLocal(string name, out Value value)
 ```
 
-*Undocumented.*
+Looks a local up through this scope and its parents, innermost first. False leaves `value` at `Value.None`, which is also what a local explicitly set to none reads as — so the return value is the one to test.
 
 ---
 
@@ -1244,7 +1268,7 @@ Holds every active listener and answers "who hears this event, in what order". I
 public int Count { get; private set; }
 ```
 
-*Undocumented.*
+How many listeners are registered. It counts every phase and every owner, so it moves as statuses come and go rather than being a property of the content.
 
 ```csharp
 public IReadOnlyList<Listener> Periodic { get; }
@@ -1270,7 +1294,7 @@ Cheap pre-check so verbs can skip building events nobody listens to.
 public IReadOnlyList<Listener> OwnedBy(Entity owner)
 ```
 
-*Undocumented.*
+Every listener one entity declared, in registration order. With `ModifierPipeline.OwnedBy(Entity)` it is what an inspector needs to say what a single thing is doing to a game. The list is live: it changes as the entity gains or loses listeners.
 
 ---
 
@@ -1288,13 +1312,13 @@ Always takes the first options offered. Deterministic, and the default.
 public IReadOnlyList<Entity> Choose(ChoiceRequest request, GameState state)
 ```
 
-*Undocumented.*
+Takes the first options, as many as the request needs. Deterministic, which is why it is the default and what tests rely on.
 
 ```csharp
 public EntityDefinition? ChooseDefinition(DefinitionChoice request, GameState state)
 ```
 
-*Undocumented.*
+Takes the first candidate, or null when nothing is on offer.
 
 ---
 
@@ -1312,7 +1336,11 @@ Something that happened, or is about to. Every verb raises one of these in each 
 public GameEvent(string name)
 ```
 
-*Undocumented.*
+An event a verb or a game is about to raise. Building one does nothing; the interpreter raises it. A game raising an event of its own names it something the engine does not use, or it is forging a built-in one, which is CT322.
+
+**Parameters.**
+
+- `name` — The event name as content listens for it, without a phase prefix.
 
 ### Properties
 
@@ -1344,7 +1372,7 @@ Anything else a verb wants to expose as `event.<name>`.
 public string Name { get; }
 ```
 
-*Undocumented.*
+The event name without a phase prefix: `damaged`, not `before_damaged`. The phase is `GameEvent.Phase`, and content writes it as the prefix.
 
 ```csharp
 public EventPhase Phase { get; internal set; }
@@ -1388,7 +1416,7 @@ Trace entry for this event, so listeners can be recorded as its children.
 public override string ToString()
 ```
 
-*Undocumented.*
+The phase and the name, as in `before damaged`. For a log, not for matching.
 
 ---
 
@@ -1446,19 +1474,19 @@ Whose step it was when this was written, or zero when none of the party's was. I
 public int ActiveTeam { get; set; }
 ```
 
-*Undocumented.*
+`Team` as a number. The enum's numbers are fixed for the whole 1.x line, which is what makes this safe to store.
 
 ```csharp
 public Dictionary<string, long> BattleHistory { get; set; }
 ```
 
-*Undocumented.*
+The same counters kept for the whole battle rather than the turn, as raw `Num` values. A raw value is not the number content reads: divide by `Num.Scale`, or use `Num.FromRaw(long)`.
 
 ```csharp
 public int BattleNumber { get; set; }
 ```
 
-*Undocumented.*
+How many battles the run had started. It carries across battles, so it is part of the run and not of the fight.
 
 ```csharp
 public BoardSnapshot? Board { get; set; }
@@ -1476,13 +1504,13 @@ The board this battle is being fought on, by name. Empty in a save from before b
 public long ClockNow { get; set; }
 ```
 
-*Undocumented.*
+The clock's time in its own units. On a tick clock the rate is *not* saved, so a restore into a clock at another rate reinterprets every duration in the game.
 
 ```csharp
 public List<EntitySnapshot> Entities { get; set; }
 ```
 
-*Undocumented.*
+Every entity, the dead and the removed included. It is the whole cast; the zones say where each one is.
 
 ```csharp
 public int FormatVersion { get; set; }
@@ -1494,19 +1522,19 @@ The format this save is written in. A hand-built snapshot is in this build's for
 public bool InBattle { get; set; }
 ```
 
-*Undocumented.*
+Whether a battle was running. False for a save taken in a shop, a rest or a map screen.
 
 ```csharp
 public List<ListenerDueSnapshot> ListenerDues { get; set; }
 ```
 
-*Undocumented.*
+When each `on every ...:` listener next fires, so a reload does not silently reset every periodic effect.
 
 ```csharp
 public List<ListenerLimitSnapshot> ListenerLimits { get; set; }
 ```
 
-*Undocumented.*
+Which `once per ...` windows are already used, so a saved battle cannot get a second use of a once-per-battle listener.
 
 ```csharp
 public int MinimumReader { get; set; }
@@ -1518,25 +1546,25 @@ The oldest `GameSnapshot.CurrentFormat` that can read this save. Zero in a save 
 public long NextChainRoot { get; set; }
 ```
 
-*Undocumented.*
+The next causal-chain root to hand out, which is what `once per chain` counts by.
 
 ```csharp
 public int NextEntityId { get; set; }
 ```
 
-*Undocumented.*
+The next entity id to hand out. It is saved because an id has to stay unique across a restore, not only within one session.
 
 ```csharp
 public long NextScheduleId { get; set; }
 ```
 
-*Undocumented.*
+The next `ScheduledAction.Id` to hand out.
 
 ```csharp
 public long NextSequence { get; set; }
 ```
 
-*Undocumented.*
+The next activation number to hand out, which is what the "play order" listener tie-break compares.
 
 ```csharp
 public List<int> PartyIds { get; set; }
@@ -1548,7 +1576,7 @@ The party: every actor the game asks for input, leader first. A save that lists 
 public int PlayerId { get; set; }
 ```
 
-*Undocumented.*
+The leader's `EntitySnapshot.Id`, or 0 for a game saved before a player was created.
 
 ```csharp
 public ulong[] Rng { get; set; }
@@ -1566,19 +1594,19 @@ The generator `GameSnapshot.Rng` came from, empty for `GameSnapshot.CurrentRng`.
 public List<ScheduledSnapshot> Scheduled { get; set; }
 ```
 
-*Undocumented.*
+Deferred work: `next turn:` blocks, timed work, and `until` blocks waiting to be put back.
 
 ```csharp
 public bool SkipNextDraw { get; set; }
 ```
 
-*Undocumented.*
+Whether the next battle should skip its opening hand, as a test that sets the hand itself asks for.
 
 ```csharp
 public int Turn { get; set; }
 ```
 
-*Undocumented.*
+The turn within the battle, or 0 between battles and in a real-time game.
 
 ```csharp
 public Dictionary<string, long> TurnHistory { get; set; }
@@ -1590,7 +1618,7 @@ History counters, as raw `Num` values.
 public bool? Won { get; set; }
 ```
 
-*Undocumented.*
+How the last battle went, or null while one is running or before the first.
 
 ```csharp
 public string WrittenBy { get; set; }
@@ -1604,7 +1632,7 @@ It is for people, not for rules: nothing branches on it, and a refusal quotes it
 public List<ZoneSnapshot> Zones { get; set; }
 ```
 
-*Undocumented.*
+Where everything is, in order — and the order matters: a draw pile's is the sequence the player will see. A restore refuses a save whose zones and entities disagree.
 
 ### Methods
 
@@ -1630,7 +1658,14 @@ All rules state for one game: entities, zones, listeners, modifiers, clock, RNG,
 public GameState(ContentLibrary content, Ruleset rules, IGameClock clock, ulong seed)
 ```
 
-*Undocumented.*
+Builds the rules state for one game. `CardRuntime` does this; a game builds one directly only when it drives the interpreter itself.
+
+**Parameters.**
+
+- `content` — The library the game is played from.
+- `rules` — The effective ruleset, usually `ContentLibrary.BuildRuleset(DiagnosticBag)`.
+- `clock` — Turns or ticks. It is not checked against the ruleset here; `CardRuntime` is where that mismatch is caught.
+- `seed` — The run's seed. Every roll in the game comes from it.
 
 ### Properties
 
@@ -1646,13 +1681,13 @@ Under `turns: initiative` it is binding: that member and no other may act, and t
 public Team ActiveTeam { get; internal set; }
 ```
 
-*Undocumented.*
+Whose turn it is. In a real-time game it stays on `Team.Player`, since nothing hands it over.
 
 ```csharp
 public int BattleNumber { get; internal set; }
 ```
 
-*Undocumented.*
+How many battles this run has started, counting from 1. It survives a battle ending, which is what a run's difficulty curve reads.
 
 ```csharp
 public BoardShape Board { get; }
@@ -1664,37 +1699,37 @@ The board this battle is fought on. Content owns the shapes; a game picks one pe
 public IGameClock Clock { get; }
 ```
 
-*Undocumented.*
+Time. Whether it is a `TurnClock` or a `TickClock` is what makes this a turn-based or a real-time game.
 
 ```csharp
 public ContentLibrary Content { get; }
 ```
 
-*Undocumented.*
+The library this game is played from. Reloading into it needs `CardRuntime.ApplyContentChanges` to take effect on live entities.
 
 ```csharp
 public IReadOnlyList<Entity> Entities { get; }
 ```
 
-*Undocumented.*
+Every entity ever made in this game, in creation order, the removed and the dead included. Filter it: `Actors(Team?)`, `ZoneOf(Entity, string)` and `Party` are the questions usually meant.
 
 ```csharp
 public EventBus Events { get; }
 ```
 
-*Undocumented.*
+Every live listener, and who hears what in which order. It does not run anything; the interpreter does.
 
 ```csharp
 public bool InBattle { get; internal set; }
 ```
 
-*Undocumented.*
+Whether a battle is running. It is false between battles and during a run's shops and rests, where most of the battle vocabulary means nothing.
 
 ```csharp
 public ModifierPipeline Modifiers { get; }
 ```
 
-*Undocumented.*
+Every live `modify`, and what computes a value from them. `Entity.Get(string)` is the usual way in.
 
 ```csharp
 public IReadOnlyList<Entity> Party { get; }
@@ -1708,37 +1743,37 @@ A game that never declares a `hero` has a party of one: the leader `CreatePlayer
 public Entity? Player { get; internal set; }
 ```
 
-*Undocumented.*
+The run's leader, or null before `CardRuntime.CreatePlayer(string, int, int)`. `CardRuntime.Player` is the same actor without the null.
 
 ```csharp
 public Rng Rng { get; }
 ```
 
-*Undocumented.*
+The game's own generator, and the one every roll in the rules comes out of. Drawing from it directly shifts every later shuffle, so a game that wants a number of its own forks it.
 
 ```csharp
 public Ruleset Rules { get; }
 ```
 
-*Undocumented.*
+The rules this game started with. A game keeps them for its whole life: content reloaded with a different ruleset does not change a game in progress, which is what the reload report says out loud.
 
 ```csharp
 public IReadOnlyList<ScheduledAction> Scheduled { get; }
 ```
 
-*Undocumented.*
+Everything waiting to run or to be undone, in the order it was scheduled. It is saved with the game.
 
 ```csharp
 public TraceLog Trace { get; }
 ```
 
-*Undocumented.*
+The causality log. Disabled unless `RuntimeOptions.Trace` asked for it, and free while disabled.
 
 ```csharp
 public int Turn { get; internal set; }
 ```
 
-*Undocumented.*
+The turn number within the current battle, counting from 1, and 0 before the first one. A real-time game has no turns, so it stays at 0 for the whole fight — which is a battle in progress, not one that has not started.
 
 ```csharp
 public IReadOnlyList<Entity> TurnOrder { get; }
@@ -1836,7 +1871,7 @@ A dead actor is still on the board until it is buried, so that its own `on died`
 public Entity? Find(int id)
 ```
 
-*Undocumented.*
+The entity with that id, or null. Ids are stable across a save and restore, which is why a game that has to remember one entity between sessions remembers the id and not the object.
 
 ```csharp
 public Entity? FindByName(string name)
@@ -1872,7 +1907,7 @@ Creates an entity from a definition, copying its stats and tags.
 public bool IsActive(Entity entity)
 ```
 
-*Undocumented.*
+Whether this entity's listeners and modifiers are live, which depends on where it is: an actor on the board and alive, a card in hand (or, for a power, in play), a relic held, a status whose host is itself active. A card in the draw pile is in the game and does nothing.
 
 ```csharp
 public void MoveTo(Entity entity, string zone, bool toTop = false)
@@ -1926,7 +1961,9 @@ Pluggable decision maker: UI, AI, random or scripted. Answers must be a subset o
 virtual IReadOnlyList<Entity> Choose(ChoiceRequest request, GameState state)
 ```
 
-*Undocumented.*
+Answers a question about entities. The default takes as many of the first options as the request needs, which keeps a partly written chooser deterministic rather than stuck.
+
+Whatever is returned is filtered to `ChoiceRequest.Options`, so a chooser cannot smuggle in an entity content did not offer. A UI that cannot answer on the spot uses `DeferredChooser` rather than blocking here.
 
 ```csharp
 virtual EntityDefinition? ChooseDefinition(DefinitionChoice request, GameState state)
@@ -1984,7 +2021,7 @@ Abstract game time. The core only ever sees whole units: a `TurnClock` advances 
 long Now { get; }
 ```
 
-*Undocumented.*
+The current time in this clock's own whole units: turns elapsed, or ticks elapsed. It starts at 0 and only ever goes up, so a duration is stored as the absolute time it ends at.
 
 ### Methods
 
@@ -2008,7 +2045,7 @@ The default accepts a bare number as this clock's own unit and refuses every nam
 event Action<long>? Advanced
 ```
 
-*Undocumented.*
+Raised once per unit after the clock has moved, carrying the new `IGameClock.Now`. A runtime subscribes from the moment it is built — that is what runs scheduled work, periodic triggers and timed statuses — so a game that shares one clock between two runtimes drives both. `IGameClock.Restore(long)` deliberately does not raise it.
 
 ---
 
@@ -2026,13 +2063,13 @@ Evaluates a modifier's scope, filter and amount. Implemented by the interpreter.
 Value Amount(Modifier modifier, ModifierQuery query)
 ```
 
-*Undocumented.*
+What the modifier's right-hand side evaluates to for this query. It is evaluated per query, not once, because an amount may read the owner's stats.
 
 ```csharp
 bool Applies(Modifier modifier, ModifierQuery query)
 ```
 
-*Undocumented.*
+Whether this modifier's scope and filter match the value being computed.
 
 ---
 
@@ -2050,7 +2087,12 @@ The tree-walking interpreter. It evaluates expressions, executes statements, dis
 public Interpreter(GameState state, IEffectHost? host = null)
 ```
 
-*Undocumented.*
+Builds the interpreter for a game and installs itself as the state's modifier evaluator — so a state without one computes every value unmodified. `CardRuntime` does this; a game builds one directly only when it drives the rules itself.
+
+**Parameters.**
+
+- `state` — The game to run. It is left as it is; nothing starts here.
+- `host` — The game's side of the integration. Null installs one that answers nothing, which is right for a simulation.
 
 ### Fields and constants
 
@@ -2078,13 +2120,13 @@ Who answers a choice. Never null; setting it to null throws.
 public ContentLibrary Content { get; }
 ```
 
-*Undocumented.*
+The library being played, which is the state's. Loading into it does not rebind live entities on its own.
 
 ```csharp
 public IEffectHost Host { get; }
 ```
 
-*Undocumented.*
+The game's side of the integration. Never null: a runtime given none gets one that answers nothing, so a call here needs no guard.
 
 ```csharp
 public PendingTrigger? Next { get; }
@@ -2108,19 +2150,19 @@ Work queued and not yet resolved.
 public Ruleset Rules { get; }
 ```
 
-*Undocumented.*
+The rules this game started with, which is the state's.
 
 ```csharp
 public GameState State { get; }
 ```
 
-*Undocumented.*
+The game this interpreter runs.
 
 ```csharp
 public IEnumerable<string> VerbNames { get; }
 ```
 
-*Undocumented.*
+Every verb that can be called: built-ins, host verbs and content verbs, deduplicated without case. It is what a "did you mean?" and an editor's completion list are built from.
 
 ### Methods
 
@@ -2211,7 +2253,11 @@ Draws from the top of the draw pile, reshuffling the discard pile when it runs o
 public Value Evaluate(ExprNode node, EvalContext context)
 ```
 
-*Undocumented.*
+Evaluates one expression in a context. Evaluating is not free of side effects: a range rolls, so the same node evaluated twice can give two numbers.
+
+**Throws.**
+
+- `RuntimeError` — The expression could not be evaluated, with the line it is written on.
 
 ```csharp
 public bool EvaluateCondition(ExprNode node, EvalContext context)
@@ -2229,19 +2275,45 @@ Evaluates to a number. Ranges roll, lists count, booleans are 1 or 0.
 public void Execute(BlockNode block, EvalContext context)
 ```
 
-*Undocumented.*
+Runs a block of statements. It is how a game runs a block of its own that it read out of `EntityDefinition.Blocks` — and such a block has to be named in `LintOptions.HostBlocks`, or the linter reports it as a line that never runs (CT313).
+
+**Throws.**
+
+- `RuntimeError` — A statement failed, with the line it failed on.
+
+It runs the statements and nothing else: the trigger queue is drained by whoever started the action, which is why content run this way from inside a host callback resolves at a different moment than content run through `CardRuntime.Execute(string, Entity, Entity)`.
 
 ```csharp
 public Num GainBlock(Entity? source, Entity target, Num amount, EvalContext context, SourceSpan span = default(SourceSpan))
 ```
 
-*Undocumented.*
+Gives block as content's own `block` does, raising `gained_block` and moving the history counter.
+
+**Parameters.**
+
+- `source` — Who is giving it. Null for block nobody gave.
+- `target` — Who gains it.
+- `amount` — How much, before modifiers and before any before listener changes it.
+- `context` — The effect this is part of.
+- `span` — The line responsible, for traces and errors.
+
+**Returns.** The block actually gained, which is 0 when a listener cancelled it.
 
 ```csharp
 public Num Heal(Entity? source, Entity target, Num amount, EvalContext context, SourceSpan span = default(SourceSpan))
 ```
 
-*Undocumented.*
+Heals as content's own `heal` does: the hp is clamped to the maximum, `healed` is raised, and the history counter moves. Writing hp with `Entity.SetBase(string, Num)` does none of that.
+
+**Parameters.**
+
+- `source` — Who is healing, for `event.source` and `source:` filters. Null for a heal nobody did.
+- `target` — Who is healed.
+- `amount` — How much to try to heal. A before listener may change it.
+- `context` — The effect this is part of.
+- `span` — The line responsible, for traces and errors.
+
+**Returns.** The hp actually restored, which is 0 at full hp and 0 when a listener cancelled the heal — the two are not distinguished here.
 
 ```csharp
 public Entity? IntentTargetOf(Entity enemy)
@@ -2263,13 +2335,13 @@ Area and random effects still resolve through the interpreter's own selectors, a
 public bool IsTrue(Value value, EvalContext context)
 ```
 
-*Undocumented.*
+Truthiness as the language means it: a non-zero number, a non-empty text or list, a live entity. A qualifier such as `tag:fire` is tested against the context's focus rather than being simply true, which is why this takes a context where `Value.AsBool` does not.
 
 ```csharp
 public bool IsVerb(string name)
 ```
 
-*Undocumented.*
+Whether anything answers to this name: a built-in, a verb the game registered, or one content declares. It is the question the linter cannot answer on its own, which is why host verbs have to be named in `LintOptions.HostVerbs`.
 
 ```csharp
 public bool Kill(Entity target, Entity? source, EvalContext context)
@@ -2433,7 +2505,7 @@ Event name without phase prefix or scope, e.g. `damaged`.
 public int Id { get; }
 ```
 
-*Undocumented.*
+A number unique within this game, stable while the listener is registered. It is not saved, so it does not survive a restore.
 
 ```csharp
 public long IntervalUnits { get; internal set; }
@@ -2457,19 +2529,19 @@ Registration order, the "play order" tie-break.
 public Entity Owner { get; }
 ```
 
-*Undocumented.*
+The entity whose declaration this came from — the relic, the status, the card. Inside the listener's body, that is what `self` and a bare `source` mean; `event.source` is who caused the event, which is the other thing entirely.
 
 ```csharp
 public EventPhase Phase { get; }
 ```
 
-*Undocumented.*
+Which of the three phases it listens in, from the prefix content wrote.
 
 ```csharp
 public int Priority { get; }
 ```
 
-*Undocumented.*
+The `priority` written on the listener, 0 unless stated. Higher runs first, and only while the ruleset's ordering puts priority first, which the default does.
 
 ```csharp
 public string? Scope { get; }
@@ -2481,7 +2553,7 @@ The dotted prefix, e.g. `owner` in `owner.damaged`. Null when unscoped.
 public ListenerNode Syntax { get; }
 ```
 
-*Undocumented.*
+The parsed `on ...:` block, for a tool that needs the filter, the body or the span.
 
 ### Methods
 
@@ -2489,7 +2561,7 @@ public ListenerNode Syntax { get; }
 public override string ToString()
 ```
 
-*Undocumented.*
+The owner and the event, for a log or an inspector.
 
 ---
 
@@ -2507,7 +2579,7 @@ When an `on every ...:` listener of one entity is next due to fire.
 public long DueAt { get; set; }
 ```
 
-*Undocumented.*
+The absolute clock time it next fires at, so a restored game does not reset every interval to the moment it loaded.
 
 ```csharp
 public int Index { get; set; }
@@ -2525,7 +2597,7 @@ The listener's hash, matched as `ListenerLimitSnapshot.ListenerHash` is.
 public int OwnerId { get; set; }
 ```
 
-*Undocumented.*
+The entity whose periodic listener this is.
 
 ---
 
@@ -2555,13 +2627,13 @@ A hash of the listener as written: of its `on` line, then, after a colon, of its
 public int OwnerId { get; set; }
 ```
 
-*Undocumented.*
+The entity whose listener this window belongs to.
 
 ```csharp
 public long Window { get; set; }
 ```
 
-*Undocumented.*
+The window already used, as a clock time: the turn, battle or run the listener last fired in. Restoring it is what stops a save reload buying a second use of a `once per battle`.
 
 ---
 
@@ -2571,13 +2643,13 @@ public long Window { get; set; }
 public enum ListenerOrdering
 ```
 
-*Undocumented.*
+One tie-break in the order listeners run. The ruleset lists several, applied in turn, and an id comparison settles whatever is left — so the order never depends on a dictionary and a replay always agrees.
 
 | Member | |
 |---|---|
-| `Priority = 0` | *Undocumented.* |
-| `PlayOrder = 1` | *Undocumented.* |
-| `ActivePlayer = 2` | *Undocumented.* |
+| `Priority = 0` | Higher `priority` first. It is the first tie-break by default, so a listener that has to go first says so. |
+| `PlayOrder = 1` | Whoever came into play first, then whichever listener was registered first. The usual "oldest relic wins" rule. |
+| `ActivePlayer = 2` | The side whose turn it is goes first. It decides nothing in a real-time game, where the active side never changes. |
 
 ---
 
@@ -2587,7 +2659,7 @@ public enum ListenerOrdering
 public enum LoopProtection
 ```
 
-*Undocumented.*
+What stops a chain of reactions from running for ever. It is a ruleset setting because the two answers suit different games, not because one is a bug.
 
 | Member | |
 |---|---|
@@ -2610,19 +2682,19 @@ An active `modify` line, bound to the entity that declared it.
 public string Channel { get; }
 ```
 
-*Undocumented.*
+What this modifies: a stat name, or an action channel such as `damage` or `cost`. Which end of an action an `of` group names is the channel's decision, not the modifier's.
 
 ```csharp
 public int Id { get; }
 ```
 
-*Undocumented.*
+A number unique within this game, stable while the modifier is registered. It is not saved.
 
 ```csharp
 public ModifierLayer Layer { get; }
 ```
 
-*Undocumented.*
+Which layer of the pipeline it applies in, taken from how the amount was written: `+2` adds, `x150%` multiplies, `set 1` overrides.
 
 ```csharp
 public long Order { get; }
@@ -2634,13 +2706,13 @@ Registration order. Within the override layer the latest modifier wins.
 public Entity Owner { get; }
 ```
 
-*Undocumented.*
+The entity whose declaration this came from. Its controller is what the bare, unscoped form of the modifier is anchored to.
 
 ```csharp
 public ModifyNode Syntax { get; }
 ```
 
-*Undocumented.*
+The parsed `modify` line, for a tool that needs the scope, the filter or the span.
 
 ### Methods
 
@@ -2648,7 +2720,7 @@ public ModifyNode Syntax { get; }
 public override string ToString()
 ```
 
-*Undocumented.*
+The owner and the channel, for a log or an inspector.
 
 ---
 
@@ -2672,7 +2744,7 @@ Stat reads served from the cache. Exposed for profiling and tests.
 public int Count { get; private set; }
 ```
 
-*Undocumented.*
+How many modifiers are registered, across every channel and owner.
 
 ```csharp
 public IModifierEvaluator? Evaluator { get; internal set; }
@@ -2704,13 +2776,13 @@ Like `ModifierPipeline.Compute(ModifierQuery, Num)`, but records every step for 
 public bool HasChannel(string channel)
 ```
 
-*Undocumented.*
+Whether anything at all modifies this channel, which is the cheap pre-check before building a query. It says nothing about whether any of them would match.
 
 ```csharp
 public IReadOnlyList<Modifier> OnChannel(string channel)
 ```
 
-*Undocumented.*
+Every modifier registered on a channel, in registration order — not the order they are applied in, which the layers decide. Empty for a channel nothing modifies.
 
 ```csharp
 public IReadOnlyList<Modifier> OwnedBy(Entity owner)
@@ -2734,7 +2806,7 @@ What a value is being computed for. Stats use only `ModifierQuery.Subject`; acti
 public ModifierQuery(string channel)
 ```
 
-*Undocumented.*
+A question for the pipeline. Set `ModifierQuery.Subject` at least; for an action channel set `ModifierQuery.Source`, `ModifierQuery.Card` and `ModifierQuery.Tags` too, or filters that look at them will not match.
 
 ### Properties
 
@@ -2742,13 +2814,13 @@ public ModifierQuery(string channel)
 public Entity? Card { get; set; }
 ```
 
-*Undocumented.*
+The card the action came from, when there is one, so a `card:` filter has something to read.
 
 ```csharp
 public string Channel { get; }
 ```
 
-*Undocumented.*
+The stat or action channel being computed.
 
 ```csharp
 public Entity? Source { get; set; }
@@ -2766,7 +2838,7 @@ The entity whose value this is: the stat holder, the damage target, the card who
 public IReadOnlyCollection<string> Tags { get; set; }
 ```
 
-*Undocumented.*
+The action's own tags — `fire` on fire damage — which a `tag:` filter tests. Empty rather than null by default, so a filter never has to guard.
 
 ---
 
@@ -2776,7 +2848,7 @@ public IReadOnlyCollection<string> Tags { get; set; }
 public sealed class ModifierResult
 ```
 
-*Undocumented.*
+A value and everything that was done to it: what a "base 6 → +3 Strength → ×1.5 Codex → 13" tooltip is drawn from.
 
 ### Properties
 
@@ -2784,19 +2856,19 @@ public sealed class ModifierResult
 public Num Base { get; }
 ```
 
-*Undocumented.*
+The value before any modifier: the printed number.
 
 ```csharp
 public Num Final { get; }
 ```
 
-*Undocumented.*
+The value after every step, which is what the rules use.
 
 ```csharp
 public IReadOnlyList<ModifierStep> Steps { get; }
 ```
 
-*Undocumented.*
+Every modifier that applied, in the order they were applied. A modifier whose filter did not match is not here at all, which is why an empty list and an unchanged value mean the same thing to a reader and different things to a designer hunting a rule that is not firing.
 
 ### Methods
 
@@ -2804,7 +2876,7 @@ public IReadOnlyList<ModifierStep> Steps { get; }
 public override string ToString()
 ```
 
-*Undocumented.*
+The whole breakdown on one line, as a trace prints it.
 
 ---
 
@@ -2822,7 +2894,7 @@ One step of a modifier breakdown, for the "base 6 → +3 Strength → ×1.5 Code
 public ModifierStep(Modifier modifier, Num amount, Num before, Num after)
 ```
 
-*Undocumented.*
+Records one modifier's effect on a value. Built by the pipeline; a game reads these rather than making them.
 
 ### Properties
 
@@ -2830,25 +2902,25 @@ public ModifierStep(Modifier modifier, Num amount, Num before, Num after)
 public Num After { get; }
 ```
 
-*Undocumented.*
+The running value coming out. `After - Before` is the difference this step actually made, which for a clamp may be zero.
 
 ```csharp
 public Num Amount { get; }
 ```
 
-*Undocumented.*
+What the modifier said, in its own terms: the addend, the multiplier, the override value. Not the difference it made.
 
 ```csharp
 public Num Before { get; }
 ```
 
-*Undocumented.*
+The running value going in.
 
 ```csharp
 public Modifier Modifier { get; }
 ```
 
-*Undocumented.*
+Which modifier this step was, so a breakdown can name the relic or status responsible.
 
 ### Methods
 
@@ -2856,7 +2928,7 @@ public Modifier Modifier { get; }
 public override string ToString()
 ```
 
-*Undocumented.*
+The step as a breakdown line: `+3 Strength`, `×1.5 Codex`, `clamp Ward`.
 
 ---
 
@@ -2891,7 +2963,7 @@ Raised by `DeferredChooser` when content offers a choice of content that does no
 public OfferPendingException(DefinitionChoice offer)
 ```
 
-*Undocumented.*
+Signals an unanswered offer of content, as `discover` makes. The same control flow as `ChoicePendingException`.
 
 ### Properties
 
@@ -2899,7 +2971,7 @@ public OfferPendingException(DefinitionChoice offer)
 public DefinitionChoice Offer { get; }
 ```
 
-*Undocumented.*
+The offer, whose options are definitions rather than entities: nothing has been made yet.
 
 ---
 
@@ -2950,7 +3022,7 @@ True when this offers content (`PendingChoice.Definitions`) rather than entities
 public int Max { get; }
 ```
 
-*Undocumented.*
+The most that may be picked. It is capped at what is on offer, so it is safe to compare against a selection count; `PendingChoice.Min` may still exceed `PendingChoice.Options` when content asked for more than exists, and the action then takes what there is.
 
 ```csharp
 public int Min { get; }
@@ -2968,7 +3040,7 @@ The entities to choose between. Empty for an offer, which uses `PendingChoice.De
 public string Prompt { get; }
 ```
 
-*Undocumented.*
+What content wrote as the prompt, or the engine's own wording when it wrote none. It is not localized: a game that translates its UI translates this itself.
 
 ```csharp
 public SourceSpan Span { get; }
@@ -2982,7 +3054,7 @@ The content that asked, for tools that jump to the line.
 public override string ToString()
 ```
 
-*Undocumented.*
+The prompt and the shape of the choice, for a log or a test failure.
 
 ---
 
@@ -3026,7 +3098,7 @@ The line of content behind it, when it has one.
 public override string ToString()
 ```
 
-*Undocumented.*
+The description, which is what a debugger's "next step" line shows.
 
 ---
 
@@ -3044,7 +3116,7 @@ A `qualifier:name` pair such as `tag:fire` or `source:self`.
 public QualifiedName(string qualifier, string name)
 ```
 
-*Undocumented.*
+Builds a `qualifier:name` pair. Neither half is validated: the interpreter decides what a qualifier means when it tests one.
 
 ### Properties
 
@@ -3052,13 +3124,13 @@ public QualifiedName(string qualifier, string name)
 public string Name { get; }
 ```
 
-*Undocumented.*
+The part after the colon: what the qualifier is being tested against.
 
 ```csharp
 public string Qualifier { get; }
 ```
 
-*Undocumented.*
+The part before the colon — `tag`, `source`, `card` — which says what kind of test this is.
 
 ### Methods
 
@@ -3066,7 +3138,7 @@ public string Qualifier { get; }
 public override string ToString()
 ```
 
-*Undocumented.*
+The form content writes: `tag:fire`.
 
 ---
 
@@ -3084,7 +3156,7 @@ Picks uniformly at random from its own forked RNG stream, so it never disturbs g
 public RandomChooser(ulong seed)
 ```
 
-*Undocumented.*
+A chooser with a stream of its own, so its rolls never move the game's. A simulation seeds this separately from the run, which is what lets the same game be replayed against different decisions.
 
 ### Methods
 
@@ -3092,13 +3164,13 @@ public RandomChooser(ulong seed)
 public IReadOnlyList<Entity> Choose(ChoiceRequest request, GameState state)
 ```
 
-*Undocumented.*
+Shuffles the options and takes a count somewhere between the request's bounds — so it varies how many it picks, not only which.
 
 ```csharp
 public EntityDefinition? ChooseDefinition(DefinitionChoice request, GameState state)
 ```
 
-*Undocumented.*
+One candidate, uniformly, or null when nothing is on offer.
 
 ---
 
@@ -3116,13 +3188,13 @@ Rules that content is written against. These change results, so they live in con
 public bool AfterEvents { get; set; }
 ```
 
-*Undocumented.*
+Whether `on` listeners run. This is the common phase, so turning it off disables most of what content does.
 
 ```csharp
 public bool BeforeEvents { get; set; }
 ```
 
-*Undocumented.*
+Whether `before_` listeners run at all. Turning it off makes every one of them silently dead, and with it every `cancel` — it is a performance switch for content that uses none.
 
 ```csharp
 public ClockKind Clock { get; set; }
@@ -3146,13 +3218,13 @@ Cards drawn at the start of each player turn.
 public bool InsteadEvents { get; set; }
 ```
 
-*Undocumented.*
+Whether `instead_of_` listeners run. Off, every replacement effect in the content quietly stops replacing anything.
 
 ```csharp
 public LoopProtection Loops { get; set; }
 ```
 
-*Undocumented.*
+What stops a chain of reactions. The default lets fan-out through but never re-triggers a listener from its own consequences, which is why two listeners that set each other off is a note (CT306) rather than a hang.
 
 ```csharp
 public int MaxCallDepth { get; set; }
@@ -3182,7 +3254,7 @@ Interpreter steps allowed per top-level action. This is the mod sandbox's step l
 public IReadOnlyList<ModifierLayer> ModifierLayers { get; set; }
 ```
 
-*Undocumented.*
+The order a value passes through the modifier layers. The default is add, multiply, clamp, override — so an override beats a clamp, and reordering these two changes which of a pair of modifiers has the last word.
 
 ```csharp
 public NewListeners NewListeners { get; set; }
@@ -3200,13 +3272,13 @@ The order the party's members are offered in. `PartyOrder.Position` by default: 
 public IReadOnlyList<ListenerOrdering> Ordering { get; set; }
 ```
 
-*Undocumented.*
+The tie-breaks that decide listener order, applied in this order until one settles it. The default is priority, then play order, then the active side; an id comparison settles the rest, so the result never depends on a hash.
 
 ```csharp
 public TriggerResolution Triggers { get; set; }
 ```
 
-*Undocumented.*
+When an after-phase listener runs. The default queues them until the action finishes, which is what makes a card's whole effect resolve before anything reacts to its first line.
 
 ```csharp
 public TurnMode Turns { get; set; }
@@ -3250,7 +3322,12 @@ Raised for errors in content at runtime, carrying the offending source location.
 public RuntimeError(string message, SourceSpan span)
 ```
 
-*Undocumented.*
+An error in content, caught while it runs. It is thrown at whoever drove the action, so a game that runs content from a UI handler catches it there; `CardRuntime` does not swallow it.
+
+**Parameters.**
+
+- `message` — What went wrong, without the location.
+- `span` — The line of content, which is prefixed onto `Exception.Message` when there is one.
 
 ### Properties
 
@@ -3258,13 +3335,13 @@ public RuntimeError(string message, SourceSpan span)
 public string Detail { get; }
 ```
 
-*Undocumented.*
+The message without the location in front of it, for a UI that shows the two separately.
 
 ```csharp
 public SourceSpan Span { get; }
 ```
 
-*Undocumented.*
+The line of content behind it, so a tool can jump there. `SourceSpan.None` when the engine raised it outside any line.
 
 ---
 
@@ -3274,7 +3351,7 @@ public SourceSpan Span { get; }
 public enum ScheduleTiming
 ```
 
-*Undocumented.*
+What makes a piece of deferred work come due. It is saved with the game, so the numbers are fixed for the whole 1.x line.
 
 | Member | |
 |---|---|
@@ -3304,43 +3381,43 @@ Names captured when the block was scheduled (`target`, `source`...).
 public BlockNode? Body { get; }
 ```
 
-*Undocumented.*
+The statements to run, or null for an `ScheduleTiming.Until` entry, whose whole job is to put `ScheduledAction.Undo` back. A body the game itself parsed is also null after a save, which is why such a block blocks `CardRuntime.Capture` until it has run.
 
 ```csharp
 public string? Deadline { get; internal set; }
 ```
 
-*Undocumented.*
+The event that ends an `until` block, such as `turn_end`. Null for the other timings.
 
 ```csharp
 public long DueAt { get; internal set; }
 ```
 
-*Undocumented.*
+The absolute clock time this is due at, for `ScheduleTiming.AtTime`. Meaningless for the other two timings.
 
 ```csharp
 public long Id { get; }
 ```
 
-*Undocumented.*
+A number unique within this game, kept in the save, so a scheduled block survives a round trip and can be cancelled by id.
 
 ```csharp
 public Entity Owner { get; }
 ```
 
-*Undocumented.*
+Whose block this is: whose turn ends it, and what `self` means when it runs.
 
 ```csharp
 public ScheduleTiming Timing { get; }
 ```
 
-*Undocumented.*
+What makes it come due, which decides whether `ScheduledAction.DueAt` or `ScheduledAction.Deadline` is the one to read.
 
 ```csharp
 public List<TemporaryChange> Undo { get; }
 ```
 
-*Undocumented.*
+What to put back when the deadline fires, in the order it was done — it is reverted from the end. Empty for a plain `next turn:` block, which changes nothing that has to be undone.
 
 ---
 
@@ -3350,7 +3427,7 @@ public List<TemporaryChange> Undo { get; }
 public sealed class ScheduledSnapshot
 ```
 
-*Undocumented.*
+One piece of deferred work as plain data. The block itself is not written: it is found again by its address in content, which is why content that has changed underneath a save can make a restore refuse.
 
 ### Properties
 
@@ -3358,7 +3435,7 @@ public sealed class ScheduledSnapshot
 public Dictionary<string, ValueSnapshot> Bindings { get; set; }
 ```
 
-*Undocumented.*
+The names the block captured when it was scheduled — `target`, `source` — so that the block still means what it meant, whatever has happened since.
 
 ```csharp
 public string? Block { set; }
@@ -3390,19 +3467,19 @@ The name `ScheduledSnapshot.UntilEvent` had in format 1, kept for reading as `Sc
 public long DueAt { get; set; }
 ```
 
-*Undocumented.*
+The absolute clock time it is due at. Meaningless for work that waits on `ScheduledSnapshot.UntilEvent` instead.
 
 ```csharp
 public long Id { get; set; }
 ```
 
-*Undocumented.*
+The id the action had, so that work cancelled by id still refers to the same thing after a restore.
 
 ```csharp
 public int OwnerId { get; set; }
 ```
 
-*Undocumented.*
+Whose block this is: whose turn ends it, and what `self` will mean when it runs.
 
 ```csharp
 public string? Statements { get; set; }
@@ -3414,13 +3491,13 @@ The statements `CardRuntime.Execute` ran, when the block is part of them rather 
 public int Timing { get; set; }
 ```
 
-*Undocumented.*
+`ScheduleTiming` as a number, whose values are fixed for the whole 1.x line.
 
 ```csharp
 public List<UndoSnapshot> Undo { get; set; }
 ```
 
-*Undocumented.*
+What an `until` block has to put back, in the order it was done. Empty for every other timing.
 
 ```csharp
 public string? UntilEvent { get; set; }
@@ -3446,7 +3523,11 @@ Answers from a queue of names, for tests and replays. Each answer is a comma-sep
 public ScriptedChooser(params string[] answers)
 ```
 
-*Undocumented.*
+A chooser that reads from a queue of answers. Each answer is a comma-separated list of entity **names**, not ids, which is what lets a test written against content survive the entities being renumbered.
+
+**Parameters.**
+
+- `answers` — The answers, in the order the questions will be asked.
 
 ### Properties
 
@@ -3454,7 +3535,7 @@ public ScriptedChooser(params string[] answers)
 public int Remaining { get; }
 ```
 
-*Undocumented.*
+How many answers are left. Zero does not mean the script is finished: the chooser then quietly takes the first options, so a test that asks more questions than it answered still passes or fails on something.
 
 ### Methods
 
@@ -3462,7 +3543,7 @@ public int Remaining { get; }
 public IReadOnlyList<Entity> Choose(ChoiceRequest request, GameState state)
 ```
 
-*Undocumented.*
+Takes the next answer and matches its names against the options, ignoring case. A name that matches nothing is skipped in silence, so a misspelled answer reads as "picked fewer" rather than as an error.
 
 ```csharp
 public EntityDefinition? ChooseDefinition(DefinitionChoice request, GameState state)
@@ -3474,7 +3555,7 @@ Answers a definition offer from the same queue, so a test says `answer Fireball`
 public void Enqueue(string answer)
 ```
 
-*Undocumented.*
+Adds one more answer to the back of the queue.
 
 ---
 
@@ -3498,7 +3579,15 @@ A move made inside an `until` block, with the slot to put the actor back on.
 public TemporaryChange(Entity entity, string? tag = null, Entity? attached = null, string? stat = null, Num delta = default(Num))
 ```
 
-*Undocumented.*
+Records one reversible change made inside an `until` block. Exactly one of the three optional halves is meant per change: a tag added, an entity attached, or a stat moved by `delta`.
+
+**Parameters.**
+
+- `entity` — What was changed.
+- `tag` — The tag that was added, to be taken off again.
+- `attached` — The status or keyword that was attached, to be removed again.
+- `stat` — The stat that moved.
+- `delta` — How far it moved, to be subtracted back off. Undoing a stat puts the delta back rather than restoring the old number, so a change made in between survives.
 
 ### Properties
 
@@ -3506,19 +3595,19 @@ public TemporaryChange(Entity entity, string? tag = null, Entity? attached = nul
 public Entity? Attached { get; }
 ```
 
-*Undocumented.*
+The status or keyword that was attached, or null when this change is not an attachment.
 
 ```csharp
 public Num Delta { get; }
 ```
 
-*Undocumented.*
+How far the stat moved. The undo subtracts this rather than restoring the old value, so anything that changed the stat in between is kept.
 
 ```csharp
 public Entity Entity { get; }
 ```
 
-*Undocumented.*
+What was changed, and what the undo will be applied to.
 
 ```csharp
 public (int Lane, int Rank)? Slot { get; }
@@ -3530,13 +3619,13 @@ The slot the actor stood on before an `until` block moved it, or null for a chan
 public string? Stat { get; }
 ```
 
-*Undocumented.*
+The stat that moved, or null when this change is not about a stat.
 
 ```csharp
 public string? Tag { get; }
 ```
 
-*Undocumented.*
+The tag that was added, or null when this change is not about a tag.
 
 ---
 
@@ -3554,7 +3643,15 @@ Fixed-timestep clock for real-time games. Advance it from the engine's physics s
 public TickClock(int ticksPerSecond = 60)
 ```
 
-*Undocumented.*
+A tick clock at a fixed rate. The rate is what turns `3s` in content into a number of ticks, so it has to match the fixed timestep the game calls `CardRuntime.Tick(int)` from, or every duration in the content is wrong by that ratio.
+
+**Parameters.**
+
+- `ticksPerSecond` — Ticks in one second of game time. It cannot be changed afterwards, and it is not part of a save: restoring into a clock running at another rate reinterprets every cooldown and every timed status in it.
+
+**Throws.**
+
+- `ArgumentOutOfRangeException` — Zero or fewer ticks per second.
 
 ### Properties
 
@@ -3562,13 +3659,13 @@ public TickClock(int ticksPerSecond = 60)
 public long Now { get; private set; }
 ```
 
-*Undocumented.*
+Ticks elapsed since the game began. It does not reset between battles, so a cooldown across a battle boundary still expires when it should.
 
 ```csharp
 public int TicksPerSecond { get; }
 ```
 
-*Undocumented.*
+How many ticks a second is. A UI dividing `ready_at - Now` by this gets seconds, which is the one conversion the core cannot do for it.
 
 ### Methods
 
@@ -3576,19 +3673,19 @@ public int TicksPerSecond { get; }
 public void Restore(long now)
 ```
 
-*Undocumented.*
+Sets the time from a snapshot without raising `TickClock.Advanced`, so restoring a save does not replay every tick that had passed.
 
 ```csharp
 public void Tick(int count = 1)
 ```
 
-*Undocumented.*
+Moves time on, raising `TickClock.Advanced` once per tick rather than once per call — so a game that catches up four ticks at once resolves each of them in order, and nothing that was due in between is skipped.
 
 ```csharp
 public bool TryConvert(Num amount, string? unit, out long units)
 ```
 
-*Undocumented.*
+Accepts seconds, milliseconds, ticks and a bare number, always rounding up, so a length shorter than one tick becomes one tick rather than none. Refuses `turns`, which is what CT325 reports before the game ever runs.
 
 ### Events
 
@@ -3596,7 +3693,7 @@ public bool TryConvert(Num amount, string? unit, out long units)
 public event Action<long>? Advanced
 ```
 
-*Undocumented.*
+Raised once per tick, after `TickClock.Now` has moved — so a `TickClock.Tick(int)` of four raises it four times, and nothing that was due in between is skipped. `TickClock.Restore(long)` does not raise it.
 
 ---
 
@@ -3614,13 +3711,13 @@ One recorded step. Every action records what caused it, which is the foundation 
 public string Description { get; }
 ```
 
-*Undocumented.*
+What happened, in one line, for a person to read.
 
 ```csharp
 public long Id { get; }
 ```
 
-*Undocumented.*
+This entry's number, unique within the log and increasing. `TraceLog.Find(long)` takes it.
 
 ```csharp
 public string Kind { get; }
@@ -3638,7 +3735,7 @@ The listener that ran, if this step is a trigger.
 public long? ParentId { get; }
 ```
 
-*Undocumented.*
+What caused this step, or null for a top-level action. An entry whose parent has been dropped by the ring buffer keeps its id, so a viewer has to treat a parent it cannot find as a root.
 
 ```csharp
 public string? Source { get; }
@@ -3662,7 +3759,7 @@ Clock time when the step happened.
 public IReadOnlyDictionary<string, object> Values { get; }
 ```
 
-*Undocumented.*
+The numbers behind the step — the amount, the before and after, whatever the site recorded — so a tool can show a breakdown instead of parsing `TraceEntry.Description`. Empty rather than null when there are none.
 
 ### Methods
 
@@ -3670,7 +3767,7 @@ public IReadOnlyDictionary<string, object> Values { get; }
 public override string ToString()
 ```
 
-*Undocumented.*
+The kind, the description, the values and the source location on one line, as the tree view prints it.
 
 ---
 
@@ -3706,13 +3803,13 @@ How many entries the ring buffer has discarded since the log was last cleared. A
 public bool Enabled { get; set; }
 ```
 
-*Undocumented.*
+Whether anything is recorded. Off by default and free when off: every recording site checks this before allocating. Turning it on mid-game starts a log from that moment, with no history behind it.
 
 ```csharp
 public IReadOnlyList<TraceEntry> Entries { get; }
 ```
 
-*Undocumented.*
+Everything recorded, oldest first. It is the live list, so its count is also the mark `TraceLog.TruncateTo(int)` takes.
 
 ### Methods
 
@@ -3726,19 +3823,19 @@ Walks from an entry up to the root action: the "why did this happen" view.
 public IEnumerable<TraceEntry> Children(long id)
 ```
 
-*Undocumented.*
+The steps one entry caused, oldest first — one level, not the whole subtree. It scans the whole log per call, so building a tree from it is quadratic; `TraceLog.FormatTree` does it in one pass.
 
 ```csharp
 public void Clear()
 ```
 
-*Undocumented.*
+Drops every entry, every open scope and the dropped count. Ids are not reused, so an id from before a clear finds nothing rather than something else.
 
 ```csharp
 public TraceEntry? Find(long id)
 ```
 
-*Undocumented.*
+The entry with that id, or null when it never existed or the ring buffer has dropped it. It searches from the newest backwards, so recent entries are cheap and old ones are not.
 
 ```csharp
 public string FormatTree()
@@ -3750,7 +3847,18 @@ Renders the log as an indented tree, the text form of the causality view.
 public long Record(long time, string kind, string description, string? source = null, string? listener = null, SourceSpan span = default(SourceSpan), IReadOnlyDictionary<string, object>? values = null, long? parentOverride = null)
 ```
 
-*Undocumented.*
+Records one step and returns its id, or 0 when the log is disabled — and 0 is never a real id, so it can be passed to `TraceLog.Scope(long)` without checking.
+
+**Parameters.**
+
+- `time` — The clock time the step happened at.
+- `kind` — A category: `action`, `event`, `listener`, `verb`, `modifier`, `warning`.
+- `description` — One line, for a person.
+- `source` — The entity responsible, formatted as `Name#id`.
+- `listener` — The listener that ran, when this step is a trigger.
+- `span` — The line of content behind it.
+- `values` — The numbers behind it, for a tool that would rather not parse the description.
+- `parentOverride` — Attaches this to a parent other than the open scope — how work queued earlier is recorded under what queued it.
 
 ```csharp
 public IDisposable Scope(long id)
@@ -3788,7 +3896,7 @@ Whether anything is set at all, checked before a drain does any extra work.
 public int Count { get; }
 ```
 
-*Undocumented.*
+How many breakpoints are set, by line and by event together.
 
 ### Methods
 
@@ -3808,19 +3916,19 @@ Stops before anything queued by this event, wherever it was written. This is the
 public void Clear()
 ```
 
-*Undocumented.*
+Removes every breakpoint, by line and by event.
 
 ```csharp
 public bool Remove(string file, int line)
 ```
 
-*Undocumented.*
+Takes a line breakpoint off. False when there was none there, which is not an error.
 
 ```csharp
 public bool RemoveEvent(string eventName)
 ```
 
-*Undocumented.*
+Takes an event breakpoint off. False when there was none, which is not an error.
 
 ---
 
@@ -3830,7 +3938,7 @@ public bool RemoveEvent(string eventName)
 public enum TriggerResolution
 ```
 
-*Undocumented.*
+When an after-phase listener runs: at the end of the action that set it off, or in the middle of it. It changes the order everything happens in, so it is not a setting to change mid-project.
 
 | Member | |
 |---|---|
@@ -3853,7 +3961,7 @@ One unit per turn. The default for turn-based games.
 public long Now { get; private set; }
 ```
 
-*Undocumented.*
+Turns elapsed since the game began. It is not the battle's turn number, which is `GameState.Turn` and restarts each battle.
 
 ### Methods
 
@@ -3861,19 +3969,19 @@ public long Now { get; private set; }
 public void AdvanceTurn()
 ```
 
-*Undocumented.*
+Moves one turn on and raises `TurnClock.Advanced`. The runtime calls it; a game that calls it itself moves time without ending a turn.
 
 ```csharp
 public void Restore(long now)
 ```
 
-*Undocumented.*
+Sets the time from a snapshot without raising `TurnClock.Advanced`, so restoring a save does not re-run everything that was due.
 
 ```csharp
 public bool TryConvert(Num amount, string? unit, out long units)
 ```
 
-*Undocumented.*
+Accepts a bare number, `turn`, `turns` and `t`, rounding up; refuses seconds and milliseconds, which is what CT325 reports before the game ever runs. A negative length converts to 0 rather than failing.
 
 ### Events
 
@@ -3881,7 +3989,7 @@ public bool TryConvert(Num amount, string? unit, out long units)
 public event Action<long>? Advanced
 ```
 
-*Undocumented.*
+Raised once per turn, after `TurnClock.Now` has moved. `TurnClock.Restore(long)` does not raise it.
 
 ---
 
@@ -3906,7 +4014,7 @@ Whether the party takes one turn between them or every combatant takes its own s
 public sealed class UndoSnapshot
 ```
 
-*Undocumented.*
+One reversible change an `until` block made, as plain data — the saved form of `TemporaryChange`.
 
 ### Properties
 
@@ -3914,19 +4022,19 @@ public sealed class UndoSnapshot
 public int AttachedId { get; set; }
 ```
 
-*Undocumented.*
+The status or keyword that was attached, by id, or 0 when this change is not an attachment.
 
 ```csharp
 public long Delta { get; set; }
 ```
 
-*Undocumented.*
+How far the stat moved, as a raw `Num`. The undo subtracts it rather than restoring the old number.
 
 ```csharp
 public int EntityId { get; set; }
 ```
 
-*Undocumented.*
+What was changed, by id.
 
 ```csharp
 public int? Lane { get; set; }
@@ -3938,19 +4046,19 @@ The slot the actor stood on before an `until` block moved it. Both are set toget
 public int? Rank { get; set; }
 ```
 
-*Undocumented.*
+The rank of the slot the actor stood on, paired with `UndoSnapshot.Lane`. Both are set together or neither is, and neither being set is what says this change is not a move.
 
 ```csharp
 public string? Stat { get; set; }
 ```
 
-*Undocumented.*
+The stat that moved, or null when this change is not about a stat.
 
 ```csharp
 public string? Tag { get; set; }
 ```
 
-*Undocumented.*
+The tag that was added, or null when this change is not about a tag.
 
 ---
 
@@ -3968,19 +4076,19 @@ The dynamically typed value the interpreter passes around. Numbers are always `N
 public static readonly Value False
 ```
 
-*Undocumented.*
+False. Distinct from `Value.None`, which is also falsey but means "nothing here" rather than "no".
 
 ```csharp
 public static readonly Value None
 ```
 
-*Undocumented.*
+The absent value, and what `default(Value)` is. It is false, it denotes no entities, and it is what a name that resolved to nothing gives back.
 
 ```csharp
 public static readonly Value True
 ```
 
-*Undocumented.*
+True. It is a `ValueKind.Bool`, not a number, though its payload is 1.
 
 ### Properties
 
@@ -3988,25 +4096,25 @@ public static readonly Value True
 public EntityDefinition? Definition { get; }
 ```
 
-*Undocumented.*
+The definition this names, or null for every other kind.
 
 ```csharp
 public Entity? Entity { get; }
 ```
 
-*Undocumented.*
+The entity, or null — including for a `ValueKind.List` of exactly one, which is what most selectors give. `AsEntities` covers both.
 
 ```csharp
 public bool IsNone { get; }
 ```
 
-*Undocumented.*
+Whether this is the absent value. It is not "is this falsey": `Value.False`, zero and the empty string are all present. `AsBool` is the other question.
 
 ```csharp
 public ValueKind Kind { get; }
 ```
 
-*Undocumented.*
+What this is holding. Every accessor below answers null or zero for the wrong kind rather than throwing, so a caller that does not check gets a quiet default.
 
 ```csharp
 public Num Number { get; }
@@ -4018,7 +4126,7 @@ The numeric payload for numbers, and 1/0 for booleans.
 public QualifiedName? Qualified { get; }
 ```
 
-*Undocumented.*
+The `qualifier:name` pair, or null for every other kind.
 
 ```csharp
 public Num RangeHigh { get; }
@@ -4030,7 +4138,7 @@ Upper bound of a `ValueKind.Range`; the lower bound is `Value.Number`.
 public string? Text { get; }
 ```
 
-*Undocumented.*
+The text, or null for every other kind.
 
 ```csharp
 public string? Unit { get; }
@@ -4056,55 +4164,55 @@ Every entity this value denotes: one for an entity, all of them for a list, none
 public static Value FromBool(bool value)
 ```
 
-*Undocumented.*
+`Value.True` or `Value.False`.
 
 ```csharp
 public static Value FromDefinition(EntityDefinition definition)
 ```
 
-*Undocumented.*
+A reference to loaded content by name, as `Poison` is in `apply Poison 3`. Nothing has been made from it.
 
 ```csharp
 public static Value FromEntities(IReadOnlyList<Entity> entities)
 ```
 
-*Undocumented.*
+A list of entities. The list is taken as it is and not copied, so a caller that goes on mutating it changes what the value denotes.
 
 ```csharp
 public static Value FromEntity(Entity? entity)
 ```
 
-*Undocumented.*
+One entity, or `Value.None` when it is null — so a lookup that failed needs no separate branch.
 
 ```csharp
 public static Value FromNumber(Num value, string? unit = null)
 ```
 
-*Undocumented.*
+A number, with the unit it was written with. The unit is carried, not converted: a clock is what turns `3s` into ticks, and it only does so where a duration is expected.
 
 ```csharp
 public static Value FromQualified(string qualifier, string name)
 ```
 
-*Undocumented.*
+A `qualifier:name` predicate such as `tag:fire`. Building one does not test anything; the interpreter does that.
 
 ```csharp
 public static Value FromRange(Num low, Num high)
 ```
 
-*Undocumented.*
+An unrolled `3..6`: both ends, with nothing chosen yet. Whoever consumes it rolls it, so the same range in two places gives two numbers.
 
 ```csharp
 public static Value FromText(string text)
 ```
 
-*Undocumented.*
+A text value. Null becomes the empty string, which is falsey, rather than `Value.None`.
 
 ```csharp
 public override string ToString()
 ```
 
-*Undocumented.*
+A readable form for traces and test failures: `none`, `true`, a quoted string, `Name#id` for an entity, a bracketed list. It is for people, not for parsing.
 
 ---
 
@@ -4114,16 +4222,16 @@ public override string ToString()
 public enum ValueKind
 ```
 
-*Undocumented.*
+What a `Value` is holding. Worth branching on rather than guessing: several kinds carry a number and only `ValueKind.Number` is one.
 
 | Member | |
 |---|---|
-| `None = 0` | *Undocumented.* |
-| `Number = 1` | *Undocumented.* |
-| `Bool = 2` | *Undocumented.* |
-| `Text = 3` | *Undocumented.* |
-| `Entity = 4` | *Undocumented.* |
-| `List = 5` | *Undocumented.* |
+| `None = 0` | Nothing at all — a name that resolved to no entity, a selector that matched none. It is what `default(Value)` is. |
+| `Number = 1` | A number, in `Num`, possibly with a unit such as `%` or `s`. |
+| `Bool = 2` | True or false, carried as 1 or 0 in `Value.Number`. Not the same kind as a number, though it reads as one. |
+| `Text = 3` | A string literal from content. |
+| `Entity = 4` | One entity in the game. A selector that found exactly one still gives a `ValueKind.List`, so use `Value.AsEntities` rather than branching. |
+| `List = 5` | A list of entities: what every selector produces, however many it matched, including none. |
 | `Definition = 6` | A reference to loaded content by name, such as `Poison` in `apply Poison 3`. |
 | `Qualified = 7` | A `tag:fire` style predicate. |
 | `Range = 8` | An unrolled `3..6`. |
@@ -4136,7 +4244,7 @@ public enum ValueKind
 public sealed class ValueSnapshot
 ```
 
-*Undocumented.*
+One `Value` as plain data. Entities are stored as ids, definitions as kind and name, and numbers as raw `Num` longs, so nothing in here is a live object.
 
 ### Properties
 
@@ -4144,55 +4252,55 @@ public sealed class ValueSnapshot
 public string? DefinitionKind { get; set; }
 ```
 
-*Undocumented.*
+The declaring keyword of a definition value, paired with `ValueSnapshot.DefinitionName`.
 
 ```csharp
 public string? DefinitionName { get; set; }
 ```
 
-*Undocumented.*
+The name of a definition value, looked up in the content the restore is given.
 
 ```csharp
 public List<int>? Entities { get; set; }
 ```
 
-*Undocumented.*
+The ids of a list or single entity value. An id whose entity is gone is dropped on restore, so a list can come back shorter than it was written.
 
 ```csharp
 public long High { get; set; }
 ```
 
-*Undocumented.*
+The raw high end of a range. Zero for every other kind.
 
 ```csharp
 public int Kind { get; set; }
 ```
 
-*Undocumented.*
+`ValueKind` as a number, whose values are fixed for the whole 1.x line. It says which of the fields below mean anything.
 
 ```csharp
 public long Number { get; set; }
 ```
 
-*Undocumented.*
+The raw `Num` payload: the number, the 1 or 0 of a bool, or the low end of a range. Not the decimal value.
 
 ```csharp
 public string? Qualifier { get; set; }
 ```
 
-*Undocumented.*
+The part before the colon of a `qualifier:name` pair; `ValueSnapshot.Text` holds the rest.
 
 ```csharp
 public string? Text { get; set; }
 ```
 
-*Undocumented.*
+The text of a text value, or the name half of a `qualifier:name` pair.
 
 ```csharp
 public string? Unit { get; set; }
 ```
 
-*Undocumented.*
+The unit a number was written with, such as `%` or `s`. It is carried unconverted, as the live value carries it.
 
 ---
 
@@ -4210,43 +4318,43 @@ A verb invocation as seen by its implementation: lazy access to the positional a
 public int ArgumentCount { get; }
 ```
 
-*Undocumented.*
+How many positional arguments were written. Nothing checks it, so a verb that needs one has to say so itself.
 
 ```csharp
 public EvalContext Context { get; }
 ```
 
-*Undocumented.*
+Who is acting and on whom. Pass it on to any primitive called from here, or the effects this verb causes will be attributed to nobody.
 
 ```csharp
 public Interpreter Interpreter { get; }
 ```
 
-*Undocumented.*
+The interpreter running this verb, which is where a C# verb reaches the primitives — `ChangeStat`, `Interpreter.Heal(Entity, Entity, Num, EvalContext, SourceSpan)`, `Interpreter.Raise(GameEvent, EvalContext, Action, Action)` — that do the same bookkeeping content's own verbs do.
 
 ```csharp
 public CommandNode Node { get; }
 ```
 
-*Undocumented.*
+The parsed call, for a verb that needs more than the arguments and clauses this class offers.
 
 ```csharp
 public SourceSpan Span { get; }
 ```
 
-*Undocumented.*
+Where this call is written, for a diagnostic or a trace entry. `VerbCall.Error(string)` attaches it for you.
 
 ```csharp
 public GameState State { get; }
 ```
 
-*Undocumented.*
+The game this is running in, for a verb that needs to look something up.
 
 ```csharp
 public string Verb { get; }
 ```
 
-*Undocumented.*
+The name this was called by, as content wrote it. A handler registered for two names can tell which one was used.
 
 ### Methods
 
@@ -4262,25 +4370,25 @@ A bare percentage means nothing to any of them, and the unit used to be dropped:
 public Value Argument(int index)
 ```
 
-*Undocumented.*
+Evaluates a positional argument, or `Value.None` when it was not written. Arguments are evaluated on demand, so reading one twice runs it twice — including any roll in it.
 
 ```csharp
 public ExprNode? ArgumentNode(int index)
 ```
 
-*Undocumented.*
+The unevaluated argument, or null when it was not written. It is what to print in a message about an argument, since the value alone does not say how it was spelled.
 
 ```csharp
 public Value Clause(string keyword)
 ```
 
-*Undocumented.*
+Evaluates a named clause such as `to` or `from`, or `Value.None` when it was not written. A clause a verb never reads is silently dropped, which is what CT323 reports.
 
 ```csharp
 public RuntimeError Error(string message)
 ```
 
-*Undocumented.*
+Builds the error to throw from a verb, with the verb's name and this call's location already on it. Throw it: returning one does nothing.
 
 ```csharp
 public bool Flag(string name)
@@ -4292,13 +4400,13 @@ True for trailing flags such as `, ignore block` (stored as `ignore_block`).
 public bool HasClause(string keyword)
 ```
 
-*Undocumented.*
+Whether a named clause was written, without evaluating it. It also answers true for a bare flag of that name, so it is "was this word written", not "was a value given for it".
 
 ```csharp
 public Num Number(int index, Num fallback)
 ```
 
-*Undocumented.*
+A numeric argument, or `fallback` when it was not written. It accepts a bare percentage; `VerbCall.Amount(int, Num)` is the one that refuses one, and is what the built-in verbs use for counts.
 
 ```csharp
 public IReadOnlyList<Entity> Targets(string clause = "to", Entity? fallback = null)
@@ -4346,7 +4454,7 @@ The owner of the zone, which for an actor on the board is 0: one board per team.
 public string Zone { get; set; }
 ```
 
-*Undocumented.*
+The zone's name, from `Zones` or one the game invented.
 
 ---
 
@@ -4364,55 +4472,55 @@ Well-known zone names. Games may use any other string as well.
 public const string Attached = "attached"
 ```
 
-*Undocumented.*
+Statuses, keywords and abilities hanging off an actor. It is the zone that is easiest to miss: nothing in the C# guide's list of piles holds an ability, and `CardRuntime.AbilitiesOf(Entity)` exists so no game has to learn that.
 
 ```csharp
 public const string Board = "board"
 ```
 
-*Undocumented.*
+Where actors stand. An actor is in here while it has a slot, alive or dead, until it is buried.
 
 ```csharp
 public const string Dead = "dead"
 ```
 
-*Undocumented.*
+Where the buried go. A fallen party member is here, which is how `CardRuntime.Fallen` can list one to revive.
 
 ```csharp
 public const string Discard = "discard"
 ```
 
-*Undocumented.*
+Where played and discarded cards go, and what a shuffle pulls back into the draw pile.
 
 ```csharp
 public const string Draw = "draw"
 ```
 
-*Undocumented.*
+The pile drawn from, and where deck building puts cards. A card here is inert: it neither listens nor modifies.
 
 ```csharp
 public const string Exhaust = "exhaust"
 ```
 
-*Undocumented.*
+Out of the battle. A shuffle does not reach it, which is the whole point of exhausting a card.
 
 ```csharp
 public const string Hand = "hand"
 ```
 
-*Undocumented.*
+Cards held. A card listens from here, which is what a curse that hurts while held relies on.
 
 ```csharp
 public const string None = ""
 ```
 
-*Undocumented.*
+Nowhere. What an entity that has been removed, or never placed, reports.
 
 ```csharp
 public const string Play = "play"
 ```
 
-*Undocumented.*
+Where a card sits while its effect resolves. A card is here only for the length of its own play.
 
 ```csharp
 public const string Powers = "powers"
@@ -4424,7 +4532,7 @@ Played cards that stay in effect for the rest of the battle.
 public const string Relics = "relics"
 ```
 
-*Undocumented.*
+Where an actor's relics and items live, from the moment they are obtained until the run ends.
 
 ### Properties
 

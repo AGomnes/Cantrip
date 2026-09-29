@@ -17,8 +17,18 @@ namespace Cantrip.Content
             File = file;
         }
 
+        /// <summary>The parsed <c>test</c> block: its name, its body and its span.</summary>
         public TestDeclNode Syntax { get; }
+        /// <summary>
+        /// The file this was loaded from, as it was named to the loader — a real path for
+        /// <see cref="ContentLibrary.LoadFile"/>, and whatever a host passed to
+        /// <see cref="ContentLibrary.LoadText"/> otherwise.
+        /// </summary>
         public string File { get; }
+        /// <summary>
+        /// The name in the <c>test</c> line. Nothing enforces that it is unique across a library, so a
+        /// report that groups by it may merge two different tests.
+        /// </summary>
         public string Name => Syntax.Name;
     }
 
@@ -31,8 +41,11 @@ namespace Cantrip.Content
             File = file;
         }
 
+        /// <summary>The parsed <c>scenario</c> block: its name, its body and its span.</summary>
         public ScenarioDeclNode Syntax { get; }
+        /// <summary>The file this was loaded from, named as <see cref="TestDefinition.File"/> is.</summary>
         public string File { get; }
+        /// <summary>The name in the <c>scenario</c> line, which the simulator reports its numbers under.</summary>
         public string Name => Syntax.Name;
     }
 
@@ -73,9 +86,16 @@ namespace Cantrip.Content
         private readonly List<ScenarioDefinition> _scenarios = new List<ScenarioDefinition>();
         private readonly Dictionary<string, SourceFileNode> _files = new Dictionary<string, SourceFileNode>(FileNames);
         private readonly Dictionary<string, DiagnosticBag> _fileDiagnostics = new Dictionary<string, DiagnosticBag>(FileNames);
+
         /// <summary>Ruleset blocks in load order. A list, not a dictionary, so "last loaded" survives unloads.</summary>
         private readonly List<(string File, RulesetDeclNode Syntax)> _rulesets = new List<(string, RulesetDeclNode)>();
 
+        /// <summary>
+        /// An empty library with the built-in resources already in it — <c>hp</c>, <c>block</c>,
+        /// <c>energy</c>, <c>stacks</c> and <c>gold</c> — which content may override with a
+        /// <c>resource</c> block of its own. Load files into it with <see cref="LoadText"/>,
+        /// <see cref="LoadFile"/> or <see cref="LoadFolder"/>.
+        /// </summary>
         public ContentLibrary()
         {
             AddBuiltInResources();
@@ -135,11 +155,37 @@ namespace Cantrip.Content
             }
         }
 
+        /// <summary>
+        /// Every definition loaded, of every kind, <c>resource</c> and <c>board</c> included — filter on
+        /// <see cref="EntityDefinition.IsThing"/> for the ones a game can make one of.
+        /// </summary>
+        /// <remarks>
+        /// The order is a dictionary's, and a reload removes and re-adds entries, so it is not stable
+        /// and must never reach the RNG. Anything that picks a definition at random reads
+        /// <see cref="Pool"/> instead, or the same seed would stop replaying.
+        /// </remarks>
         public IEnumerable<EntityDefinition> Definitions => _definitions.Values;
+
+        /// <summary>The verbs content declares. Verbs the game registers from C# are not here; they belong to the runtime.</summary>
         public IEnumerable<VerbDefinition> Verbs => _verbs.Values;
+
+        /// <summary>Every <c>test</c> block, in load order — which is the order <c>DslTestRunner.RunAll(string)</c> runs them in.</summary>
         public IReadOnlyList<TestDefinition> Tests => _tests;
+
+        /// <summary>Every <c>scenario</c> block, in load order. A real-time game should declare none: a bot plays a scenario by taking turns.</summary>
         public IReadOnlyList<ScenarioDefinition> Scenarios => _scenarios;
+
+        /// <summary>
+        /// Every resource and its bounds, keyed by stat name, case-insensitively. It always has the
+        /// built-in five in it, so it is never empty and its count is not a measure of what content
+        /// declared.
+        /// </summary>
         public IReadOnlyDictionary<string, ResourceRule> Resources => _resources;
+
+        /// <summary>
+        /// The parsed syntax tree of every file loaded, for a tool that wants the text rather than the
+        /// definitions. A game never needs it.
+        /// </summary>
         public IEnumerable<SourceFileNode> Files => _files.Values;
 
         /// <summary>The boards content declares, in declaration order. Empty when it declares none.</summary>
@@ -170,6 +216,13 @@ namespace Cantrip.Content
         /// <summary>The ruleset declared in content, merged with defaults. Null when content declares none.</summary>
         public RulesetDeclNode? RulesetSyntax => _rulesets.Count == 0 ? null : _rulesets[_rulesets.Count - 1].Syntax;
 
+        /// <summary>
+        /// A library holding one piece of text, for a test or a snippet. It does <b>not</b> throw on
+        /// errors — check <see cref="Diagnostics"/>, or use <c>CardRuntime.FromText(string, RuntimeOptions)</c>,
+        /// which does.
+        /// </summary>
+        /// <param name="text">The content, as it would be written in a <c>.cantrip</c> file.</param>
+        /// <param name="file">The name diagnostics will point at. It does not have to exist.</param>
         public static ContentLibrary FromText(string text, string file = "<inline>")
         {
             var library = new ContentLibrary();
@@ -354,6 +407,16 @@ namespace Cantrip.Content
 
         // Lookup -------------------------------------------------------------------------------
 
+        /// <summary>
+        /// The definition of that name, or null. Names compare case-insensitively, as everywhere else.
+        /// </summary>
+        /// <param name="name">A definition's name, as content wrote it.</param>
+        /// <param name="kind">
+        /// The declaring keyword — <c>card</c>, <c>status</c>, <c>enemy</c> — which is what makes the
+        /// answer unambiguous. Null takes the first definition of that name whatever its kind, and
+        /// "first" is not defined when two kinds share a name, so pass a kind whenever the caller knows
+        /// one. <see cref="FindAny"/> is the way to ask for several in a stated order.
+        /// </param>
         public EntityDefinition? Find(string name, string? kind = null)
         {
             if (string.IsNullOrEmpty(name)) return null;
@@ -365,7 +428,6 @@ namespace Cantrip.Content
             return list[0];
         }
 
-        /// <summary>First match among several kinds, in the order given.</summary>
         /// <summary>
         /// Every definition declared with one keyword, in a stated order: sorted by
         /// <c>kind:name</c> with <see cref="StringComparer.OrdinalIgnoreCase"/>, the same key and
@@ -399,6 +461,10 @@ namespace Cantrip.Content
             return members;
         }
 
+        /// <summary>
+        /// The first match among several kinds, in the order given — how a call that accepts either a
+        /// <c>relic</c> or an <c>item</c> asks for both without guessing which came first.
+        /// </summary>
         public EntityDefinition? FindAny(string name, params string[] kinds)
         {
             foreach (string kind in kinds)
@@ -409,10 +475,22 @@ namespace Cantrip.Content
             return null;
         }
 
+        /// <summary>
+        /// The verb content declares under that name, or null. A verb the game registered from C# is not
+        /// here; ask <c>Interpreter.IsVerb(string)</c> to cover both.
+        /// </summary>
         public VerbDefinition? FindVerb(string name) => _verbs.TryGetValue(name, out VerbDefinition? verb) ? verb : null;
 
+        /// <summary>
+        /// The bounds and reset behaviour declared for a stat, or null when the stat is just a number
+        /// with no rules attached. The built-in five always answer.
+        /// </summary>
         public ResourceRule? Resource(string stat) => _resources.TryGetValue(stat, out ResourceRule? rule) ? rule : null;
 
+        /// <summary>
+        /// Every name that has at least one definition, once each however many kinds share it. It is
+        /// what a "did you mean?" or an editor's completion list is built from.
+        /// </summary>
         public IEnumerable<string> AllNames => _byName.Where(kv => kv.Value.Count > 0).Select(kv => kv.Key);
 
         /// <summary>

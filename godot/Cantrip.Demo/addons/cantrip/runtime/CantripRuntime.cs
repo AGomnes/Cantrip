@@ -52,6 +52,10 @@ namespace Cantrip.GodotAdapter
         private bool _busy;
         private bool _wasInBattle;
 
+        /// <summary>
+        /// Godot builds this; a scene adds the node. Nothing is loaded and no runtime exists until the
+        /// node enters the tree, so the exported properties can all be set from the inspector first.
+        /// </summary>
         public CantripRuntime() => _loop = new RunLoop(this);
 
         /// <summary>
@@ -121,15 +125,31 @@ namespace Cantrip.GodotAdapter
         [Export]
         public TickDriver? Driver { get; set; }
 
+        /// <summary>
+        /// One resolved event, as a dictionary with snake_case keys. It arrives <em>after</em> the whole
+        /// action has finished, never during it, so a handler may call back into the node — and
+        /// <c>after</c> carries the stats as they were at that event, which is what an animation should
+        /// show rather than the live values.
+        /// </summary>
         [Signal]
         public delegate void EffectEventEventHandler(Godot.Collections.Dictionary effect_event);
 
+        /// <summary>A battle has begun. It is emitted only if the battle is still running once <c>battle_start</c> has resolved.</summary>
         [Signal]
         public delegate void BattleStartedEventHandler();
 
+        /// <summary>
+        /// The battle is over, and the action that ended it has finished. It is safe to act from here —
+        /// hand out a reward, start the next battle — and the next battle will announce its own end when
+        /// it comes.
+        /// </summary>
         [Signal]
         public delegate void BattleEndedEventHandler(bool won);
 
+        /// <summary>
+        /// The rules stopped to ask the player something. The game has been rolled back to before the
+        /// action, so nothing has happened yet; answer with <c>Answer</c> and the action replays.
+        /// </summary>
         [Signal]
         public delegate void ChoiceRequestedEventHandler(Godot.Collections.Dictionary request);
 
@@ -140,10 +160,19 @@ namespace Cantrip.GodotAdapter
         /// <summary>The rules engine itself, for a game written in C#.</summary>
         public CardRuntime Core => EnsureRuntime();
 
+        /// <summary>
+        /// The loaded content, for a game written in C#. It is replaced by a load, so hold the node
+        /// rather than this.
+        /// </summary>
         public ContentLibrary Content { get; private set; } = new ContentLibrary();
 
         internal EventBuffer Buffer => _host.Buffer;
 
+        /// <summary>
+        /// Puts a <see cref="Driver"/> on this node's tick rate and, when <see cref="AutoLoad"/> is on,
+        /// loads the content — reporting any problems to the Output panel, since nothing receives what
+        /// an automatic load returns.
+        /// </summary>
         public override void _Ready()
         {
             if (Driver != null)
@@ -166,12 +195,18 @@ namespace Cantrip.GodotAdapter
             if (AutoLoad) Report(Load(string.Empty));
         }
 
+        /// <summary>Uninstalls the editor debug agent. The runtime itself keeps working: a node that is only being moved in the tree has lost nothing.</summary>
         public override void _ExitTree()
         {
             _debug?.Uninstall();
             _debug = null;
         }
 
+        /// <summary>
+        /// Releases the Callables the game registered, on predelete rather than on leaving the tree. A
+        /// GDScript lambda still held when Godot shuts down is freed after GDScript has gone, and the
+        /// process crashes on exit.
+        /// </summary>
         public override void _Notification(int what)
         {
             // Let go of the registered callables while GDScript is still there to free them. Held
@@ -223,6 +258,14 @@ namespace Cantrip.GodotAdapter
         // These run no rules, so they do not go through Act, but they do change the game, so a host
         // callback may no more call them than play a card.
 
+        /// <summary>
+        /// Makes the run's leader and returns its id. Every game calls it once, before anything else.
+        /// </summary>
+        /// <remarks>
+        /// The defaults are C# defaults, and GDScript does not see them: a script has to pass all three.
+        /// A leader that needs a stat of its own, such as <c>speed</c> under <c>order: speed</c>, gets it
+        /// afterwards from <c>SetStat</c> — there is no fourth argument and no declaration this reads.
+        /// </remarks>
         public int CreatePlayer(string name = "Player", int hp = 80, int max_energy = 3)
         {
             CardRuntime core = EnsureRuntime();
@@ -253,6 +296,11 @@ namespace Cantrip.GodotAdapter
             return Act(() => core.AddHero(name!, hp > 0 ? (int?)hp : null).Id);
         }
 
+        /// <summary>
+        /// Puts one copy of a <c>card</c> into one of the leader's piles and returns its id. Nothing is
+        /// announced, so no <c>drawn</c> or <c>obtained</c> listener hears it: this is deck building.
+        /// A zone that is not one Cantrip knows is warned about in the Output panel and used anyway.
+        /// </summary>
         public int AddCard(string name, string zone = Zones.Draw)
         {
             CardRuntime core = EnsureRuntime();
@@ -262,6 +310,10 @@ namespace Cantrip.GodotAdapter
             return core.AddCard(name, zone).Id;
         }
 
+        /// <summary>
+        /// Adds a card for each name into the draw pile and returns their ids, in order. Repeating a name
+        /// is how a deck holds five Strikes.
+        /// </summary>
         public Godot.Collections.Array AddDeck(Godot.Collections.Array names)
         {
             CardRuntime core = EnsureRuntime();
@@ -272,6 +324,11 @@ namespace Cantrip.GodotAdapter
             return ids;
         }
 
+        /// <summary>
+        /// Gives the leader a relic and returns its id. Unlike <see cref="AddCard"/> this announces
+        /// <c>obtained</c>, so a relic whose whole effect is an <c>on obtained:</c> block fires here,
+        /// during setup.
+        /// </summary>
         public int AddRelic(string name) => Act(() => EnsureRuntime().AddRelic(name).Id);
 
         /// <summary>
@@ -389,6 +446,14 @@ namespace Cantrip.GodotAdapter
 
         // Battle flow ----------------------------------------------------------------------------
 
+        /// <summary>
+        /// Opens a battle against whatever enemies are on the board and emits <c>BattleStarted</c>.
+        /// Spawn the enemies first: a battle with none is over as soon as it has begun.
+        /// </summary>
+        /// <remarks>
+        /// The defaults are C# defaults, which GDScript does not see, so a script passes both.
+        /// <see cref="StartBattleOn"/> is the one that names a board.
+        /// </remarks>
         public void StartBattle(bool shuffle = true, bool draw_opening_hand = true)
         {
             CardRuntime core = EnsureRuntime();
@@ -503,6 +568,11 @@ namespace Cantrip.GodotAdapter
             return true;
         });
 
+        /// <summary>
+        /// Advances a real-time game by whole ticks. Call it from the physics step, or let a
+        /// <see cref="Driver"/> do it; driving it from <c>_Process</c> makes the game depend on the frame
+        /// rate. It throws on a turn-based runtime, which has no tick clock to advance.
+        /// </summary>
         public void Tick(int count = 1) => Act(() =>
         {
             EnsureRuntime().Tick(count);
@@ -576,12 +646,19 @@ namespace Cantrip.GodotAdapter
             return VariantMap.Ids(core.State.ZoneOf(owner, zone));
         }
 
+        /// <summary>The living enemies on the board, as ids, in the order they stand.</summary>
         public Godot.Collections.Array GetEnemies() => VariantMap.Ids(EnsureRuntime().State.Actors(Team.Enemy));
 
+        /// <summary>
+        /// Everyone on the player's side, as ids — which includes summoned minions that take no step.
+        /// <c>GetParty</c> is the narrower list of who the game asks for input.
+        /// </summary>
         public Godot.Collections.Array GetAllies() => VariantMap.Ids(EnsureRuntime().State.Actors(Team.Player));
 
+        /// <summary>Every living actor on the board, both sides, as ids.</summary>
         public Godot.Collections.Array GetActors() => VariantMap.Ids(EnsureRuntime().State.Actors());
 
+        /// <summary>The leader's id, or 0 before <see cref="CreatePlayer"/>. Ids start at 1, so 0 is always "none".</summary>
         public int PlayerId()
         {
             CardRuntime core = EnsureRuntime();
@@ -721,6 +798,11 @@ namespace Cantrip.GodotAdapter
             return Act(() => core.ChangeStat(entity, stat ?? string.Empty, by).ToInt());
         }
 
+        /// <summary>
+        /// What this card costs to play right now, after modifiers — not its printed number. 0 for an id
+        /// that names nothing, and 0 for a card that really is free, which is the same answer for two
+        /// different things.
+        /// </summary>
         public int CostOf(int card_id)
         {
             CardRuntime core = EnsureRuntime();
@@ -839,8 +921,13 @@ namespace Cantrip.GodotAdapter
             return names;
         }
 
+        /// <summary>Whether a battle is running. False in a shop, a rest or a map screen, where most of the battle calls mean nothing.</summary>
         public bool IsInBattle() => EnsureRuntime().State.InBattle;
 
+        /// <summary>
+        /// The turn within the current battle, counting from 1. It is 0 between battles — and 0 for the
+        /// whole of a real-time battle, which has no turns at all.
+        /// </summary>
         public int GetTurn() => EnsureRuntime().State.Turn;
 
         /// <summary>
@@ -941,6 +1028,10 @@ namespace Cantrip.GodotAdapter
 
         // Choices --------------------------------------------------------------------------------
 
+        /// <summary>
+        /// Whether the rules are waiting on the player. While this is true the game has been rolled back
+        /// to before the action, so nothing the pending action would have done has happened yet.
+        /// </summary>
         public bool HasPendingChoice() => _choices.IsPending;
 
         /// <summary>The decision the rules are waiting on, or empty when there is none.</summary>

@@ -12,12 +12,18 @@ namespace Cantrip.Runtime
     /// </summary>
     public sealed class ChoicePendingException : Exception
     {
+        /// <summary>
+        /// Signals that content has asked a question the game has not answered. It is the engine's own
+        /// control flow: catching it outside <c>CardRuntime</c> means the action was not rolled back and
+        /// the game is mid-effect, which nothing should try to carry on from.
+        /// </summary>
         public ChoicePendingException(ChoiceRequest request)
             : base("A player choice is pending.")
         {
             Request = request;
         }
 
+        /// <summary>The question, so whoever catches this can ask it. Its options are entities in the game as it was before the action started.</summary>
         public ChoiceRequest Request { get; }
     }
 
@@ -28,12 +34,14 @@ namespace Cantrip.Runtime
     /// </summary>
     public sealed class OfferPendingException : Exception
     {
+        /// <summary>Signals an unanswered offer of content, as <c>discover</c> makes. The same control flow as <see cref="ChoicePendingException"/>.</summary>
         public OfferPendingException(DefinitionChoice offer)
             : base("A player choice between offered content is pending.")
         {
             Offer = offer;
         }
 
+        /// <summary>The offer, whose options are definitions rather than entities: nothing has been made yet.</summary>
         public DefinitionChoice Offer { get; }
     }
 
@@ -71,6 +79,10 @@ namespace Cantrip.Runtime
             Span = span;
         }
 
+        /// <summary>
+        /// What content wrote as the prompt, or the engine's own wording when it wrote none. It is not
+        /// localized: a game that translates its UI translates this itself.
+        /// </summary>
         public string Prompt { get; }
 
         /// <summary>The entities to choose between. Empty for an offer, which uses <see cref="Definitions"/>.</summary>
@@ -85,6 +97,11 @@ namespace Cantrip.Runtime
         /// <summary>How many options must be picked, and how many may be.</summary>
         public int Min { get; }
 
+        /// <summary>
+        /// The most that may be picked. It is capped at what is on offer, so it is safe to compare
+        /// against a selection count; <see cref="Min"/> may still exceed <see cref="Options"/> when
+        /// content asked for more than exists, and the action then takes what there is.
+        /// </summary>
         public int Max { get; }
 
         /// <summary>The actor making the choice.</summary>
@@ -93,6 +110,7 @@ namespace Cantrip.Runtime
         /// <summary>The content that asked, for tools that jump to the line.</summary>
         public SourceSpan Span { get; }
 
+        /// <summary>The prompt and the shape of the choice, for a log or a test failure.</summary>
         public override string ToString() => $"{Prompt} ({Min}-{Max} of {(IsOffer ? Definitions.Count : Options.Count)})";
     }
 
@@ -136,6 +154,15 @@ namespace Cantrip.Runtime
             _picks.Add(pick);
         }
 
+        /// <summary>
+        /// Replays an answer already given, or stops the action so the game can ask. Outside an action
+        /// the runtime can roll back it takes the first options instead, since there is nothing to
+        /// replay into.
+        /// </summary>
+        /// <exception cref="ChoicePendingException">
+        /// No answer for this question yet, and an action is running that can be rolled back. It is
+        /// caught by <c>CardRuntime</c>, not by the game.
+        /// </exception>
         public IReadOnlyList<Entity> Choose(ChoiceRequest request, GameState state)
         {
             if (_next < _answers.Count)

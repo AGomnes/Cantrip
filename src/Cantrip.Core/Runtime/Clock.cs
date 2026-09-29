@@ -17,8 +17,18 @@ namespace Cantrip.Runtime
     /// </remarks>
     public interface IGameClock
     {
+        /// <summary>
+        /// The current time in this clock's own whole units: turns elapsed, or ticks elapsed. It starts
+        /// at 0 and only ever goes up, so a duration is stored as the absolute time it ends at.
+        /// </summary>
         long Now { get; }
 
+        /// <summary>
+        /// Raised once per unit after the clock has moved, carrying the new <see cref="Now"/>. A runtime
+        /// subscribes from the moment it is built — that is what runs scheduled work, periodic triggers
+        /// and timed statuses — so a game that shares one clock between two runtimes drives both.
+        /// <see cref="Restore"/> deliberately does not raise it.
+        /// </summary>
         event Action<long>? Advanced;
 
         /// <summary>
@@ -48,16 +58,24 @@ namespace Cantrip.Runtime
     /// <summary>One unit per turn. The default for turn-based games.</summary>
     public sealed class TurnClock : IGameClock
     {
+        /// <summary>Turns elapsed since the game began. It is not the battle's turn number, which is <c>GameState.Turn</c> and restarts each battle.</summary>
         public long Now { get; private set; }
 
+        /// <summary>Raised once per turn, after <see cref="Now"/> has moved. <see cref="Restore"/> does not raise it.</summary>
         public event Action<long>? Advanced;
 
+        /// <summary>Moves one turn on and raises <see cref="Advanced"/>. The runtime calls it; a game that calls it itself moves time without ending a turn.</summary>
         public void AdvanceTurn()
         {
             Now++;
             Advanced?.Invoke(Now);
         }
 
+        /// <summary>
+        /// Accepts a bare number, <c>turn</c>, <c>turns</c> and <c>t</c>, rounding up; refuses seconds
+        /// and milliseconds, which is what CT325 reports before the game ever runs. A negative length
+        /// converts to 0 rather than failing.
+        /// </summary>
         public bool TryConvert(Num amount, string? unit, out long units)
         {
             switch (unit)
@@ -75,6 +93,7 @@ namespace Cantrip.Runtime
             }
         }
 
+        /// <summary>Sets the time from a snapshot without raising <see cref="Advanced"/>, so restoring a save does not re-run everything that was due.</summary>
         public void Restore(long now) => Now = now;
     }
 
@@ -84,18 +103,44 @@ namespace Cantrip.Runtime
     /// </summary>
     public sealed class TickClock : IGameClock
     {
+        /// <summary>
+        /// A tick clock at a fixed rate. The rate is what turns <c>3s</c> in content into a number of
+        /// ticks, so it has to match the fixed timestep the game calls <c>CardRuntime.Tick(int)</c> from,
+        /// or every duration in the content is wrong by that ratio.
+        /// </summary>
+        /// <param name="ticksPerSecond">
+        /// Ticks in one second of game time. It cannot be changed afterwards, and it is not part of a
+        /// save: restoring into a clock running at another rate reinterprets every cooldown and every
+        /// timed status in it.
+        /// </param>
+        /// <exception cref="ArgumentOutOfRangeException">Zero or fewer ticks per second.</exception>
         public TickClock(int ticksPerSecond = 60)
         {
             if (ticksPerSecond <= 0) throw new ArgumentOutOfRangeException(nameof(ticksPerSecond));
             TicksPerSecond = ticksPerSecond;
         }
 
+        /// <summary>
+        /// How many ticks a second is. A UI dividing <c>ready_at - Now</c> by this gets seconds, which
+        /// is the one conversion the core cannot do for it.
+        /// </summary>
         public int TicksPerSecond { get; }
 
+        /// <summary>Ticks elapsed since the game began. It does not reset between battles, so a cooldown across a battle boundary still expires when it should.</summary>
         public long Now { get; private set; }
 
+        /// <summary>
+        /// Raised once per tick, after <see cref="Now"/> has moved — so a <see cref="Tick"/> of four
+        /// raises it four times, and nothing that was due in between is skipped.
+        /// <see cref="Restore"/> does not raise it.
+        /// </summary>
         public event Action<long>? Advanced;
 
+        /// <summary>
+        /// Moves time on, raising <see cref="Advanced"/> once per tick rather than once per call — so a
+        /// game that catches up four ticks at once resolves each of them in order, and nothing that was
+        /// due in between is skipped.
+        /// </summary>
         public void Tick(int count = 1)
         {
             for (int i = 0; i < count; i++)
@@ -105,6 +150,11 @@ namespace Cantrip.Runtime
             }
         }
 
+        /// <summary>
+        /// Accepts seconds, milliseconds, ticks and a bare number, always rounding up, so a length
+        /// shorter than one tick becomes one tick rather than none. Refuses <c>turns</c>, which is what
+        /// CT325 reports before the game ever runs.
+        /// </summary>
         public bool TryConvert(Num amount, string? unit, out long units)
         {
             switch (unit)
@@ -131,6 +181,7 @@ namespace Cantrip.Runtime
             }
         }
 
+        /// <summary>Sets the time from a snapshot without raising <see cref="Advanced"/>, so restoring a save does not replay every tick that had passed.</summary>
         public void Restore(long now) => Now = now;
     }
 }

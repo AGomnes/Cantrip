@@ -26,6 +26,10 @@ namespace Cantrip.Descriptions
         /// </summary>
         string? Text(EntityDefinition definition) => null;
 
+        /// <summary>
+        /// The flavour line in this language. It is kept apart from the rules text and never mixed into
+        /// it, so a translation can drop it entirely by returning an empty string.
+        /// </summary>
         string? Flavour(EntityDefinition definition) => null;
 
         /// <summary>
@@ -45,6 +49,10 @@ namespace Cantrip.Descriptions
     /// </summary>
     public class EnglishDescriptions : IDescriptionLocalizer
     {
+        /// <summary>
+        /// The shared instance, which a builder given no localizer uses. It holds no state, so one is
+        /// enough; a subclass that overrides a few phrases makes its own.
+        /// </summary>
         public static readonly EnglishDescriptions Instance = new EnglishDescriptions();
 
         private static readonly Dictionary<string, string> Phrases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -280,12 +288,24 @@ namespace Cantrip.Descriptions
 
         internal static string? Default(string key) => Phrases.TryGetValue(key, out string? phrase) ? phrase : null;
 
+        /// <summary>
+        /// Null, so the definition's own name is used. Override it to rename things without touching
+        /// content.
+        /// </summary>
         public virtual string? Name(EntityDefinition definition) => null;
 
+        /// <summary>Null, so the definition's own <c>text:</c> or generated text is used.</summary>
         public virtual string? Text(EntityDefinition definition) => null;
 
+        /// <summary>Null, so the definition's own flavour line is used.</summary>
         public virtual string? Flavour(EntityDefinition definition) => null;
 
+        /// <summary>
+        /// The built-in English phrase for a key, or null for a key that has none. This is the one
+        /// member that does not default to null, which is why subclassing this class rather than
+        /// implementing the interface gives a translation that still reads correctly where it is
+        /// incomplete.
+        /// </summary>
         public virtual string? Phrase(string key) => Default(key);
     }
 }

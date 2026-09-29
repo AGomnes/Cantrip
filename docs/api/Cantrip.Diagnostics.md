@@ -10,7 +10,7 @@ Part of [the API reference](README.md). The guides are [docs/csharp.md](../cshar
 |---|---|
 | [`Diagnostic`](#diagnostic) | A single parser or linter message, tied to a source location. |
 | [`DiagnosticBag`](#diagnosticbag) | Collects diagnostics produced while loading or linting content. |
-| [`DiagnosticSeverity`](#diagnosticseverity) | *Undocumented.* |
+| [`DiagnosticSeverity`](#diagnosticseverity) | How much a diagnostic matters. Only `DiagnosticSeverity.Error` stops content loading; the other two are advice a tool may show and a game may ignore. |
 | [`DslException`](#dslexception) | Thrown when content cannot be loaded. Carries every error, not just the first. |
 | [`SourceSpan`](#sourcespan) | A location in a DSL source file. Every AST node and every runtime trace entry carries one so that any number on screen can be traced back to the line that produced it. |
 
@@ -30,7 +30,15 @@ A single parser or linter message, tied to a source location.
 public Diagnostic(DiagnosticSeverity severity, string code, string message, SourceSpan span, string? suggestion = null)
 ```
 
-*Undocumented.*
+Builds a message a tool can report. Games rarely call this; the one that does is a host adding a finding of its own to a bag it is about to print alongside the engine's.
+
+**Parameters.**
+
+- `severity` — Whether this stops content loading. See `DiagnosticSeverity`.
+- `code` — A stable `CT` code, so the message can be suppressed by code.
+- `message` — One sentence, in the voice the rest of the tool speaks in.
+- `span` — Where in the content. `SourceSpan.None` when there is no line to point at.
+- `suggestion` — A single closest spelling, or null. It is the word alone, not a sentence.
 
 ### Properties
 
@@ -38,25 +46,27 @@ public Diagnostic(DiagnosticSeverity severity, string code, string message, Sour
 public string Code { get; }
 ```
 
-Stable identifier such as `CT0104`, so rules can be suppressed by code.
+Stable identifier such as `CT0104`, so a rule can be suppressed by code and a message can be looked up without parsing its text.
+
+The codes are not a fixed width. Loading and parsing use four digits (`CT0001` to `CT0202`); the linter uses three (`CT301` upwards), and so do the description builder's `CT4xx`. Anything matching them with a pattern has to allow both.
 
 ```csharp
 public string Message { get; }
 ```
 
-*Undocumented.*
+The sentence to show, without the location or the code in front of it — `Diagnostic.ToString` is what assembles the whole line.
 
 ```csharp
 public DiagnosticSeverity Severity { get; }
 ```
 
-*Undocumented.*
+Whether this one stops content loading. `DiagnosticBag.ThrowIfErrors` looks at nothing else.
 
 ```csharp
 public SourceSpan Span { get; }
 ```
 
-*Undocumented.*
+Where in the content, or `SourceSpan.None` for a finding about the library as a whole. A tool that jumps to a diagnostic should check `SourceSpan.IsNone` first.
 
 ```csharp
 public string? Suggestion { get; }
@@ -70,7 +80,7 @@ Optional "did you mean ...?" hint.
 public override string ToString()
 ```
 
-*Undocumented.*
+The whole line, as the CLI prints it: `file:line:column: severity code: message`, with the suggestion appended when there is one. It is the form an editor's problem list can parse back into a location.
 
 ---
 
@@ -88,25 +98,25 @@ Collects diagnostics produced while loading or linting content.
 public int Count { get; }
 ```
 
-*Undocumented.*
+How many diagnostics, of every severity. Zero is not the same as "loaded cleanly": see `DiagnosticBag.HasErrors`.
 
 ```csharp
 public IEnumerable<Diagnostic> Errors { get; }
 ```
 
-*Undocumented.*
+The errors alone, in the order they were found. Evaluated on each enumeration rather than stored.
 
 ```csharp
 public bool HasErrors { get; }
 ```
 
-*Undocumented.*
+Whether anything in here stops the content being used. This, not `DiagnosticBag.Count`, is the check a loader makes: a library with forty warnings is a library that runs.
 
 ```csharp
 public IEnumerable<Diagnostic> Warnings { get; }
 ```
 
-*Undocumented.*
+The warnings alone. Note that this leaves out `DiagnosticSeverity.Info`, so it is not "everything that is not an error".
 
 ### Methods
 
@@ -114,31 +124,31 @@ public IEnumerable<Diagnostic> Warnings { get; }
 public void Add(Diagnostic diagnostic)
 ```
 
-*Undocumented.*
+Appends one already-built diagnostic. Nothing is deduplicated, so the same finding added twice is reported twice.
 
 ```csharp
 public void AddRange(IEnumerable<Diagnostic> diagnostics)
 ```
 
-*Undocumented.*
+Appends a whole run of diagnostics, keeping their order — how a linter's findings join a loader's.
 
 ```csharp
 public void Error(string code, string message, SourceSpan span, string? suggestion = null)
 ```
 
-*Undocumented.*
+Records an error: the content cannot be used as written.
 
 ```csharp
 public IEnumerator<Diagnostic> GetEnumerator()
 ```
 
-*Undocumented.*
+Every diagnostic, of every severity, in the order it was found.
 
 ```csharp
 public void Info(string code, string message, SourceSpan span, string? suggestion = null)
 ```
 
-*Undocumented.*
+Records a note. Tools may hide these by default; nothing in the engine acts on them.
 
 ```csharp
 public void ThrowIfErrors()
@@ -150,13 +160,13 @@ Throws if anything in the bag is an error. Used by the strict loading paths.
 public override string ToString()
 ```
 
-*Undocumented.*
+Every diagnostic, one per line. Useful in a test's failure message; a tool should format them itself.
 
 ```csharp
 public void Warn(string code, string message, SourceSpan span, string? suggestion = null)
 ```
 
-*Undocumented.*
+Records a warning: the content runs, but part of it does less than it looks like it does.
 
 ---
 
@@ -166,13 +176,13 @@ public void Warn(string code, string message, SourceSpan span, string? suggestio
 public enum DiagnosticSeverity
 ```
 
-*Undocumented.*
+How much a diagnostic matters. Only `DiagnosticSeverity.Error` stops content loading; the other two are advice a tool may show and a game may ignore.
 
 | Member | |
 |---|---|
-| `Info = 0` | *Undocumented.* |
-| `Warning = 1` | *Undocumented.* |
-| `Error = 2` | *Undocumented.* |
+| `Info = 0` | Worth knowing, never wrong. The linter uses it for things that are legal and probably not what was meant. |
+| `Warning = 1` | The content loads and runs, but something in it does less than it looks like it does — a clause that is accepted and ignored, a modifier that can never match. Most of what the linter finds is here, and it is the severity worth failing a content build on. |
+| `Error = 2` | The content cannot be used as written. `DiagnosticBag.ThrowIfErrors` throws on these and nothing else. |
 
 ---
 
@@ -190,13 +200,13 @@ Thrown when content cannot be loaded. Carries every error, not just the first.
 public DslException(Diagnostic diagnostic)
 ```
 
-*Undocumented.*
+The single-error form. `DslException.Diagnostics` still holds a list, of one.
 
 ```csharp
 public DslException(IReadOnlyList<Diagnostic> diagnostics)
 ```
 
-*Undocumented.*
+Carries a whole batch of errors, so one throw reports every problem in the file rather than the first. `Exception.Message` lists them all, indented.
 
 ### Properties
 
@@ -204,7 +214,7 @@ public DslException(IReadOnlyList<Diagnostic> diagnostics)
 public IReadOnlyList<Diagnostic> Diagnostics { get; }
 ```
 
-*Undocumented.*
+Every error that caused this, not just the one the message begins with. A tool that catches this should report these rather than `Exception.Message`, which is a summary.
 
 ---
 
@@ -222,7 +232,14 @@ A location in a DSL source file. Every AST node and every runtime trace entry ca
 public SourceSpan(string file, int line, int column, int length)
 ```
 
-*Undocumented.*
+A location in a source file. Nothing is validated: a span the caller got wrong points somewhere wrong rather than throwing, since a diagnostic that cannot be reported is worse than one that points at the wrong column.
+
+**Parameters.**
+
+- `file` — The file, or null for none — which becomes the empty string and reads as `SourceSpan.None`.
+- `line` — 1-based. Zero with no file is `SourceSpan.None`.
+- `column` — 1-based.
+- `length` — How many characters, on that line alone.
 
 ### Fields and constants
 
@@ -230,7 +247,7 @@ public SourceSpan(string file, int line, int column, int length)
 public static readonly SourceSpan None
 ```
 
-*Undocumented.*
+No location: a diagnostic about the library as a whole, or a node the engine synthesised rather than parsed. It is also `default(SourceSpan)`, so a span nobody set reads as this.
 
 ### Properties
 
@@ -250,13 +267,13 @@ Path the source was loaded from, or a synthetic name for in-memory content.
 public bool IsNone { get; }
 ```
 
-*Undocumented.*
+Whether there is a place to point at. Worth asking before jumping to a diagnostic: a span with no file is `SourceSpan.None`, not line 0 of the file being read.
 
 ```csharp
 public int Length { get; }
 ```
 
-*Undocumented.*
+How many characters the span covers, on `SourceSpan.Line` alone — a span never crosses a line break, so an editor can underline it without looking at what follows.
 
 ```csharp
 public int Line { get; }
@@ -270,19 +287,19 @@ public int Line { get; }
 public bool Equals(SourceSpan other)
 ```
 
-*Undocumented.*
+All four fields, exactly. Two spans that overlap but do not coincide are not equal.
 
 ```csharp
 public override bool Equals(object? obj)
 ```
 
-*Undocumented.*
+The boxing form of `SourceSpan.Equals(SourceSpan)`.
 
 ```csharp
 public override int GetHashCode()
 ```
 
-*Undocumented.*
+Hashes all four fields, so a span works as a dictionary key — which is how a tool groups diagnostics by location.
 
 ```csharp
 public SourceSpan To(SourceSpan other)

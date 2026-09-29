@@ -12,7 +12,7 @@ Part of [the API reference](README.md). The guides are [docs/csharp.md](../cshar
 | [`BoardShape`](#boardshape) | The shape of the board a battle is fought on: a rectangle of `lanes` across and `ranks` along the facing axis, both counting from 0. Content declares any number of them by name and a game picks one per battle; content that declares none gets `BoardShape.Default`, which is the board every game had before boards existed. |
 | [`BoardSides`](#boardsides) | Whether the two sides stand on mirrored grids or on one shared grid. |
 | [`ContentLibrary`](#contentlibrary) | Every definition loaded from DSL files. Parse errors are collected rather than thrown, so a designer sees all the problems in a folder at once. Reloading a file replaces exactly the definitions that file contributed, which is what makes hot reload cheap. |
-| [`EnemyPatternKind`](#enemypatternkind) | *Undocumented.* |
+| [`EnemyPatternKind`](#enemypatternkind) | How an enemy picks its next move. It is rolled once per turn, when the intent is telegraphed, not when the move runs. |
 | [`EntityDefinition`](#entitydefinition) | Loaded, validated content: one card, status, relic, enemy, keyword or resource. Built once from the syntax tree and shared by every entity instantiated from it. |
 | [`MoveDefinition`](#movedefinition) | A named enemy move: `move "Chomp": deal 11 to player`. |
 | [`OnVacated`](#onvacated) | What happens to the actors behind a slot when its occupant leaves. |
@@ -57,7 +57,22 @@ A shape is content, never something a game invents at runtime, because the linte
 public BoardShape(string name, int lanes = 1, int ranks = 0, BoardSides sides = Facing, BoardMetric metric = Manhattan, OnVacated onVacated = Gap, string? laneWord = null, string? rankWord = null)
 ```
 
-*Undocumented.*
+A board shape built in C#, for a test or a tool. A game does not build one: shapes come from `board` declarations, because the linter has to know them to check what reaches across them.
+
+**Parameters.**
+
+- `name` — What content calls this board. Names compare case-insensitively.
+- `lanes` — Slots across, at least one.
+- `ranks` — Slots deep, or `BoardShape.Unbounded` for a lane with no floor.
+- `sides` — Whether the two sides stand on mirrored grids or on one shared grid.
+- `metric` — How the distance between two slots is measured.
+- `onVacated` — What happens to the actors behind a slot when its occupant leaves.
+- `laneWord` — What rules text calls a lane. Null or blank keeps `lane`.
+- `rankWord` — What rules text calls a rank. Null or blank keeps `rank`.
+
+**Throws.**
+
+- `ArgumentOutOfRangeException` — Fewer than one lane, or a negative number of ranks.
 
 ### Fields and constants
 
@@ -111,19 +126,19 @@ On a `facing` board the two sides are mirrored and the rank term across them is 
 public BoardMetric Metric { get; }
 ```
 
-*Undocumented.*
+How a distance across both axes is added up, which is what decides whether a diagonal step counts as one or two.
 
 ```csharp
 public string Name { get; }
 ```
 
-*Undocumented.*
+What content calls this board, and what `CardRuntime.StartBattle(bool, bool, string)` is given to pick it.
 
 ```csharp
 public OnVacated OnVacated { get; }
 ```
 
-*Undocumented.*
+What the board does with the hole an actor leaves behind. It is the difference between a back rank that stays safe once the front rank dies and one that does not.
 
 ```csharp
 public bool RankHoldsOne { get; }
@@ -147,13 +162,13 @@ Slots deep, or `BoardShape.Unbounded` for a lane with no floor.
 public bool RanksAreUnbounded { get; }
 ```
 
-*Undocumented.*
+Whether a lane goes on for as long as anything is put in it. A wave game wants this; it also means `BoardShape.MaxDistance` has no answer, so nothing can say that a reach covers the whole board.
 
 ```csharp
 public BoardSides Sides { get; }
 ```
 
-*Undocumented.*
+Whether the two sides stand on mirrored grids or share one. It decides what a rank number means, so it is the setting most likely to be behind a fight where the distances look wrong.
 
 ### Methods
 
@@ -179,7 +194,7 @@ Whether a rank number is one this board has. Every rank from 0 up, when unbounde
 public bool Holds(int lane, int rank)
 ```
 
-*Undocumented.*
+Whether a slot is one this board has at all, which is both `BoardShape.HasLane(int)` and `BoardShape.HasRank(int)`.
 
 ```csharp
 public bool SameShapeAs(BoardShape? other)
@@ -191,7 +206,7 @@ Whether this is the same board as `other`, by everything that changes a result. 
 public override string ToString()
 ```
 
-*Undocumented.*
+The declaration form, for a diagnostic or a log: `board "front" (2 lanes, 3 ranks, facing)`.
 
 ---
 
@@ -224,7 +239,7 @@ Every definition loaded from DSL files. Parse errors are collected rather than t
 public ContentLibrary()
 ```
 
-*Undocumented.*
+An empty library with the built-in resources already in it — `hp`, `block`, `energy`, `stacks` and `gold` — which content may override with a `resource` block of its own. Load files into it with `ContentLibrary.LoadText(string, string)`, `ContentLibrary.LoadFile(string)` or `ContentLibrary.LoadFolder(string, string, bool)`.
 
 ### Fields and constants
 
@@ -240,7 +255,7 @@ File extension used by `ContentLibrary.LoadFolder(string, string, bool)` when no
 public IEnumerable<string> AllNames { get; }
 ```
 
-*Undocumented.*
+Every name that has at least one definition, once each however many kinds share it. It is what a "did you mean?" or an editor's completion list is built from.
 
 ```csharp
 public IReadOnlyList<BoardShape> Boards { get; }
@@ -258,7 +273,9 @@ The board a battle is fought on when nobody names one: the first board content d
 public IEnumerable<EntityDefinition> Definitions { get; }
 ```
 
-*Undocumented.*
+Every definition loaded, of every kind, `resource` and `board` included — filter on `EntityDefinition.IsThing` for the ones a game can make one of.
+
+The order is a dictionary's, and a reload removes and re-adds entries, so it is not stable and must never reach the RNG. Anything that picks a definition at random reads `ContentLibrary.Pool(string)` instead, or the same seed would stop replaying.
 
 ```csharp
 public DiagnosticBag Diagnostics { get; }
@@ -270,7 +287,7 @@ Every diagnostic from every loaded file, in load order.
 public IEnumerable<SourceFileNode> Files { get; }
 ```
 
-*Undocumented.*
+The parsed syntax tree of every file loaded, for a tool that wants the text rather than the definitions. A game never needs it.
 
 ```csharp
 public string Fingerprint { get; }
@@ -288,7 +305,7 @@ Incremented whenever content changes, so a runtime knows to rebind live entities
 public IReadOnlyDictionary<string, ResourceRule> Resources { get; }
 ```
 
-*Undocumented.*
+Every resource and its bounds, keyed by stat name, case-insensitively. It always has the built-in five in it, so it is never empty and its count is not a measure of what content declared.
 
 ```csharp
 public RulesetDeclNode? RulesetSyntax { get; }
@@ -300,19 +317,19 @@ The ruleset declared in content, merged with defaults. Null when content declare
 public IReadOnlyList<ScenarioDefinition> Scenarios { get; }
 ```
 
-*Undocumented.*
+Every `scenario` block, in load order. A real-time game should declare none: a bot plays a scenario by taking turns.
 
 ```csharp
 public IReadOnlyList<TestDefinition> Tests { get; }
 ```
 
-*Undocumented.*
+Every `test` block, in load order — which is the order `DslTestRunner.RunAll(string)` runs them in.
 
 ```csharp
 public IEnumerable<VerbDefinition> Verbs { get; }
 ```
 
-*Undocumented.*
+The verbs content declares. Verbs the game registers from C# are not here; they belong to the runtime.
 
 ### Methods
 
@@ -332,25 +349,35 @@ Builds the effective ruleset: defaults overridden by any `ruleset` block.
 public EntityDefinition? Find(string name, string? kind = null)
 ```
 
-*Undocumented.*
+The definition of that name, or null. Names compare case-insensitively, as everywhere else.
+
+**Parameters.**
+
+- `name` — A definition's name, as content wrote it.
+- `kind` — The declaring keyword — `card`, `status`, `enemy` — which is what makes the answer unambiguous. Null takes the first definition of that name whatever its kind, and "first" is not defined when two kinds share a name, so pass a kind whenever the caller knows one. `ContentLibrary.FindAny(string, string[])` is the way to ask for several in a stated order.
 
 ```csharp
 public EntityDefinition? FindAny(string name, params string[] kinds)
 ```
 
-*Undocumented.*
+The first match among several kinds, in the order given — how a call that accepts either a `relic` or an `item` asks for both without guessing which came first.
 
 ```csharp
 public VerbDefinition? FindVerb(string name)
 ```
 
-*Undocumented.*
+The verb content declares under that name, or null. A verb the game registered from C# is not here; ask `Interpreter.IsVerb(string)` to cover both.
 
 ```csharp
 public static ContentLibrary FromText(string text, string file = "<inline>")
 ```
 
-*Undocumented.*
+A library holding one piece of text, for a test or a snippet. It does **not** throw on errors — check `ContentLibrary.Diagnostics`, or use `CardRuntime.FromText(string, RuntimeOptions)`, which does.
+
+**Parameters.**
+
+- `text` — The content, as it would be written in a `.cantrip` file.
+- `file` — The name diagnostics will point at. It does not have to exist.
 
 ```csharp
 public DiagnosticBag LoadFile(string path)
@@ -374,7 +401,7 @@ Parses and registers a source file. Returns that file's diagnostics.
 public IReadOnlyList<EntityDefinition> Pool(string kind)
 ```
 
-First match among several kinds, in the order given.
+Every definition declared with one keyword, in a stated order: sorted by `kind:name` with `StringComparer.OrdinalIgnoreCase`, the same key and comparer `ContentLibrary.Fingerprint` sorts by. Cached until content changes.
 
 `ContentLibrary.Definitions` enumerates a dictionary, and a reload removes then re-adds its entries, so its order is not a contract and must never reach the RNG. Anything that picks content at random reads it from here instead, or the same seed would stop replaying.
 
@@ -382,7 +409,7 @@ First match among several kinds, in the order given.
 public ResourceRule? Resource(string stat)
 ```
 
-*Undocumented.*
+The bounds and reset behaviour declared for a stat, or null when the stat is just a number with no rules attached. The built-in five always answer.
 
 ```csharp
 public void Unload(string file)
@@ -398,7 +425,7 @@ Removes everything a file contributed.
 public enum EnemyPatternKind
 ```
 
-*Undocumented.*
+How an enemy picks its next move. It is rolled once per turn, when the intent is telegraphed, not when the move runs.
 
 | Member | |
 |---|---|
@@ -428,7 +455,7 @@ The abilities a `hero` is granted when it is created, from its `abilities` line.
 public IReadOnlyDictionary<string, BlockMemberNode> Blocks { get; }
 ```
 
-*Undocumented.*
+Labelled blocks by name, case-insensitively. The engine runs only `effect` and the `move`s; anything else here is a block the game runs itself, or a typo that never runs. A game that does run one names it in `LintOptions.HostBlocks` so the linter stops reporting it.
 
 ```csharp
 public string CostResource { get; private set; }
@@ -452,19 +479,19 @@ The event that triggers decay, typically `turn_end`.
 public BlockNode? Effect { get; }
 ```
 
-*Undocumented.*
+The `effect:` block, or null when the definition has none. A card with no effect is legal: its whole behaviour may be its listeners, its modifiers or a tag.
 
 ```csharp
 public StatusFlags Flags { get; private set; }
 ```
 
-*Undocumented.*
+What kind of status this is and how it behaves, from the words on its declaration. `StatusFlags.None` for everything that is not a status.
 
 ```csharp
 public string? Flavour { get; }
 ```
 
-*Undocumented.*
+The flavour line, or null. Both spellings are read, `flavour` first, so content written either way works and a definition that has both shows the British one.
 
 ```csharp
 public bool IsHero { get; }
@@ -482,7 +509,7 @@ Whether this declares something the game can make one of, rather than a rule abo
 public EntityKind Kind { get; }
 ```
 
-*Undocumented.*
+What the engine treats this as. Several keywords land on one kind — `enemy`, `actor` and `hero` are all `EntityKind.Actor` — so `EntityDefinition.KindName` is what tells them apart.
 
 ```csharp
 public string KindName { get; }
@@ -494,37 +521,37 @@ The keyword it was declared with: `card`, `status`, `relic`...
 public IReadOnlyList<ListenerNode> Listeners { get; }
 ```
 
-*Undocumented.*
+Every `on ...:` block, in declaration order. A line that only looks like a listener — `when card_played:` — is in `EntityDefinition.Blocks` instead and never runs, which is CT313.
 
 ```csharp
 public int? MaxStacks { get; private set; }
 ```
 
-*Undocumented.*
+The cap on `stacks`, or null for none. It is the `max_stacks` line: misspell it and the status silently has no cap, since any other property is just a stat.
 
 ```csharp
 public IReadOnlyList<ModifyNode> Modifiers { get; }
 ```
 
-*Undocumented.*
+Every `modify` line, in declaration order. They are live while the entity is, and the pipeline decides their order, not this list.
 
 ```csharp
 public IReadOnlyList<MoveDefinition> Moves { get; }
 ```
 
-*Undocumented.*
+Every `move`, in declaration order — which is also the order a `cycle` pattern takes them in when no `pattern` line names them.
 
 ```csharp
 public string Name { get; }
 ```
 
-*Undocumented.*
+The name in the declaration, as content wrote it. Two definitions of different kinds may share one.
 
 ```csharp
 public EnemyPatternKind Pattern { get; private set; }
 ```
 
-*Undocumented.*
+How this enemy picks its next move. The default takes the moves in order, which is what makes an enemy readable; only a `pattern` line changes it.
 
 ```csharp
 public IReadOnlyList<string> PatternMoves { get; private set; }
@@ -542,7 +569,7 @@ Behaviour phases, in declaration order. Empty means the enemy has one behaviour 
 public IReadOnlyDictionary<string, PropertyNode> Properties { get; }
 ```
 
-*Undocumented.*
+Every property line as it was parsed, by name. It holds the configuration lines as well as the numbers, so `EntityDefinition.Stats` is the narrower question and usually the one meant.
 
 ```csharp
 public Reach? Range { get; private set; }
@@ -554,7 +581,7 @@ How far this reaches, from its `range` line, or null when it says nothing and re
 public StackingMode Stacking { get; private set; }
 ```
 
-*Undocumented.*
+How a second application combines with the first. The default is `StackingMode.Intensity`, which has no timer at all, so a status meant to run out has to say so.
 
 ```csharp
 public IReadOnlyDictionary<string, Num> Stats { get; }
@@ -566,13 +593,13 @@ Numeric properties that become base stats on instantiation (`cost`, `hp`...).
 public EntityDeclNode Syntax { get; }
 ```
 
-*Undocumented.*
+The declaration this was built from, for a tool that needs the text, the spans or a member this class does not surface.
 
 ```csharp
 public IReadOnlyList<string> Tags { get; }
 ```
 
-*Undocumented.*
+The words on the `tags` line, lower-cased and deduplicated. A tag written on a line of its own is not here: it is a property nothing reads, which is CT316.
 
 ```csharp
 public string? Text { get; }
@@ -592,19 +619,19 @@ Plain text with no live values (description level 3).
 public bool HasTag(string tag)
 ```
 
-*Undocumented.*
+Whether the `tags` line carries this word, ignoring case. It asks about the definition, so a tag an effect added to one live entity is `Entity.HasTag(string)` instead.
 
 ```csharp
 public PropertyNode? Property(string name)
 ```
 
-*Undocumented.*
+One property line as it was parsed, or null when it was not written. The parsed node is what a tool wants; `EntityDefinition.Stats`, `EntityDefinition.ReadString(string)` and `EntityDefinition.Word(string)` are the shortcuts for reading a value out of one.
 
 ```csharp
 public string? ReadString(string property)
 ```
 
-*Undocumented.*
+A property's value when it was written as a quoted string, or null — which also covers a property that was written without quotes. Use `EntityDefinition.Word(string)` for a bare word.
 
 ```csharp
 public IReadOnlyList<string> ReadWordList(string property)
@@ -616,7 +643,7 @@ Every word a property lists: `abilities Smite, Bulwark` gives both. Empty when t
 public override string ToString()
 ```
 
-*Undocumented.*
+The declaration's first line, as content wrote it: `card "Strike"`. This is what diagnostics name it by.
 
 ```csharp
 public string? Word(string property)
@@ -640,7 +667,14 @@ A named enemy move: `move "Chomp": deal 11 to player`.
 public MoveDefinition(string name, BlockNode body, Num weight, string? phase = null)
 ```
 
-*Undocumented.*
+A move built in C#, for a test or a tool. Content declares them with `move "Chomp": ...`.
+
+**Parameters.**
+
+- `name` — What the intent panel shows and what `use` names.
+- `body` — The statements the move runs.
+- `weight` — Its share of a `random` pattern. Ignored by a `cycle` pattern.
+- `phase` — The phase it belongs to, or null for a move available in every phase.
 
 ### Properties
 
@@ -648,13 +682,13 @@ public MoveDefinition(string name, BlockNode body, Num weight, string? phase = n
 public BlockNode Body { get; }
 ```
 
-*Undocumented.*
+The statements the move runs. They are run in the enemy's turn, not when the intent is rolled.
 
 ```csharp
 public string Name { get; }
 ```
 
-*Undocumented.*
+The move's name, as the intent panel shows it and as `use "Chomp"` names it.
 
 ```csharp
 public string? Phase { get; }
@@ -678,7 +712,7 @@ Who the move telegraphs against, from `move "Cutthroat" at lowest hp enemies:`. 
 public Num Weight { get; }
 ```
 
-*Undocumented.*
+This move's share of a `random` pattern, relative to the other moves'. A `cycle` pattern takes every move in order and ignores it.
 
 ---
 
@@ -711,7 +745,14 @@ A behaviour phase: `phase Broken when hp <= max_hp / 2`. Moves tagged with the p
 public PhaseDefinition(string name, ExprNode condition, SourceSpan span, bool retelegraph = false)
 ```
 
-*Undocumented.*
+A phase built in C#, for a test or a tool. Content declares them with `phase Broken when ...`.
+
+**Parameters.**
+
+- `name` — What moves tag themselves with to belong to this phase.
+- `condition` — Evaluated against the enemy each time its intent is rolled.
+- `span` — Where it was written, for diagnostics.
+- `retelegraph` — Whether entering the phase re-rolls the intent there and then.
 
 ### Properties
 
@@ -725,7 +766,7 @@ Evaluated against the enemy each time its intent is rolled.
 public string Name { get; }
 ```
 
-*Undocumented.*
+The phase's name, which is what a `move` tags itself with to belong to it.
 
 ```csharp
 public bool Retelegraph { get; }
@@ -739,7 +780,7 @@ Opt-in, because it trades away a guarantee worth keeping: ordinarily the intent 
 public SourceSpan Span { get; }
 ```
 
-*Undocumented.*
+Where the `phase` line was written, so a diagnostic about it can point somewhere.
 
 ### Methods
 
@@ -747,7 +788,7 @@ public SourceSpan Span { get; }
 public override string ToString()
 ```
 
-*Undocumented.*
+The phase's name.
 
 ---
 
@@ -767,7 +808,12 @@ A reach is measured with `GameState.Distance(Entity, Entity)` between whoever is
 public Reach(int min, int max)
 ```
 
-*Undocumented.*
+A reach from two step counts. A negative `min` is clamped to 0 rather than refused, so a `range` modifier that drives the near end below zero still names a reach.
+
+**Parameters.**
+
+- `min` — The nearest slot reached. 0 means "from where I stand outwards".
+- `max` — The furthest slot reached.
 
 ### Properties
 
@@ -789,19 +835,19 @@ The nearest slot this reaches. Zero unless content wrote `range 2..3`.
 public bool Equals(Reach other)
 ```
 
-*Undocumented.*
+Both ends, exactly.
 
 ```csharp
 public override bool Equals(object? obj)
 ```
 
-*Undocumented.*
+The boxing form of `Reach.Equals(Reach)`.
 
 ```csharp
 public override int GetHashCode()
 ```
 
-*Undocumented.*
+Hashes both ends.
 
 ```csharp
 public bool Reaches(int distance)
@@ -813,7 +859,7 @@ Whether something that many steps away is within this reach.
 public override string ToString()
 ```
 
-*Undocumented.*
+The form content writes: `1` for a reach that starts where the user stands, `2..3` otherwise.
 
 ---
 
@@ -831,7 +877,7 @@ Bounds and reset behaviour for a stat treated as a resource. Resources are data,
 public ResourceRule(string stat)
 ```
 
-*Undocumented.*
+An unbounded rule for a stat: no floor, no ceiling and no reset until one is set. Content declares these with `resource "energy"`; a game builds one only to add a resource the content did not.
 
 ### Properties
 
@@ -863,7 +909,7 @@ Value restored when `ResourceRule.ResetOn` fires.
 public string Stat { get; }
 ```
 
-*Undocumented.*
+The stat this governs, lower-cased. Every actor's stat of that name is bound by it; a resource is not owned by anybody.
 
 ---
 
@@ -881,19 +927,19 @@ A `scenario` block together with the file it came from.
 public string File { get; }
 ```
 
-*Undocumented.*
+The file this was loaded from, named as `TestDefinition.File` is.
 
 ```csharp
 public string Name { get; }
 ```
 
-*Undocumented.*
+The name in the `scenario` line, which the simulator reports its numbers under.
 
 ```csharp
 public ScenarioDeclNode Syntax { get; }
 ```
 
-*Undocumented.*
+The parsed `scenario` block: its name, its body and its span.
 
 ---
 
@@ -907,13 +953,13 @@ Status flags: what a status is (buff, debuff) and how it behaves (persistent, un
 
 | Member | |
 |---|---|
-| `None = 0` | *Undocumented.* |
-| `Buff = 1` | *Undocumented.* |
-| `Debuff = 2` | *Undocumented.* |
-| `Dispellable = 4` | *Undocumented.* |
-| `Persistent = 8` | *Undocumented.* |
-| `Hidden = 16` | *Undocumented.* |
-| `UniquePerSource = 32` | *Undocumented.* |
+| `None = 0` | No flags. What a status has unless its declaration says otherwise. |
+| `Buff = 1` | Good for whoever has it. Read by `dispel`-style effects and by a UI choosing a colour. |
+| `Debuff = 2` | Bad for whoever has it. A status may be neither, and nothing sets one from the other automatically. |
+| `Dispellable = 4` | May be removed by an effect that strips statuses. Without it, a status stays through a cleanse. |
+| `Persistent = 8` | Survives the end of a battle instead of being cleared with everything else. |
+| `Hidden = 16` | Not to be shown to the player. The rules treat it like any other status; this is a note for the UI. |
+| `UniquePerSource = 32` | One instance per applying source rather than one per holder, so two enemies each keep their own copy on the same target. |
 
 ---
 
@@ -931,19 +977,19 @@ A `test` block together with the file it came from.
 public string File { get; }
 ```
 
-*Undocumented.*
+The file this was loaded from, as it was named to the loader — a real path for `ContentLibrary.LoadFile(string)`, and whatever a host passed to `ContentLibrary.LoadText(string, string)` otherwise.
 
 ```csharp
 public string Name { get; }
 ```
 
-*Undocumented.*
+The name in the `test` line. Nothing enforces that it is unique across a library, so a report that groups by it may merge two different tests.
 
 ```csharp
 public TestDeclNode Syntax { get; }
 ```
 
-*Undocumented.*
+The parsed `test` block: its name, its body and its span.
 
 ---
 
@@ -961,23 +1007,23 @@ A content-defined verb: `verb shatter(t): ...`.
 public BlockNode Body { get; }
 ```
 
-*Undocumented.*
+The statements the verb runs, with its parameters bound as locals.
 
 ```csharp
 public string Name { get; }
 ```
 
-*Undocumented.*
+What content calls this verb. It shadows nothing: a name that is already a built-in is CT301 at every use.
 
 ```csharp
 public IReadOnlyList<string> Parameters { get; }
 ```
 
-*Undocumented.*
+The parameter names, in order, as the body reads them. A call with the wrong count is a runtime error, not a load error.
 
 ```csharp
 public VerbDeclNode Syntax { get; }
 ```
 
-*Undocumented.*
+The parsed `verb` declaration, for a tool that needs the spans.
 

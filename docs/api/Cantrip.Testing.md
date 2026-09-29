@@ -8,7 +8,7 @@ Part of [the API reference](README.md). The guides are [docs/csharp.md](../cshar
 
 | Type | |
 |---|---|
-| [`DslTestResult`](#dsltestresult) | *Undocumented.* |
+| [`DslTestResult`](#dsltestresult) | What one `test` block did. A result always exists, even for a test that could not build a runtime at all: that is a failure with a reason, not an exception thrown at the caller. |
 | [`DslTestRunner`](#dsltestrunner) | Runs `test` blocks. Each test gets a fresh runtime with a player (80 hp, 3 energy) and seed 1. Setup statements run first; the battle starts, without shuffling or drawing, at the first statement that is not setup. |
 
 ---
@@ -19,7 +19,7 @@ Part of [the API reference](README.md). The guides are [docs/csharp.md](../cshar
 public sealed class DslTestResult
 ```
 
-*Undocumented.*
+What one `test` block did. A result always exists, even for a test that could not build a runtime at all: that is a failure with a reason, not an exception thrown at the caller.
 
 ### Properties
 
@@ -27,31 +27,31 @@ public sealed class DslTestResult
 public string? Failure { get; }
 ```
 
-*Undocumented.*
+Why it failed, in one line, or null when it passed. It is prose for a person: nothing should match on it.
 
 ```csharp
 public SourceSpan FailureSpan { get; }
 ```
 
-*Undocumented.*
+The line that failed, so an editor can jump to it. It is the `test` line itself, not a statement inside it, when the failure was setting the test up rather than running it; and `SourceSpan.None` is possible, so check `SourceSpan.IsNone`.
 
 ```csharp
 public string Name { get; }
 ```
 
-*Undocumented.*
+The name in the `test` line. Names are not required to be unique across a library, so a report that groups by this may merge two different tests.
 
 ```csharp
 public bool Passed { get; }
 ```
 
-*Undocumented.*
+Whether every `expect` in the test held. False also covers a test that never reached its expectations — a runtime error, or content the runner could not set up — so a failure is not necessarily a failed assertion.
 
 ```csharp
 public TestDefinition Test { get; }
 ```
 
-*Undocumented.*
+The test this is about, with its file, its span and its parsed body.
 
 ```csharp
 public string? Trace { get; }
@@ -65,7 +65,7 @@ The causality tree, when the runner was asked to trace.
 public override string ToString()
 ```
 
-*Undocumented.*
+One line, as the CLI prints it. It leaves out `DslTestResult.Trace`, which is the long part.
 
 ---
 
@@ -90,7 +90,7 @@ test "Fireball kills a 6 HP enemy"
 public DslTestRunner(ContentLibrary content)
 ```
 
-*Undocumented.*
+A runner over a loaded library. It does not check the library first: content with errors in it gives tests that fail for reasons that are really load errors, so look at `content.Diagnostics` before running.
 
 ### Properties
 
@@ -124,11 +124,17 @@ Record the causality trace for every test (slower; attached to failures). The tr
 public DslTestResult Run(TestDefinition test)
 ```
 
-*Undocumented.*
+Runs one test in a runtime of its own: a fresh player at 80 hp and 3 energy, seed 1, and a tick clock only if the test says `realtime`. Nothing carries over between tests, which is why the order they run in cannot matter.
+
+It does not throw. Anything that goes wrong — content that will not load into a runtime, a runtime error mid-test, a choice the test did not answer — comes back as a result with `DslTestResult.Passed` false and the reason in `DslTestResult.Failure`.
 
 ```csharp
 public IReadOnlyList<DslTestResult> RunAll(string? nameFilter = null)
 ```
 
-*Undocumented.*
+Runs every test in the library, in the order they were loaded, and returns a result for each — nothing stops at the first failure.
+
+**Parameters.**
+
+- `nameFilter` — Keeps only the tests whose name contains this, ignoring case. It is a substring match and not a pattern, and null runs everything. A filter that matches nothing gives an empty list rather than an error, which is worth checking for in a CI script that would otherwise report success.
 

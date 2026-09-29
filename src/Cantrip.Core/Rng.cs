@@ -16,6 +16,10 @@ namespace Cantrip
     {
         private ulong _s0, _s1, _s2, _s3;
 
+        /// <summary>
+        /// A generator at the start of the stream a seed names. Two generators built from the same seed
+        /// give the same numbers for ever, on every machine and every build.
+        /// </summary>
         public Rng(ulong seed) => Reseed(seed);
 
         /// <summary>Restores a generator from a previously captured <see cref="GetState"/>.</summary>
@@ -25,8 +29,18 @@ namespace Cantrip
             if ((s0 | s1 | s2 | s3) == 0) Reseed(0);
         }
 
+        /// <summary>
+        /// The seed this generator was last started from — a label, not its position. It does not move
+        /// as numbers are drawn and <see cref="SetState"/> does not change it, so
+        /// <c>new Rng(saved.Seed)</c> rewinds to the beginning of the run rather than restoring where
+        /// that generator had got to. <see cref="GetState"/> is what restores a generator.
+        /// </summary>
         public ulong Seed { get; private set; }
 
+        /// <summary>
+        /// Throws away the current position and starts the stream this seed names, as the constructor
+        /// does. It is for starting a new run, not for restoring one: see <see cref="SetState"/>.
+        /// </summary>
         public void Reseed(ulong seed)
         {
             Seed = seed;
@@ -68,6 +82,11 @@ namespace Cantrip
         /// </summary>
         public Rng Fork(ulong salt) => new Rng(NextUInt64() ^ salt);
 
+        /// <summary>
+        /// The raw draw every other method is built on. Calling it advances the same stream the game's
+        /// shuffles and rolls come out of, so a host that borrows a number here changes every later
+        /// shuffle — <see cref="Fork"/> is the way to take numbers without disturbing the game.
+        /// </summary>
         public ulong NextUInt64()
         {
             ulong result = RotateLeft(_s1 * 5UL, 7) * 9UL;
@@ -124,6 +143,12 @@ namespace Cantrip
             }
         }
 
+        /// <summary>
+        /// One item, uniformly. An empty list throws rather than answering <c>default</c>, because a
+        /// caller that picks from nothing has a bug one line earlier and a silent null is a worse place
+        /// to find it.
+        /// </summary>
+        /// <exception cref="ArgumentException"><paramref name="items"/> is null or empty.</exception>
         public T Pick<T>(IReadOnlyList<T> items)
         {
             if (items == null || items.Count == 0) throw new ArgumentException("Cannot pick from an empty list.", nameof(items));
