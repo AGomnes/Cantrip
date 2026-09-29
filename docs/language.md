@@ -499,7 +499,7 @@ hero "Vestal"
 | `allies` | everyone on the side, members and summons both |
 | `fallen` | the dead of the side, in the order they fell â the group the other three leave out |
 
-`player` keeps meaning the leader and always will. In content that declares a `hero`, writing it inside an enemy's move or a card's or ability's effect is error **CT326**, because `deal 5 to player` in an enemy move would hit one hero however carefully the enemy telegraphed somebody else — quietly, which is the one class of wrong answer this project refuses to ship. Write `target` for whoever the line is aimed at, `leader` where the run's own actor really is meant, or `party` for all of them. Everywhere else — a relic's listener, a run's gold, a test's own lines — `player` is still the right word and is left alone.
+`player` keeps meaning the leader and always will. In content that declares a `hero`, writing it inside an enemy's move, a card's or ability's effect, or a listener on an enemy, a card or an ability is error **CT326**, because `deal 5 to player` in an enemy move would hit one hero however carefully the enemy telegraphed somebody else — quietly, which is the one class of wrong answer this project refuses to ship. Listeners count for the same reason and because of where they are: under `clock ticks` an enemy has no `move` at all, so its whole behaviour is written in listeners and the guard would otherwise cover none of a real-time party game. Write `target` for whoever the line is aimed at, `leader` where the run's own actor really is meant, or `party` for all of them. Everywhere else — a relic's listener, a status's own lines, a run's gold, a test — `player` is still the right word and is left alone.
 
 ### The turn
 
@@ -583,7 +583,13 @@ ability "Smite"
     deal 8 to target
 ```
 
-Real-time games create the runtime with a `TickClock` and call `runtime.Tick()` from their fixed timestep. `GrantAbility` attaches an ability to an actor; `UseAbility` runs it if it is off cooldown and starts the cooldown. Durations with `s` or `ms` convert to ticks on a tick clock; `turns` convert on a turn clock. Using seconds on a turn clock is an error when the line runs, and error CT325 at lint for content that states its [`clock`](#rulesets). A cooldown goes through the [`cooldown` modifier channel](#modifiers), so content can shorten it.
+Real-time games create the runtime with a `TickClock` and call `runtime.Tick()` from their fixed timestep; [csharp.md](csharp.md#real-time) and [godot.md](godot.md#real-time) walk through one. `GrantAbility` attaches an ability to an actor; `UseAbility` runs it if it is off cooldown and starts the cooldown. Durations with `s` or `ms` convert to ticks on a tick clock; `turns` convert on a turn clock. Using seconds on a turn clock is an error when the line runs, and error CT325 at lint for content that states its [`clock`](#rulesets). A cooldown goes through the [`cooldown` modifier channel](#modifiers), so content can shorten it.
+
+**An ability is registered against the clock that exists when it is granted.** `AddHero` grants a `hero`'s own abilities as it adds the member, so a real-time game creates the runtime with its `TickClock` before it creates anybody, and a test says `realtime 20` before its `hero` and `grant` lines. A cooldown registered against the wrong clock is a cooldown in the wrong units.
+
+**A cost is not how an ability is paid for.** `cost` on an `ability` declaration is error CT339: the price of an ability is the seconds it makes you wait, and nothing ever takes the resource a `cost` names. Put the effect on a card if it should be paid for.
+
+**Asking what may not be done yet.** `who.is_ready(Name)` is whether that ability's cooldown has run out, and `who.can_use(Name)` also asks whether its owner is alive and there is somebody in reach — the same two questions `IsReady` and `CanUse` answer in C#. They are the way a [test](#tests) says a keeper may *not* act yet, since `cast` fails a test outright when an ability is refused, and they are how content itself decides between two things to do. Naming an ability the actor does not have is a runtime error rather than a quiet false, because "not ready" and "spelt wrong" should not look the same.
 
 An ability takes a `target` line and reads it exactly as a card does — the same four filters, in [Targets](#targets). `UseAbility` with no target settles one: with a single candidate it takes it, and with several it asks the chooser. An ability with nothing legal to aim at is refused with `InvalidTarget` and does not start its cooldown, rather than running at nobody. `cast Smite` in a [test](#tests) does the same.
 
@@ -780,7 +786,7 @@ The scope is matched against the event's target, whatever the event. So `on owne
 | `shuffled` | the discard pile was shuffled into the draw pile |
 | `discarded`, `exhausted` | target (a card) changed zone. Data: `kind` `"card"`, `from`, `to`. A card drawn with a full hand is `discarded`. |
 | `moved` | target changed where it is. A card changed zone: data `kind` `"card"`, `from`, `to` (zone names). An actor changed slot: data `kind` `"actor"`, `from`, `to` (places in words), `from_lane`, `from_rank`, `to_lane`, `to_rank`. `before_moved` refuses an actor's move; a row closing under `on_vacated close_ranks` is reported once it has closed. |
-| `created` | target was created by `create`, `copy` or `shuffle <card>`. Data: `copy_of`, the original, when `copy` made it. |
+| `created` | target was created by `create`, `copy` or `shuffle <card>`, or by the game's own `SpawnEnemy`. Data: `copy_of`, the original, when `copy` made it. A spawn raises it after the actor is already in the game, so `before created:` cannot cancel one; in a turn game a spawn happens once, before the battle, and in a wave game it is the most frequent event there is. |
 | `destroyed` | target was taken out of the game |
 | `transformed` | target is becoming something else and keeps its id, owner, side and place. Data: `was`, `into` (both definitions). Tags: the tags it had before. Raised once; the statuses it sheds raise nothing. |
 | `card_played` | source played card on target; `amount` is the energy paid. Tags: the card's tags. |
@@ -981,7 +987,7 @@ Percent values multiply as fractions: `10 * 50%` is 5. Division by zero gives 0.
 
 **Selectors.** `random N group` shuffles with the game's RNG and takes N. `lowest <stat> group` and `highest <stat> group` take the first by that stat, breaking ties by where an actor stands — lane, then rank — and then by id; with a single name (`lowest enemies`) the stat is `hp`. `other group` leaves out the running entity itself, and also the target when the target is in the group, or else the running entity's controller. In a modifier's `of` scope the running entity is the one the modifier is written on, so `modify attack of other allies where it.has(tag:goblin): +1` on a goblin leader buffs every other goblin but not the leader. A prefix word followed by nothing selectable (as in `pattern random`) is an ordinary name. `within` with a plain number counts slots on the [board](#boards); with a unit (`5m`, `250px`) it is passed to the host's `TryCall`, and without a host that implements it, that is a runtime error. CT330 says which of the two a line is asking for.
 
-**Functions**: `min(a, b, ...)`, `max(...)`, `abs(n)`, `floor(n)`, `ceil(n)`, `round(n)`, `clamp(n, lo, hi)`, `count(group)`, `random(lo, hi)`, `adjacent(who)`, `within(who, n)`, `lane(who)`, `rank(who)`, `distance(a, b)`, `has(who, predicate)`, `stacks(Status[, who])`. Methods: `who.has(predicate)`, `who.stacks(Status)`. The five board ones are described under [Boards](#boards).
+**Functions**: `min(a, b, ...)`, `max(...)`, `abs(n)`, `floor(n)`, `ceil(n)`, `round(n)`, `clamp(n, lo, hi)`, `count(group)`, `random(lo, hi)`, `adjacent(who)`, `within(who, n)`, `lane(who)`, `rank(who)`, `distance(a, b)`, `has(who, predicate)`, `stacks(Status[, who])`. Methods: `who.has(predicate)`, `who.stacks(Status)`, `who.is_ready(Ability)`, `who.can_use(Ability)` — the last two ask whether an ability's cooldown has run out and whether it could be used at all, and are described under [Abilities and real time](#abilities-and-real-time). The five board ones are described under [Boards](#boards).
 
 `has` is true when the entity has the tag (directly or on an attached status), has a status of that name, or is that entity.
 
@@ -1260,6 +1266,7 @@ ruleset
 | `new_listeners` | `hear_the_event` | whether a listener that comes into play during an event hears that event. See below. |
 | `turns` | `sides` | `sides` or `initiative`: whether [the party](#the-party) acts as a side or every combatant takes its own step in one interleaved order. |
 | `order` | `position` | `position` or `speed`: the order combatants are offered in — where they stand, `(lane, rank)`, or by the `speed` stat descending with ties broken by where they stand. |
+| `ends` | `last_enemy` | `last_enemy` or `called`: what ends a battle the party is still standing in. See below. |
 | `hand_size` | 5 | cards drawn each turn |
 | `max_hand_size` | 10 | cards drawn beyond this go to the discard pile |
 | `max_steps` | 100000 | interpreter steps per top-level action before it is stopped with a runtime error (see [When content fails at runtime](csharp.md#when-content-fails-at-runtime)) |
@@ -1277,6 +1284,35 @@ ruleset
 ```
 
 A runtime with no `RuntimeOptions.Clock` of its own then starts a `TickClock`, so the content runs on the clock it asked for.
+
+**A stated clock decides which declarations are live, not only which units are legal.** `clock ticks` means the game takes no turns at all: `turn_start` and `turn_end` are never raised, `State.Turn` stays at 0, and `EndTurn`, `Pass`, `CanAct` and `ActiveMember` refuse. Everything a turn drives is therefore dead, and writing it is error **CT337**:
+
+| Written under `clock ticks` | What to write instead |
+|---|---|
+| `move "Beam":` on an enemy | `on every 2s:` on the enemy — a real-time enemy's whole behaviour is its listeners |
+| `pattern cycle Beam, Sweep` | one listener for each thing it does, and a filter or a status to say which |
+| `phase Wounded when hp <= max_hp / 2` | a filter on a listener of its own: `on every 3s (self.hp <= self.max_hp / 2):` |
+| `stacking duration`, `stacking refresh`, `stacking both` | `stacking intensity` or `stacking none`, and a length where it is applied: `apply Chill 3 for 4s` |
+| `decay 1 on turn_end` (and bare `decay 1`) | the same: a length where it is applied |
+| `until turn_end:` | `until 3s:`, or an event this game does raise |
+| `next turn:` | `in 2s:` |
+| `once per turn` | `once per battle`, or let the listener's own interval limit it |
+| `reset_on turn_start` on a resource | reset it from an `on every <n>s:` listener |
+| `on turn_start:` / `on turn_end:` | `on every <n>s:` for something repeated, `on battle_start:` for something once |
+
+Each message says the same thing where the line is written, and every one of them offers `clock turns` as the answer, because "this is really a turn game" is always a legitimate one. Without this, half the vocabulary was silently inert: `apply Chill 3` on a tick clock was a permanent Chill, with no error, no warning and no note.
+
+A `scenario` in `clock ticks` content is error **CT338**, and `cantrip sim` refuses such a folder, because a bot plays a scenario by taking turns. Cover a real-time game with [`test` blocks](#tests) instead: `realtime <rate>` gives one a tick clock and `tick <n>` is how time passes in it.
+
+**`ends`** says what finishes a battle the party is still standing in. `last_enemy`, the default, is what every game gets without saying: the fight is won the moment the last enemy that was in it is gone. That is right for a fight laid out once and wrong for every fight that arrives in waves, where the board is empty every few seconds by design and the first gap between two waves wins it.
+
+```
+ruleset
+  clock ticks
+  ends: called
+```
+
+Under `ends: called` an empty board is just an empty board. The battle still ends when no party member is alive, which is the rules' own answer and the same in every game; what it stops is winning by default. The game says when the fight is over with `runtime.EndBattle(won)` in C# or `rules.EndBattle(won)` on the Godot node — a timer ran out, a gate held, a boss arrived — and everything downstream of an ending is unchanged: `battle_end` is raised, `won` is in its data, temporary statuses end and the cards go home.
 
 **`new_listeners`** says whether a listener that comes into play *during* an event hears that event. The default, `hear_the_event`, is what it has always done: a minion summoned by "whenever you summon a minion" hears its own summoning, so a listener of that shape has to leave its own cause out —
 
@@ -1301,9 +1337,11 @@ Only a listener's own arrival counts, by registration order: a status applied du
 2. **A turn starts**: the turn number increases; each actor on the side raises `turn_start`, which resets resources such as energy and block; pending `next turn:` blocks run; the turn clock advances; each [party member](#the-party) draws `hand_size` cards from its own pile.
 3. **The party plays cards** with `Play`, and uses abilities with `UseAbility`. Queued triggers resolve after each. A member that is done passes; when the last one has, the turn ends.
 4. **EndTurn**: the party raises `turn_end` (decay and `until` reverts follow its listeners); every member's hand is discarded except retained cards, and ethereal cards are exhausted; the enemies' turn starts; each living enemy uses the move it telegraphed, against the member it telegraphed it at; enemies raise `turn_end`; intents are rolled; the party's next turn starts.
-5. **The battle ends** when no party member is alive (lost) or no enemies are left alive (won). `battle_end` is raised, `until` blocks are undone, every member's statuses are removed unless flagged `persistent`, and every card returns to its owner's draw pile.
+5. **The battle ends** when no party member is alive (lost) or no enemies are left alive (won). `battle_end` is raised, `until` blocks are undone, every member's statuses are removed unless flagged `persistent`, and every card returns to its owner's draw pile. Under [`ends: called`](#rulesets) the second half of that is off: an empty board is just an empty board, and the game says when the fight is over.
 
 Dead enemies stay on the `dead` zone until the next battle starts.
+
+**On a tick clock there are no steps 2, 3 and 4.** `StartBattle` raises `battle_start` and deals the opening hand, and then nothing happens until the clock moves: every actor acts whenever its own cooldowns are ready, and every `on every <n>s:`, `in <n>s:` and `for <n>s` is pumped by `Tick`. `turn_start` and `turn_end` are never raised, the turn number stays at 0, and `EndTurn`, `Pass`, `CanAct` and `ActiveMember` refuse rather than pretending. Step 5 is unchanged.
 
 ## Descriptions
 
@@ -1357,7 +1395,7 @@ test "Poison ticks and decays"
 | `grant Ability` | yes | Gives an ability to whoever is running the line — the leader, in a test's setup. It is a [rule verb](#built-in-verbs), not a test verb, so `grant Smite to target` works in content too |
 | `seed N` | yes | Reseeds the game's RNG |
 | `answer "A, B"` | yes | Queues the answer to the next choice, by name; `"A, B"` picks both |
-| `realtime N` | yes | Uses a tick clock with N ticks per second for the whole test, wherever it is written |
+| `realtime N` | yes | Uses a tick clock with N ticks per second for the whole test. Write it first: an ability is registered against the clock that exists when it is granted, so a `hero` line or a `grant` above it registers cooldowns in turns |
 | `setup:` | yes | A block of setup statements |
 | `play Card [by who] [on who]` | no | Plays a card, adding it to the hand if needed; fails the test if it cannot be played. `by` names the member performing it, and may be written either side of `on`. See the note below: `play` is a rule verb too |
 | `end turn` | no | Ends the turn, runs the enemies' turn and starts the next one |
@@ -1383,7 +1421,7 @@ test "Poison ticks and decays"
 **What a test cannot do:**
 
 - span two battles, so it cannot show that something resets between battles;
-- check that a play was refused, since `play` fails the test when a card cannot be played. For a targeting rule, show it the other way round: play the card with no target and check what it picked;
+- check that a play or a cast was refused, since `play` fails the test when a card cannot be played and `cast` fails it when an ability is still cooling or has nothing in reach. For an ability, ask instead of attempting: `expect not leader.is_ready(Bulwark)` is whether the cooldown has run out and `expect not leader.can_use(Bulwark)` also asks whether anybody is in reach. For a card's targeting rule, show it the other way round: play the card with no target and check what it picked;
 - show `log` output when it passes. Only `--trace` shows it, and only for a failing test;
 - in the `cantrip` tool, use a verb, name or function that your game supplies in C#. Run such a test from the game's own test suite, where `DslTestRunner` can register them: see [Verbs written in C#](csharp.md#verbs-written-in-c).
 
@@ -1550,7 +1588,7 @@ Codes with four digits come from reading and loading the files. An error among t
 | CT323 | error | A named clause a built-in verb does not read, such as `block 8 for 2 turns`, `apply Poison 3 at target` or `deal 5 against enemy2`. The clause was dropped in silence, so the line read as one thing and did another. It is a runtime error too. A flag after a comma is not a clause and is never reported, and neither is a verb content declares or a game registers. | Write the clause the verb reads — the message names it, and [Built-in verbs](#built-in-verbs) has the table — or drop the clause. Some of them are not a spelling at all: block is not timed, and a heal happens once. `--suppress CT323`, or `LintOptions.HostVerbs`, for content that reaches a verb of that name another way. |
 | CT324 | error | A bare percentage where a built-in verb counts whole things, such as `apply Slow 40%`. The unit was dropped, so forty stacks were applied while the card's generated text said "Apply 40% Slow". It is a runtime error too. | Write the number (`apply Slow 40`), or a share of something (`deal target.max_hp * 40% to target`), which is what a percentage is for. |
 | CT325 | error | A length in units the game's clock cannot measure: `on every 1s:` or `for 3s` where the ruleset says `clock turns`, or `2 turns` where it says `clock ticks`. Only content that states its clock is checked. | Write the length in the units that clock measures, or change the `clock` setting. The message says which units the stated clock takes. |
-| CT326 | error | `player` written inside an enemy's move or a card's or ability's effect, in content that declares a [`hero`](#the-party). `player` is one entity — the party's leader — so the line acts on that one member however carefully the rules settled on another, and it does it quietly. Content with no `hero` is never reported, and `player` elsewhere is never reported. | Write `target` for whoever the line is aimed at, `leader` where the run's own actor really is meant, or `party` for all of them. |
+| CT326 | error | `player` written inside an enemy's move, a card's or ability's effect, or a listener on an enemy, a card or an ability, in content that declares a [`hero`](#the-party). `player` is one entity — the party's leader — so the line acts on that one member however carefully the rules settled on another, and it does it quietly. Content with no `hero` is never reported, and `player` elsewhere — a relic's or status's listener, a run's gold, a test — is never reported. | Write `target` for whoever the line is aimed at, `leader` where the run's own actor really is meant, or `party` for all of them. |
 | CT327 | warning | A lane or rank no [board](#boards) this game declares can hold. Compared against one, the comparison is the same for every actor before the game runs: `it.lane == 4` on a three-lane board matches nobody, and `it.rank <= 3` on a three-rank board matches everybody and limits nothing. Moved to one, the move stops at the edge of the board instead. | Use a place the board has, counting from 0, or declare the board the rule is written for. |
 | CT328 | error | `position` assigned. It reads a rank and always will, but it names one axis of a place that has two, so a move written with it would have to guess which. | Write `rank`. `who.rank = 0` and `who.lane += 1` are moves; see [Boards](#boards). |
 | CT329 | note | `position` read, which is the older name for `rank`. | Nothing is wrong: it reads the same number and keeps working for the whole 1.x line. Write `rank` when you next touch the line. |
@@ -1560,6 +1598,9 @@ Codes with four digits come from reading and loading the files. An error among t
 | CT333 | warning | `lane(...)` on a board one rank deep, or `rank(...)` on a board one lane wide. One actor stands on a slot, so the row is that actor and nobody else. | Write the actor itself, or give the board a second rank or lane. |
 | CT335 | error | `turns:` or `order:` in a game that says `clock ticks`. Both say how a turn is shared out, and a real-time game has no turns: `turn_start` and `turn_end` never fire there and the engine ignores the setting, so `turns: initiative` asks for an order that will never run. | Drop the line, or say `clock turns` if this game does take turns. |
 | CT336 | warning | An `of` group that can never hold what the channel names: a pile of cards (`hand`, `discard`, `deck`, `cards`) on a channel whose value belongs to an actor, such as `damage` or `heal_taken`. The modifier would apply to nothing, whatever the game does. | Name a group of actors — `party`, `allies`, `enemies`, `everyone` — or move the rule to a channel a card carries, such as `cost`. |
+| CT337 | error | Machinery a turn drives, in a game that says `clock ticks`: a `move`, a `pattern`, a `phase`, a `stacking duration`, a `decay ... on turn_end`, an `until turn_end:`, a `next turn:`, an `once per turn`, a `reset_on turn_start`, or a `turn_start` or `turn_end` listener. A real-time game takes no turns, so none of it ever runs. See [Rulesets](#rulesets) for the table of what to write instead. | Write the real-time shape of the same idea, which each message names — usually `on every <n>s:`, a filter on a second listener, or a `for <n>s` where a status is applied. Or say `clock turns` if this game does take turns. |
+| CT338 | error | A `scenario` in a game that says `clock ticks`. A bot plays a scenario by taking turns, so nothing would ever advance the clock: every listener would stay silent, every ability used once would never come back, and no battle could end. `cantrip sim` refuses such a folder for the same reason. | Cover a real-time game with `test` blocks, which have `realtime <rate>` and `tick <n>`. Or say `clock turns` if this game does take turns. |
+| CT339 | error | `cost` on an `ability`. An ability is paid for in the seconds it makes you wait; nothing spends the resource a `cost` line names, so the number reads like a rule and is not one. | Write the price as a `cooldown`, or put the effect on a card, which does pay. |
 
 **Descriptions**
 

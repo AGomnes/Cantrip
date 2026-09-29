@@ -161,6 +161,19 @@ namespace Cantrip
             return (int)units;
         }
 
+        /// <summary>
+        /// Rounds half away from zero and returns the result as a <see cref="long"/>, for the
+        /// values that are counts of clock units rather than damage.
+        /// </summary>
+        /// <remarks>
+        /// A cast does not work and cannot be made to: <c>(long)entity.Get("ready_at")</c> is
+        /// <c>CS0030</c>, because a <see cref="Num"/> is a fixed-point number and not a
+        /// <see cref="long"/> in disguise. <see cref="ToInt"/> is the usual answer and
+        /// <see cref="ToDouble"/> keeps the fraction; this is the one in between, for a tick count
+        /// that outgrows an <see cref="int"/>.
+        /// </remarks>
+        public long ToLong() => Round().Raw / Scale;
+
         public double ToDouble() => (double)Raw / Scale;
 
         public static bool TryParse(string text, out Num value)

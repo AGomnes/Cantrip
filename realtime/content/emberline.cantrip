@@ -8,16 +8,25 @@
 #   dotnet cantrip test realtime/content
 
 # `clock ticks` is what makes `cooldown 4s` and `on every 2s:` checkable rather than hopeful: a
-# `2 turns` anywhere below is error CT325 at lint instead of a line that quietly never fires.
+# `2 turns` anywhere below is error CT325 at lint, and a `move`, a `pattern`, a `stacking duration`
+# or an `until turn_end:` is error CT337, instead of a line that quietly never fires.
 # `turns:` and `order:` are deliberately absent -- they are CT335 under this clock.
+#
+# `ends: called` is what makes a hold possible at all. By default a battle is won the moment the
+# last enemy is gone, and in a wave game the board is empty every few seconds by design, so the
+# first run of this ended at two seconds, having been won. Here the game says when the fight is
+# over: the host calls `EndBattle` when the forty-five seconds are up, or the party falls.
 ruleset
   clock ticks
+  ends: called
   max_hand_size 10
 
-# Three lanes wide, four ranks deep, mirrored. The keepers hold rank 0; everything hostile walks
+# Three lanes wide, five ranks deep, mirrored. The keepers hold rank 0; everything hostile walks
 # in at rank 3 and closes one rank at a time, so the distance between a keeper and a hollow is
 # 1 when it is on top of them and 4 when it has just arrived. Every ability's `range` is written
-# against those numbers, and that is the whole of the game's tension: what you can reach.
+# against those numbers, and that is the whole of the game's tension: what you can reach. The
+# fifth rank is standing room: a wave lands on the first free slot of lane 0 and walks to its own
+# lane from there, so the board needs somewhere to put one that arrives in a crowd.
 board "The Line"
   lanes 3
   ranks 5

@@ -270,6 +270,14 @@ about the setting rather than about the content.
 line choosing a card by hand would fight the bot. `realtime` is out for the same reason — when to
 act in continuous time is the game's own frame loop.
 
+**`sim` cannot play a real-time game and refuses to try.** A bot plays a scenario by deciding what
+to do and then ending the turn, and content whose ruleset says `clock ticks` has no turn to end: the
+clock would stand at zero for the whole run, so every `on every` listener would be silent, every
+ability used once would never come back, and no battle could end. The command refuses such a folder
+with one sentence, and a `scenario` written in `clock ticks` content is error CT338 at lint. Cover a
+real-time game with [`test` blocks](language.md#tests) instead, which have `realtime <rate>` and
+`tick <n>`; [realtime/content/tests.cantrip](../realtime/content/tests.cantrip) is eighteen of them.
+
 ## The command
 
 ```

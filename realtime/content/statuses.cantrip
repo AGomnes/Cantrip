@@ -2,7 +2,8 @@
 #
 # Every one of these ends because something says `for <n>s`, or because another line removes it.
 # A `stacking duration` status ticks down on its host's `turn_end`, and there is no turn_end in a
-# real-time game, so a duration status here would sit on its host for ever. See FINDINGS #4.
+# real-time game, so one here would sit on its host for ever -- which is why `stacking duration`,
+# `stacking refresh` and `decay ... on turn_end` are error CT337 under `clock ticks`. FINDINGS #14.
 
 # The keepers' shield. `stacking none` so a second Bulwark does not stack the reduction, only
 # refreshes how long it lasts.

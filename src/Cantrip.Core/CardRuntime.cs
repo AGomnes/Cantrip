@@ -209,7 +209,41 @@ namespace Cantrip
         /// with its members in any order, so it is always null there and a game asks
         /// <see cref="CanAct"/> of each member instead.
         /// </summary>
-        public Entity? ActiveMember => State.ActiveMember;
+        public Entity? ActiveMember
+        {
+            get
+            {
+                if (RealTime) throw NoTurns(nameof(ActiveMember));
+                return State.ActiveMember;
+            }
+        }
+
+        /// <summary>
+        /// Whether this runtime measures time in ticks rather than turns: a real-time game.
+        /// </summary>
+        /// <remarks>
+        /// A runtime gets a tick clock two ways, and both count. The game hands one to
+        /// <see cref="RuntimeOptions.Clock"/>, or the content says <c>clock ticks</c> and a runtime
+        /// that was given no clock starts one.
+        /// </remarks>
+        internal bool RealTime => State.Clock is TickClock;
+
+        /// <summary>
+        /// The refusal every turn-shaped call makes on a real-time runtime, the mirror of the one
+        /// <see cref="Tick"/> makes on a turn-based one.
+        /// </summary>
+        /// <remarks>
+        /// These calls used to answer. <c>EndTurn()</c> ran a whole turn cycle, enemy moves and
+        /// all, in a game with no turns, so a front end that left its <b>End turn</b> button wired
+        /// up gave the player a button that fired every enemy's move at once for free. Refusing is
+        /// a breaking change, which is why it was made before the surface was promised rather than
+        /// after.
+        /// </remarks>
+        private static InvalidOperationException NoTurns(string what) =>
+            new InvalidOperationException(
+                $"{what} needs turns; this runtime uses a TickClock, so it has none. " +
+                "Time passes here by calling Tick() from a fixed timestep, and every actor acts when its own cooldowns are ready. " +
+                "If this game does take turns, give the runtime no clock, or a TurnClock, and say `clock turns` in the ruleset.");
 
         /// <summary>
         /// Whether this member still has its step this round: it is a member, it is alive, a battle
@@ -220,6 +254,7 @@ namespace Cantrip
         public bool CanAct(Entity member)
         {
             if (member == null) throw new ArgumentNullException(nameof(member));
+            if (RealTime) throw NoTurns(nameof(CanAct));
             if (!State.InBattle || !member.IsPartyMember || !member.IsAlive) return false;
             if (State.Acted.Contains(member.Id)) return false;
 
@@ -248,6 +283,7 @@ namespace Cantrip
         public ActionResult Pass(Entity member)
         {
             if (member == null) throw new ArgumentNullException(nameof(member));
+            if (RealTime) throw NoTurns(nameof(Pass));
 
             int memberId = member.Id;
             return Attempt(
@@ -380,6 +416,19 @@ namespace Cantrip
             return relic;
         }
 
+        /// <summary>
+        /// Puts an enemy on the board and announces it with <c>created</c>, the same event
+        /// content's own <c>create</c> raises.
+        /// </summary>
+        /// <remarks>
+        /// The event is an announcement rather than a gate: the enemy is already in the game when
+        /// it is raised, so a <c>before created:</c> listener cannot stop a spawn the host has
+        /// decided on. What it buys is the thing a wave game needs and had no way to write — an
+        /// arrival effect, a self-placement, a relic that hears anything entering the fight:
+        /// <c>on created(target:self): self.rank = 3</c> on the enemy's own declaration. In a turn
+        /// game a spawn happens once, before the battle, so this never came up; in a real-time game
+        /// it is the most frequent event there is.
+        /// </remarks>
         public Entity SpawnEnemy(string name, int? hp = null)
         {
             EntityDefinition definition = Content.Find(name, "enemy") ?? Require(name, "actor");
@@ -393,7 +442,44 @@ namespace Cantrip
             if (!enemy.HasStat("block")) enemy.SetBase("block", 0);
 
             if (State.InBattle) RollIntent(enemy);
+
+            Run(enemy, context => Interpreter.Raise(new GameEvent("created") { Source = enemy, Target = enemy }, context));
             return enemy;
+        }
+
+        /// <summary>
+        /// Stands an actor at <paramref name="lane"/>, <paramref name="rank"/>, raising
+        /// <c>moved</c> so content hears it and <c>before_moved</c> can refuse it. The same move
+        /// content writes as <c>target.rank = 0</c>, from C#.
+        /// </summary>
+        /// <returns>
+        /// True when the actor stands there afterwards; false when a <c>before_moved</c> listener
+        /// refused the move.
+        /// </returns>
+        /// <remarks>
+        /// Where somebody stands is a rule and not a view, so the Godot node has nothing that does
+        /// this — but a rule still has to be reachable from the game that owns the fight above it.
+        /// A host with waves to place had to execute a string of content for every spawn, which
+        /// turned a typo in a lane number from a compile error into a <c>DslException</c> on a hot
+        /// path. A slot off the board is refused here with the board's own name and shape, rather
+        /// than clamped: a wave walking in at a rank that does not exist is a bug in the schedule,
+        /// and quietly standing it somewhere else would hide it.
+        /// </remarks>
+        public bool Place(Entity actor, int lane, int rank)
+        {
+            if (actor == null) throw new ArgumentNullException(nameof(actor));
+            if (actor.Kind != EntityKind.Actor || actor.Zone != Zones.Board)
+                throw new ArgumentException($"{actor} is not an actor on the board, so it has no slot to stand in.", nameof(actor));
+            if (!State.Board.Holds(lane, rank))
+                throw new ArgumentException(
+                    $"Board \"{State.Board.Name}\" ({State.Board.Describe()}) has no {State.Board.LaneWord} {lane}, {State.Board.RankWord} {rank}.",
+                    nameof(lane));
+
+            if (actor.Lane == lane && actor.Rank == rank) return true;
+
+            bool moved = false;
+            Run(actor, context => moved = Interpreter.MoveActor(actor, lane, rank, context));
+            return moved;
         }
 
         /// <summary>
@@ -489,7 +575,32 @@ namespace Cantrip
             Run(player, context => Interpreter.Raise(new GameEvent("battle_start") { Source = player }, context));
             if (CheckBattleOver()) return;
 
-            if (Initiative) StartRound(); else StartTurn(Team.Player);
+            if (RealTime) BeginRealTime();
+            else if (Initiative) StartRound();
+            else StartTurn(Team.Player);
+        }
+
+        /// <summary>
+        /// Opens a battle on a tick clock: no turn, so no <c>turn_start</c>, no <c>State.Turn</c>
+        /// and no turn order, but the opening hand is still dealt, because a hand is not a turn.
+        /// </summary>
+        /// <remarks>
+        /// <c>turn_start</c> used to fire here, exactly once per real-time battle, while CT335 told
+        /// authors it never fired at all. Content written against the diagnostic got one reset of
+        /// every <c>reset_on turn_start</c> resource, one pass of every <c>turn_start</c> listener
+        /// and a <c>State.Turn</c> of 1 in a game with no turns; content written against the engine
+        /// got a rule the linter refused to let it say. The diagnostic was the honest half, so the
+        /// engine moved: on a tick clock the turn events do not fire, and <c>State.Turn</c> stays
+        /// at 0 for the whole fight.
+        /// </remarks>
+        private void BeginRealTime()
+        {
+            State.ActiveTeam = Team.Player;
+            State.ResetTurnHistory();
+            State.ClearActed();
+
+            if (_skipNextDraw) _skipNextDraw = false;
+            else DrawForEveryMember();
         }
 
         /// <summary>Ends the player's turn, runs the enemies' turn, and starts the next player turn.</summary>
@@ -498,10 +609,17 @@ namespace Cantrip
         /// something in the turn asks the player to choose: the whole call, enemy turn included, is
         /// rolled back and runs again from <see cref="Answer(int[])"/>.
         /// </returns>
-        public ActionResult EndTurn() =>
-            Attempt(
+        /// <exception cref="InvalidOperationException">
+        /// This runtime uses a <see cref="TickClock"/>, so it has no turns to end.
+        /// </exception>
+        public ActionResult EndTurn()
+        {
+            if (RealTime) throw NoTurns(nameof(EndTurn));
+
+            return Attempt(
                 () => { EndTurnCore(); return ActionResult.Played; },
                 () => { EndTurn(); return Outcome(); });
+        }
 
         private void EndTurnCore()
         {
@@ -735,22 +853,34 @@ namespace Cantrip
             // no setting to tell them apart.
             if (team == Team.Player && State.Player != null && (State.Player.IsAlive || State.Party.Count > 0))
             {
-                if (_skipNextDraw)
-                {
-                    _skipNextDraw = false;
-                }
-                else
-                {
-                    foreach (Entity member in State.Party)
-                    {
-                        if (!member.IsAlive) continue;
-                        Entity drawing = member;
-                        Run(drawing, context => Interpreter.Draw(drawing, State.Rules.HandSize, context));
-                        if (!State.InBattle) return;
-                    }
-                }
+                if (_skipNextDraw) _skipNextDraw = false;
+                else if (!DrawForEveryMember()) return;
+
                 CheckBattleOver();
             }
+        }
+
+        /// <summary>
+        /// Deals a hand to every living member. Returns false when the battle ended while dealing.
+        /// </summary>
+        /// <remarks>
+        /// Each member draws from its own pile. One with no pile of its own draws nothing — Draw
+        /// stops at an empty draw and an empty discard without touching the generator — and plays
+        /// from the party's hand instead, which is the second of the two shapes and needs no
+        /// setting to tell them apart.
+        /// </remarks>
+        private bool DrawForEveryMember()
+        {
+            if (State.Player == null) return State.InBattle;
+
+            foreach (Entity member in State.Party)
+            {
+                if (!member.IsAlive) continue;
+                Entity drawing = member;
+                Run(drawing, context => Interpreter.Draw(drawing, State.Rules.HandSize, context));
+                if (!State.InBattle) return false;
+            }
+            return true;
         }
 
         /// <summary>Returns true if the battle ended during the turn end.</summary>
@@ -794,21 +924,51 @@ namespace Cantrip
             // sentence, which is why nothing a game does today notices the change.
             if (State.Player != null && State.Party.Count == 0)
             {
-                EndBattle(won: false);
+                FinishBattle(won: false);
                 return true;
             }
+
+            // `ends: called` means an empty board is just an empty board. A wave game clears one
+            // wave two seconds before the next arrives, and under the default that gap wins it the
+            // fight; there, the game says when the fight is over and this asks nothing.
+            if (State.Rules.Ends == BattleEnd.Called) return false;
 
             bool hadEnemies = State.Entities.Any(e => e.Kind == EntityKind.Actor && e.Team == Team.Enemy && !e.IsRemoved);
             if (hadEnemies && State.Actors(Team.Enemy).Count == 0)
             {
-                EndBattle(won: true);
+                FinishBattle(won: true);
                 return true;
             }
 
             return false;
         }
 
-        private void EndBattle(bool won)
+        /// <summary>
+        /// Ends the running battle, won or lost, as though the last enemy had just fallen:
+        /// <c>battle_end</c> is raised, temporary statuses end, cards go home and
+        /// <see cref="Won"/> answers.
+        /// </summary>
+        /// <returns>
+        /// <see cref="ActionResult.Played"/>, <see cref="ActionResult.Unplayable"/> when no battle
+        /// is running, or <see cref="ActionResult.ChoicePending"/> when a <c>battle_end</c> effect
+        /// stops to ask the player something.
+        /// </returns>
+        /// <remarks>
+        /// The companion of <c>ends: called</c>: a game that has turned the automatic ending off
+        /// needs a way to say the fight is over, and a wave game's ending is a rule of the game
+        /// above the fight — a timer ran out, a boss arrived, the gate held. It works under
+        /// <see cref="BattleEnd.LastEnemy"/> too, for a retreat or a surrender.
+        /// </remarks>
+        public ActionResult EndBattle(bool won)
+        {
+            if (!State.InBattle) return ActionResult.Unplayable;
+
+            return Attempt(
+                () => { FinishBattle(won); return ActionResult.Played; },
+                () => Outcome());
+        }
+
+        private void FinishBattle(bool won)
         {
             State.InBattle = false;
             Won = won;
@@ -1222,6 +1382,41 @@ namespace Cantrip
         }
 
         public bool IsReady(Entity ability) => ability.GetBase("ready_at") <= Num.FromInt(State.Clock.Now);
+
+        /// <summary>
+        /// How much longer this ability has to wait, in clock units: ticks on a
+        /// <see cref="TickClock"/>, turns on a <see cref="TurnClock"/>. Zero when it is ready.
+        /// </summary>
+        /// <remarks>
+        /// The number a cooldown sweep is drawn from, and the whole of how a real-time game
+        /// communicates. Divide by <see cref="TickClock.TicksPerSecond"/> for the seconds a player
+        /// reads. The answer used to live in an undocumented <c>ready_at</c> stat that does not
+        /// exist at all until the ability has been used once, so a front end had to find the stat
+        /// by reflection and then know to treat "absent" as ready rather than as zero seconds left.
+        /// </remarks>
+        public long ReadyIn(Entity ability)
+        {
+            if (ability == null) throw new ArgumentNullException(nameof(ability));
+
+            long left = ability.GetBase("ready_at").Ceiling().ToLong() - State.Clock.Now;
+            return left > 0 ? left : 0;
+        }
+
+        /// <summary>
+        /// The abilities an actor is carrying, in the order they were granted: the row of buttons a
+        /// real-time front end draws.
+        /// </summary>
+        /// <remarks>
+        /// An ability is an entity in <see cref="Zones.Attached"/> whose <see cref="Entity.Kind"/>
+        /// is <see cref="EntityKind.Ability"/>, which is a true sentence that a game should not
+        /// have to learn: none of the zones the C# guide lists holds an ability, so the only way to
+        /// list them was to read the assembly.
+        /// </remarks>
+        public IReadOnlyList<Entity> AbilitiesOf(Entity owner)
+        {
+            if (owner == null) throw new ArgumentNullException(nameof(owner));
+            return State.ZoneOf(owner, Zones.Attached).Where(e => e.Kind == EntityKind.Ability).ToList();
+        }
 
         /// <summary>
         /// Whether <see cref="UseAbility(Entity, Entity)"/> would accept this ability now: it is an

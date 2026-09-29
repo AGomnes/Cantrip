@@ -4,8 +4,8 @@ extends Node
 # at all, that the TickDriver advances the clock from the engine's own physics loop, and that a
 # save taken with cooldowns running and a delayed effect in the air comes back.
 #
-# Nothing else in this repository drives the addon on a tick clock -- `TickDriver` has no other
-# caller anywhere, tests included -- so this file is the whole of its coverage. FINDINGS #10.
+# `TickDriver` has no other caller in a scene anywhere, so this file is the whole of its coverage
+# outside the core's unit tests. FINDINGS #10.
 
 var _failures := 0
 var rules: CantripRuntime
@@ -54,24 +54,23 @@ func _static_checks() -> void:
 	var lantern: int = rules.AddHero("Lantern", 0)
 	_check("AddHero works on a tick runtime", warden != 0 and lantern != 0)
 
-	var dark: int = rules.SpawnEnemy("The Dark", -1)
+	_check("the node knows this is a real-time game", rules.IsRealTime())
+
 	rules.StartBattle(false, false)
-	rules.Execute("loom self", dark, 0)
-	rules.Execute("hold self 0", warden, 0)
-	rules.Execute("hold self 1", stoker, 0)
-	rules.Execute("hold self 2", lantern, 0)
+	_check("Place stands a keeper where the game says", rules.Place(warden, 0, 0))
+	rules.Place(stoker, 1, 0)
+	rules.Place(lantern, 2, 0)
+	_check("and refuses a slot the board does not have", not rules.Place(warden, 0, 9))
 
 	var hollow: int = rules.SpawnEnemy("Hollow", -1)
-	rules.Execute("arrive self 1", hollow, 0)
+	rules.Place(hollow, 1, 3)
 	_check("a wave walks in at the back rank", rules.GetEntity(hollow)["rank"] == 3,
 		str(rules.GetEntity(hollow)))
 	_check("and the keepers stand abreast on the front one",
 		rules.GetEntity(warden)["lane"] == 0 and rules.GetEntity(warden)["rank"] == 0
 		and rules.GetEntity(lantern)["lane"] == 2, str(rules.GetEntity(lantern)))
 
-	# The node's entity dictionary lists an actor's abilities. C# has no such member, which is
-	# the difference between a row of cooldown buttons taking one call and taking a zone query
-	# nothing documents. FINDINGS #9.
+	# The node's entity dictionary lists an actor's abilities, and C# has runtime.AbilitiesOf.
 	_check("a keeper's abilities come back with it",
 		_abilities_of(warden).size() == 2, str(_abilities_of(warden)))
 	var bolt: int = _named_ability(stoker, "Ember Bolt")
@@ -90,15 +89,18 @@ func _static_checks() -> void:
 		rules.UseAbility(bolt, hollow) == "not_ready")
 	_check("which CanUse agrees with", not rules.CanUse(bolt))
 
-	# Seconds until it comes back, for a cooldown sweep. `ready_at` is not in any document.
-	var left: int = rules.GetStat(bolt, "ready_at")
-	_check("a cooldown sweep can be drawn from `ready_at`", left == 20, str(left))
+	# Seconds until it comes back, for a cooldown sweep.
+	_check("a cooldown sweep reads in seconds", abs(rules.CooldownLeft(bolt) - 1.0) < 0.001,
+		str(rules.CooldownLeft(bolt)))
 
 	rules.Tick(20)
 	_check("a second later it is back", rules.CanUse(bolt))
+	_check("and has no sweep left to draw", rules.CooldownLeft(bolt) == 0.0)
 
-	# No turn was taken to get here.
-	_check("no turn was ever taken", rules.GetTurn() == 1, str(rules.GetTurn()))
+	# No turn was taken to get here, and the node says what time it is.
+	_check("no turn was ever taken", rules.GetTurn() == 0, str(rules.GetTurn()))
+	_check("and the node says what time it is", rules.GetTicks() == 20, str(rules.GetTicks()))
+	_check("in seconds too", abs(rules.GetSeconds() - 1.0) < 0.001, str(rules.GetSeconds()))
 	_check("the battle is still running", rules.IsInBattle() and rules.GetWon() == null)
 
 	# A save with cooldowns running, a burn part way through a second and a flare in the air.
@@ -130,14 +132,11 @@ func _static_checks() -> void:
 	_check("and it really did land", rules.GetStat(hollow, "hp") < 6,
 		str(rules.GetStat(hollow, "hp")))
 
-	# Turn-shaped calls on a tick runtime. None of these refuses; every one answers as though this
-	# were a turn game, and EndTurn really does run one. FINDINGS #2.
-	_check("CanAct answers on a tick runtime", rules.CanAct(warden))
-	_check("ActiveMemberId answers too", rules.ActiveMemberId() != 0)
-	var turn_before: int = rules.GetTurn()
-	rules.EndTurn()
-	_check("and EndTurn runs a whole turn in a game that has none",
-		rules.GetTurn() == turn_before + 1, "%d -> %d" % [turn_before, rules.GetTurn()])
+	# An empty board is an empty board: the content says `ends: called`, so the fight runs on.
+	rules.Execute("deal 9999 to enemies", 0, 0)
+	_check("clearing the board does not win the fight",
+		rules.GetEnemies().is_empty() and rules.IsInBattle() and rules.GetWon() == null)
+	_check("until the game says so", rules.EndBattle(true) and rules.GetWon() == true)
 
 	rules.queue_free()
 	second.queue_free()
@@ -159,12 +158,10 @@ func _driver_checks() -> void:
 
 	node.LoadContent("res://content")
 	var stoker: int = node.CreatePlayer("Stoker", 30, 3)
-	var dark: int = node.SpawnEnemy("The Dark", -1)
 	node.StartBattle(false, false)
-	node.Execute("loom self", dark, 0)
-	node.Execute("hold self 1", stoker, 0)
+	node.Place(stoker, 1, 0)
 	var hollow: int = node.SpawnEnemy("Hollow", -1)
-	node.Execute("arrive self 1", hollow, 0)
+	node.Place(hollow, 1, 3)
 
 	_check("the runtime puts the driver on its own rate", driver.TicksPerSecond == 20,
 		str(driver.TicksPerSecond))
@@ -190,6 +187,17 @@ func _driver_checks() -> void:
 		await get_tree().physics_frame
 	_check("pausing the driver stops the game's clock",
 		node.GetEntity(hollow)["rank"] == rank_paused and node.GetStat(stoker, "hp") == hp_paused)
+
+	# The driver's own counters, which godot.md documents now: what it ran and what it threw away.
+	_check("the driver counted the ticks it ran", driver.TotalTicks() >= 100, str(driver.TotalTicks()))
+	_check("and dropped none of them at this speed", driver.DroppedTicks() == 0,
+		str(driver.DroppedTicks()))
+	_check("the game's own clock agrees with it", node.GetTicks() == driver.TotalTicks(),
+		"%d vs %d" % [node.GetTicks(), driver.TotalTicks()])
+	driver.Reset()
+	_check("and Reset clears the driver's counters without touching the game's clock",
+		driver.TotalTicks() == 0 and node.GetTicks() > 0,
+		"%d vs %d" % [driver.TotalTicks(), node.GetTicks()])
 
 	node.queue_free()
 	driver.queue_free()

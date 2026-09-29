@@ -396,7 +396,13 @@ it is still on cooldown. `not_ready` never comes back from `Play`, and `not_in_h
 | `GetTargetMode(card_id: int) -> String` | What the card is aimed at: whatever word content wrote after `target`, usually `"enemy"`, `"ally"`, `"self"`, `"any"` or `"none"`. An ability id works here too, and answers about its `target` line. `""` for an id that names nothing, which is how a stale id is told from a card needing no target. |
 | `GetLegalTargets(card_id: int) -> Array` | The ids it may be aimed at, for highlighting, after the card's own `target … where` and content's `targetable` rules. An ability id works here too. Empty for a `target` word the rules do not recognise. |
 | `IsInBattle() -> bool` | Whether a battle is running |
-| `GetTurn() -> int` | The turn number, counted from 1 in each battle |
+| `GetTurn() -> int` | The turn number, counted from 1 in each battle. 0 for the whole of a real-time battle, which takes none |
+| `IsRealTime() -> bool` | Whether this runtime measures time in ticks. True when `RealTime` is set, and when the content's ruleset says `clock ticks`. A shared UI asks this before it draws an **End turn** button, because every turn-shaped call below refuses on a tick runtime |
+| `GetTicks() -> int` | What time it is, in clock units: the tick-clock answer to `GetTurn`. This is the **game's** clock, the one a save brings back, and not `TickDriver.TotalTicks()` |
+| `GetSeconds() -> float` | The same number in seconds, for an "18 / 45 seconds" read-out. 0 in a turn game, which measures no seconds |
+| `CooldownLeft(ability_id: int) -> float` | Seconds until an ability comes back, for a sweep on a button. 0 when it is ready and for an id that is not an ability |
+| `Place(actor_id: int, lane: int, rank: int) -> bool` | Stands an actor at that place, raising `moved`, which `before_moved` can refuse. What a game that spawns its own waves uses; content writes the same move as `target.rank = 0`. False for an id that names nobody on the board and for a place this board does not have |
+| `EndBattle(won: bool) -> bool` | Ends the running battle as though the last enemy had fallen. What a game whose ruleset says `ends: called` uses to say the fight is over. False when no battle is running |
 | `GetWon() -> Variant` | How the last battle ended: `true` if the player won it, `false` if not, and `null` while a battle runs and before the first has ended |
 | `StateHash() -> String` | The whole rules state as 16 hex digits, for checking that two runs agree |
 
@@ -1088,9 +1094,85 @@ because the length of a rendered frame is not an input a deterministic game can 
 have a `TicksPerSecond`, and the runtime's is the one `cooldown 8s` in content converts through: as
 the runtime enters the tree it puts its driver on that rate, warning in the Output panel if the two
 disagreed, so a driver left at another rate can no longer make a cooldown mean two different lengths
-of time. Any rate works against any physics rate. Its `Running` pauses the clock, and its
-`MaxCatchUp` caps how many ticks one frame may run after a stall. A game can also call
-`Tick(count)` itself.
+of time. Any rate works against any physics rate.
+
+```gdscript
+func _ready() -> void:
+	rules = CantripRuntime.new()
+	rules.RealTime = true
+	rules.TicksPerSecond = 20
+
+	driver = TickDriver.new()          # before the runtime enters the tree
+	rules.Driver = driver
+	add_child(driver)
+	add_child(rules)
+
+	rules.LoadContent("res://content")
+	driver.Ticked.connect(_on_ticked)  # the one place to act between ticks
+
+func _on_ticked(_count: int) -> void:
+	_refresh()                         # hp bars, cooldown sweeps, "%d seconds" % rules.GetSeconds()
+```
+
+**The driver**
+
+| Member | |
+|---|---|
+| `TicksPerSecond` | How many ticks make a second. The runtime forces this onto its own rate as it enters the tree |
+| `Running` | Pauses and resumes the clock. Everything stops: cooldowns, `on every`, timed statuses, delayed effects |
+| `MaxCatchUp` | The most ticks one frame may run after a stall |
+| `Ticked(count: int)` | Emitted after each frame's ticks have run. The only place a game may act between ticks without polling in `_process` |
+| `TotalTicks() -> int` | How many ticks **this driver** has run since it was last reset |
+| `DroppedTicks() -> int` | How many it abandoned to `MaxCatchUp`: time the game skipped |
+| `Reset()` | Clears the carried remainder and both counters, as after loading a save |
+
+`TotalTicks()` is the driver's count and not the game's clock. They agree until a save is restored:
+the clock comes back where it was and the counter does not, so a game that schedules anything off
+wall time reads `GetTicks()` or `GetSeconds()` on the runtime, and calls `driver.Reset()` after a
+load so the two start together again.
+
+**A stall skips time rather than replaying it.** After a frame longer than `MaxCatchUp` allows, the
+driver abandons the ticks it could not run and `DroppedTicks()` counts them. That is deliberate — a
+frame that tried to run two seconds of simulation would stall the next one too — but it means the
+game's clock falls behind wall time on a slow machine, and a fight timed in seconds is shorter
+there. A game that cares should show `DroppedTicks()` in its diagnostics, or raise `MaxCatchUp`
+and accept the hitch.
+
+### Running faster or slower
+
+**`Engine.time_scale` has no effect on a Cantrip game, and neither has
+`Engine.physics_ticks_per_second`.** The driver counts physics frames and converts them at its own
+configured rate; the frame's delta is deliberately ignored, because a fixed step is fixed by
+definition and using the measured delta would make the simulation depend on how long the last frame
+happened to take. Raising the runtime's `TicksPerSecond` is not the answer either — it is the rate
+every `cooldown 6s` in the content converts through, so it changes the game rather than its speed.
+
+The way to run at any other speed is to drive the clock yourself:
+
+```gdscript
+driver.Running = false                 # take the clock off the physics loop
+
+func _process(_delta: float) -> void:
+	rules.Tick(2)                      # double speed; Tick(0) to pause, Tick(20) to fast-forward
+```
+
+`Tick(n)` and `n` calls to `Tick(1)` are the same game, to the state hash, so a replay, a
+fast-forward or a "2× speed" option changes nothing about what happens — only when it is watched.
+
+### What has no turns
+
+Every turn-shaped call on the node refuses on a tick runtime, the way `Tick` refuses on a
+turn-based one: `EndTurn()`, `Pass(id)`, `CanAct(id)` and `ActiveMemberId()` all raise an error
+naming `Tick`. `GetTurn()` is 0 for the whole fight, and `turn_start` and `turn_end` are never
+raised. Ask `IsRealTime()` before drawing anything that ends a turn.
+
+`Place(actor_id, lane, rank)` is how a game that spawns its own waves says where they walk in, and
+`EndBattle(won)` is how a game whose ruleset says `ends: called` says the fight is over — without
+it, a wave game is won by the first empty board between two waves. Both are in the table above.
+
+[realtime/godot](../realtime/godot) is a whole real-time front end built on this: a forty-five
+second hold against waves, with ability buttons and cooldown sweeps, targeting, saving mid-fight and
+an autopilot that plays it headlessly for CI.
 
 ## Content and exports
 

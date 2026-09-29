@@ -844,6 +844,87 @@ namespace Cantrip.GodotAdapter
         public int GetTurn() => EnsureRuntime().State.Turn;
 
         /// <summary>
+        /// Whether this runtime measures time in ticks rather than turns. True when
+        /// <see cref="RealTime"/> is set, and also when the content's ruleset says
+        /// <c>clock ticks</c> and no clock was given.
+        /// </summary>
+        /// <remarks>
+        /// A shared UI asks this before it draws an <b>End turn</b> button: every turn-shaped call
+        /// on this node refuses on a tick runtime, the way <see cref="Tick"/> refuses on a
+        /// turn-based one.
+        /// </remarks>
+        public bool IsRealTime() => EnsureRuntime().State.Clock is TickClock;
+
+        /// <summary>
+        /// What time it is, in clock units: ticks in a real-time game, turns in a turn-based one.
+        /// The tick-clock answer to <see cref="GetTurn"/>.
+        /// </summary>
+        /// <remarks>
+        /// This is the game's own clock and not the driver's count, which is what
+        /// <c>TickDriver.TotalTicks()</c> answers. The two agree until a save is restored: the
+        /// clock comes back where it was and the driver's counter does not, so a game that used the
+        /// driver's number to schedule waves released them all again after a load.
+        /// </remarks>
+        public int GetTicks() => (int)EnsureRuntime().State.Clock.Now;
+
+        /// <summary>
+        /// What time it is in seconds, for a "18 / 45 seconds" read-out. Zero in a turn-based game,
+        /// which measures no seconds.
+        /// </summary>
+        public float GetSeconds() =>
+            EnsureRuntime().State.Clock is TickClock clock && clock.TicksPerSecond > 0
+                ? (float)clock.Now / clock.TicksPerSecond
+                : 0f;
+
+        /// <summary>
+        /// Seconds until an ability comes back, for a cooldown sweep: 0 when it is ready now, and 0
+        /// for an id that is not an ability. Turns, not seconds, in a turn-based game.
+        /// </summary>
+        public float CooldownLeft(int ability_id)
+        {
+            CardRuntime core = EnsureRuntime();
+            if (!(core.State.Find(ability_id) is Entity ability) || ability.Kind != EntityKind.Ability) return 0f;
+
+            long left = core.ReadyIn(ability);
+            if (left <= 0) return 0f;
+            return core.State.Clock is TickClock clock && clock.TicksPerSecond > 0 ? (float)left / clock.TicksPerSecond : left;
+        }
+
+        /// <summary>
+        /// Stands an actor at <paramref name="lane"/>, <paramref name="rank"/>, raising
+        /// <c>moved</c>. Answers whether it stands there afterwards; false for an id that names
+        /// nobody on the board, and for a place this game's board does not have.
+        /// </summary>
+        /// <remarks>
+        /// Where somebody stands is a rule, and content writes it as <c>target.rank = 0</c>. This
+        /// is the same rule for a game that places its own waves: a horde arriving on a timer is
+        /// decided above the fight, and executing a string of content per spawn made a typo in a
+        /// lane number a runtime error on a hot path.
+        /// </remarks>
+        public bool Place(int actor_id, int lane, int rank)
+        {
+            CardRuntime core = EnsureRuntime();
+            if (!(core.State.Find(actor_id) is Entity actor)) return false;
+            if (actor.Kind != EntityKind.Actor || actor.Zone != Zones.Board) return false;
+            if (!core.State.Board.Holds(lane, rank)) return false;
+
+            return Act(() => core.Place(actor, lane, rank));
+        }
+
+        /// <summary>
+        /// Ends the running battle, won or lost, as though the last enemy had fallen. What a game
+        /// whose ruleset says <c>ends: called</c> uses to say the fight is over: a timer ran out, a
+        /// gate held, a boss arrived.
+        /// </summary>
+        /// <returns>False when no battle is running.</returns>
+        public bool EndBattle(bool won)
+        {
+            CardRuntime core = EnsureRuntime();
+            if (!core.State.InBattle) return false;
+            return Act(() => core.EndBattle(won) != ActionResult.Unplayable);
+        }
+
+        /// <summary>
         /// Whether the player won the battle that ended last: null while a battle is running and
         /// before the first one has ended.
         /// </summary>

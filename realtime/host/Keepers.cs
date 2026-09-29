@@ -10,7 +10,9 @@ namespace Cantrip.Realtime;
 /// The policy is the whole of real-time play: every tick, look at what is off cooldown and decide
 /// whether this is the second to spend it. Nothing in Cantrip helps with this and nothing should
 /// -- but note what it has to do without. A tick game has no intents and no telegraph
-/// (FINDINGS #3), so the only warning of anything is where things are standing.
+/// (FINDINGS #3), so the only warning of anything is where things are standing. `cantrip sim`
+/// cannot stand in for it either, and says so: when to act in continuous time is a game's own
+/// frame loop, not a bot's.
 /// </summary>
 public static class Keepers
 {

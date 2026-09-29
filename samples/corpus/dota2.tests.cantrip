@@ -55,9 +55,8 @@ test "dota Mana Font regenerates mana once a second"
   tick 20
   expect player.mana == 3
 
-# `cast` fails a test when an ability is not ready, so the reduction is shown the other way round:
-# four seconds halved is twenty ticks, and the second cast lands there. Without the Vestments it
-# would still be waiting.
+# Four seconds halved is twenty ticks. `is_ready` says it head on: still waiting at nineteen ticks,
+# back at twenty, where a full four-second cooldown would have nineteen more to go.
 test "dota Arcane Vestments halves what an ability waits"
   realtime 10
   enemy hp 30
@@ -65,7 +64,10 @@ test "dota Arcane Vestments halves what an ability waits"
   grant "Chain Bolt"
   cast "Chain Bolt"
   expect enemy.hp == 27
-  tick 20
+  tick 19
+  expect not player.is_ready("Chain Bolt")
+  tick 1
+  expect player.is_ready("Chain Bolt")
   cast "Chain Bolt"
   expect enemy.hp == 24
 

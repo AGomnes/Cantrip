@@ -287,3 +287,16 @@ Cantrip.Runtime.Interpreter.Create(Cantrip.Content.EntityDefinition! definition,
 Cantrip.CardRuntime.SetStat(Cantrip.Runtime.Entity! entity, string! stat, long value) -> Cantrip.Num
 Cantrip.CardRuntime.ChangeStat(Cantrip.Runtime.Entity! entity, string! stat, long by) -> Cantrip.Num
 Cantrip.CardRuntime.RemoveCard(Cantrip.Runtime.Entity! card) -> bool
+const Cantrip.Linting.Linter.TurnMachineryWithoutTurns = "CT337" -> string!
+const Cantrip.Linting.Linter.ScenarioWithoutTurns = "CT338" -> string!
+const Cantrip.Linting.Linter.AbilityCost = "CT339" -> string!
+Cantrip.Runtime.BattleEnd
+Cantrip.Runtime.BattleEnd.Called = 1 -> Cantrip.Runtime.BattleEnd
+Cantrip.Runtime.BattleEnd.LastEnemy = 0 -> Cantrip.Runtime.BattleEnd
+Cantrip.Runtime.Ruleset.Ends.get -> Cantrip.Runtime.BattleEnd
+Cantrip.Runtime.Ruleset.Ends.set -> void
+Cantrip.CardRuntime.EndBattle(bool won) -> Cantrip.ActionResult
+Cantrip.CardRuntime.Place(Cantrip.Runtime.Entity! actor, int lane, int rank) -> bool
+Cantrip.Num.ToLong() -> long
+Cantrip.CardRuntime.ReadyIn(Cantrip.Runtime.Entity! ability) -> long
+Cantrip.CardRuntime.AbilitiesOf(Cantrip.Runtime.Entity! owner) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!

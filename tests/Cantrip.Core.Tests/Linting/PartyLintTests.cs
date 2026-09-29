@@ -53,6 +53,33 @@ namespace Cantrip.Tests.Linting
               effect:
                 block 3 to player
             """, "an ability's effect")]
+        // A real-time enemy has no `move` at all -- a move runs on a turn, and CT337 refuses one
+        // under `clock ticks` -- so its whole behaviour is written in listeners. This check did
+        // not look there, which left the party guarantee absent from the entire surface a
+        // real-time party game lives on.
+        [InlineData("""
+            enemy "Sniper"
+              hp 10
+              on every 2s:
+                deal 5 to player
+            """, "an enemy's listener")]
+        [InlineData("""
+            enemy "Sniper"
+              hp 10
+              on damaged:
+                deal 5 to player
+            """, "an enemy's listener")]
+        [InlineData("""
+            card "Echo"
+              cost 1
+              on card_played:
+                deal 2 to player
+            """, "a card's listener")]
+        [InlineData("""
+            ability "Aura"
+              on damaged:
+                block 1 to player
+            """, "an ability's listener")]
         public void Player_where_a_member_is_meant_is_an_error(string body, string place)
         {
             Diagnostic error = Assert.Single(Coded(Party + body, Linter.PlayerWhereAMemberIsMeant));

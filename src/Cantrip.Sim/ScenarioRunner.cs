@@ -98,6 +98,7 @@ namespace Cantrip.Sim
             if (scenario == null) throw new ArgumentNullException(nameof(scenario));
             if (_options.MakeBots.Count == 0)
                 throw new InvalidOperationException("A scenario needs a bot to play it, and ScenarioOptions.MakeBots is empty.");
+            RefuseRealTime();
 
             var outcome = new ScenarioOutcome(scenario, _options.TurnLimit);
             foreach (CommandNode command in Commands(scenario.Syntax.Body))
@@ -143,8 +144,32 @@ namespace Cantrip.Sim
             if (_options.MakeBots.Count == 0)
                 throw new InvalidOperationException("A scenario needs a bot to play it, and ScenarioOptions.MakeBots is empty.");
 
+            RefuseRealTime();
+
             var facts = new ContentFacts();
             return new OneRun(this, scenario, seed, facts, NewMeter(facts), _options.MakeBots[0], log).Play();
+        }
+
+        /// <summary>
+        /// Refuses content written for a tick clock. A bot decides what to play and then ends the
+        /// turn, and a real-time game has no turn to end: the clock would stand at zero for the
+        /// whole run.
+        /// </summary>
+        /// <remarks>
+        /// It used to play such a folder anyway. Nothing threw, so the report was printed in full
+        /// and read as a finding about the content: 40 battles reaching the turn limit and never
+        /// ending, 50.0 turns in a game with no turns, and 0.0 hp lost against enemies that between
+        /// them dealt seventeen damage every three seconds. A tool that quietly gets the answer
+        /// wrong is worse than one that refuses.
+        /// </remarks>
+        private void RefuseRealTime()
+        {
+            if (_content.BuildRuleset(new DiagnosticBag()).Clock != ClockKind.Ticks) return;
+
+            throw new InvalidOperationException(
+                "This content says `clock ticks`, and a scenario is played by taking turns, so there is nothing here a bot could play. " +
+                "When to act in continuous time is the game's own frame loop, not a bot's. Cover a real-time game with `test` blocks: " +
+                "`realtime <rate>` gives one a tick clock and `tick <n>` is how time passes in it.");
         }
 
         /// <summary>

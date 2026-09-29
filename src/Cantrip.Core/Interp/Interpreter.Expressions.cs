@@ -449,8 +449,22 @@ namespace Cantrip.Runtime
                         string status = NameOf(Evaluate(call.Arguments[0], context), call.Span);
                         return Value.FromNumber(Num.FromInt(receiver.AsEntities().Sum(e => e.StacksOf(status))));
 
+                    // `leader.is_ready(Bulwark)` and `leader.can_use(Bulwark)`: the two questions a
+                    // real-time game is made of, asked from content. A test could say what an
+                    // ability does and never that it may not be used yet, because `cast` fails the
+                    // test when the ability is refused — so in a game whose design is entirely
+                    // about what you may not do yet, half the test surface had no words.
+                    case "is_ready":
+                    case "can_use":
+                    {
+                        RequireArguments(call, 1);
+                        string wanted = NameOf(Evaluate(call.Arguments[0], context), call.Span);
+                        bool strict = call.Name.ToLowerInvariant() == "can_use";
+                        return Value.FromBool(receiver.AsEntities().Any(owner => AbilityIsReady(owner, wanted, strict, call.Span)));
+                    }
+
                     default:
-                        throw new RuntimeError($"Unknown method `{call.Name}`." + SuggestionText(call.Name, new[] { "has", "stacks" }), call.Span);
+                        throw new RuntimeError($"Unknown method `{call.Name}`." + SuggestionText(call.Name, new[] { "has", "stacks", "is_ready", "can_use" }), call.Span);
                 }
             }
 
@@ -623,6 +637,35 @@ namespace Cantrip.Runtime
         };
 
         /// <summary>True when an entity has a tag, a status, or a keyword, directly or via an attachment.</summary>
+        /// <summary>
+        /// Whether <paramref name="owner"/> could use the ability called <paramref name="name"/>
+        /// right now: <c>is_ready</c> asks only whether its cooldown has run out,
+        /// <paramref name="strict"/> (<c>can_use</c>) also asks whether there is anybody in reach
+        /// to aim it at.
+        /// </summary>
+        /// <remarks>
+        /// An ability the owner does not have is a mistake worth saying out loud rather than a
+        /// quiet false, because "it is not ready" and "you spelt it wrong" look the same from the
+        /// outside and only one of them is a bug in the game.
+        /// </remarks>
+        private bool AbilityIsReady(Entity owner, string name, bool strict, SourceSpan span)
+        {
+            Entity ability = owner.FindAttached(name)
+                ?? throw new RuntimeError(
+                    $"{owner.Name} has no ability `{name}`; use `grant` first, or list it on the hero.",
+                    span);
+
+            if (ability.Kind != EntityKind.Ability)
+                throw new RuntimeError($"`{name}` on {owner.Name} is a {ability.Kind.ToString().ToLowerInvariant()}, not an ability.", span);
+
+            if (ability.GetBase("ready_at") > Num.FromInt(State.Clock.Now)) return false;
+            if (!strict) return true;
+            if (!owner.IsAlive) return false;
+
+            TargetRule rule = TargetRule.Of(ability.Definition);
+            return !rule.NeedsSomeone || LegalTargets(rule, owner, ability).Count > 0;
+        }
+
         internal bool Has(Entity entity, Value predicate, EvalContext context)
         {
             switch (predicate.Kind)

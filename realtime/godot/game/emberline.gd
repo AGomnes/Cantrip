@@ -6,9 +6,9 @@ extends Control
 # What is Cantrip's: the abilities, their cooldowns in seconds, the statuses, what reaches how far
 # across the board, the enemies' own two-second and three-second listeners, and the save.
 #
-# What is this script's, and would not be in a turn game: the wave schedule, placing everything on
-# the board, keeping a battle alive between waves, the elapsed clock, and the decision that the
-# hold is over. realtime/FINDINGS.md counts that up.
+# What is this script's, and would not be in a turn game: the wave schedule, which lane each wave
+# walks down, and the decision that the hold is over. realtime/FINDINGS.md counts that up, and
+# what is no longer on the list is most of it.
 #
 # Run it headlessly with `-- --emberline-auto` and it plays itself and quits, which is how CI
 # checks it still works with nobody watching.
@@ -17,6 +17,7 @@ const CONTENT := "res://content"
 const SAVE_PATH := "user://emberline.json"
 const TICKS_PER_SECOND := 20
 const HOLD_SECONDS := 45
+const ARRIVE_RANK := 3
 
 # The encounter. Cantrip has no idea a wave exists, so this belongs to the game.
 const SCHEDULE := [
@@ -35,11 +36,10 @@ var driver: TickDriver
 var stoker := 0
 var warden := 0
 var lantern := 0
-var dark := 0
 
-# The game's own clock. The node has no way to say what time it is, so the front end adds up the
-# ticks the driver reports and is careful to put this back when it loads a save. FINDINGS #11.
-var elapsed_ticks := 0
+# The wave schedule is the game's, so it is saved beside the rules' own save. What time it is
+# is the rules' -- `rules.GetTicks()` and `rules.GetSeconds()` read the game's own clock, which
+# is the one that comes back with a save.
 var next_wave := 0
 var killed := 0
 var finished := false
@@ -87,13 +87,12 @@ func _begin() -> void:
 	warden = rules.AddHero("Warden", 0)
 	lantern = rules.AddHero("Lantern", 0)
 
-	# Something has to be standing or the battle is won before it begins. FINDINGS #7.
-	dark = rules.SpawnEnemy("The Dark", -1)
+	# The content says `ends: called`, so an empty board between two waves is just an empty
+	# board and this hold runs on the clock. Nothing has to be standing to keep the fight open.
 	rules.StartBattle(false, false)
-	rules.Execute("loom self", dark, 0)
-	rules.Execute("hold self 0", warden, 0)
-	rules.Execute("hold self 1", stoker, 0)
-	rules.Execute("hold self 2", lantern, 0)
+	rules.Place(warden, 0, 0)
+	rules.Place(stoker, 1, 0)
+	rules.Place(lantern, 2, 0)
 
 	# The only line in this file that makes time pass is the driver's, and it is already running.
 	if auto:
@@ -109,8 +108,9 @@ func _on_ticked(count: int) -> void:
 
 # Nobody is watching under `--emberline-auto`, so the clock is pumped as fast as the machine will
 # go rather than in real time. The driver deliberately ignores the frame delta -- a fixed step is
-# fixed -- so `Engine.time_scale` cannot speed a Cantrip game up and neither can anything else.
-# FINDINGS #13.
+# fixed -- so `Engine.time_scale` does not speed a Cantrip game up and neither does raising
+# `Engine.physics_ticks_per_second`. Calling `Tick(count)` is how a game runs at any speed but
+# one, which is what docs/godot.md says under Running faster or slower.
 func _process(_delta: float) -> void:
 	if not auto or finished:
 		return
@@ -120,10 +120,9 @@ func _process(_delta: float) -> void:
 		rules.Tick(1)
 		_advance(1)
 
-func _advance(count: int) -> void:
+func _advance(_count: int) -> void:
 	if finished:
 		return
-	elapsed_ticks += count
 	_release_waves()
 	if auto:
 		_autopilot()
@@ -131,21 +130,24 @@ func _advance(count: int) -> void:
 		_finish()
 	_refresh()
 
+# The rules' own clock, which is the one a save brings back. TickDriver.TotalTicks() counts the
+# driver's ticks since its last Reset(), and the two part company the moment a save is restored.
 func seconds() -> int:
-	return int(elapsed_ticks / TICKS_PER_SECOND)
+	return int(rules.GetSeconds())
 
 func _release_waves() -> void:
 	while next_wave < SCHEDULE.size() and SCHEDULE[next_wave][0] <= seconds():
 		var wave: Array = SCHEDULE[next_wave]
 		next_wave += 1
 		var id: int = rules.SpawnEnemy(wave[1], -1)
-		rules.Execute("arrive self %d" % wave[2], id, 0)
+		rules.Place(id, wave[2], ARRIVE_RANK)
 		_say("%s comes out of the dark in lane %d." % [wave[1], wave[2]])
 
 func _finish() -> void:
 	finished = true
 	driver.Running = false
 	var held: bool = not rules.GetParty().is_empty() and seconds() >= HOLD_SECONDS
+	rules.EndBattle(held)        # under `ends: called` the game says when the fight is over
 	_say("[b]%s[/b]" % ("The line held. %d down." % killed if held else "The line broke at %ds." % seconds()))
 	if auto:
 		get_tree().quit(0 if held else 1)
@@ -207,7 +209,7 @@ func _autopilot() -> void:
 					if biggest != 0: _use(ability, biggest)
 				"Bulwark":
 					for id in rules.GetEnemies():
-						if id != dark and rules.GetEntity(id)["rank"] == 0:
+						if rules.GetEntity(id)["rank"] == 0:
 							_use(ability, 0)
 							break
 				"Mend":
@@ -234,8 +236,6 @@ func _most_clustered(ids: Array) -> int:
 		var here: Dictionary = rules.GetEntity(id)
 		var count := 0
 		for other in rules.GetEnemies():
-			if other == dark:
-				continue
 			var there: Dictionary = rules.GetEntity(other)
 			if abs(there["lane"] - here["lane"]) + abs(there["rank"] - here["rank"]) <= 1:
 				count += 1
@@ -254,11 +254,11 @@ func _save() -> void:
 	if not saved["accepted"]:
 		_say("[color=#d66]%s[/color]" % str(saved.get("message", "")))
 		return
-	# The rules save the fight. The clock this script keeps, the wave the schedule is up to and
-	# the body count are the game's, and go beside it. FINDINGS #11 and #12.
+	# The rules save the fight, the clock included. The wave the schedule is up to and the body
+	# count are this game's own and go beside it: a Cantrip save knows nothing above the fight.
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	file.store_string(JSON.stringify({
-		"rules": saved["save"], "elapsed": elapsed_ticks, "wave": next_wave, "killed": killed,
+		"rules": saved["save"], "wave": next_wave, "killed": killed,
 	}))
 	file.close()
 	_say("Saved at %ds." % seconds())
@@ -276,7 +276,6 @@ func _load() -> void:
 	if not loaded["accepted"]:
 		_say("[color=#d66]%s[/color]" % str(loaded.get("message", "")))
 		return
-	elapsed_ticks = int(held["elapsed"])
 	next_wave = int(held["wave"])
 	killed = int(held["killed"])
 	driver.Reset()               # the driver counts its own ticks, not the game's
@@ -362,8 +361,6 @@ func _refresh() -> void:
 
 	for child in _line_box.get_children(): child.queue_free()
 	for id in rules.GetEnemies():
-		if id == dark:
-			continue
 		var it: Dictionary = rules.GetEntity(id)
 		var button := Button.new()
 		button.text = "%s  lane %d, rank %d  %d hp%s" % [it["name"], it["lane"], it["rank"],
@@ -382,14 +379,9 @@ func _refresh() -> void:
 			button.pressed.connect(_on_ability_pressed.bind(ability))
 			_ability_box.add_child(button)
 
-# Seconds left on a cooldown, for the sweep on a button. `ready_at` is the tick it comes back at
-# and is not in any document; `CanUse` is the only documented question, and it answers yes or no.
-# FINDINGS #9.
+# Seconds left on a cooldown, for the sweep on a button.
 func _cooldown_text(ability: int) -> String:
-	if rules.CanUse(ability):
-		return "ready"
-	var ready_at: int = rules.GetStat(ability, "ready_at")
-	var left: int = ready_at - elapsed_ticks
-	if left <= 0:
-		return "..."
-	return "%.1fs" % (float(left) / TICKS_PER_SECOND)
+	var left: float = rules.CooldownLeft(ability)
+	if left <= 0.0:
+		return "ready" if rules.CanUse(ability) else "..."
+	return "%.1fs" % left

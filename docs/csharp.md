@@ -61,7 +61,7 @@ Everything a battle screen draws comes from the live state:
 | To show | Read |
 |---|---|
 | The player, and the enemies still standing | `runtime.Player`, and `runtime.State.Actors(Team.Enemy)` in board order |
-| A pile | `runtime.State.ZoneOf(player, Zones.Hand)`, and likewise `Draw`, `Discard`, `Exhaust`, `Powers` and `Relics` |
+| A pile | `runtime.State.ZoneOf(player, Zones.Hand)`, and likewise `Draw`, `Discard`, `Exhaust`, `Powers` and `Relics`. `Zones.Attached` holds what is on an actor rather than in a pile — its statuses and its abilities — and `runtime.AbilitiesOf(who)` is the abilities alone |
 | Where a card is | `card.Zone`, such as `"hand"` or `"discard"`; `"play"` while its effect resolves |
 | hp, block, energy and other stats | `entity.GetInt("hp")`, after modifiers |
 | Statuses and their numbers | `entity.Attached`, and `entity.CounterOf(status.Name)` for each |
@@ -270,7 +270,7 @@ switch (runtime.UseAbility(ability, target))
 }
 ```
 
-An ability has no cost and does not settle its own target, so it never answers `NotEnoughEnergy` or `InvalidTarget` today; both are in the type so that the day it does is not another signature change.
+An ability settles its own target from its `target` and `range` lines when none is given, so `InvalidTarget` is a real answer: it means there was nobody in reach. An ability has no cost and never will have one -- its price is the seconds it makes you wait, and a `cost` line on an `ability` declaration is refused at lint as CT339 -- so it never answers `NotEnoughEnergy`, which is in the type only because one enum serves cards as well.
 
 `AddRelic`, `ApplyStatus` and `Tick` never stop: a choice they raise takes the first option.
 
@@ -363,6 +363,15 @@ while (runtime.Won == null)
 
 `runtime.Won` is null while a battle runs, and before the first one; once a side is gone it is true or false. A battle ends when no party member is alive or no enemy is left alive, so check `Won` after each call, or listen for `battle_end`, whose data holds `won`.
 
+**A fight that does not end with the last enemy.** A wave defence, a horde mode, a survival run or an endless arena has an empty board every few seconds by design, and under the default rule the first gap between two waves wins it. Content says so once, in its ruleset:
+
+```
+ruleset
+  ends: called
+```
+
+An empty board is then just an empty board: the battle runs until the party falls, which is still the rules' own answer, or until the game says otherwise with `runtime.EndBattle(won)`. That call raises `battle_end`, ends the temporary statuses, sends the cards home and sets `Won`, exactly as the last enemy falling does — so everything downstream of the ending is unchanged, and only what *causes* it moved. It works under the default rule too, for a retreat or a surrender.
+
 One runtime plays a whole run. Between battles, give rewards, heal, spawn the next encounter and start again:
 
 ```csharp
@@ -388,6 +397,105 @@ A card made during a battle, such as a Wound, stays in the deck like any other. 
 When a run is over and the game starts a new one with a new runtime, let the old one go with `runtime.Dispose()`. A runtime listens to its clock from the moment it is built — that is how scheduled work, `on every` triggers and timed statuses run — so a runtime given a clock through `RuntimeOptions.Clock` that the game keeps using goes on resolving effects on a game nobody is playing, and the clock holds it alive while it does. A runtime that made its own clock, which is every turn-based game that passes no clock, is collected with it either way. `Dispose` tears nothing else down: the state, the entities and the content are ordinary objects and still read afterwards.
 
 [src/Cantrip.Sim/ScenarioRunner.cs](../src/Cantrip.Sim/ScenarioRunner.cs) is a worked example of a run above the battle: one runtime carries hp, deck and relics from fight to fight, and whatever the scenario writes between them — `heal 12`, `relic "Ember Charm"` — runs as a statement.
+
+## Real time
+
+A real-time game measures time in **ticks** instead of turns. Everything else on this page is the same: the same runtime, the same cards and abilities, the same board, the same saves. What changes is what makes time pass, and that nothing takes a turn.
+
+Two things have to agree. Content says which clock it is written for, so that `cooldown 6s` and `2 turns` are checked rather than hoped for:
+
+```
+ruleset
+  clock ticks
+```
+
+and the game gives the runtime a `TickClock`, whose one argument is **how many ticks make a second**:
+
+```csharp
+using Cantrip;
+using Cantrip.Runtime;
+
+var clock = new TickClock(20);                     // 20 ticks a second
+var runtime = new CardRuntime(content, new RuntimeOptions { Clock = clock, Seed = seed });
+```
+
+**The tick rate is part of the game, not part of the machine.** Every `cooldown 1s`, `for 3s`, `in 2s:` and `on every 2s:` in the content converts through it, so the same content at `new TickClock(20)` and at `new TickClock(60)` is the same game — but a rate the content was not balanced against is a different one, in the way that changing gravity is. Keep the number beside the content it belongs to, not beside the frame rate. Content whose ruleset says `clock ticks` and which is given no clock gets a `TickClock(60)` of its own, which is a reasonable default and nobody's considered choice.
+
+Then `Tick` is the whole of the game's clock:
+
+```csharp
+void FixedUpdate()                                  // your engine's fixed timestep
+{
+    runtime.Tick();                                 // or Tick(n) to catch up several at once
+}
+```
+
+`Tick(n)` and `n` calls to `Tick(1)` are the same game, to the state hash: a listener whose due tick falls inside a multi-tick call fires at that call and keeps its original schedule. Drive it from a **fixed** step and never from a rendered frame, because a step measured from how long the last frame took makes the simulation depend on the frame rate.
+
+### No turns means no turns
+
+Every turn-shaped call refuses on a tick runtime, the way `Tick` refuses on a turn-based one:
+
+| Called on a `TickClock` runtime | |
+|---|---|
+| `EndTurn()`, `Pass(member)`, `CanAct(member)`, `ActiveMember` | throw `InvalidOperationException`, with a message naming `Tick()` |
+| `State.Turn` | stays 0 for the whole fight |
+| `turn_start`, `turn_end` | never raised |
+
+So a shared front end asks before it draws an **End turn** button. There is no flag to read from C# because the game made the clock and knows: `options.Clock is TickClock`. (The Godot node, which makes its own, has `IsRealTime()`.)
+
+Half the turn-based vocabulary follows the turn events and is therefore dead under ticks — `move`, `pattern`, `phase`, `stacking duration`, `decay ... on turn_end`, `until turn_end:`, `next turn:`, `once per turn`, `reset_on turn_start`. **The linter refuses all of it as CT337** when the ruleset says `clock ticks`, and each message names the real-time shape of the same idea, so this is a thing content is told once and not a rule to remember. In particular: an enemy's whole behaviour is `on every <n>s:` listeners, and a status ends because something said `for <n>s` where it was applied.
+
+One consequence worth stating outright: **`cantrip sim` cannot play a real-time game and refuses to try.** When to act in continuous time is the game's own frame loop, not a bot's. Cover a real-time game with `test` blocks, which have `realtime <rate>` and `tick <n>`.
+
+### Placing what arrives
+
+A wave game decides where things walk in, which is a decision above the fight:
+
+```csharp
+Entity hollow = runtime.SpawnEnemy("Hollow");       // raises `created`, so content can meet it
+runtime.Place(hollow, lane: 1, rank: 3);            // and the game says where it arrives
+```
+
+`Place` is content's `target.rank = 0` from C#: it raises `moved`, a `before_moved` listener can refuse it, and it answers whether the actor stands there afterwards. A slot the board does not have is refused with the board's own name and shape rather than clamped, because a wave arriving at a rank that does not exist is a bug in the schedule. Writing a slot that is taken **swaps** the two actors, which is the same rule content gets.
+
+`SpawnEnemy` raises `created`, the same event `create` raises, so an arrival is something content can hear: an entrance effect, a relic that reacts to anything joining the fight, an enemy that places itself. It is an announcement rather than a gate — the enemy is already in the game — so a `before created:` listener cannot cancel a spawn the game has decided on.
+
+### What a real-time interface reads
+
+A row of ability buttons with cooldown sweeps is the whole of a real-time interface, and it is two calls:
+
+```csharp
+foreach (Entity ability in runtime.AbilitiesOf(member))
+{
+    bool usable = runtime.CanUse(ability);                        // off cooldown, and something in reach
+    double seconds = (double)runtime.ReadyIn(ability) / clock.TicksPerSecond;
+    DrawButton(ability.Name, usable, sweep: seconds);
+}
+```
+
+| Call | |
+|---|---|
+| `AbilitiesOf(owner)` | the abilities that actor is carrying, in the order they were granted |
+| `GrantAbility(name, owner)` | gives one from an `ability` declaration. A `hero`'s own are granted by `AddHero` |
+| `IsReady(ability)` | whether its cooldown has run out |
+| `ReadyIn(ability)` | how much longer it has to wait, **in clock units** — ticks here, turns on a turn clock. 0 when it is ready |
+| `CanUse(ability)` | ready, its owner alive, and somebody in reach if it needs one: what a button is greyed out on |
+| `LegalTargets(ability)`, `TargetMode(ability)` | answer for an ability exactly as for a card, so one targeting UI serves both |
+| `UseAbility(ability, target = null)` | with no target it settles its own from the ability's `target` and `range`, and answers `InvalidTarget` when nobody is in reach |
+| `clock.Now` | what time it is, in ticks. Divide by `TicksPerSecond` for a read-out |
+
+Content can ask the first two of those itself, which is how a test says what a keeper may *not* do yet: `leader.is_ready(Bulwark)` is whether the cooldown has run out, and `leader.can_use(Bulwark)` also asks whether anything is in reach.
+
+### Saving a running clock
+
+A save carries the clock's position, every cooldown's due tick, a burn part way through its second, a `for 3s` buff part way through its three and an `in 2s:` effect still in the air. Restore it into a runtime with a `TickClock` of the same rate and both copies play on identically, hash for hash — `IGameClock.Restore` puts the clock back where it was, which is the detail that makes it work. There is nothing extra to do and nothing extra to write down.
+
+What a save does **not** carry is anything above the fight: a wave schedule, a mission timer, the score. Those are the game's, and go beside the save in the game's own file.
+
+### A whole one
+
+[realtime/](../realtime) is a complete real-time game built on this — *Emberline*, a forty-five second hold against waves — with the content, a headless C# host and a Godot front end. [realtime/host/Emberline.cs](../realtime/host/Emberline.cs) is the shortest thing to read first: a clock, a fixed timestep, a wave schedule and an ending.
 
 ## Enemy intents
 

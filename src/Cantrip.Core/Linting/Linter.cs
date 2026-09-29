@@ -95,6 +95,37 @@ namespace Cantrip.Linting
         /// </summary>
         public const string ScopeCannotMatch = "CT336";
 
+        /// <summary>
+        /// Turn machinery written into a game that says <c>clock ticks</c>. CT325 checks the
+        /// <em>units</em> a designer writes; this checks the <em>declarations</em>. A <c>move</c>,
+        /// a <c>pattern</c>, a <c>phase</c>, a <c>stacking duration</c>, a
+        /// <c>decay ... on turn_end</c>, an <c>until turn_end:</c>, a <c>next turn:</c>, an
+        /// <c>once per turn</c>, a <c>reset_on turn_start</c> and a <c>turn_start</c> listener are
+        /// every one of them driven by a turn, and a real-time game takes none.
+        /// </summary>
+        /// <remarks>
+        /// Before this, content whose ruleset said <c>clock ticks</c> and which declared moves,
+        /// patterns and phases that could never run linted with zero errors, zero warnings and
+        /// zero notes, while a <c>2 turns</c> in the same file was CT325. The language checked the
+        /// unit an author wrote and not the machinery they used, so half the vocabulary was
+        /// silently inert: <c>apply Chill 3</c> on a tick clock was a permanent Chill.
+        /// </remarks>
+        public const string TurnMachineryWithoutTurns = "CT337";
+
+        /// <summary>
+        /// A <c>scenario</c> in a game that says <c>clock ticks</c>. The simulator plays a scenario
+        /// by taking turns, and a real-time game has none, so every number it printed was about a
+        /// game nobody played.
+        /// </summary>
+        public const string ScenarioWithoutTurns = "CT338";
+
+        /// <summary>
+        /// <c>cost</c> on an ability. An ability is paid for in the seconds it makes you wait;
+        /// nothing spends the resource a <c>cost</c> line names, so the number reads like a rule
+        /// and is not one.
+        /// </summary>
+        public const string AbilityCost = "CT339";
+
         /// <summary>Below this many runs, a scenario's numbers move about from one run to the next (CT318).</summary>
         private const int FewRuns = 100;
 
@@ -368,6 +399,7 @@ namespace Cantrip.Linting
 
             CheckBlocks();
             CheckClock();
+            CheckAbilityCosts();
             CheckIgnoredDurations();
             CheckTagProperties();
             CheckListenedEvents();
@@ -674,6 +706,8 @@ namespace Cantrip.Linting
             if (declared == ClockKind.Unstated) return;
 
             CheckTurnOrder(declared);
+            CheckTurnMachinery(declared);
+            CheckScenarioClock(declared);
 
             IGameClock clock = declared == ClockKind.Ticks ? new TickClock() : (IGameClock)new TurnClock();
             string stated = declared == ClockKind.Ticks ? "ticks" : "turns";
@@ -743,6 +777,186 @@ namespace Cantrip.Linting
                     $"Drop the `{setting.Name}:` line, or say `clock turns` if this game does take turns.",
                     setting.Span);
             }
+        }
+
+
+        /// <summary>
+        /// CT337: machinery a turn drives, written into a game that says <c>clock ticks</c>.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// CT325 asks whether a length is written in a unit this clock can measure. This asks the
+        /// larger question behind it: whether the declaration itself is one a tick clock ever
+        /// reaches. An enemy's <c>move</c> runs on the enemies' turn, a <c>pattern</c> advances at
+        /// the same moment and a <c>phase</c> gates the moves the other two pick, so under ticks
+        /// all three are text. A <c>stacking duration</c> status ticks down on its host's
+        /// <c>turn_end</c>, which never comes, so it sits on its host for ever; that is a balance
+        /// bug a designer would chase for a long time, and it used to lint clean.
+        /// </para>
+        /// <para>
+        /// Every message names the real-time shape of the same idea, because each of these has
+        /// one: <c>on every N s:</c> for a move, a filter on a second listener for a phase, a
+        /// <c>for N s</c> where a status is applied for a duration, and <c>in N s:</c> for
+        /// <c>next turn:</c>. The last line of every one of them offers <c>clock turns</c>,
+        /// because "this is really a turn game" is always a legitimate answer.
+        /// </para>
+        /// </remarks>
+        private void CheckTurnMachinery(ClockKind declared)
+        {
+            if (declared != ClockKind.Ticks) return;
+
+            void Dead(string what, string instead, SourceSpan span) =>
+                Error(TurnMachineryWithoutTurns,
+                    $"{what} This game says `clock ticks`, so it has no turns and nothing ever runs it. " +
+                    instead + " Or say `clock turns` in the ruleset if this game does take turns.",
+                    span);
+
+            // Every declaration, not only the things: `reset_on turn_start` is written on a
+            // `resource`, which is a rule rather than a thing and so is not in `IsThing`.
+            foreach (EntityDefinition definition in _content.Definitions)
+            {
+                foreach (MemberNode member in definition.Syntax.Members)
+                {
+                    switch (member)
+                    {
+                        case BlockMemberNode { Name: "move" } move:
+                            Dead("A `move` is what an enemy does when its turn comes round.",
+                                "Write the behaviour as a listener on the enemy instead, as in `on every 2s:`.",
+                                move.Span);
+                            break;
+
+                        case PropertyNode { Name: "pattern" } pattern:
+                            Dead("A `pattern` chooses the next move at the enemy's turn.",
+                                "In continuous time an enemy keeps its own schedule: give it an `on every <n>s:` for each thing it does, and a filter or a status to say which.",
+                                pattern.Span);
+                            break;
+
+                        case PropertyNode { Name: "phase" } phase:
+                            Dead("A `phase` gates the moves an enemy picks from on its turn.",
+                                "Write the change as a filter on a listener of its own, as in `on every 3s (self.hp <= self.max_hp / 2):`.",
+                                phase.Span);
+                            break;
+
+                        case PropertyNode { Name: "stacking" } stacking when StacksDownOnTurnEnd(stacking) != null:
+                            Dead($"`stacking {StacksDownOnTurnEnd(stacking)}` counts down on its host's `turn_end`.",
+                                "A status applied on a tick clock ends because something said how long: write `stacking intensity` or `stacking none` and apply it with a length, as in `apply Chill 3 for 4s`.",
+                                stacking.Span);
+                            break;
+
+                        case PropertyNode { Name: "decay" } decay when TurnEvent(DecayTrigger(decay)):
+                            Dead($"`decay ... on {DecayTrigger(decay)}` takes a stack off at the end of a turn.",
+                                "Apply the status with a length instead, as in `apply Chill 3 for 4s`, or decay it on an event this game does raise.",
+                                decay.Span);
+                            break;
+
+                        case PropertyNode { Name: "reset_on" } reset when Words(reset).Any(TurnEvent):
+                            Dead($"`reset_on {Words(reset).First(TurnEvent)}` refills this resource when a turn begins or ends.",
+                                "Nothing refills it in continuous time unless content says so: reset it from an `on every <n>s:` listener, or on an event this game does raise.",
+                                reset.Span);
+                            break;
+
+                        case ListenerNode listener when listener.Interval.IsZero && TurnEvent(listener.EventName):
+                            Dead($"`{listener.EventName}` is raised when a turn begins or ends.",
+                                "Nothing raises it on a tick clock: write `on every <n>s:` for something that happens over and over, or `on battle_start:` for something that happens once.",
+                                listener.Span);
+                            break;
+
+                        case ListenerNode listener when listener.Limit == LimitScope.Turn:
+                            Dead("`once per turn` opens again when the next turn begins.",
+                                "There is no next turn here, so it opens once and never again: limit it with `once per battle`, or let the listener's own interval do the limiting.",
+                                listener.Span);
+                            break;
+                    }
+                }
+            }
+
+            foreach (Body body in _bodies)
+            {
+                foreach (ScheduleNode schedule in body.Facts.Schedules)
+                {
+                    switch (schedule.Kind)
+                    {
+                        case ScheduleKind.NextTurn:
+                            Dead("`next turn:` runs its body when the next turn starts.",
+                                "Write the delay as a length of time instead, as in `in 2s:`.",
+                                schedule.Span);
+                            break;
+
+                        case ScheduleKind.Until when TurnEvent(schedule.Deadline):
+                            Dead($"`until {schedule.Deadline}:` undoes what it did when the turn ends.",
+                                "Give the window a length instead, as in `until 3s:`, or end it on an event this game does raise.",
+                                schedule.Span);
+                            break;
+                    }
+                }
+            }
+        }
+
+        /// <summary>The words of a property, lower-cased, for the settings CT337 reads.</summary>
+        private static IEnumerable<string> Words(PropertyNode property) =>
+            property.Values.SelectMany(EntityDefinition.ReadWords).Select(w => w.ToLowerInvariant());
+
+        /// <summary>
+        /// The stacking mode named on this line when it is one that counts itself down at
+        /// <c>turn_end</c>, else null. <c>intensity</c>, <c>none</c> and <c>separate</c> do not,
+        /// so they are the three a real-time status is written with.
+        /// </summary>
+        private static string? StacksDownOnTurnEnd(PropertyNode stacking) =>
+            Words(stacking).FirstOrDefault(w => w == "duration" || w == "refresh" || w == "both");
+
+        /// <summary>
+        /// Which event a <c>decay</c> line takes a stack off on. <c>decay 1</c> alone means
+        /// <c>turn_end</c>, which is exactly the silent case CT337 is here to catch.
+        /// </summary>
+        private static string? DecayTrigger(PropertyNode decay) => decay.First switch
+        {
+            NumberExpr => "turn_end",
+            BinaryExpr { Operator: BinaryOperator.On, Right: NameExpr trigger } => trigger.Name.ToLowerInvariant(),
+            _ => null,
+        };
+
+        /// <summary>Whether an event name is one only a turn raises.</summary>
+        private static bool TurnEvent(string? name) =>
+            string.Equals(name, "turn_start", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "turn_end", StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// CT339: a <c>cost</c> on an ability. It parses, <see cref="CardRuntime.CostOf"/> answers
+        /// it, and nothing spends it: an ability's price is the seconds it makes you wait. A number
+        /// that reads like a rule and is not one is the class of silence this linter exists for, so
+        /// it is refused where it is written rather than found by counting energy afterwards.
+        /// </summary>
+        private void CheckAbilityCosts()
+        {
+            foreach (EntityDefinition definition in _content.Definitions)
+            {
+                if (!string.Equals(definition.KindName, "ability", StringComparison.OrdinalIgnoreCase)) continue;
+                if (!(definition.Property("cost") is PropertyNode cost)) continue;
+
+                Error(AbilityCost,
+                    $"`cost` on ability `{definition.Name}` is never charged: an ability is paid for in the seconds it makes you wait, " +
+                    "and nothing takes the resource this names. Write the price as a `cooldown`, or put the effect on a card, which does pay.",
+                    cost.Span);
+            }
+        }
+
+        /// <summary>
+        /// CT338: a <c>scenario</c> in a game that says <c>clock ticks</c>. The simulator plays a
+        /// scenario by ending turns, so on a tick clock nothing ever advanced the clock: every
+        /// listener stayed silent, every ability used once never came back, no battle could end,
+        /// and the report said "hp lost 0.0" and "50.0 turns" at exit 0. The command refuses such a
+        /// folder now, and this says the same thing where the scenario is written.
+        /// </summary>
+        private void CheckScenarioClock(ClockKind declared)
+        {
+            if (declared != ClockKind.Ticks) return;
+
+            foreach (ScenarioDefinition scenario in _content.Scenarios)
+                Error(ScenarioWithoutTurns,
+                    $"Scenario `{scenario.Name}` cannot be played: `cantrip sim` takes turns, and this game says `clock ticks`. " +
+                    "When to act in continuous time is the game's own frame loop, not a bot's. Cover a real-time game with `test` blocks, " +
+                    "which drive the clock with `realtime <rate>` and `tick <n>`.",
+                    scenario.Syntax.Span);
         }
 
         /// <summary>
@@ -1198,15 +1412,45 @@ namespace Cantrip.Linting
         }
 
         /// <summary>
-        /// Which of the three bodies CT326 is about this is, in words for the message, or null when
-        /// it is none of them. An enemy's move, a card's effect, an ability's effect: the places
-        /// where a line acts on somebody and the somebody is settled by the rules, not by the word.
+        /// Which body CT326 is about this is, in words for the message, or null when it is none of
+        /// them: the places where a line acts on somebody and the somebody is settled by the rules,
+        /// not by the word.
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// An enemy's <c>move</c>, a card's <c>effect</c> and an ability's <c>effect</c> were the
+        /// first three, and they are the whole of a turn game's enemy behaviour. They are not the
+        /// whole of a real-time game's: a real-time enemy has no <c>move</c> at all, because a move
+        /// runs on a turn (CT337) — its entire behaviour is <c>on every &lt;n&gt;s:</c> listeners,
+        /// which is the one place this check did not look. So the party guarantee 1.0 makes was
+        /// absent from the whole surface a real-time party game lives on, and
+        /// <c>on every 2s: deal 5 to player</c> on an enemy linted with zero errors.
+        /// </para>
+        /// <para>
+        /// A listener on a status, a card or an ability counts for the same reason: it fires for
+        /// whoever is carrying it, and <c>player</c> names the leader whoever that is. A relic's
+        /// listener does not: a relic belongs to the run, which is the leader's, so there
+        /// <c>player</c> is the right word and always was.
+        /// </para>
+        /// </remarks>
         private static string? PartyBody(Body body)
         {
-            if (body.Kind != BodyKind.Effect || body.Owner == null || !(body.Anchor is BlockMemberNode block)) return null;
-
+            if (body.Owner == null) return null;
             string kind = body.Owner.KindName.ToLowerInvariant();
+
+            if (body.Kind == BodyKind.Listener)
+            {
+                return kind switch
+                {
+                    "enemy" => "an enemy's listener",
+                    "card" => "a card's listener",
+                    "ability" => "an ability's listener",
+                    _ => null,
+                };
+            }
+
+            if (body.Kind != BodyKind.Effect || !(body.Anchor is BlockMemberNode block)) return null;
+
             if (kind == "enemy" && block.Name == "move") return "an enemy's move";
             if (block.Name != "effect") return null;
             return kind == "card" ? "a card's effect" : kind == "ability" ? "an ability's effect" : null;

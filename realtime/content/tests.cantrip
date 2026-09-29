@@ -4,10 +4,13 @@
 # with a second in it is registered -- a `hero`'s abilities included. `tick N` is the only way
 # time passes: there is no `end turn` anywhere below, and that is the point.
 #
-# Three of these are written inside out -- "cast it at nobody and see which one it picked" -- for
-# the same reason the reference game's board tests are: `cast` fails the test when an ability is
-# refused or still cooling, so nothing here can assert a refusal head on. In a game whose whole
-# design is what you may not do yet, that is half the test surface. FINDINGS #8.
+# `cast` still fails a test when an ability is refused, so what a keeper may *not* do yet is
+# asked rather than attempted: `leader.is_ready(Bulwark)` is whether its cooldown has run out and
+# `leader.can_use("Ember Bolt")` also asks whether anything is in reach. In a game whose whole
+# design is what you may not do yet, those two are half the test surface. FINDINGS #8.
+#
+# Nothing places an enemy here: a spawn raises `created` and each enemy stands itself at the back
+# of the board, so a test only picks the lane.
 #
 #   dotnet cantrip test realtime/content
 
@@ -77,17 +80,19 @@ test "Backdraft reaches two ranks and no further"
   realtime 20
   hold leader 1
   enemy Hollow
-  enemy Hollow
-  arrive enemy1 1
-  arrive enemy2 1
-  enemy2.rank = 1
+  arrive enemy 1
   grant "Backdraft"
-  expect distance(leader, enemy1) == 4
-  expect distance(leader, enemy2) == 2
-  # Aimed at nobody it takes the only one in reach, and never the one at the back.
+  # Said head on: it is off cooldown and still cannot be used, because four ranks out is out of
+  # reach. Before `can_use` this had to be written inside out -- two enemies, one reachable and
+  # one not, cast at nobody, then see which one it picked.
+  expect distance(leader, enemy) == 4
+  expect leader.is_ready(Backdraft)
+  expect not leader.can_use(Backdraft)
+  enemy.rank = 1
+  expect distance(leader, enemy) == 2
+  expect leader.can_use(Backdraft)
   cast "Backdraft"
-  expect enemy2.hp == 9
-  expect enemy1.hp == 16
+  expect enemy.hp == 9
 
 test "Backdraft catches the lane beside the one it lands in"
   realtime 20
@@ -172,14 +177,14 @@ test "and cannot reach the far lane from where the Lantern stands"
   hero Lantern
   hold Lantern 2
   enemy Hollow
-  enemy Hollow
-  arrive enemy1 0
-  arrive enemy2 2
-  expect distance(Lantern, enemy1) == 6
-  expect distance(Lantern, enemy2) == 4
+  arrive enemy 0
+  expect distance(Lantern, enemy) == 6
+  expect not Lantern.can_use("Signal Flare")
+  arrive enemy 2
+  expect distance(Lantern, enemy) == 4
+  expect Lantern.can_use("Signal Flare")
   cast "Signal Flare" by Lantern
-  expect enemy2.has(Lit)
-  expect not enemy1.has(Lit)
+  expect enemy.has(Lit)
 
 test "Mend keeps a keeper up"
   realtime 20
@@ -231,18 +236,51 @@ test "a burn part way through a second is part way through a second"
   expect enemy.Scorched == 2
   expect enemy.hp == 7
 
-# --- the workaround that keeps a wave game alive ------------------------------------------------
+# --- what a keeper may not do yet ----------------------------------------------------------------
 
-test "The Dark stands there and can never be pointed at"
+test "an ability that is still cooling says so"
+  realtime 20
+  hero Warden
+  expect Warden.is_ready(Bulwark)
+  cast Bulwark by Warden
+  expect not Warden.is_ready(Bulwark)
+  tick 100
+  expect not Warden.is_ready(Bulwark)
+  tick 20
+  expect Warden.is_ready(Bulwark)
+
+test "and one with nobody on the board says so separately"
+  realtime 20
+  hero Lantern
+  hold Lantern 2
+  # Ready from the first tick, and still not usable: there is nobody to aim it at. Those are two
+  # different answers and a real-time game says different things about them.
+  expect Lantern.is_ready("Signal Flare")
+  expect not Lantern.can_use("Signal Flare")
+  enemy Hollow
+  arrive enemy 2
+  expect Lantern.is_ready("Signal Flare")
+  expect Lantern.can_use("Signal Flare")
+
+# --- the fight is over when the game says it is ---------------------------------------------------
+
+test "an empty board does not win the fight"
   realtime 20
   hold leader 1
-  enemy "The Dark"
-  loom enemy1
   enemy Hollow
-  arrive enemy2 1
+  arrive enemy 1
   grant "Ember Bolt"
-  expect enemy1.rank == 4
-  # Aimed at nobody the bolt takes the Hollow, because the Dark is not a legal target at all.
+  apply Braced 1 for 30s to leader
   cast "Ember Bolt"
-  expect enemy2.hp == 11
-  expect enemy1.hp == 9999
+  tick 20
+  cast "Ember Bolt"
+  tick 20
+  cast "Ember Bolt"
+  tick 20
+  cast "Ember Bolt"
+  # The Hollow is gone and the board is empty, and under `ends: called` that is all it is: the
+  # hold runs on the clock, not on the body count, and the next wave is still two seconds away.
+  # A battle that had ended would have stripped Braced on its way out, and this one has not.
+  expect count(enemies) == 0
+  expect leader.has(Braced)
+  expect leader.hp == 80

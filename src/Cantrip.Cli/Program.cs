@@ -332,6 +332,20 @@ turn limit or a failed expectation (or lint warnings, with --warnings-as-errors)
             Print(broken);
             if (content.Diagnostics.HasErrors || broken.Count > 0) return 1;
 
+            // A bot plays a scenario by taking turns, and this content has none. It used to load
+            // such a folder without a murmur and play it by calling EndTurn fifty times: the clock
+            // was a TickClock and nothing ever ticked it, so every `on every` listener was silent,
+            // every ability used once never came back, no battle could end, and the report said
+            // "hp lost 0.0" against enemies dealing seventeen damage every three seconds, at exit 0.
+            if (content.BuildRuleset(new DiagnosticBag()).Clock == ClockKind.Ticks)
+            {
+                Console.Error.WriteLine(
+                    "`sim` cannot play this content: its ruleset says `clock ticks`, and a scenario is played by taking turns.\n" +
+                    "When to act in continuous time is the game's own frame loop, not a bot's. Cover a real-time game with `test`\n" +
+                    "blocks instead: `realtime <rate>` gives the test a tick clock and `tick <n>` is how time passes in it.");
+                return 2;
+            }
+
             List<ScenarioDefinition> scenarios = content.Scenarios
                 .Where(s => name == null || s.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0)
                 .ToList();

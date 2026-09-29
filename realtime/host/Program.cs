@@ -52,6 +52,7 @@ public static class Program
             game.Step();           // one tick of the clock
             steps++;
         }
+        game.Finish();             // the game says when the fight is over, not the body count
         return game;
     }
 
@@ -70,6 +71,7 @@ public static class Program
             lastSecond = game.Second;
             Console.WriteLine($"  {game.Second,3}s  keepers {Describe(game.Party)}   line {Line(game)}");
         }
+        game.Finish();
         Console.WriteLine();
         Console.WriteLine(game.Held
             ? $"The line held. {game.Killed} down, {game.Party.Count} keeper(s) standing."
@@ -86,6 +88,20 @@ public static class Program
 
     // ---------------------------------------------------------------------------------------
 
+    /// <summary>Whether a turn-shaped call refused instead of answering.</summary>
+    static bool Refuses(Action call)
+    {
+        try { call(); return false; }
+        catch (InvalidOperationException) { return true; }
+    }
+
+    /// <summary>What it said when it refused, so the message can be checked as well as the refusal.</summary>
+    static string Because(Action call)
+    {
+        try { call(); return "(it did not refuse)"; }
+        catch (InvalidOperationException error) { return error.Message; }
+    }
+
     static void Expect(string what, bool ok, string detail = "")
     {
         Console.WriteLine((ok ? "ok   " : "FAIL ") + what + (ok || detail.Length == 0 ? "" : "  (" + detail + ")"));
@@ -101,7 +117,18 @@ public static class Program
             game.Second >= Emberline.HoldSeconds, $"stopped at {game.Second}s after {steps} ticks");
         Expect("the keepers held the line", game.Held, $"{game.Party.Count} standing");
         Expect("things died on the way", game.Killed >= 6, game.Killed.ToString());
-        Expect("no turn was ever taken", game.Runtime.State.Turn == 1, game.Runtime.State.Turn.ToString());
+
+        // No turn is taken in a real-time battle and none is counted: `turn_start` does not fire
+        // at StartBattle on a tick clock, which is what CT335 has always told authors.
+        Expect("no turn was ever taken", game.Runtime.State.Turn == 0, game.Runtime.State.Turn.ToString());
+        Expect("and no turn event was ever raised",
+            !game.Events.All.Any(e => e.Name == "turn_start" || e.Name == "turn_end"),
+            string.Join(", ", game.Events.All.Select(e => e.Name).Where(n => n.StartsWith("turn"))));
+
+        // A spawn says so, so content can meet an arrival.
+        Expect("every spawn raised `created`",
+            game.Events.All.Count(e => e.Name == "created") == Emberline.Schedule.Length,
+            game.Events.All.Count(e => e.Name == "created").ToString());
 
         // 2. The same seed plays the same hold.
         Emberline again = Play(content, 1, out _);
@@ -153,11 +180,26 @@ public static class Program
         for (int i = 0; i < Emberline.TicksPerSecond; i++) fresh.Step();
         Expect("and a second later it is back", fresh.Runtime.IsReady(bolt));
 
-        // 5. What a real-time game has no business doing, and what happens when it does it anyway.
-        //    None of these refuses; every one of them answers as though this were a turn game.
-        Expect("CanAct answers on a tick runtime instead of refusing", fresh.Runtime.CanAct(fresh.Warden));
-        Expect("ActiveMember answers too", fresh.Runtime.ActiveMember != null,
-            fresh.Runtime.ActiveMember?.Name ?? "null");
+        // 5. Every turn-shaped call refuses on a tick runtime, the way Tick refuses on a turn one.
+        //    EndTurn used to run a whole turn cycle here, every enemy's move included, in a game
+        //    with no turns -- so an End turn button left wired up fired the lot for free.
+        Expect("EndTurn refuses on a tick runtime", Refuses(() => fresh.Runtime.EndTurn()));
+        Expect("and so does Pass", Refuses(() => fresh.Runtime.Pass(fresh.Warden)));
+        Expect("and CanAct", Refuses(() => fresh.Runtime.CanAct(fresh.Warden)));
+        Expect("and ActiveMember", Refuses(() => _ = fresh.Runtime.ActiveMember));
+        Expect("each of them naming Tick", Because(() => fresh.Runtime.EndTurn()).Contains("Tick()"),
+            Because(() => fresh.Runtime.EndTurn()));
+
+        // 6. An empty board is an empty board. Under `ends: called` the fight runs on the clock.
+        var lull = new Emberline(content);
+        lull.Begin(9);
+        for (int i = 0; i < Emberline.TicksPerSecond; i++) { Keepers.Act(lull); lull.Step(); }
+        foreach (Entity standing in lull.Enemies.ToList()) lull.Runtime.Execute("deal 999 to self", standing, null);
+        Expect("the board can be cleared between waves", lull.Enemies.Count == 0);
+        Expect("and the fight carries on regardless",
+            lull.Runtime.State.InBattle && lull.Runtime.Won == null, lull.Runtime.Won?.ToString() ?? "still running");
+        lull.Runtime.EndBattle(won: true);
+        Expect("until the game says otherwise", lull.Runtime.Won == true && !lull.Runtime.State.InBattle);
 
         Console.WriteLine();
         Console.WriteLine(failures == 0 ? "All checks passed." : failures + " check(s) failed.");

@@ -101,6 +101,33 @@ namespace Cantrip.Runtime
         Initiative,
     }
 
+    /// <summary>What ends a battle that the party is still standing in.</summary>
+    /// <remarks>
+    /// A battle has always ended the instant the board was empty, which is right for a fight the
+    /// engine lays out once and wrong for every fight that arrives in waves. In a wave game the
+    /// board is empty every few seconds by design — the keepers clear one wave and the next is two
+    /// seconds away — so the first run of a survival mode ends at two seconds, having been won.
+    /// The only way to keep such a fight open was an enemy that is always there and can never be
+    /// pointed at, propping the battle open while every count and every <c>deal to enemies</c> in
+    /// the game had to remember it was there.
+    /// </remarks>
+    public enum BattleEnd
+    {
+        /// <summary>
+        /// The default, and what every game written before this setting existed gets: the battle is
+        /// won the moment the last enemy that was in it is gone.
+        /// </summary>
+        LastEnemy,
+
+        /// <summary>
+        /// The game says when. An empty board is just an empty board; the battle runs until the
+        /// party falls or something calls <see cref="Cantrip.CardRuntime.EndBattle"/>. What a wave,
+        /// horde, survival or endless-arena game needs, and nothing else changes.
+        /// </summary>
+        Called,
+    }
+
+    /// <summary>The order the engine offers a party's members in when it runs the side itself.</summary>
     /// <summary>The order the engine offers a party's members in when it runs the side itself.</summary>
     public enum PartyOrder
     {
@@ -175,6 +202,13 @@ namespace Cantrip.Runtime
         /// </summary>
         public PartyOrder Order { get; set; } = PartyOrder.Position;
 
+        /// <summary>
+        /// What ends a battle the party is still standing in.
+        /// <see cref="BattleEnd.LastEnemy"/> by default, which is what every game written before
+        /// this setting existed gets.
+        /// </summary>
+        public BattleEnd Ends { get; set; } = BattleEnd.LastEnemy;
+
         /// <summary>Cards drawn at the start of each player turn.</summary>
         public int HandSize { get; set; } = 5;
 
@@ -208,6 +242,7 @@ namespace Cantrip.Runtime
             && Triggers == other.Triggers
             && Clock == other.Clock
             && Turns == other.Turns
+            && Ends == other.Ends
             && Order == other.Order
             && NewListeners == other.NewListeners
             && HandSize == other.HandSize
@@ -296,6 +331,14 @@ namespace Cantrip.Runtime
                                 Suggest.Closest(words.FirstOrDefault() ?? string.Empty, new[] { "position", "speed" }));
                         break;
 
+                    case "ends":
+                        if (words.Contains("last_enemy") || words.Contains("empty_board")) rules.Ends = BattleEnd.LastEnemy;
+                        else if (words.Contains("called") || words.Contains("game")) rules.Ends = BattleEnd.Called;
+                        else
+                            diagnostics.Error("CT0202", $"Unknown value `{string.Join(" ", words)}` for `ends`. Write `ends: last_enemy` or `ends: called`.", setting.Span,
+                                Suggest.Closest(words.FirstOrDefault() ?? string.Empty, new[] { "last_enemy", "called" }));
+                        break;
+
                     case "hand_size":
                         rules.HandSize = FirstNumber(setting) ?? rules.HandSize;
                         break;
@@ -319,7 +362,7 @@ namespace Cantrip.Runtime
                             setting.Span,
                             Suggest.Closest(setting.Name, new[]
                             {
-                                "events", "loops", "ordering", "modifier_layers", "triggers", "clock", "new_listeners", "turns", "order", "hand_size", "max_hand_size", "max_steps", "max_call_depth",
+                                "events", "loops", "ordering", "modifier_layers", "triggers", "clock", "new_listeners", "turns", "order", "ends", "hand_size", "max_hand_size", "max_steps", "max_call_depth",
                             }));
                         break;
                 }

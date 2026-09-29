@@ -438,7 +438,7 @@ namespace Cantrip.Tests.Docs
         }
 
         [Fact]
-        public void Of_the_setup_calls_only_AddRelic_and_ApplyStatus_raise_events()
+        public void Of_the_setup_calls_AddCard_and_AddDeck_are_the_quiet_ones()
         {
             var host = new Recorder();
             var runtime = new CardRuntime(Library(), new RuntimeOptions { Seed = 7, Host = host });
@@ -446,9 +446,15 @@ namespace Cantrip.Tests.Docs
             runtime.AddCard("Strike");
             runtime.AddCard("Defend", Zones.Hand);
             runtime.AddDeck("Strike", "Defend");
-            Entity worm = runtime.SpawnEnemy("Jaw Worm");
             Assert.Empty(host.Events);
 
+            // A spawn is the most obviously "created" thing there is, and in a wave game it is the
+            // most frequent event there is, so it says so.
+            Entity worm = runtime.SpawnEnemy("Jaw Worm");
+            Assert.Equal(new[] { "created" }, host.Names());
+            Assert.Same(worm, host.Events.Single().Event.Target);
+
+            host.Events.Clear();
             runtime.AddRelic("Thorn Ring");
             Assert.Equal(new[] { "obtained" }, host.Names());
 

@@ -391,7 +391,7 @@ Short answers to common questions, each with a test that passes. Every recipe is
 
 ### A debuff that lasts N enemy turns
 
-A status with `stacking duration` counts turns, not stacks: applying 2 gives it 2, and it loses 1 at the end of each of its host's turns. On an enemy, that covers the enemy's next N turns.
+A status with `stacking duration` counts turns, not stacks: applying 2 gives it 2, and it loses 1 at the end of each of its host's turns. On an enemy, that covers the enemy's next N turns. In a game that says `clock ticks` there are no turns for it to count, so `stacking duration` is error CT337 there and a status ends because the line that applied it said `for 4s`.
 
 ```
 status Weak

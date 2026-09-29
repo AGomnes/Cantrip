@@ -149,8 +149,8 @@ jobs:
         run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- test realtime/content
 
       # There is no `sim` step here and no scenario in realtime/content, because `cantrip sim`
-      # cannot play a real-time game: it never advances the clock, so every battle stalls and
-      # every number in the report is wrong. realtime/FINDINGS.md #4 has the experiment.
+      # cannot play a real-time game and now says so: a bot plays a scenario by taking turns, and
+      # this game has none. A scenario written here would be error CT338 at the lint step above.
       - name: The real-time game plays itself
         run: |
           dotnet build realtime/host/Cantrip.Realtime.csproj -c Release

@@ -7,7 +7,7 @@
 
 [Godot addon](docs/godot.md) · [Quickstart](docs/quickstart.md) · [Writing content](docs/writing-content.md) · [Language reference](docs/language.md) · [C# guide](docs/csharp.md) · [Stability](docs/stability.md) · [Changelog](CHANGELOG.md)
 
-Cantrip is a rules language and rules engine for the combat in single-player, turn-based games, where one side fights AI enemies that show their next move. It was written for deckbuilders and roguelites in the style of Slay the Spire, and cards are optional: a turn-based roguelike whose actors use abilities on cooldowns is the same engine without them, as [samples/abilities](samples/abilities) shows. You write cards, abilities, statuses, relics and enemies as short `.cantrip` files, with their own tests, and the rules engine works out how they interact. Your game drives the battles and keeps the rendering, input, map and rewards between battles in its own code.
+Cantrip is a rules language and rules engine for the combat in single-player games, where one side fights AI enemies. It was written for deckbuilders and roguelites in the style of Slay the Spire, and neither cards nor turns are required: a roguelike whose actors use abilities on cooldowns is the same engine without cards, as [samples/abilities](samples/abilities) shows, and a game that says `clock ticks` measures time in seconds instead of turns and is driven from its own fixed timestep, as [realtime/](realtime) shows. You write cards, abilities, statuses, relics and enemies as short `.cantrip` files, with their own tests, and the rules engine works out how they interact. Your game drives the battles and keeps the rendering, input, map and rewards between battles in its own code.
 
 You use it from **Godot 4.6, on Godot's .NET edition**, writing GDScript or C#, through the [Cantrip addon](docs/godot.md) — or from **any other .NET project** on .NET 5 or later, because the rules engine underneath the addon references no game engine at all.
 
@@ -82,7 +82,7 @@ None of these knows about the others. A Fireball on a frozen enemy deals its 6 d
 
 ## Status
 
-**Preview (0.x).** The current version is on the NuGet badge above and in the [changelog](CHANGELOG.md). The core has unit tests and content tests, and a small roguelite has been built with it and played headlessly by a bot, but no shipped game uses Cantrip yet. The API, the language and the save format may change between previews; [docs/stability.md](docs/stability.md) says how, and lists the tested platforms and the known limitations. Among them, real time (a tick clock, and cooldowns counted in seconds rather than turns) is experimental, and the Godot addon has so far been installed only by its author and by an automated test.
+**Preview (0.x).** The current version is on the NuGet badge above and in the [changelog](CHANGELOG.md). The core has unit tests and content tests, and a small roguelite has been built with it and played headlessly by a bot, but no shipped game uses Cantrip yet. The API, the language and the save format may change between previews; [docs/stability.md](docs/stability.md) says how, and lists the tested platforms and the known limitations. Among them, the Godot addon has so far been installed only by its author and by an automated test.
 
 These docs describe the `main` branch, which can be ahead of the latest release. The changelog's [Unreleased](CHANGELOG.md#unreleased) section lists what that release lacks, and each release's own docs are in [its tag](https://github.com/AGomnes/Cantrip/tags).
 
