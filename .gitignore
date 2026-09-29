@@ -62,3 +62,8 @@ gameplay-effects-dsl.md
 ## reference/godot/assemble.sh puts both in place.
 reference/godot/addons/
 reference/godot/content/
+
+## The real-time game's Godot project is assembled, not committed, for the same reason:
+## realtime/godot/assemble.sh puts the addon and realtime/content in place.
+realtime/godot/addons/
+realtime/godot/content/

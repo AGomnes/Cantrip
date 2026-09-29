@@ -1,0 +1,54 @@
+# What comes out of the dark.
+#
+# There are no turns here, so there are no `move` blocks and no intents: an enemy's whole
+# behaviour is its own `on every <n>s:` listeners, pumped by the clock. That is the single
+# largest difference between writing a real-time enemy and a turn-based one, and FINDINGS #2
+# and #3 are about what it costs.
+#
+# None of them places itself. Spawning an enemy raises no event at all -- `created` is for
+# `create`, `copy` and `shuffle` -- so there is nothing in content for a listener to hang on,
+# and a wave that walks in from the back rank has to be put there by whoever spawned it. The
+# host does it with `Execute("self.rank = 3", id, 0)` and every test below does it by hand.
+# FINDINGS #5.
+#
+# `random party` rather than `player`: `player` is the leader alone, and an enemy that always
+# swings at the leader is the bug CT326 exists to stop. CT326 does not look inside a listener,
+# so nothing would have told me. FINDINGS #6.
+
+# The common one. Closes a rank every two seconds; once it is on the line it swings instead.
+enemy "Hollow"
+  hp 16
+  on every 2s:
+    if not self.has(Reeling):
+      if self.rank > 0:
+        self.rank -1
+      else:
+        deal 5 to random party
+
+# Never closes. Stands where it arrived and throws, which is what makes `range` matter: a keeper
+# who spends everything on what is nearest never reaches the Wisps and loses slowly.
+enemy "Wisp"
+  hp 10
+  on every 3s:
+    deal 3 to random party
+
+# Slow and heavy, and angrier once it is hurt. A phase gates a `move`, and there are no moves
+# here, so the halfway change is a filter on a second listener instead.
+enemy "Breaker"
+  hp 40
+  on every 3s:
+    if self.rank > 0:
+      self.rank -1
+    else:
+      deal 9 to random party
+  on every 3s (self.hp <= self.max_hp / 2):
+    deal 4 to random party
+
+# The thing the keepers are holding against, and a workaround for the hardest finding of the
+# round: a battle is over the moment no enemy is left standing, so in a game where waves arrive
+# on a timer the fight ends in the gap between two of them. The Dark is an enemy that is always
+# there and can never be pointed at, so the board is never empty and the hold runs on the clock
+# instead of on the body count. It stands on rank 4, which no wave ever walks to. FINDINGS #7.
+enemy "The Dark"
+  hp 9999
+  modify targetable: set 0

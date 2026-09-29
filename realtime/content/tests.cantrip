@@ -1,0 +1,248 @@
+# Emberline's tests.
+#
+# Every one says `realtime 20` first, because the clock has to be a tick clock before anything
+# with a second in it is registered -- a `hero`'s abilities included. `tick N` is the only way
+# time passes: there is no `end turn` anywhere below, and that is the point.
+#
+# Three of these are written inside out -- "cast it at nobody and see which one it picked" -- for
+# the same reason the reference game's board tests are: `cast` fails the test when an ability is
+# refused or still cooling, so nothing here can assert a refusal head on. In a game whose whole
+# design is what you may not do yet, that is half the test surface. FINDINGS #8.
+#
+#   dotnet cantrip test realtime/content
+
+# --- the clock is the game --------------------------------------------------------------------
+
+test "a hollow closes a rank every two seconds"
+  realtime 20
+  enemy Hollow
+  arrive enemy 1
+  expect enemy.rank == 3
+  tick 40
+  expect enemy.rank == 2
+  tick 40
+  expect enemy.rank == 1
+  tick 40
+  expect enemy.rank == 0
+
+test "and swings at somebody once it is on the line"
+  realtime 20
+  hero Warden
+  enemy Hollow
+  arrive enemy 1
+  expect leader.hp + Warden.hp == 80 + 34
+  tick 120
+  expect enemy.rank == 0
+  expect leader.hp + Warden.hp == 80 + 34
+  tick 40
+  expect leader.hp + Warden.hp == 80 + 34 - 5
+
+test "a wisp never closes and throws from where it stands"
+  realtime 20
+  enemy Wisp
+  arrive enemy 1
+  tick 60
+  expect enemy.rank == 3
+  expect leader.hp == 77
+  tick 60
+  expect leader.hp == 74
+
+test "a breaker hits harder once it is halfway down"
+  realtime 20
+  enemy Breaker
+  arrive enemy 1
+  tick 180
+  expect enemy.rank == 0
+  deal 21 to enemy
+  expect enemy.hp == 19
+  tick 60
+  expect leader.hp == 80 - 9 - 4
+
+# --- what the player does with the seconds ------------------------------------------------------
+
+test "Ember Bolt reaches the far end of the line and waits one second"
+  realtime 20
+  hold leader 1
+  enemy Hollow
+  arrive enemy 0
+  grant "Ember Bolt"
+  expect distance(leader, enemy) == 5
+  cast "Ember Bolt"
+  expect enemy.hp == 11
+  tick 20
+  cast "Ember Bolt"
+  expect enemy.hp == 6
+
+test "Backdraft reaches two ranks and no further"
+  realtime 20
+  hold leader 1
+  enemy Hollow
+  enemy Hollow
+  arrive enemy1 1
+  arrive enemy2 1
+  enemy2.rank = 1
+  grant "Backdraft"
+  expect distance(leader, enemy1) == 4
+  expect distance(leader, enemy2) == 2
+  # Aimed at nobody it takes the only one in reach, and never the one at the back.
+  cast "Backdraft"
+  expect enemy2.hp == 9
+  expect enemy1.hp == 16
+
+test "Backdraft catches the lane beside the one it lands in"
+  realtime 20
+  hold leader 1
+  enemy Hollow
+  enemy Hollow
+  arrive enemy1 1
+  arrive enemy2 2
+  grant "Backdraft"
+  tick 80
+  cast "Backdraft" on enemy1
+  expect enemy1.hp == 9
+  expect enemy2.hp == 9
+
+test "Backdraft leaves what it hit burning for three seconds"
+  realtime 20
+  hold leader 1
+  enemy Hollow
+  arrive enemy 1
+  grant "Backdraft"
+  tick 80
+  cast "Backdraft"
+  expect enemy.Scorched == 2
+  expect enemy.hp == 9
+  tick 20
+  expect enemy.hp == 7
+  tick 20
+  expect enemy.hp == 5
+  tick 20
+  expect enemy.hp == 3
+  tick 60
+  expect enemy.hp == 3
+  expect not enemy.has(Scorched)
+
+test "Bulwark covers the whole party for three seconds and then stops"
+  realtime 20
+  hero Warden
+  hero Lantern
+  cast Bulwark by Warden
+  expect Warden.has(Braced)
+  expect Lantern.has(Braced)
+  expect leader.has(Braced)
+  deal 5 to Lantern
+  expect Lantern.hp == 26 - 2
+  tick 60
+  expect not Lantern.has(Braced)
+  deal 5 to Lantern
+  expect Lantern.hp == 26 - 2 - 5
+
+test "Haul buys four seconds back from a hollow on the line"
+  realtime 20
+  hero Warden
+  hold Warden 1
+  enemy Hollow
+  arrive enemy 1
+  tick 120
+  expect enemy.rank == 0
+  cast Haul by Warden on enemy
+  expect enemy.rank == 1
+  expect enemy.has(Reeling)
+  tick 40
+  expect enemy.rank == 1
+  tick 40
+  expect enemy.rank == 0
+
+test "a Signal Flare lands its fire two seconds later, on what is standing there then"
+  realtime 20
+  hero Lantern
+  hold Lantern 1
+  enemy Breaker
+  arrive enemy 1
+  cast "Signal Flare" by Lantern on enemy
+  expect enemy.has(Lit)
+  expect enemy.hp == 40
+  tick 20
+  expect enemy.hp == 40
+  tick 20
+  expect enemy.hp == 40 - 9 - 3
+
+test "and cannot reach the far lane from where the Lantern stands"
+  realtime 20
+  hero Lantern
+  hold Lantern 2
+  enemy Hollow
+  enemy Hollow
+  arrive enemy1 0
+  arrive enemy2 2
+  expect distance(Lantern, enemy1) == 6
+  expect distance(Lantern, enemy2) == 4
+  cast "Signal Flare" by Lantern
+  expect enemy2.has(Lit)
+  expect not enemy1.has(Lit)
+
+test "Mend keeps a keeper up"
+  realtime 20
+  hero Lantern
+  hero Warden
+  deal 20 to Warden
+  expect Warden.hp == 14
+  cast Mend by Lantern on Warden
+  expect Warden.hp == 24
+
+# --- cooldowns compete for the same second -------------------------------------------------------
+
+test "four abilities fired in one second come back at four different moments"
+  realtime 20
+  hero Warden
+  hero Lantern
+  hold leader 1
+  hold Warden 0
+  hold Lantern 2
+  enemy Breaker
+  arrive enemy 1
+  grant "Ember Bolt"
+  cast "Ember Bolt"
+  cast Bulwark by Warden
+  cast "Signal Flare" by Lantern on enemy
+  # One second on, the bolt alone is back.
+  tick 20
+  cast "Ember Bolt"
+  # Three seconds on, the Flare's fire has landed; Bulwark is still waiting.
+  tick 40
+  expect enemy.hp == 40 - 5 - (5 + 3) - (9 + 3)   # Lit adds 3 to everything after it lands
+  expect not Warden.has(Braced)
+  # Six seconds in, Bulwark comes back.
+  tick 60
+  cast Bulwark by Warden
+  expect Warden.has(Braced)
+
+# --- what a save has to carry ---------------------------------------------------------------
+
+test "a burn part way through a second is part way through a second"
+  realtime 20
+  hold leader 1
+  enemy Hollow
+  arrive enemy 1
+  grant "Backdraft"
+  tick 80
+  cast "Backdraft"
+  tick 30
+  expect enemy.Scorched == 2
+  expect enemy.hp == 7
+
+# --- the workaround that keeps a wave game alive ------------------------------------------------
+
+test "The Dark stands there and can never be pointed at"
+  realtime 20
+  hold leader 1
+  enemy "The Dark"
+  loom enemy1
+  enemy Hollow
+  arrive enemy2 1
+  grant "Ember Bolt"
+  expect enemy1.rank == 4
+  # Aimed at nobody the bolt takes the Hollow, because the Dark is not a legal target at all.
+  cast "Ember Bolt"
+  expect enemy2.hp == 11
+  expect enemy1.hp == 9999

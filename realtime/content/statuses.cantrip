@@ -1,0 +1,32 @@
+# Statuses on a tick clock.
+#
+# Every one of these ends because something says `for <n>s`, or because another line removes it.
+# A `stacking duration` status ticks down on its host's `turn_end`, and there is no turn_end in a
+# real-time game, so a duration status here would sit on its host for ever. See FINDINGS #4.
+
+# The keepers' shield. `stacking none` so a second Bulwark does not stack the reduction, only
+# refreshes how long it lasts.
+status "Braced"
+  tags buff
+  stacking none
+  modify damage_taken of owner: -3
+
+# Burning. The status carries the ticking, which is the real-time shape of a damage-over-time:
+# the ability that applies it is over the moment it is used, and the burn keeps its own time.
+status "Scorched"
+  tags debuff, fire
+  stacking intensity
+  on every 1s:
+    deal stacks to owner, ignore block
+
+# What a Signal Flare leaves on a thing: it takes more from everything while it is lit.
+status "Lit"
+  tags debuff
+  stacking none
+  modify damage_taken of owner: +3
+
+# A hollow that has been hauled back is off balance and cannot close for a moment. Its own
+# advance listener reads this.
+status "Reeling"
+  tags debuff, control
+  stacking none

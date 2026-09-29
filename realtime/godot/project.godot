@@ -1,0 +1,38 @@
+; Emberline, as a Godot game.
+;
+; A real-time hold: three keepers, five abilities on cooldowns in seconds, and a clock driven by
+; the engine's own physics loop through the addon's TickDriver. There is no End turn button
+; anywhere in this project, because there are no turns.
+;
+; `addons/cantrip` and `content/` are NOT in the repository. They are assembled by
+; realtime/godot/assemble.sh from the one copy of each -- the addon under
+; godot/Cantrip.Demo/addons/cantrip and the content under realtime/content.
+;
+;   bash realtime/godot/assemble.sh
+;   dotnet build realtime/godot/Cantrip.Realtime.Godot.csproj
+;   Godot_v4.6.2-stable_mono_win64.exe --path realtime/godot
+
+config_version=5
+
+[application]
+
+config/name="Emberline"
+config/description="A real-time hold, built on Cantrip's tick clock."
+config/features=PackedStringArray("4.6", "C#")
+run/main_scene="res://game/emberline.tscn"
+
+[cantrip]
+
+content/folder="res://content"
+
+[dotnet]
+
+project/assembly_name="Cantrip.Realtime.Godot"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/cantrip/plugin.cfg")
+
+[physics]
+
+common/physics_ticks_per_second=60

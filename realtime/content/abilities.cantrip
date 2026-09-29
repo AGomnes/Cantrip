@@ -1,0 +1,60 @@
+# Five abilities on five different cooldowns, which is the whole of the player's interface.
+#
+# There are no cards in Emberline and no energy: an ability's only price is the seconds it makes
+# you wait, so the game is deciding what to spend the next second of attention on. The cooldowns
+# are deliberately coprime-ish -- 1s, 3s, 5s, 6s, 9s -- so they come off cooldown at different
+# moments and the player is never offered all five at once.
+
+# The Stoker's workhorse. One second, reaches the whole board, small.
+ability "Ember Bolt"
+  cooldown 1s
+  target enemy
+  range 5
+  effect:
+    deal 5 to target
+
+# The Stoker's answer to a lane that has closed: it only reaches two ranks, so it is a reward for
+# letting something get close. `within(target, 1)` is the square around where it lands.
+ability "Backdraft"
+  cooldown 6s
+  target enemy
+  range 2
+  effect:
+    deal 7 to enemies in within(target, 1)
+    apply Scorched 2 for 3s to enemies in within(target, 1)
+
+# The Warden's shield, on everyone, for three seconds out of every six. Holding it for the moment
+# a Breaker lands is the difference between a hold and a rout.
+ability "Bulwark"
+  cooldown 6s
+  effect:
+    apply Braced 1 for 3s to party
+
+# The Warden pushes a hollow back a rank and leaves it reeling for two seconds, so a lane about to
+# break gets four seconds back. Only reaches what is nearly on top of the line.
+ability "Haul"
+  cooldown 3s
+  target enemy
+  range 2
+  effect:
+    if target.rank < 3:
+      target.rank +1
+    apply Reeling 1 for 2s to target
+
+# The Lantern's flare: the light lands now and the fire lands two seconds later, on whatever is
+# still standing there. `in 2s:` is the one thing a turn game cannot spell at all.
+ability "Signal Flare"
+  cooldown 5s
+  target enemy
+  range 5
+  effect:
+    apply Lit 1 for 4s to target
+    in 2s:
+      deal 9 to target
+
+# The Lantern's mend. It cannot bring anyone back, only keep them up.
+ability "Mend"
+  cooldown 5s
+  target ally
+  effect:
+    heal 10 to target

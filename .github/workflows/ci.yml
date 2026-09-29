@@ -139,6 +139,23 @@ jobs:
           dotnet build reference/host/Cantrip.Reference.csproj -c Release
           dotnet run --project reference/host -c Release --no-build -- --check
 
+      # Emberline: the real-time game. Nothing else in the repository drives the tick clock as a
+      # game -- no turns anywhere, cooldowns in seconds, enemies that act from their own
+      # `on every` listeners, and a host that owns the frame loop. See realtime/FINDINGS.md.
+      - name: Lint realtime/content
+        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- lint realtime/content --warnings-as-errors
+
+      - name: DSL tests (realtime/content)
+        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- test realtime/content
+
+      # There is no `sim` step here and no scenario in realtime/content, because `cantrip sim`
+      # cannot play a real-time game: it never advances the clock, so every battle stalls and
+      # every number in the report is wrong. realtime/FINDINGS.md #4 has the experiment.
+      - name: The real-time game plays itself
+        run: |
+          dotnet build realtime/host/Cantrip.Realtime.csproj -c Release
+          dotnet run --project realtime/host -c Release --no-build -- --check
+
       # Pack the two NuGet packages and follow docs/quickstart.md word for word against them, in an
       # empty folder. This is what a new user does first, so it is what must never break. Linux
       # only: the packages are the same on both, and the script is bash.
@@ -223,6 +240,21 @@ jobs:
 
       - name: The reference game plays a whole descent in Godot
         run: timeout 300 "$GODOT" --headless --path reference/godot res://game/chapel.tscn -- --chapel-auto
+
+      # Emberline as a Godot project of its own, with its clock coming from the engine's own
+      # physics loop through the addon's TickDriver. Nothing else in this repository uses that
+      # node at all, so these three steps are the whole of its coverage.
+      - name: Assemble the real-time game
+        run: |
+          bash realtime/godot/assemble.sh
+          dotnet build realtime/godot/Cantrip.Realtime.Godot.csproj
+          timeout 300 "$GODOT" --headless --path realtime/godot --import
+
+      - name: The real-time game answers for the node
+        run: timeout 300 "$GODOT" --headless --path realtime/godot res://game/checks.tscn
+
+      - name: The real-time game holds the line in Godot
+        run: timeout 300 "$GODOT" --headless --path realtime/godot res://game/emberline.tscn -- --emberline-auto
 
       # The addon as a user gets it: the release zip unzipped into a blank Godot project outside the
       # repository, Cantrip.Core added the way docs/godot.md says, then a battle from GDScript. The

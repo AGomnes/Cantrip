@@ -1,0 +1,22 @@
+# Where everybody stands.
+#
+# The engine fills a board depth-first down lane 0, so a party of three arrives in single file
+# and so does a wave: leader at (0,0), the two keepers behind it at (0,1) and (0,2). A hold is
+# three abreast on the front rank with the dark four ranks away, and nothing but these two verbs
+# puts anyone there. There is no host-side call for it either -- `Execute("hold(self, 1)", id, 0)`
+# is how the C# game and the Godot node both reach them. FINDINGS #5.
+#
+# Writing a place is a swap when the slot is taken, so lane goes first and rank second, and the
+# order the host calls these in is the order they end up in.
+
+verb hold(who, l):
+  who.lane = l
+  who.rank = 0
+
+verb arrive(who, l):
+  who.lane = l
+  who.rank = 3
+
+verb loom(who):
+  who.lane = 1
+  who.rank = 4

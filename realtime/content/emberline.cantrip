@@ -1,0 +1,36 @@
+# Emberline -- the rules of a real-time hold.
+#
+# Three keepers stand on the near ranks of a burning line and hold it against things that come
+# out of the dark. Nothing in this game takes a turn: the host advances a tick clock from its own
+# fixed timestep, twenty ticks a second, and every length in this content is written in seconds.
+#
+#   dotnet cantrip lint realtime/content --warnings-as-errors
+#   dotnet cantrip test realtime/content
+
+# `clock ticks` is what makes `cooldown 4s` and `on every 2s:` checkable rather than hopeful: a
+# `2 turns` anywhere below is error CT325 at lint instead of a line that quietly never fires.
+# `turns:` and `order:` are deliberately absent -- they are CT335 under this clock.
+ruleset
+  clock ticks
+  max_hand_size 10
+
+# Three lanes wide, four ranks deep, mirrored. The keepers hold rank 0; everything hostile walks
+# in at rank 3 and closes one rank at a time, so the distance between a keeper and a hollow is
+# 1 when it is on top of them and 4 when it has just arrived. Every ability's `range` is written
+# against those numbers, and that is the whole of the game's tension: what you can reach.
+board "The Line"
+  lanes 3
+  ranks 5
+  facing
+  metric manhattan
+  on_vacated gap
+  lane_word "lane"
+  rank_word "rank"
+
+hero "Warden"
+  hp 34
+  abilities "Bulwark", "Haul"
+
+hero "Lantern"
+  hp 26
+  abilities "Signal Flare", "Mend"
