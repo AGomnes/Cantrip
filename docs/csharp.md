@@ -292,9 +292,49 @@ if (runtime.Pending!.IsOffer)
 
 A chooser that answers on the spot handles offers by overriding `IChoiceProvider.ChooseDefinition`; `RandomChooser` and `ScriptedChooser` already do. It has a default that takes the first candidate, so a chooser that only decides between live entities still runs.
 
+## The party
+
+`CreatePlayer` makes a party of one, and that member is the leader. A game with more than one hero adds the rest from `hero` declarations:
+
+```csharp
+Entity leader = runtime.CreatePlayer("Crusader", hp: 38);
+Entity vestal = runtime.AddHero("Vestal");          // with the abilities its declaration lists
+runtime.StartBattle();
+
+foreach (Entity member in runtime.Party)            // the living members, in step order
+{
+    if (!runtime.CanAct(member)) continue;
+    // ... let the player act with this member ...
+    runtime.Pass(member);                           // done for this turn
+}
+```
+
+When the last member that could act has passed, the enemies take their turn and the next one begins — so for a party of one `Pass` is `EndTurn`, to the turn number and the state hash. A game that never calls any of this is unchanged: `Party` is `[Player]`, `CanAct(Player)` is true while it is the player's turn, and `EndTurn` means what it always did.
+
+| Member | What it answers |
+|---|---|
+| `Party` | the living members, in the order they take their steps |
+| `Player` | the leader: the one `CreatePlayer` made, the one that holds the run's relics and gold |
+| `AddHero(name, hp = null)` | adds a member from a `hero` declaration, with its abilities |
+| `CanAct(member)` | a battle is running, it is the party's turn, the member is alive and has not passed |
+| `Pass(member)` | that member is done this turn; the last one ends the turn |
+| `ActiveMember` | whose step it is, under a turn order that has one. Null under `turns: sides`, which is the only mode this release has: there the game acts with its members in any order and asks `CanAct` of each |
+| `Revive(actor, hp = 1)` | brings a fallen actor back. False for one that was never dead |
+| `Entity.IsPartyMember` | true for the leader and every `hero`; false for a summon standing beside them |
+
+**Playing a card with a named performer.** `Play(card, target, performer)` is how one member plays out of the party's hand: the cost comes out of the card controller's pool, and everything else is the performer's — `card_played`'s source, the damage, `source:` filters, that member's own statuses and modifiers. With no performer it means what it always meant, the card's own controller.
+
+```csharp
+runtime.Play(sanctuary, crusader, performer: vestal);
+```
+
+**Abilities.** `CanUse(ability)` is `CanPlay`'s companion: the owner is alive, the cooldown is up, and one that needs somebody to point at has somebody. `LegalTargets` and `TargetMode` answer for an ability as well as a card, so the same targeting UI serves both. A cooldown belongs to the ability entity, so two members with the same ability have two of them.
+
+**Losing.** The battle is lost when no member is alive, not when the leader dies. A surviving summon does not keep it going.
+
 ## Winning, losing and several battles
 
-`runtime.Won` is null while a battle runs, and before the first one; once a side is gone it is true or false. A battle ends when the player dies or no enemy is left alive, so check `Won` after each call, or listen for `battle_end`, whose data holds `won`.
+`runtime.Won` is null while a battle runs, and before the first one; once a side is gone it is true or false. A battle ends when no party member is alive or no enemy is left alive, so check `Won` after each call, or listen for `battle_end`, whose data holds `won`.
 
 One runtime plays a whole run. Between battles, give rewards, heal, spawn the next encounter and start again:
 
@@ -311,8 +351,8 @@ if (runtime.Won == true)
 
 | Carries over | Starts afresh |
 |---|---|
-| The player, with its hp, max hp and any other stats | Enemies: the dead are removed when the next battle starts |
-| Every card still in the game, back in the draw pile, exhausted cards and cards made during the battle included | The player's statuses, unless flagged `persistent` |
+| Every party member, with its hp, max hp and any other stats | Enemies: the dead are removed when the next battle starts |
+| Every card still in the game, back in its owner's draw pile, exhausted cards and cards made during the battle included | Every member's statuses, unless flagged `persistent` |
 | Relics, and `once per run` limits | `until` effects, which are undone, and scheduled work, which is dropped |
 | | `once per battle` limits, the battle's history counters and the turn number |
 
@@ -331,6 +371,8 @@ var text = new DescriptionBuilder(content);
 string move = worm.Intent!;                                // "Chomp", for choosing an icon
 Description intent = text.DescribeIntent(worm, runtime);   // "Deal 11 damage to the player."
 ```
+
+`IntentTargetOf(enemy)` is who that move is aimed at: the member the enemy telegraphed, while that member is still a legal target, and otherwise whoever is left. **It is recomputed on every call**, so a taunt applied mid-turn, a death or a swap changes what the panel shows with no event for the UI to have missed — and it agrees with what the move itself does when it runs, because both ask one question of one rule. It is null while `Intent` is. `Entity.IntentTarget` is the raw telegraph as it was rolled, which is what a save holds; a UI wants `IntentTargetOf`.
 
 `DescribeIntent` is empty while `Intent` is null. It returns the same `Description` as a card's rules text, so it is drawn the same way (below); in an intent, a `Buffed` value is one the enemy hits harder with. `DescribeMove(definition, moveName, runtime, enemy)` describes any one of an enemy's moves, for a bestiary or a tooltip.
 

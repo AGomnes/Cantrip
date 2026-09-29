@@ -83,7 +83,7 @@ Cantrip.CardRuntime.Answer(System.Collections.Generic.IEnumerable<Cantrip.Runtim
 Cantrip.CardRuntime.Answer(System.Collections.Generic.IEnumerable<int>! entityIds) -> Cantrip.ActionResult
 Cantrip.CardRuntime.EndTurn() -> Cantrip.ActionResult
 Cantrip.CardRuntime.Execute(string! statements, Cantrip.Runtime.Entity? self = null, Cantrip.Runtime.Entity? target = null) -> Cantrip.ActionResult
-Cantrip.CardRuntime.Play(Cantrip.Runtime.Entity! card, Cantrip.Runtime.Entity? target = null) -> Cantrip.ActionResult
+*REMOVED*Cantrip.CardRuntime.Play(Cantrip.Runtime.Entity! card, Cantrip.Runtime.Entity? target = null) -> Cantrip.ActionResult
 Cantrip.CardRuntime.Play(string! cardName, Cantrip.Runtime.Entity? target = null) -> Cantrip.ActionResult
 Cantrip.CardRuntime.StartBattle(bool shuffle = true, bool drawOpeningHand = true, string? board = null) -> Cantrip.ActionResult
 Cantrip.CardRuntime.UseAbility(Cantrip.Runtime.Entity! ability, Cantrip.Runtime.Entity? target = null) -> Cantrip.ActionResult
@@ -223,3 +223,45 @@ const Cantrip.Linting.Linter.ReachLimitsNothing = "CT332" -> string!
 const Cantrip.Linting.Linter.ReachWithoutATarget = "CT331" -> string!
 const Cantrip.Linting.Linter.RowOfOne = "CT333" -> string!
 const Cantrip.Linting.Linter.SpatialSelector = "CT330" -> string!
+Cantrip.CardRuntime.ActiveMember.get -> Cantrip.Runtime.Entity?
+Cantrip.CardRuntime.AddHero(string! name, int? hp = null) -> Cantrip.Runtime.Entity!
+Cantrip.CardRuntime.CanAct(Cantrip.Runtime.Entity! member) -> bool
+Cantrip.CardRuntime.CanUse(Cantrip.Runtime.Entity! ability) -> bool
+Cantrip.CardRuntime.IntentTargetOf(Cantrip.Runtime.Entity! enemy) -> Cantrip.Runtime.Entity?
+Cantrip.CardRuntime.Party.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.CardRuntime.Pass(Cantrip.Runtime.Entity! member) -> Cantrip.ActionResult
+Cantrip.CardRuntime.Play(Cantrip.Runtime.Entity! card, Cantrip.Runtime.Entity? target = null, Cantrip.Runtime.Entity? performer = null) -> Cantrip.ActionResult
+Cantrip.CardRuntime.Revive(Cantrip.Runtime.Entity! actor, int hp = 1) -> bool
+Cantrip.Content.EntityDefinition.Abilities.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Cantrip.Content.EntityDefinition.IsHero.get -> bool
+Cantrip.Content.EntityDefinition.ReadWordList(string! property) -> System.Collections.Generic.IReadOnlyList<string!>!
+Cantrip.Content.MoveDefinition.TargetSelector.get -> Cantrip.Syntax.ExprNode?
+Cantrip.Runtime.Entity.IntentTarget.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.Entity.IsPartyMember.get -> bool
+Cantrip.Runtime.EntitySnapshot.IntentTargetId.get -> int
+Cantrip.Runtime.EntitySnapshot.IntentTargetId.set -> void
+Cantrip.Runtime.EntitySnapshot.IsPartyMember.get -> bool
+Cantrip.Runtime.EntitySnapshot.IsPartyMember.set -> void
+Cantrip.Runtime.GameSnapshot.ActedIds.get -> System.Collections.Generic.List<int>!
+Cantrip.Runtime.GameSnapshot.ActedIds.set -> void
+Cantrip.Runtime.GameSnapshot.ActiveMemberId.get -> int
+Cantrip.Runtime.GameSnapshot.ActiveMemberId.set -> void
+Cantrip.Runtime.GameSnapshot.PartyIds.get -> System.Collections.Generic.List<int>!
+Cantrip.Runtime.GameSnapshot.PartyIds.set -> void
+Cantrip.Runtime.GameState.ActiveMember.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.GameState.Party.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.Runtime.Interpreter.IntentTargetOf(Cantrip.Runtime.Entity! enemy) -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.Interpreter.Revive(Cantrip.Runtime.Entity! actor, Cantrip.Num hp, Cantrip.Runtime.EvalContext! context, Cantrip.Diagnostics.SourceSpan span = default(Cantrip.Diagnostics.SourceSpan)) -> bool
+Cantrip.Runtime.PartyOrder
+Cantrip.Runtime.PartyOrder.Position = 0 -> Cantrip.Runtime.PartyOrder
+Cantrip.Runtime.PartyOrder.Speed = 1 -> Cantrip.Runtime.PartyOrder
+Cantrip.Runtime.Ruleset.Order.get -> Cantrip.Runtime.PartyOrder
+Cantrip.Runtime.Ruleset.Order.set -> void
+Cantrip.Runtime.Ruleset.Turns.get -> Cantrip.Runtime.TurnMode
+Cantrip.Runtime.Ruleset.Turns.set -> void
+Cantrip.Runtime.TurnMode
+Cantrip.Runtime.TurnMode.Initiative = 1 -> Cantrip.Runtime.TurnMode
+Cantrip.Runtime.TurnMode.Sides = 0 -> Cantrip.Runtime.TurnMode
+const Cantrip.Runtime.BuiltinEvents.Revived = "revived" -> string!
+const Cantrip.Linting.Linter.PlayerWhereAMemberIsMeant = "CT326" -> string!
+const Cantrip.Linting.Linter.TurnSettingNotYetBuilt = "CT334" -> string!

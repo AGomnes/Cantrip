@@ -81,6 +81,38 @@ namespace Cantrip.Runtime
     }
 
     /// <summary>
+    /// Whether the party takes one turn between them or every combatant takes its own step in one
+    /// interleaved order.
+    /// </summary>
+    public enum TurnMode
+    {
+        /// <summary>
+        /// The default, and what every game written before a party existed gets: the party acts,
+        /// then the enemies. Members act in whatever order the game likes within the party's turn.
+        /// </summary>
+        Sides,
+
+        /// <summary>
+        /// Every combatant takes its step in one order across both sides. Not in this release; the
+        /// word is here so content can be read, and writing it is refused rather than ignored.
+        /// </summary>
+        Initiative,
+    }
+
+    /// <summary>The order the engine offers a party's members in when it runs the side itself.</summary>
+    public enum PartyOrder
+    {
+        /// <summary>
+        /// Where they stand: <c>(lane, rank)</c>, which is what <c>GameState.Actors</c> already
+        /// gives and so cannot move an existing game.
+        /// </summary>
+        Position,
+
+        /// <summary>By the <c>speed</c> stat, descending. Not in this release.</summary>
+        Speed,
+    }
+
+    /// <summary>
     /// Rules that content is written against. These change results, so they live in
     /// content where mod authors can see them, unlike execution speed which lives in code.
     /// </summary>
@@ -122,6 +154,21 @@ namespace Cantrip.Runtime
         /// </summary>
         public NewListeners NewListeners { get; set; } = NewListeners.HearTheEvent;
 
+        /// <summary>
+        /// Whether the party acts as a side or in one interleaved order. <see cref="TurnMode.Sides"/>
+        /// by default, which is what every game written before a party existed gets. One round is
+        /// one turn in either mode: <c>State.Turn</c> is the round number, because
+        /// <c>on every N turns</c>, <c>once per turn</c>, the history counters, the saved turn and
+        /// the simulator's stall limit all key off it.
+        /// </summary>
+        public TurnMode Turns { get; set; } = TurnMode.Sides;
+
+        /// <summary>
+        /// The order the party's members are offered in. <see cref="PartyOrder.Position"/> by
+        /// default: where they stand, which is the order the board already keeps them in.
+        /// </summary>
+        public PartyOrder Order { get; set; } = PartyOrder.Position;
+
         /// <summary>Cards drawn at the start of each player turn.</summary>
         public int HandSize { get; set; } = 5;
 
@@ -154,6 +201,8 @@ namespace Cantrip.Runtime
             && MaxDepth == other.MaxDepth
             && Triggers == other.Triggers
             && Clock == other.Clock
+            && Turns == other.Turns
+            && Order == other.Order
             && NewListeners == other.NewListeners
             && HandSize == other.HandSize
             && MaxHandSize == other.MaxHandSize
@@ -225,6 +274,24 @@ namespace Cantrip.Runtime
                                 Suggest.Closest(words.FirstOrDefault() ?? string.Empty, new[] { "turns", "ticks" }));
                         break;
 
+                    case "turns":
+                        if (words.Contains("sides") || words.Contains("side")) rules.Turns = TurnMode.Sides;
+                        else if (words.Contains("initiative"))
+                            diagnostics.Error("CT334", "`turns: initiative` is not in this release. Every combatant taking its own step in one interleaved order is the half a later release adds; write `turns: sides`, where the party acts and then the enemies do.", setting.Span, "sides");
+                        else
+                            diagnostics.Error("CT0202", $"Unknown value `{string.Join(" ", words)}` for `turns`. Write `turns: sides`.", setting.Span,
+                                Suggest.Closest(words.FirstOrDefault() ?? string.Empty, new[] { "sides", "initiative" }));
+                        break;
+
+                    case "order":
+                        if (words.Contains("position") || words.Contains("rank")) rules.Order = PartyOrder.Position;
+                        else if (words.Contains("speed"))
+                            diagnostics.Error("CT334", "`order: speed` is not in this release. Ordering the party by a `speed` stat is the half a later release adds; write `order: position`, which is where the members stand.", setting.Span, "position");
+                        else
+                            diagnostics.Error("CT0202", $"Unknown value `{string.Join(" ", words)}` for `order`. Write `order: position`.", setting.Span,
+                                Suggest.Closest(words.FirstOrDefault() ?? string.Empty, new[] { "position", "speed" }));
+                        break;
+
                     case "hand_size":
                         rules.HandSize = FirstNumber(setting) ?? rules.HandSize;
                         break;
@@ -248,7 +315,7 @@ namespace Cantrip.Runtime
                             setting.Span,
                             Suggest.Closest(setting.Name, new[]
                             {
-                                "events", "loops", "ordering", "modifier_layers", "triggers", "clock", "new_listeners", "hand_size", "max_hand_size", "max_steps", "max_call_depth",
+                                "events", "loops", "ordering", "modifier_layers", "triggers", "clock", "new_listeners", "turns", "order", "hand_size", "max_hand_size", "max_steps", "max_call_depth",
                             }));
                         break;
                 }

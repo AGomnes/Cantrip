@@ -74,6 +74,26 @@ namespace Cantrip.Runtime
         public bool InBattle { get; set; }
         public int PlayerId { get; set; }
 
+        /// <summary>
+        /// The party: every actor the game asks for input, leader first. A save that lists none —
+        /// which is every save a game with no <c>hero</c> writes, and every save written before a
+        /// party existed — restores as a party of one, <see cref="PlayerId"/> alone.
+        /// </summary>
+        public List<int> PartyIds { get; set; } = new List<int>();
+
+        /// <summary>
+        /// Whose step it is, under a turn order that has one. Zero under <c>turns: sides</c>, which
+        /// is the only mode this release has: there the party takes one turn between them and
+        /// <see cref="ActedIds"/> is what says who is still to act.
+        /// </summary>
+        public int ActiveMemberId { get; set; }
+
+        /// <summary>
+        /// The members that have already taken their step this turn. Ids rather than slots, so a
+        /// member that moves mid-turn keeps having acted.
+        /// </summary>
+        public List<int> ActedIds { get; set; } = new List<int>();
+
         public int NextEntityId { get; set; }
         public long NextSequence { get; set; }
         public long NextScheduleId { get; set; }
@@ -146,6 +166,11 @@ namespace Cantrip.Runtime
         /// actor in it stood at lane 0 on the rank its <c>Position</c> already records. So the step
         /// is: lane 0 for everyone, the default board, and nothing else moves.
         /// </para>
+        /// <para>
+        /// Format 3 also carries the party. It is not a fourth format, because format 3 has not
+        /// been published: a save from any earlier format, and any format 3 save a game with no
+        /// <c>hero</c> wrote, lists no party and restores as a party of one — which is what it was.
+        /// </para>
         /// </remarks>
         internal static void Upgrade(GameSnapshot snapshot)
         {
@@ -163,6 +188,12 @@ namespace Cantrip.Runtime
                     if (record != null) record.Lane = 0;
                 }
             }
+
+            // A save that names no party is a party of one, whatever format wrote it: a game with
+            // no `hero` declared has exactly the leader, which is what every save before this one
+            // described. The flag on the leader's own record is set by the restore, from here.
+            if ((snapshot.PartyIds == null || snapshot.PartyIds.Count == 0) && snapshot.PlayerId != 0)
+                snapshot.PartyIds = new List<int> { snapshot.PlayerId };
 
             snapshot.FormatVersion = CurrentFormat;
             if (snapshot.MinimumReader > CurrentMinimumReader) snapshot.MinimumReader = CurrentMinimumReader;
@@ -217,6 +248,17 @@ namespace Cantrip.Runtime
         public int PatternIndex { get; set; }
         public string? LastMove { get; set; }
         public string? Intent { get; set; }
+
+        /// <summary>
+        /// Who this enemy telegraphed <see cref="Intent"/> against, or 0 for nobody. A save from
+        /// before intents named anybody has 0, which restores as "not rolled yet" and is settled
+        /// the first time the move is asked who it is aimed at.
+        /// </summary>
+        public int IntentTargetId { get; set; }
+
+        /// <summary>True for an actor the game asks for input: the leader, and every <c>hero</c>.</summary>
+        public bool IsPartyMember { get; set; }
+
         public string? Phase { get; set; }
 
         /// <summary>Base stats, as raw <see cref="Num"/> values.</summary>
@@ -441,6 +483,7 @@ namespace Cantrip.Runtime
                 ActiveTeam = (int)ActiveTeam,
                 InBattle = InBattle,
                 PlayerId = Player?.Id ?? 0,
+                ActiveMemberId = ActiveMember?.Id ?? 0,
                 NextEntityId = _nextId,
                 NextSequence = _nextSequence,
                 NextScheduleId = _nextScheduleId,
@@ -450,6 +493,15 @@ namespace Cantrip.Runtime
             };
 
             snapshot.Rng = Rng.GetState();
+
+            // The party, leader first, then the rest where they stand. Written even for a party of
+            // one, because a save that lists none is the older shape and is read as one anyway.
+            if (Player != null && Player.IsPartyMember) snapshot.PartyIds.Add(Player.Id);
+            foreach (Entity entity in _entities)
+            {
+                if (entity.IsPartyMember && entity != Player) snapshot.PartyIds.Add(entity.Id);
+            }
+            snapshot.ActedIds.AddRange(_acted.OrderBy(id => id));
 
             foreach (Entity entity in _entities)
             {
@@ -472,6 +524,8 @@ namespace Cantrip.Runtime
                     PatternIndex = entity.PatternIndex,
                     LastMove = entity.LastMove,
                     Intent = entity.Intent,
+                    IntentTargetId = entity.IntentTarget?.Id ?? 0,
+                    IsPartyMember = entity.IsPartyMember,
                     Phase = entity.Phase,
                 };
                 foreach (string stat in entity.StatNames.OrderBy(s => s, StringComparer.Ordinal)) record.Stats[stat] = entity.GetBase(stat).Raw;
@@ -677,6 +731,7 @@ namespace Cantrip.Runtime
                 Entity entity = _byId[record.Id];
                 entity.Owner = Lookup(record.OwnerId);
                 entity.Source = Lookup(record.SourceId);
+                entity.IntentTarget = Lookup(record.IntentTargetId);
                 foreach (int attached in record.Attached) entity.Attach(Lookup(attached) ?? throw Missing(attached));
             }
 
@@ -696,6 +751,24 @@ namespace Cantrip.Runtime
             ActiveTeam = (Team)snapshot.ActiveTeam;
             InBattle = snapshot.InBattle;
             Player = Lookup(snapshot.PlayerId);
+
+            // A save that names no party is a party of one: the leader, which is what every game
+            // with no `hero` declared has and what every save written before a party existed held.
+            // The flag is set from the list rather than from each record, so the two can never
+            // disagree about who is in the party.
+            foreach (Entity entity in _entities) entity.IsPartyMember = false;
+            IReadOnlyList<int> party = snapshot.PartyIds != null && snapshot.PartyIds.Count > 0
+                ? (IReadOnlyList<int>)snapshot.PartyIds
+                : snapshot.PlayerId != 0 ? new[] { snapshot.PlayerId } : Array.Empty<int>();
+            foreach (int id in party)
+            {
+                if (Lookup(id) is Entity member) member.IsPartyMember = true;
+            }
+
+            _acted.Clear();
+            foreach (int id in snapshot.ActedIds ?? new List<int>()) _acted.Add(id);
+            ActiveMember = Lookup(snapshot.ActiveMemberId);
+
             _nextId = snapshot.NextEntityId;
             _nextSequence = snapshot.NextSequence;
             _nextScheduleId = snapshot.NextScheduleId;

@@ -128,6 +128,13 @@ namespace Cantrip.Content
         /// nothing and reaches as far as the board is wide.
         /// </summary>
         public Reach? Range { get; internal set; }
+
+        /// <summary>
+        /// Who the move telegraphs against, from <c>move "Cutthroat" at lowest hp enemies:</c>.
+        /// Null when the move says nothing, and the target is then a living party member drawn
+        /// uniformly — which for a party of one is that one member, with nothing rolled.
+        /// </summary>
+        public ExprNode? TargetSelector { get; internal set; }
     }
 
     /// <summary>
@@ -206,6 +213,7 @@ namespace Cantrip.Content
             Blocks = blocks;
             Moves = moves;
             Phases = phases;
+            Abilities = ReadWordList("abilities");
 
             // An enemy's hp doubles as its max_hp unless both are given.
             if (_stats.ContainsKey("hp") && !_stats.ContainsKey("max_hp")) _stats["max_hp"] = _stats["hp"];
@@ -227,6 +235,18 @@ namespace Cantrip.Content
 
         /// <summary>The keyword it was declared with: <c>card</c>, <c>status</c>, <c>relic</c>...</summary>
         public string KindName { get; }
+
+        /// <summary>
+        /// True for a <c>hero</c>: an actor on the player's side that the game asks for input.
+        /// Every other actor, summoned or declared, is not one.
+        /// </summary>
+        public bool IsHero => string.Equals(KindName, "hero", StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// The abilities a <c>hero</c> is granted when it is created, from its <c>abilities</c>
+        /// line. Empty for everything else.
+        /// </summary>
+        public IReadOnlyList<string> Abilities { get; } = new string[0];
 
         /// <summary>
         /// Whether this declares something the game can make one of, rather than a rule about the
@@ -302,6 +322,17 @@ namespace Cantrip.Content
 
         public PropertyNode? Property(string name) => _properties.TryGetValue(name, out PropertyNode? node) ? node : null;
 
+        /// <summary>
+        /// Every word a property lists: <c>abilities Smite, Bulwark</c> gives both. Empty when the
+        /// property is not written at all, so a caller never has to check first.
+        /// </summary>
+        public IReadOnlyList<string> ReadWordList(string property)
+        {
+            PropertyNode? node = Property(property);
+            if (node == null) return new string[0];
+            return node.Values.SelectMany(ReadWords).ToArray();
+        }
+
         /// <summary>First word of a property, for enum-like settings such as <c>target enemy</c>.</summary>
         public string? Word(string property)
         {
@@ -329,6 +360,7 @@ namespace Cantrip.Content
             "item" => EntityKind.Item,
             "enemy" => EntityKind.Actor,
             "actor" => EntityKind.Actor,
+            "hero" => EntityKind.Actor,
             _ => EntityKind.Global,
         };
 
@@ -413,14 +445,16 @@ namespace Cantrip.Content
             // `move "Split" phase Broken:` to limit a move to one phase, and `move "Swing" range 1:`
             // for a move that only reaches what is one step away.
             Reach? range = null;
+            ExprNode? at = null;
             for (int i = 1; i + 1 < block.Arguments.Count; i++)
             {
                 if (block.Arguments[i] is NameExpr { Name: "weight" } && block.Arguments[i + 1] is NumberExpr w) weight = w.Value;
                 else if (block.Arguments[i] is NameExpr { Name: "phase" }) phase = ReadWords(block.Arguments[i + 1]).FirstOrDefault();
                 else if (block.Arguments[i] is NameExpr { Name: "range" }) range = ReadReach(block.Arguments[i + 1], $"move \"{name}\" in `{Name}`", block.Span, diagnostics);
+                else if (block.Arguments[i] is NameExpr { Name: "at" }) at = block.Arguments[i + 1];
             }
 
-            return new MoveDefinition(name, block.Body, weight, phase) { Range = range };
+            return new MoveDefinition(name, block.Body, weight, phase) { Range = range, TargetSelector = at };
         }
 
         private void ReadStatusConfig(DiagnosticBag diagnostics)

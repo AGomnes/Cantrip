@@ -132,6 +132,12 @@ namespace Cantrip.Runtime
         private readonly List<ScheduledAction> _scheduled = new List<ScheduledAction>();
 
         /// <summary>
+        /// Ids of the party members that have already taken their step this turn. Ids, not indices,
+        /// so that a member that changes slot mid-turn keeps having acted.
+        /// </summary>
+        private readonly HashSet<int> _acted = new HashSet<int>();
+
+        /// <summary>
         /// Who stands where. One actor per slot, and the only account of it: <see cref="Entity.Lane"/>
         /// and <see cref="Entity.Rank"/> are what this index is keyed by, so the two cannot drift
         /// apart. An actor is in here exactly while it is in the <c>board</c> zone, alive or not — a
@@ -177,6 +183,7 @@ namespace Cantrip.Runtime
         private Team _activeTeam = Team.Player;
         private bool _inBattle;
         private Entity? _player;
+        private Entity? _activeMember;
         private BoardShape _board;
 
         // Modifiers can read `turn` and friends, so each of these bumps the version when it changes.
@@ -209,6 +216,57 @@ namespace Cantrip.Runtime
         {
             get => _player;
             internal set { if (_player != value) { _player = value; Touch(); } }
+        }
+
+        /// <summary>
+        /// The living members of the player's party, in the order they take their steps: where they
+        /// stand, which on the default board is the order <see cref="Actors(Team?)"/> already gives.
+        /// It is derived every time it is asked and never stored, so a death, a summon or a swap
+        /// mid-turn changes it with no bookkeeping.
+        /// </summary>
+        /// <remarks>
+        /// A game that never declares a <c>hero</c> has a party of one: the leader
+        /// <c>CreatePlayer</c> made. That is why every rule written against the party is exactly
+        /// today's rule for content that has none.
+        /// </remarks>
+        public IReadOnlyList<Entity> Party
+        {
+            get
+            {
+                var members = new List<Entity>();
+                foreach (Entity actor in Actors(Team.Player))
+                {
+                    if (actor.IsPartyMember) members.Add(actor);
+                }
+                return members;
+            }
+        }
+
+        /// <summary>
+        /// Whose step it is, under a turn order that has one. <c>turns: sides</c> — the only mode
+        /// this release has — gives the whole party one turn and lets the game act with its members
+        /// in any order, so there is no single active member and this is null. A game in that mode
+        /// asks <see cref="CardRuntime.CanAct"/> of each member instead.
+        /// </summary>
+        public Entity? ActiveMember
+        {
+            get => _activeMember;
+            internal set { if (_activeMember != value) { _activeMember = value; Touch(); } }
+        }
+
+        /// <summary>The party members that have already acted this turn.</summary>
+        internal HashSet<int> Acted => _acted;
+
+        internal void ClearActed()
+        {
+            if (_acted.Count == 0) return;
+            _acted.Clear();
+            Touch();
+        }
+
+        internal void MarkActed(Entity member)
+        {
+            if (_acted.Add(member.Id)) Touch();
         }
 
         /// <summary>
@@ -1033,6 +1091,11 @@ namespace Cantrip.Runtime
             Mix((long)ActiveTeam);
             Mix(InBattle ? 1 : 0);
             Mix(Player?.Id ?? 0);
+            Mix(_activeMember?.Id ?? 0);
+            // Who has already acted decides who still may, so it belongs in the hash beside the
+            // turn. Sorted, because a set has no order of its own.
+            foreach (int id in _acted.OrderBy(i => i)) Mix(id);
+            Mix(-1);
             Mix(Clock.Now);
 
             // The board decides who can reach whom and where the next summon lands, so two games on
@@ -1060,6 +1123,10 @@ namespace Cantrip.Runtime
                 Mix(entity.Lane);
                 Mix(entity.Rank);
                 Mix(entity.PatternIndex);
+                Mix(entity.IsPartyMember ? 1 : 0);
+                // Who an enemy is telegraphing against decides who it hits, so two games that have
+                // rolled different targets have different futures and must not hash the same.
+                Mix(entity.IntentTarget?.Id ?? 0);
                 MixText(entity.Intent ?? string.Empty);
                 MixText(entity.LastMove ?? string.Empty);
                 MixText(entity.Phase ?? string.Empty);

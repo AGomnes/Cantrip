@@ -40,6 +40,7 @@ namespace Cantrip.Runtime
         public const string Overkill = "overkill";
         public const string Died = "died";
         public const string Killed = "killed";
+        public const string Revived = "revived";
         public const string Healed = "healed";
         public const string GainedBlock = "gained_block";
         public const string Drawn = "drawn";
@@ -74,6 +75,7 @@ namespace Cantrip.Runtime
             new BuiltinEvent(Overkill, "a hit killed target with damage to spare. amount is the excess."),
             new BuiltinEvent(Died, "target is dying. `on instead_of_died` prevents the death; the dying actor's own listeners still hear it."),
             new BuiltinEvent(Killed, "target died. source is the killer."),
+            new BuiltinEvent(Revived, "target is being brought back from the dead by source; amount is the hp it comes back at. Raised only for an actor that is actually dead."),
             new BuiltinEvent(Healed, "target regained hp. amount is hp actually restored."),
             new BuiltinEvent(GainedBlock, "target gained block. amount is block actually gained."),
 
@@ -142,6 +144,8 @@ namespace Cantrip.Runtime
             ["discover"] = NoEvents,
             ["cancel"] = NoEvents,
             ["kill"] = new[] { Died, Killed },
+            ["revive"] = new[] { Revived },
+            ["grant"] = NoEvents,
             ["log"] = NoEvents,
 
             // Runtime verbs. `play` and `replay` also raise whatever the card's own effect raises,

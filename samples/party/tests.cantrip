@@ -1,0 +1,158 @@
+# What a party does. Every test here fails against the build before this one, and each fails for a
+# different reason, which is the only thing that makes a suite of them worth having.
+
+test "party two heroes act in one turn, then the Brigand takes the target it telegraphed"
+  hero Crusader hp 30
+  hero Vestal
+  enemy Brigand
+
+  # The leader is a member too, so two heroes beside it is a party of three.
+  expect party.count == 3
+
+  # The intent is rolled when the battle starts, and it names somebody. The Vestal has the least
+  # hp, so `at lowest hp enemies` picks her.
+  expect enemy.intent == "Cutthroat"
+  expect enemy.intent_target.name == "Vestal"
+
+  # Each member acts in the party's one turn, with its own abilities. Nothing was granted here:
+  # the `abilities` line on the hero handed them over when it was made.
+  cast Smite by Crusader on enemy
+  cast Mend by Vestal on Crusader
+  expect enemy.hp == 37
+  expect Crusader.hp == 37
+
+  end turn
+  expect Vestal.hp == 20
+  expect Vestal.Bleeding == 2
+
+test "party a taunt moves the telegraph before the blow lands"
+  hero Crusader hp 30
+  hero Vestal
+  enemy Brigand
+  expect enemy.intent_target.name == "Vestal"
+
+  # The stored target is a telegraph, not a decision. Asking again re-reads it against the rules
+  # as they stand, so a taunt applied now changes what a UI shows with no event to listen for.
+  cast Bulwark by Crusader on Crusader
+  expect enemy.intent_target.name == "Crusader"
+
+  # And the blow follows the telegraph: the Vestal is untouched, and the Crusader's 8 block eats
+  # the 8 damage, which is what makes this test about the taunt rather than about a name.
+  end turn
+  expect Vestal.hp == 28
+  expect Crusader.hp == 30
+  expect Crusader.Bleeding == 2
+
+test "party an ability is on cooldown for the member that used it, not for the party"
+  hero Crusader hp 30
+  hero Vestal
+  enemy Brigand
+
+  # Rally hands Smite to the Vestal, who was never given one.
+  cast Rally by Crusader on Vestal
+  cast Smite by Vestal on enemy
+  expect enemy.hp == 37
+
+  # The Crusader's own Smite has no cooldown and is a different entity, so it is still ready.
+  cast Smite by Crusader on enemy
+  expect enemy.hp == 28
+
+test "party the battle is lost only when the last member falls"
+  hero Crusader hp 30
+  hero Vestal
+  enemy Brigand
+
+  # Losing the leader used to end the battle on the spot. It does not: the party fights on.
+  kill leader
+  expect party.count == 2
+  end turn
+
+  kill Crusader
+  expect party.count == 1
+  expect Vestal.alive
+  end turn
+  expect Vestal.alive
+
+test "party a fallen member is revived, where a heal would have refused"
+  hero Vestal
+  enemy Brigand
+  kill Vestal
+  expect Vestal.dead
+  expect party.count == 1
+
+  # `heal` refuses a dead target, deliberately, and that is why `revive` had to be its own verb
+  # rather than a looser `heal`.
+  heal 10 to Vestal
+  expect Vestal.dead
+
+  revive Vestal 12
+  expect Vestal.alive
+  expect Vestal.hp == 12
+  expect party.count == 2
+
+test "party the end of a turn discards every member's hand, not only the leader's"
+  hero Scout
+  enemy Brigand
+
+  # The Scout made itself a Dart at the start of the battle, and its own `turn_end` writes down
+  # how many cards it is holding.
+  end turn
+  expect Scout.held == 1
+
+  # By the next turn's end it is holding nothing: the turn's end discarded its hand, and it has no
+  # pile of its own to draw a replacement from. Before this, a member's hand was never discarded
+  # at all and grew by a full draw every round.
+  end turn
+  expect Scout.held == 0
+
+test "party a member with no pile of its own plays from the party's hand, and the pool pays"
+  hero Templar hp 20
+  hero Sister
+  enemy Footpad
+  relic "Rite of Office"
+  hand Cleanse, Lash
+  expect player.energy == 3
+
+  # The Sister performs it out of the leader's hand: 7 from the card, 3 more because the relic
+  # asked who spoke the words and she is the holy one.
+  play Cleanse by Sister on Templar
+  expect Templar.hp == 30
+  expect Templar.block == 4
+  expect Sister.Blessed == 1
+  expect Templar.Blessed == 0
+
+  # The leader's pool paid for it, not the Sister's.
+  expect player.energy == 2
+
+  play Lash by Templar on enemy
+  expect enemy.hp == 24
+  expect player.energy == 1
+
+test "party the same card performed by somebody else is somebody else's play"
+  hero Templar hp 20
+  hero Sister
+  enemy Footpad
+  relic "Rite of Office"
+  hand Cleanse
+
+  # The Templar is not holy, so the relic adds nothing and the heal is the card's own 7.
+  play Cleanse by Templar on Templar
+  expect Templar.hp == 27
+  expect Templar.Blessed == 1
+  expect Sister.Blessed == 0
+
+test "party passing with every member ends the party's turn"
+  hero Crusader hp 30
+  hero Vestal
+  enemy Brigand
+  expect enemy.intent_target.name == "Vestal"
+
+  # Passing one member is not the end of the turn: the Brigand has not swung yet.
+  pass leader
+  pass Crusader
+  expect Vestal.hp == 28
+
+  # The last one is. `pass` for a party of one is exactly `end turn`, which is why no game that
+  # never calls it can tell that it exists.
+  pass Vestal
+  expect Vestal.hp == 20

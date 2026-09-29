@@ -41,6 +41,8 @@ namespace Cantrip.Runtime
             RegisterVerb("discover", VerbDiscover);
             RegisterVerb("cancel", VerbCancel);
             RegisterVerb("kill", VerbKill);
+            RegisterVerb("revive", VerbRevive);
+            RegisterVerb("grant", VerbGrant);
             RegisterVerb("log", call => Log(string.Join(" ", Enumerable.Range(0, call.ArgumentCount).Select(i => Show(call.Argument(i))))));
         }
 
@@ -847,6 +849,69 @@ namespace Cantrip.Runtime
             foreach (Entity target in targets.ToArray())
             {
                 if (target.Kind == EntityKind.Actor) Kill(target, call.Context.Source, call.Context);
+            }
+        }
+
+        /// <summary>
+        /// <c>revive Vestal</c>, <c>revive target 10</c>: brings a fallen actor back, at 1 hp when
+        /// no number is written. It is a verb of its own because <c>heal</c> refuses a dead target,
+        /// and making it not refuse one would turn every heal into a resurrection.
+        /// </summary>
+        private void VerbRevive(VerbCall call)
+        {
+            IReadOnlyList<Entity> targets = call.ArgumentCount > 0 ? call.Argument(0).AsEntities() : call.Targets("to");
+            Num hp = call.Number(1, Num.One);
+            foreach (Entity target in targets.ToArray())
+            {
+                if (target.Kind == EntityKind.Actor) Revive(target, hp, call.Context, call.Span);
+            }
+        }
+
+        /// <summary>
+        /// <c>grant Cleave to target</c>: gives an actor an ability. Until this, only C# and a test
+        /// could, which is what CT320's own message had been telling authors to do for a while.
+        /// </summary>
+        private void VerbGrant(VerbCall call)
+        {
+            var names = new List<string>();
+            foreach (ExprNode argument in call.Node.Arguments)
+            {
+                string? word = argument switch { NameExpr n => n.Name, StringExpr s => s.Value, _ => null };
+                if (word != null) names.Add(word);
+            }
+
+            // `grant Cleave, Brace`: the parser files what follows a comma as a bare clause, so the
+            // second ability arrives there rather than as an argument.
+            foreach (ClauseNode clause in call.Node.Clauses)
+            {
+                if (clause.Value != null || Parser.IsClauseWord(clause.Keyword)) continue;
+                names.Add(clause.Keyword);
+            }
+
+            if (names.Count == 0) throw call.Error("expected an ability, as in `grant Cleave to target`.");
+
+            IReadOnlyList<Entity> owners = SelfTargets(call).ToArray();
+            foreach (string name in names)
+            {
+                EntityDefinition? ability = Content.Find(name, "ability");
+                if (ability == null)
+                {
+                    EntityDefinition? other = Content.Find(name);
+                    throw call.Error(other != null
+                        ? $"`{name}` is {A(other.KindName)}, not an ability, so it cannot be granted."
+                        : $"no ability named `{name}` is defined." + SuggestionText(name, Content.Pool("ability").Select(d => d.Name)));
+                }
+
+                foreach (Entity owner in owners)
+                {
+                    if (owner.Kind != EntityKind.Actor)
+                        throw call.Error($"`{owner.Name}` is not an actor, so it cannot hold an ability.");
+
+                    // Granting the same ability twice would leave two of it attached, each with its
+                    // own cooldown, which is never what "give this hero Smite" means.
+                    if (owner.FindAttached(ability.Name) != null) continue;
+                    Grant(ability, owner);
+                }
             }
         }
 

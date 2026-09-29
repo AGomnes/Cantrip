@@ -921,6 +921,7 @@ namespace Cantrip.Runtime
                             made = make(null, team, Zones.Board);
                         }
                         if (!made.HasStat("block")) made.SetBase("block", Num.Zero);
+                        if (definition.IsHero) JoinParty(made);
                         break;
                     }
                     case EntityKind.Relic:
@@ -960,12 +961,49 @@ namespace Cantrip.Runtime
             return 0;
         }
 
-        /// <summary>The side a freshly declared actor joins: an enemy is always an enemy, a generic actor joins its maker.</summary>
+        /// <summary>
+        /// The side a freshly declared actor joins: an enemy is always an enemy, a hero is always
+        /// the player's, and a generic actor joins its maker.
+        /// </summary>
         private static Team DeclaredSide(EntityDefinition definition, EvalContext context)
         {
+            if (definition.IsHero) return Team.Player;
             if (definition.KindName != "enemy" && context.Controller != null && context.Controller.Team != Team.Neutral)
                 return context.Controller.Team;
             return Team.Enemy;
+        }
+
+        /// <summary>
+        /// Makes an actor a party member and hands it the abilities its <c>hero</c> line grants.
+        /// One place, so a hero recruited mid-run by C# and one summoned by <c>create</c> arrive
+        /// the same way.
+        /// </summary>
+        internal void JoinParty(Entity actor)
+        {
+            actor.IsPartyMember = true;
+            foreach (string ability in actor.Definition?.Abilities ?? (IReadOnlyList<string>)new string[0])
+            {
+                EntityDefinition? granted = Content.Find(ability, "ability");
+                if (granted == null)
+                {
+                    State.Trace.Record(
+                        State.Clock.Now,
+                        "refused",
+                        $"{actor.Name} has no ability `{ability}`: no ability of that name is loaded",
+                        actor.ToString(),
+                        span: actor.Definition?.Syntax.Span ?? SourceSpan.None);
+                    continue;
+                }
+                Grant(granted, actor);
+            }
+        }
+
+        /// <summary>Attaches an ability to an actor, as <c>grant Cleave to target</c> does.</summary>
+        internal Entity Grant(EntityDefinition ability, Entity owner)
+        {
+            Entity made = State.Instantiate(ability, owner);
+            State.Attach(owner, made);
+            return made;
         }
 
         /// <summary>
@@ -1090,7 +1128,147 @@ namespace Cantrip.Runtime
                 }
             }
 
+            RollIntentTarget(enemy);
             State.Touch();
+        }
+
+        /// <summary>
+        /// Settles who the move an enemy has just telegraphed is aimed at, and stores it on the
+        /// enemy. This is the telegraph — what a UI shows before the blow lands — and not the last
+        /// word: <see cref="IntentTargetOf"/> re-reads it against the rules of the moment, so a
+        /// taunt applied afterwards changes what is shown with no event and no second roll.
+        /// </summary>
+        /// <remarks>
+        /// A move with an <c>at</c> clause names its own selector and is evaluated from the
+        /// enemy's own point of view, where <c>enemies</c> is the party's side. A move with none
+        /// aims at a living party member drawn uniformly from the game's own generator. With one
+        /// member there is nothing to draw and nothing is drawn — which is why a game with no
+        /// <c>hero</c> plays out of exactly the same numbers it always did.
+        /// </remarks>
+        internal void RollIntentTarget(Entity enemy)
+        {
+            if (enemy.Intent == null || enemy.Team != Team.Enemy)
+            {
+                enemy.IntentTarget = null;
+                return;
+            }
+
+            MoveDefinition? move = MoveNamed(enemy, enemy.Intent);
+            var rule = TargetRule.OfMove(move);
+
+            IReadOnlyList<Entity> named = IntentCandidates(enemy, move);
+            IReadOnlyList<Entity> legal = LegalTargets(rule, enemy, null, named);
+
+            if (legal.Count > 0)
+            {
+                // Only the default aims at random, and only when there is more than one to aim at.
+                // With one member there is no choice, so nothing is drawn — which is the whole of
+                // why an existing game's numbers do not move. A move that names its own selector
+                // has already said who it wants; rolling again would say it twice.
+                enemy.IntentTarget = move?.TargetSelector == null && legal.Count > 1
+                    ? legal[State.Rng.NextInt(0, legal.Count - 1)]
+                    : legal[0];
+                return;
+            }
+
+            // Nobody the move named may be aimed at. It still telegraphs at somebody, because an
+            // enemy whose every option is hidden still swings: whoever else is legal, and failing
+            // that the one it named, which is what the move itself falls back to when it runs.
+            IReadOnlyList<Entity> left = LegalTargets(rule, enemy, null, State.Party);
+            enemy.IntentTarget = left.Count > 0 ? left[0]
+                : named.Count > 0 ? named[0]
+                : State.Party.Count > 0 ? State.Party[0]
+                : null;
+        }
+
+        /// <summary>
+        /// Who a move names: its own <c>at</c> selector's answer, or — with nothing written — the
+        /// party.
+        /// </summary>
+        /// <remarks>
+        /// Not every player-side actor. A summon is not somebody the fight is about, and counting
+        /// one would have made an existing game with a minion on the board roll a number it never
+        /// rolled before, which is exactly the kind of quiet change the same-seed promise forbids.
+        /// </remarks>
+        private IReadOnlyList<Entity> IntentCandidates(Entity enemy, MoveDefinition? move)
+        {
+            if (move?.TargetSelector == null) return State.Party;
+
+            EvalContext context = SystemContext(enemy);
+            var named = new List<Entity>();
+            foreach (Entity candidate in Evaluate(move.TargetSelector, context).AsEntities())
+            {
+                if (candidate.Kind == EntityKind.Actor && candidate.IsAlive) named.Add(candidate);
+            }
+            return named;
+        }
+
+        private static MoveDefinition? MoveNamed(Entity enemy, string name) =>
+            enemy.Definition?.Moves.FirstOrDefault(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>
+        /// Who the enemy's telegraphed move is aimed at <em>now</em>: the target it rolled while
+        /// that target is still legal, and otherwise the first that is. Null when it has no intent,
+        /// or when there is nobody left to aim at.
+        /// </summary>
+        /// <remarks>
+        /// Recomputed on every ask rather than stored, so a taunt, a death or a swap changes the
+        /// displayed target with no event for a UI to miss. The move's own re-check when it runs
+        /// agrees with this by construction: both ask the same question of the same rule.
+        /// </remarks>
+        public Entity? IntentTargetOf(Entity enemy)
+        {
+            if (enemy == null) throw new ArgumentNullException(nameof(enemy));
+            if (enemy.Intent == null || !enemy.IsAlive) return null;
+
+            MoveDefinition? move = MoveNamed(enemy, enemy.Intent);
+            var rule = TargetRule.OfMove(move);
+
+            Entity? stored = enemy.IntentTarget;
+            if (stored != null && IsLegalTarget(rule, enemy, null, stored)) return stored;
+
+            // The telegraph has gone stale: a taunt has covered whoever it named, or that member
+            // has fallen. Whoever is left and legal takes its place, which is the same answer the
+            // move itself reaches when it runs — the two agree by asking one question of one rule.
+            IReadOnlyList<Entity> left = LegalTargets(rule, enemy, null, State.Party);
+            if (left.Count > 0) return left[0];
+
+            // Every option is hidden. The enemy still swings, at the one it was going to hit, which
+            // is what the move itself does when it runs.
+            return stored;
+        }
+
+        /// <summary>
+        /// Brings a dead actor back at <paramref name="hp"/>, raising <c>revived</c>. It exists
+        /// because <see cref="Heal"/> refuses a dead target, and so there was no way at all to put
+        /// a fallen party member back on its feet.
+        /// </summary>
+        /// <returns>True when the actor is alive afterwards.</returns>
+        /// <remarks>
+        /// Cancellable in the before phase and replaceable in the instead phase, like any other
+        /// event. An actor that is merely hurt is not revived: <c>revive</c> on somebody living
+        /// does nothing and raises nothing, so a card that reads "bring back a fallen ally" cannot
+        /// quietly become a heal.
+        /// </remarks>
+        public bool Revive(Entity actor, Num hp, EvalContext context, SourceSpan span = default)
+        {
+            if (actor == null) throw new ArgumentNullException(nameof(actor));
+            if (actor.Kind != EntityKind.Actor || actor.IsRemoved || !actor.IsDead) return actor.IsAlive;
+
+            Num amount = Num.Max(Num.One, hp.Floor());
+            var gameEvent = new GameEvent("revived") { Source = context.Source, Target = actor, Amount = amount };
+            Raise(gameEvent, context, () =>
+            {
+                actor.IsDead = false;
+                actor.SetBase("hp", Clamp(actor, "hp", Num.Max(Num.One, gameEvent.Amount)));
+                actor.SetBase("block", Num.Zero);
+
+                // Back on the board, in a slot of its own. The one it fell from may well have been
+                // taken while it was gone, which is why it is placed rather than put back.
+                if (actor.Zone != Zones.Board) State.MoveTo(actor, Zones.Board);
+            });
+
+            return actor.IsAlive;
         }
 
         /// <summary>

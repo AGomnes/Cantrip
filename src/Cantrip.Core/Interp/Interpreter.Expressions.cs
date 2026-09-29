@@ -22,7 +22,7 @@ namespace Cantrip.Runtime
         /// </summary>
         internal static readonly string[] ReservedNames =
         {
-            "self", "owner", "source", "target", "it", "card", "player", "controller", "true", "false", "none", "nothing",
+            "self", "owner", "source", "target", "it", "card", "player", "leader", "party", "controller", "true", "false", "none", "nothing",
             "turn", "now", "enemies", "allies", "everyone", "actors", "enemy", "hand", "draw", "draw_pile", "discard",
             "discard_pile", "exhaust", "exhaust_pile", "powers", "relics", "deck", "cards", "statuses", "stacks", "event",
         };
@@ -135,7 +135,16 @@ namespace Cantrip.Runtime
                 case "target": return Value.FromEntity(context.Target);
                 case "it": return context.ItDefinition != null ? Value.FromDefinition(context.ItDefinition) : Value.FromEntity(context.It);
                 case "card": return Value.FromEntity(context.Card ?? (context.Self?.Kind == EntityKind.Card ? context.Self : null));
-                case "player": return Value.FromEntity(State.Player);
+                // `player` and `leader` are one entity and the same one: whoever CreatePlayer made,
+                // who holds the run's relics and gold. In a game with a party, `leader` is the word
+                // that says so; CT326 is what stops `player` being written where a member is meant.
+                case "player":
+                case "leader": return Value.FromEntity(State.Player);
+
+                // The living members of the party. Not `allies`, which is everyone on the side,
+                // summons included; a game with no `hero` has a party of exactly the leader.
+                case "party": return Value.FromEntities(State.Party);
+
                 case "controller": return Value.FromEntity(controller);
                 case "true": return Value.True;
                 case "false": return Value.False;
@@ -324,6 +333,10 @@ namespace Cantrip.Runtime
                 case "rank":
                 case "position": return Value.FromNumber(Num.FromInt(entity.Rank));
                 case "intent": return entity.Intent == null ? Value.None : Value.FromText(entity.Intent);
+
+                // Who the telegraphed move is aimed at as things stand, not who it was aimed at
+                // when it was rolled: a taunt applied since then has already changed the answer.
+                case "intent_target": return Value.FromEntity(IntentTargetOf(entity));
                 case "phase": return entity.Phase == null ? Value.None : Value.FromText(entity.Phase);
                 case "statuses": return Value.FromEntities(entity.Attached.Where(a => !a.IsRemoved).ToList());
                 case "kind": return Value.FromText(entity.Definition?.KindName ?? entity.Kind.ToString().ToLowerInvariant());

@@ -48,7 +48,7 @@ namespace Cantrip.Testing
     {
         private static readonly HashSet<string> SetupVerbs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "enemy", "player", "hand", "deck", "discard_pile", "relic", "seed", "answer", "realtime", "grant",
+            "enemy", "player", "hero", "hand", "deck", "discard_pile", "relic", "seed", "answer", "realtime", "grant", "board",
         };
 
         private readonly ContentLibrary _content;
@@ -271,12 +271,16 @@ namespace Cantrip.Testing
                 ("expect", s => s.Expect),
                 ("tick", s => call => s._runtime.Tick(call.Number(0, Num.One).ToInt())),
                 ("cast", s => s.Cast),
+                ("pass", s => s.Pass),
             };
 
             private string Defined(string name, VerbCall call, string what, params string[] kinds) =>
                 _setup.Defined(name, call.Span, what, kinds);
 
-            /// <summary><c>play Strike on enemy</c>. Cards not already in hand are put there first.</summary>
+            /// <summary>
+            /// <c>play Strike on enemy</c>, <c>play Sanctuary by Vestal on Crusader</c>. Cards not
+            /// already in somebody's hand are put in the party's first.
+            /// </summary>
             private void Play(VerbCall call)
             {
                 // Written somewhere other than this test's own body, so it is the rules' verb.
@@ -288,6 +292,8 @@ namespace Cantrip.Testing
 
                 ExprNode node = call.ArgumentNode(0) ?? throw Fail("`play` needs a card.", call.Span);
                 Entity? target = null;
+                Entity? performer = Performer(call, ref target);
+
                 if (node is BinaryExpr { Operator: BinaryOperator.On } on)
                 {
                     node = on.Left;
@@ -299,7 +305,11 @@ namespace Cantrip.Testing
                 if (node is NameExpr || node is StringExpr)
                 {
                     string name = node is NameExpr n ? n.Name : ((StringExpr)node).Value;
-                    card = State.ZoneOf(State.Player, Zones.Hand).FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase))
+
+                    // The performer's own hand first, then the party's. A member with a pile of its
+                    // own holds its cards; one without plays from the leader's hand.
+                    card = InHand(performer, name)
+                        ?? InHand(State.Player, name)
                         ?? _runtime.AddCard(Defined(name, call, "card", "card"), Zones.Hand);
                 }
                 else
@@ -307,8 +317,54 @@ namespace Cantrip.Testing
                     card = Interpreter.Evaluate(node, call.Context).Entity ?? throw Fail($"`{AstPrinter.Print(node)}` is not a card.", call.Span);
                 }
 
-                ActionResult result = _runtime.Play(card, target);
+                ActionResult result = _runtime.Play(card, target, performer);
                 if (result != ActionResult.Played) throw Fail($"could not play {card.Name}: {result}.", call.Span);
+            }
+
+            private Entity? InHand(Entity? owner, string name) =>
+                owner == null
+                    ? null
+                    : State.ZoneOf(owner, Zones.Hand).FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
+
+            /// <summary>
+            /// The <c>by Who</c> on a <c>play</c> or a <c>cast</c>: which party member is doing it.
+            /// </summary>
+            /// <remarks>
+            /// <c>on</c> is an operator and <c>by</c> is a clause, so <c>by Vestal on Crusader</c>
+            /// parses the aim into the clause's own value. Unwrapping it here is what lets the line
+            /// be written either way round, which is how anyone would expect to write it.
+            /// </remarks>
+            private Entity? Performer(VerbCall call, ref Entity? target)
+            {
+                ExprNode? by = call.Node.Clause("by");
+                if (by == null) return null;
+
+                ExprNode who = by;
+                if (who is BinaryExpr { Operator: BinaryOperator.On } aimed)
+                {
+                    who = aimed.Left;
+                    target = Interpreter.Evaluate(aimed.Right, call.Context).AsEntities().FirstOrDefault()
+                        ?? throw Fail($"`{AstPrinter.Print(aimed.Right)}` is not anything that can be targeted.", call.Span);
+                }
+
+                Entity? member = Interpreter.Evaluate(who, call.Context).AsEntities().FirstOrDefault();
+                if (member == null) throw Fail($"`{AstPrinter.Print(who)}` is not anybody who could do it.", call.Span);
+                return member;
+            }
+
+            /// <summary><c>pass Vestal</c>: that member is done this turn.</summary>
+            private void Pass(VerbCall call)
+            {
+                if (!Started) Start();
+                if (!State.InBattle) throw Fail("the battle is already over, so there is no turn to pass in.", call.Span);
+
+                ExprNode? node = call.ArgumentNode(0);
+                Entity member = node == null
+                    ? State.Player ?? throw Fail("there is nobody to pass for.", call.Span)
+                    : Interpreter.Evaluate(node, call.Context).AsEntities().FirstOrDefault()
+                      ?? throw Fail($"`{AstPrinter.Print(node)}` is not a party member.", call.Span);
+
+                _runtime.Pass(member);
             }
 
             private void EndTurn(VerbCall call)
@@ -322,6 +378,7 @@ namespace Cantrip.Testing
             {
                 ExprNode node = call.ArgumentNode(0) ?? throw Fail("`cast` needs an ability.", call.Span);
                 Entity? target = null;
+                Entity? performer = Performer(call, ref target);
                 if (node is BinaryExpr { Operator: BinaryOperator.On } on)
                 {
                     node = on.Left;
@@ -329,8 +386,9 @@ namespace Cantrip.Testing
                 }
 
                 string name = node is NameExpr n ? n.Name : node is StringExpr s ? s.Value : throw Fail("expected an ability name.", call.Span);
-                Entity ability = State.Player!.FindAttached(name)
-                    ?? throw Fail($"the player has no ability `{Defined(name, call, "ability", "ability")}`; use `grant` first.", call.Span);
+                Entity caster = performer ?? State.Player!;
+                Entity ability = caster.FindAttached(name)
+                    ?? throw Fail($"{caster.Name} has no ability `{Defined(name, call, "ability", "ability")}`; use `grant` first, or list it on the hero.", call.Span);
                 ActionResult cast = _runtime.UseAbility(ability, target);
                 if (cast == ActionResult.NotReady) throw Fail($"{name} is not ready.", call.Span);
                 if (cast != ActionResult.Played) throw Fail($"{name} could not be used: {cast}.", call.Span);

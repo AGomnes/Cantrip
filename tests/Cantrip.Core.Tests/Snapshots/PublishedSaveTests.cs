@@ -33,16 +33,18 @@ namespace Cantrip.Tests.Snapshots
         /// <summary>The state hash this build computes for the game preview.5 saved.</summary>
         /// <remarks>
         /// It is not the number preview.5 itself printed, which was 15834000141062751246. A hash is
-        /// a fingerprint of the whole rules state, and 1.0 mixed two new facts into it: every actor
-        /// has a lane as well as a rank, and every game is played on a named board. So every hash
-        /// of every game moved at once, which <c>docs/stability.md</c> allows and the changelog
-        /// records. What may not move is the save, and that is what the rest of this file checks:
-        /// the restored game is the same game, on the one-lane board that <em>is</em> preview.5's.
+        /// a fingerprint of the whole rules state, and 1.0 mixed several new facts into it: every
+        /// actor has a lane as well as a rank and says whether it is in the party, every game is
+        /// played on a named board, and an enemy records who it is telegraphing against. So every
+        /// hash of every game moved at once, which <c>docs/stability.md</c> allows and the
+        /// changelog records. What may not move is the save, and that is what the rest of this
+        /// file checks: the restored game is the same game, on the one-lane board that <em>is</em>
+        /// preview.5's, with the party of one it was played as.
         /// </remarks>
-        private const ulong Saved = 2602745777152438152UL;
+        private const ulong Saved = 15977894833483203837UL;
 
         /// <summary>And the hash after playing one more turn from there. Was 6355761473111257813.</summary>
-        private const ulong OneTurnOn = 16353394762656795743UL;
+        private const ulong OneTurnOn = 7805772150322525358UL;
 
         [Fact]
         public void A_save_written_by_0_1_0_preview_5_restores_into_this_build()

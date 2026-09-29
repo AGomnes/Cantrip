@@ -63,7 +63,10 @@ namespace Cantrip.Tests.Linting
         [InlineData("  discard_pile \"Strik\"\n", "Strik", "Strike", "No card named `Strik` is defined. Did you mean `Strike`?")]
         [InlineData("  deck Strike, Strke\n", "strke", "Strike", "No card named `strke` is defined. Did you mean `Strike`?")]
         [InlineData("  relic Anchr\n", "Anchr", "Anchor", "No relic or item named `Anchr` is defined. Did you mean `Anchor`?")]
-        [InlineData("  grant Zapp\n", "Zapp", "Zap", "No ability named `Zapp` is defined. Did you mean `Zap`?")]
+        // `grant` is a rule verb now rather than one only a test had, so its refusal arrives in
+        // the shape every other rule verb’s does — named by its verb, and still the same
+        // sentence about the same word.
+        [InlineData("  grant Zapp\n", "Zapp", "Zap", "runtime error: `grant`: no ability named `Zapp` is defined. Did you mean `Zap`?")]
         [InlineData("  enemy hp 10\n  play Strik on enemy\n", "Strik", "Strike", "No card named `Strik` is defined. Did you mean `Strike`?")]
         [InlineData("  enemy Ghol hp 12\n", "Ghol", "Ghoul", "No enemy named `Ghol` is defined. Did you mean `Ghoul`?")]
         public void A_misspelt_definition_on_a_test_line_is_an_error_and_fails_the_test_plainly(string lines, string written, string nearest, string failure)
@@ -102,8 +105,11 @@ namespace Cantrip.Tests.Linting
             // The test used to fail with "the player has no ability `Zapp`; use `grant` first."
             Assert.Equal("No ability named `Zapp` is defined. Did you mean `Zap`?", new DslTestRunner(content).RunAll().Single().Failure);
 
-            // An ability that is defined but not granted still says so.
-            Assert.Equal("the player has no ability `Zap`; use `grant` first.", new DslTestRunner(Load("  cast Zap\n")).RunAll().Single().Failure);
+            // An ability that is defined but not granted still says so, and now says who has not
+            // got it: in a party, "the player" would name the wrong member.
+            Assert.Equal(
+                "Player has no ability `Zap`; use `grant` first, or list it on the hero.",
+                new DslTestRunner(Load("  cast Zap\n")).RunAll().Single().Failure);
         }
 
         [Fact]

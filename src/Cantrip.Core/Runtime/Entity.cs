@@ -59,6 +59,8 @@ namespace Cantrip.Runtime
         private bool _isDead;
         private bool _isRemoved;
         private string? _intent;
+        private Entity? _intentTarget;
+        private bool _isPartyMember;
 
         /// <summary>The entity this one belongs to: a card's or status's actor, a relic's holder.</summary>
         public Entity? Owner
@@ -158,6 +160,31 @@ namespace Cantrip.Runtime
         {
             get => _intent;
             internal set => Set(ref _intent, value);
+        }
+
+        /// <summary>
+        /// The party member this enemy telegraphed its next move against, rolled when the intent
+        /// was. It is what was decided then and not what will be hit: a taunt applied afterwards
+        /// re-aims the blow, which is why a UI asks <see cref="CardRuntime.IntentTargetOf"/>
+        /// rather than reading this.
+        /// </summary>
+        public Entity? IntentTarget
+        {
+            get => _intentTarget;
+            internal set => Set(ref _intentTarget, value);
+        }
+
+        /// <summary>
+        /// True for an actor the game asks for input: the leader <c>CreatePlayer</c> made, and
+        /// every <c>hero</c> beside it. It is what separates the party from a summon standing on
+        /// the same side, and what the battle's loss condition and the turn's draw and discard
+        /// read. A summoned <c>actor</c> is never one, which is why the corpus's minions did not
+        /// acquire a step of their own when the party arrived.
+        /// </summary>
+        public bool IsPartyMember
+        {
+            get => _isPartyMember;
+            internal set => Set(ref _isPartyMember, value);
         }
 
         private void Set<T>(ref T field, T value)
@@ -274,6 +301,8 @@ namespace Cantrip.Runtime
             PatternIndex = 0;
             LastMove = null;
             Intent = null;
+            IntentTarget = null;
+            IsPartyMember = false;
             Phase = null;
             State.Touch();
         }

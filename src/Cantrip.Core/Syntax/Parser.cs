@@ -45,7 +45,7 @@ namespace Cantrip.Syntax
 
         private static readonly HashSet<string> DeclarationKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "card", "status", "relic", "ability", "enemy", "keyword", "item", "event", "encounter", "actor", "resource", "board",
+            "card", "status", "relic", "ability", "enemy", "keyword", "item", "event", "encounter", "actor", "hero", "resource", "board",
         };
 
         /// <summary>Words that open a selector when something to select from follows them.</summary>

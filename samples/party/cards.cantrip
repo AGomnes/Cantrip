@@ -1,0 +1,49 @@
+# The second shape a party can take: one hand and one energy pool, owned by the leader, with a
+# member named as the one performing the play. The cost comes out of the pool, because that is
+# whose cards they are; everything else is the performer's, which is what lets a relic ask who
+# spoke the words.
+
+status "Blessed"
+  tags buff
+  stacking intensity
+
+hero "Templar"
+  hp 34
+
+hero "Sister"
+  hp 26
+  tags holy
+
+card "Cleanse"
+  cost 1
+  target ally
+  tags holy
+  effect:
+    heal 7 to target
+    block 4 to target
+
+    # `source` is whoever performed the play, not whoever owns the card. For a party of one those
+    # are the same actor, which is why nothing written before a party existed can tell.
+    apply Blessed 1 to source
+
+card "Lash"
+  cost 1
+  target enemy
+  tags attack
+  effect:
+    deal 6 to target
+
+# Who may speak the words is an ordinary filter on the performer, and it needs no new syntax:
+# `event.source` in a `card_played` listener is the member that played the card. (`source` on its
+# own is the listening entity — the relic — which is the rule for every listener and not something
+# the party changed.)
+relic "Rite of Office"
+  on card_played(card:Cleanse):
+    if event.source.has(tag:holy):
+      heal 3 to target
+
+enemy "Footpad"
+  hp 30
+  move "Jab" at highest hp enemies:
+    deal 5 to target
+  pattern cycle Jab

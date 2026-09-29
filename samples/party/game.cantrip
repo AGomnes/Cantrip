@@ -1,0 +1,115 @@
+# A party of heroes, which is what the `hero` declaration is for: actors on the player's side that
+# the game asks for input. The leader a game makes with `CreatePlayer` is already one of them, so a
+# party of one is every game written before this existed, and every rule here reads the same for it.
+#
+# What this file is here to show, in content rather than only in C#:
+#
+#   * `hero`, with an `abilities` line that hands them over at creation
+#   * an ability that honours its own `target` line, and a cooldown that is per member
+#   * `move ... at <selector>`, so an enemy says who it is going to hit before it hits them
+#   * a taunt re-aiming that telegraph with no new event and no second roll
+#   * the battle being lost when the last member falls, not when the leader does
+#   * `revive`, because `heal` refuses a dead target and always will
+#
+# Run:  dotnet run --project src/Cantrip.Cli -- test samples/party
+
+ruleset
+  clock turns
+
+  # The party acts, then the enemies. One round is one turn in every mode, which is why
+  # `on every N turns` and `once per turn` mean here exactly what they mean everywhere else.
+  turns: sides
+
+  # Members are offered in the order they stand in, which on a one-lane board is the order they
+  # arrived in. It is the default; it is written out because this is the file that documents it.
+  order: position
+
+status "Taunt"
+  stacking none
+
+  # The whole of a taunt: while this is on somebody, nobody else on their side may be aimed at by
+  # the other side. It is the same line Hearthstone's Taunt uses in samples/corpus, unchanged —
+  # which is the point, because a party member is an ordinary actor and needed no new mechanism.
+  modify targetable of allies where source:enemies, not it.has(Taunt): set 0
+
+status "Bleeding"
+  tags debuff, dot
+  stacking intensity
+  on owner.turn_end:
+    deal stacks to owner, ignore block
+    stacks -1
+
+hero "Crusader"
+  hp 38
+  abilities Smite, Bulwark, Rally
+
+hero "Vestal"
+  hp 28
+  abilities Mend, Judgement
+
+ability "Smite"
+  target enemy
+  effect:
+    deal 9 to target
+
+ability "Bulwark"
+  cooldown 2 turns
+  target ally
+  effect:
+    block 8 to target
+    apply Taunt 1 to target
+
+ability "Mend"
+  cooldown 1 turns
+  target ally
+  effect:
+    heal 7 to target
+
+ability "Judgement"
+  cooldown 3 turns
+  target enemy
+  effect:
+    deal 5 to target
+    apply Bleeding 2 to target
+
+# Content can hand an ability over, which until now only C# and a test could do.
+ability "Rally"
+  cooldown 3 turns
+  target ally
+  effect:
+    grant Smite to target
+
+enemy "Brigand"
+  hp 46
+
+  # `at` names who the move is telegraphed against. With nothing written it is a living party
+  # member drawn uniformly, which for a party of one is that one member and rolls nothing at all.
+  move "Cutthroat" at lowest hp enemies:
+    deal 8 to target
+    apply Bleeding 2 to target
+
+  move "Volley" at random enemies:
+    deal 4 to target
+
+  pattern cycle Cutthroat, Volley
+
+# A member with a pile of its own draws from it at the party's turn start and holds its own hand.
+# The Scout is here so the end of a turn can be watched doing what it never used to: discarding
+# every member's hand rather than only the leader's.
+hero "Scout"
+  hp 22
+  held 0
+  on battle_start:
+    create Dart into hand
+  on turn_end:
+    self.held = hand.count
+
+# Ethereal, so the test below watches the hand being emptied and nothing else. An ordinary card
+# would go to the discard pile, be shuffled back when the Scout drew from an empty pile, and land
+# in its hand again — which would hide the discard rather than show it.
+card "Dart"
+  cost 0
+  target enemy
+  tags attack, ethereal
+  effect:
+    deal 3 to target

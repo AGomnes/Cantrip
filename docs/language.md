@@ -72,6 +72,7 @@ Content lives in `.cantrip` files. A folder loads every `.cantrip` file under it
 | `keyword "Name"` | A status-like entity used for keywords such as Retain |
 | `enemy "Name"` | An enemy actor with moves |
 | `actor "Name"` | A generic actor; when created, it joins its creator's side |
+| `hero "Name"` | A party member: an actor on the player's side that the game asks for input |
 | `ability "Name"` | An ability with a cooldown, for real-time play |
 | `resource "stat"` | Bounds and reset rules for a stat |
 | `board "Name"` | The shape of the board a battle is fought on |
@@ -96,6 +97,7 @@ What each declaration reads, beyond the listeners, modifiers, `tags` and present
 | `status`, `keyword` | `stacking`, `max_stacks`, `decay`, `flags`, `immune` | none |
 | `relic`, `item` | none | none |
 | `enemy`, `actor` | `hp`, `phase`, `pattern`, `immune` | `move "Name":` |
+| `hero` | `hp`, `abilities`, `immune` | none |
 | `ability` | `cooldown` | `effect:` |
 | `resource` | `min`, `max`, `reset_to`, `reset_on` | none |
 | `board` | `lanes`, `ranks`, `facing`/`shared`, `metric`, `on_vacated`, `lane_word`, `rank_word` | none |
@@ -382,6 +384,26 @@ enemy "Gremlin"
 
 The next move (the intent, readable as `enemy.intent`) is rolled when the battle starts, when an enemy spawns or is created mid-battle, and after each enemy turn. Inside a move, `self` is the enemy and `target` is the player. `use Chant` makes an enemy perform one of its moves.
 
+### Telegraphed targets
+
+A move says who it is going to hit with `at`, and the answer is readable before the blow lands:
+
+```
+enemy "Brigand"
+  hp 46
+  move "Cutthroat" at lowest hp enemies:
+    deal 8 to target
+  move "Volley" at random enemies:
+    deal 4 to target
+  pattern cycle Cutthroat, Volley
+```
+
+`at` takes an ordinary selector, so `at lowest hp enemies`, `at highest hp enemies`, `at lowest rank enemies` and `at random enemies` all work with no words of their own. Inside an enemy, `enemies` is the player's side.
+
+**With no `at`, the move aims at a living party member, drawn uniformly.** For a party of one that is that one member, and nothing is drawn — which is why adding this moved no existing game's results.
+
+`enemy.intent` is still the move's name. `enemy.intent_target` is who it is aimed at, and it is **recomputed every time it is read**, not stored: a taunt applied after the intent was rolled changes the answer with no event for a UI to have missed, and so does a death or a swap. What it answers is exactly what the move itself decides when it runs, because both ask one question of one rule. When every option is hidden the enemy still swings, at the one it was going to hit.
+
 ### Phases
 
 **Phases** gate which moves an enemy may choose from. This boss chomps until it drops to half health, then alternates splitting and chomping:
@@ -447,6 +469,69 @@ test "The Archmage opens its Unbound phase with Meteor"
 ```
 
 Written without quotes, `enemy.intent == Meteor` is a runtime error: `Unknown name`. The phase is part of the saved game. The sample roguelite's Archmage, in [samples/slice/enemies.cantrip](../samples/slice/enemies.cantrip), is this boss with Strength added.
+
+## The party
+
+A **`hero`** is an actor on the player's side that the game asks for input. It is an ordinary actor in every other way: `EntityKind.Actor`, `Team.Player`, on the board with a place, in `allies`, a legal target for a taunt.
+
+```
+hero "Crusader"
+  hp 38
+  abilities Smite, Bulwark
+
+hero "Vestal"
+  hp 28
+  abilities Mend
+```
+
+`abilities` hands those abilities over when the member is made. Content adds a member with `create Vestal`, which is how a mid-run recruit or a mid-battle summon that *acts* is written; a game adds one with [`AddHero`](csharp.md#the-party).
+
+**The leader is already a member.** `CreatePlayer` makes a party of one, and that member is the leader, so a party of four is one `CreatePlayer` and three `AddHero`. Everything below reads the same for a party of one as it did before a party existed, which is the whole reason it could be added at 1.0.
+
+**A summoned `actor` is not a member.** That is deliberate: a Monster Train or Hearthstone minion attacks from its own `turn_end` and must not acquire an input step nobody asked for. `allies` is everyone on the side, members and summons both; `party` is the members.
+
+### What the words mean
+
+| Name | Meaning |
+|---|---|
+| `player`, `leader` | one entity: the party's leader, the one that holds the run's relics and gold |
+| `party` | the living members, in the order they take their steps |
+| `allies` | everyone on the side, members and summons both |
+
+`player` keeps meaning the leader and always will. In content that declares a `hero`, writing it inside an enemy's move or a card's or ability's effect is error **CT326**, because `deal 5 to player` in an enemy move would hit one hero however carefully the enemy telegraphed somebody else — quietly, which is the one class of wrong answer this project refuses to ship. Write `target` for whoever the line is aimed at, `leader` where the run's own actor really is meant, or `party` for all of them. Everywhere else — a relic's listener, a run's gold, a test's own lines — `player` is still the right word and is left alone.
+
+### The turn
+
+**One round is one turn.** `turn` is the round number in every mode, because `on every N turns`, `once per turn`, the history counters, the saved turn number and `sim`'s stall limit all key off it. The party acts, then the enemies do.
+
+Within the party's turn each member takes its own step, in whatever order the game likes. `turn_start` and `turn_end` fire per member, as they always have. A game asks whether a member still has its step with [`CanAct`](csharp.md#the-party) and says it is done with `Pass`; when the last one that could act has passed, the enemies take their turn. For a party of one, `Pass` is `EndTurn`.
+
+**`once per turn` is once per round, per listening entity.** A status on each of four members fires four times a round — once each, because each is a different listener. A relic on the leader fires once. That was always true and is worth saying twice.
+
+### Resources, cards and abilities
+
+Each member has its own `energy`, its own hand and its own piles, because the engine was already per-actor: `max_energy` on a hero gives it a pool that resets at its own turn start, and `draw 2 to allies.last` draws from that member's own pile.
+
+Two shapes fall out of that, and the engine tells them apart with no setting at all:
+
+- **A deck each.** A member with a draw pile of its own draws `hand_size` from it at the party's turn start, plays from its own hand and pays its own `energy`.
+- **One hand for the party.** The cards belong to the leader, so the leader draws, pays and files them. A play then names the member *performing* it: the cost comes out of the leader's pool, and everything else is the performer's — `card_played`'s source, the damage, `source:` filters, the performer's own statuses and modifiers. In a listener, `event.source` is that member (`source` on its own is the listening entity, as it is for every listener).
+
+**A member with no pile of its own draws nothing and plays from the party's hand.** That needs no code and no setting: drawing from an empty pile with an empty discard simply stops.
+
+Cooldowns are per ability entity, so per member for free: two members with the same ability have two cooldowns. On a turn clock the clock advances once a round, so `cooldown 2 turns` is two rounds however many members act.
+
+Restricting who may perform a card needs no new syntax — `on before_card_played(card:Smite): if not event.source.has(tag:holy): cancel` refuses the play before it commits, so the card never leaves the hand and nothing is paid.
+
+### Death and revival
+
+**The battle is lost when no member is alive**, not when the leader dies. A surviving summon does not keep the fight going, and a party that has lost its leader fights on. Won is unchanged: no enemy alive.
+
+A fallen member is buried in the `dead` zone like a dead enemy and cleared at the next battle. It leaves `party`, `allies` and the turn order at once, because all three are derived from where the living actors stand and none of them is stored.
+
+`heal` refuses a dead target, deliberately and permanently, so bringing one back is its own verb: `revive <who> [N]`, which un-buries the actor at N hp (1 by default) and raises `revived`. It does nothing to somebody who was never dead, so a card that reads "bring back a fallen ally" cannot quietly become a heal.
+
+At the end of a battle **every** member is tidied up — statuses that are not `persistent` removed, cards returned to that member's draw pile — and at the end of a turn **every** member's hand is discarded. Before 1.0 both touched the leader only.
 
 ## Abilities and real time
 
@@ -653,6 +738,7 @@ The scope is matched against the event's target, whatever the event. So `on owne
 | `overkill` | a killing hit had `amount` to spare |
 | `died` | target is dying. `instead_of_died` prevents it. The dying actor's own listeners still hear it. |
 | `killed` | target died; source is the killer |
+| `revived` | target is being brought back from the dead by source; `amount` is the hp it comes back at. Raised only for an actor that really is dead. |
 | `healed` | target regained `amount` hp |
 | `gained_block` | target gained `amount` block |
 | `drawn` | target (a card) was drawn |
@@ -870,7 +956,8 @@ A bare name resolves in this order: local variables (`let` bindings, `for each` 
 | `source` | who is acting |
 | `target` | the target |
 | `card` | the card being played |
-| `player`, `controller` | the game's player, whichever side is acting; the running entity's controller |
+| `player`, `leader`, `controller` | the party's leader (two names for one entity); the running entity's controller |
+| `party` | the living [party members](#the-party), in the order they take their steps |
 | `enemy`, `enemies`, `allies`, `everyone` | relative to the side the effect runs for |
 | `hand`, `draw`, `discard`, `exhaust`, `powers`, `relics`, `deck`, `cards` | the controller's zones (`deck` is draw, hand and discard) |
 | `statuses` | statuses on the candidate or controller |
@@ -887,7 +974,9 @@ A bare name resolves in this order: local variables (`let` bindings, `for each` 
 | `deal` (`damage`) | `deal N [to who] [as tag] [, ignore block]`. Without `to`, hits the effect's target. The damage carries the tags of the running card, status or relic. |
 | `attack` | `attack [who] [with attacker] [as tag] [, ignore block]`. Deals the attacker's `attack` stat to the target, with the attacker as the damage source, so the attacker's own listeners and modifiers see it as its damage. The attacker defaults to the running entity when that is an actor, otherwise to its controller, so a card or relic swings with the player; the target defaults to the effect's target. |
 | `block` (`gain_block`) | `block N [to who] [into name]`. Defaults to yourself. Block is not timed: it lasts until it is spent or the holder's turn starts, so there is no `for` on it. |
-| `heal` | `heal N [to who] [into name]`. Defaults to yourself. |
+| `heal` | `heal N [to who] [into name]`. Defaults to yourself. Refuses a dead target; see `revive`. |
+| `revive` | `revive who [N]`. Brings a fallen actor back at N hp (1 by default) and raises `revived`. Does nothing to somebody living, so it cannot become a heal. |
+| `grant` | `grant Ability[, Ability] [to who]`. Gives an actor an ability. Defaults to whoever is running the line. Granting one somebody already has does nothing. |
 | `draw` | `draw [N] [to who]` for the controller, or for whoever `to` names. Reshuffles the discard pile when the draw pile runs out. A creature controls itself, so `draw 1 to player` is how a creature draws for you. |
 | `discard`, `exhaust` | `discard N` asks the chooser to pick from hand; `discard who` and `exhaust self` name the cards. |
 | `apply` | `apply Status [N] [for duration] [to who]`. Defaults to the target, or a status's host, or the controller. |
@@ -1099,6 +1188,8 @@ ruleset
   ordering: priority, play_order, active_player
   modifier_layers: add, multiply, clamp, override
   triggers: queued
+  turns: sides
+  order: position
   hand_size 5
 ```
 
@@ -1111,6 +1202,8 @@ ruleset
 | `modifier_layers` | `add, multiply, clamp, override` | modifier layer order |
 | `triggers` | `queued` | `immediate` runs after listeners inline |
 | `new_listeners` | `hear_the_event` | whether a listener that comes into play during an event hears that event. See below. |
+| `turns` | `sides` | whether [the party](#the-party) acts as a side or in one interleaved order. `sides` is the only value this release implements; `initiative` is error CT334. |
+| `order` | `position` | the order the party's members are offered in: where they stand, `(lane, rank)`. `speed` is error CT334. |
 | `hand_size` | 5 | cards drawn each turn |
 | `max_hand_size` | 10 | cards drawn beyond this go to the discard pile |
 | `max_steps` | 100000 | interpreter steps per top-level action before it is stopped with a runtime error (see [When content fails at runtime](csharp.md#when-content-fails-at-runtime)) |
@@ -1149,10 +1242,10 @@ Only a listener's own arrival counts, by registration order: a status applied du
 ## How a battle runs
 
 1. **StartBattle** removes enemies that died in an earlier battle, shuffles the draw pile, rolls enemy intents, raises `battle_start` and starts the player's turn.
-2. **A turn starts**: the turn number increases; each actor on the side raises `turn_start`, which resets resources such as energy and block; pending `next turn:` blocks run; the turn clock advances; the player draws `hand_size` cards.
-3. **The player plays cards** with `Play`. Queued triggers resolve after each card.
-4. **EndTurn**: the player raises `turn_end` (decay and `until` reverts follow its listeners); the hand is discarded except retained cards, and ethereal cards are exhausted; the enemies' turn starts; each living enemy uses its intent; enemies raise `turn_end`; intents are rolled; the player's next turn starts.
-5. **The battle ends** when the player dies (lost) or no enemies are left alive (won). `battle_end` is raised, `until` blocks are undone, the player's statuses are removed unless flagged `persistent`, and every card returns to the draw pile.
+2. **A turn starts**: the turn number increases; each actor on the side raises `turn_start`, which resets resources such as energy and block; pending `next turn:` blocks run; the turn clock advances; each [party member](#the-party) draws `hand_size` cards from its own pile.
+3. **The party plays cards** with `Play`, and uses abilities with `UseAbility`. Queued triggers resolve after each. A member that is done passes; when the last one has, the turn ends.
+4. **EndTurn**: the party raises `turn_end` (decay and `until` reverts follow its listeners); every member's hand is discarded except retained cards, and ethereal cards are exhausted; the enemies' turn starts; each living enemy uses the move it telegraphed, against the member it telegraphed it at; enemies raise `turn_end`; intents are rolled; the party's next turn starts.
+5. **The battle ends** when no party member is alive (lost) or no enemies are left alive (won). `battle_end` is raised, `until` blocks are undone, every member's statuses are removed unless flagged `persistent`, and every card returns to its owner's draw pile.
 
 Dead enemies stay on the `dead` zone until the next battle starts.
 
@@ -1201,18 +1294,20 @@ test "Poison ticks and decays"
 | Verb | Setup | Meaning |
 |---|---|---|
 | `enemy [Name] [stat N]...` | yes | Spawns an enemy: a defined one, or a plain 10 hp enemy (`enemy "Label" hp 20`). A status name applies that status, as `apply Name N` would. The first is `enemy` and `enemy1`, then `enemy2`... |
-| `player stat N...` | yes | Sets player stats or applies statuses: `player hp 40 Strength 2` |
+| `player stat N...` | yes | Sets the leader's stats or applies statuses: `player hp 40 Strength 2` |
+| `hero Name [stat N]...` | yes | Adds a [party member](#the-party) from a `hero` declaration, with its abilities: `hero Vestal hp 20`. The first is `hero` and `hero1`, then `hero2`… and each is also bound to **its own name**, so `expect Vestal.hp == 20` reads the live member rather than the printed stat on its definition |
 | `hand`, `deck`, `discard_pile` | yes | Adds cards to the hand, the draw pile or the discard pile, in that order: `deck Strike, Strike, Defend`, or `deck 4 Strike, 2 Defend`. As a test verb, `deck` is the draw pile only; the name `deck` in an expression is draw, hand and discard together. |
 | `relic Name` | yes | Gives the player a relic or an item |
-| `grant Ability` | yes | Gives the player an ability |
+| `grant Ability` | yes | Gives an ability to whoever is running the line — the leader, in a test's setup. It is a [rule verb](#built-in-verbs), not a test verb, so `grant Smite to target` works in content too |
 | `seed N` | yes | Reseeds the game's RNG |
 | `answer "A, B"` | yes | Queues the answer to the next choice, by name; `"A, B"` picks both |
 | `realtime N` | yes | Uses a tick clock with N ticks per second for the whole test, wherever it is written |
 | `setup:` | yes | A block of setup statements |
-| `play Card [on who]` | no | Plays a card, adding it to the hand if needed; fails the test if it cannot be played. See the note below: `play` is a rule verb too |
+| `play Card [by who] [on who]` | no | Plays a card, adding it to the hand if needed; fails the test if it cannot be played. `by` names the member performing it, and may be written either side of `on`. See the note below: `play` is a rule verb too |
 | `end turn` | no | Ends the turn, runs the enemies' turn and starts the next one |
 | `tick N` | no | Advances the tick clock |
-| `cast Ability [on who]` | no | Uses an ability |
+| `cast Ability [by who] [on who]` | no | Uses an ability. `by` names the member whose ability it is |
+| `pass who` | no | That member is done this turn. When the last one has passed, the turn ends |
 | `expect condition` | no | Fails the test if the condition is false |
 
 **`play` means the test's verb only where the test wrote it.** It is also a [rule verb](#built-in-verbs), and the two are told apart by where the line is: a `play` in a test's own body puts a card into hand by name and plays it from there, and a `play` written anywhere else — in a card's effect, or in a content verb the test calls — plays a card that is already in a pile. So `verb cascade(): play draw.first` does the same thing whether a card calls it or a test line does.
@@ -1399,6 +1494,7 @@ Codes with four digits come from reading and loading the files. An error among t
 | CT323 | error | A named clause a built-in verb does not read, such as `block 8 for 2 turns`, `apply Poison 3 at target` or `deal 5 against enemy2`. The clause was dropped in silence, so the line read as one thing and did another. It is a runtime error too. A flag after a comma is not a clause and is never reported, and neither is a verb content declares or a game registers. | Write the clause the verb reads — the message names it, and [Built-in verbs](#built-in-verbs) has the table — or drop the clause. Some of them are not a spelling at all: block is not timed, and a heal happens once. `--suppress CT323`, or `LintOptions.HostVerbs`, for content that reaches a verb of that name another way. |
 | CT324 | error | A bare percentage where a built-in verb counts whole things, such as `apply Slow 40%`. The unit was dropped, so forty stacks were applied while the card's generated text said "Apply 40% Slow". It is a runtime error too. | Write the number (`apply Slow 40`), or a share of something (`deal target.max_hp * 40% to target`), which is what a percentage is for. |
 | CT325 | error | A length in units the game's clock cannot measure: `on every 1s:` or `for 3s` where the ruleset says `clock turns`, or `2 turns` where it says `clock ticks`. Only content that states its clock is checked. | Write the length in the units that clock measures, or change the `clock` setting. The message says which units the stated clock takes. |
+| CT326 | error | `player` written inside an enemy's move or a card's or ability's effect, in content that declares a [`hero`](#the-party). `player` is one entity — the party's leader — so the line acts on that one member however carefully the rules settled on another, and it does it quietly. Content with no `hero` is never reported, and `player` elsewhere is never reported. | Write `target` for whoever the line is aimed at, `leader` where the run's own actor really is meant, or `party` for all of them. |
 | CT327 | warning | A lane or rank no [board](#boards) this game declares can hold. Compared against one, the comparison is the same for every actor before the game runs: `it.lane == 4` on a three-lane board matches nobody, and `it.rank <= 3` on a three-rank board matches everybody and limits nothing. Moved to one, the move stops at the edge of the board instead. | Use a place the board has, counting from 0, or declare the board the rule is written for. |
 | CT328 | error | `position` assigned. It reads a rank and always will, but it names one axis of a place that has two, so a move written with it would have to guess which. | Write `rank`. `who.rank = 0` and `who.lane += 1` are moves; see [Boards](#boards). |
 | CT329 | note | `position` read, which is the older name for `rank`. | Nothing is wrong: it reads the same number and keeps working for the whole 1.x line. Write `rank` when you next touch the line. |
@@ -1406,6 +1502,7 @@ Codes with four digits come from reading and loading the files. An error among t
 | CT331 | warning | `range` on something that points at nobody, so nothing ever reads it. | Add a `target` line, or take the `range` off. |
 | CT332 | warning | A `range` that decides nothing: as wide as the widest board this game declares, written backwards (`range 3..1`), or `range 0` at an enemy, which on a facing board is a slot no enemy ever stands on. | Give it a reach the board can narrow. `range 1` is what melee is written as. |
 | CT333 | warning | `lane(...)` on a board one rank deep, or `rank(...)` on a board one lane wide. One actor stands on a slot, so the row is that actor and nobody else. | Write the actor itself, or give the board a second rank or lane. |
+| CT334 | error | A `turns:` or `order:` [ruleset](#rulesets) value this release does not implement: `turns: initiative` or `order: speed`. The words are known so that content written for a later release can be read and refused rather than ignored. | Write `turns: sides` or `order: position`, which is what every game gets by saying nothing. |
 
 **Descriptions**
 

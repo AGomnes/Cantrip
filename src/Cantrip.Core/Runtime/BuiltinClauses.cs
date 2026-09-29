@@ -56,6 +56,8 @@ namespace Cantrip.Runtime
             ["discover"] = new[] { "as" },
             ["cancel"] = None,
             ["kill"] = new[] { "to" },
+            ["revive"] = new[] { "to" },
+            ["grant"] = new[] { "to" },
             ["log"] = None,
 
             // Runtime verbs. `play card on target` and `replay card on target` aim with the `on`

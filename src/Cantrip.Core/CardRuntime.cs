@@ -11,13 +11,13 @@ namespace Cantrip
 {
     /// <summary>
     /// What a top-level action did. Every call that can stop for a choice reports it here:
-    /// <see cref="CardRuntime.Play(Entity, Entity)"/>, <see cref="CardRuntime.StartBattle"/>,
+    /// <see cref="CardRuntime.Play(Entity, Entity, Entity)"/>, <see cref="CardRuntime.StartBattle"/>,
     /// <see cref="CardRuntime.EndTurn"/>, <see cref="CardRuntime.Execute"/>,
     /// <see cref="CardRuntime.UseAbility"/> and <see cref="CardRuntime.Answer(int[])"/>.
     /// </summary>
     public enum ActionResult
     {
-        /// <summary>The action ran to the end. For <see cref="CardRuntime.Play(Entity, Entity)"/>, the card was played.</summary>
+        /// <summary>The action ran to the end. For <see cref="CardRuntime.Play(Entity, Entity, Entity)"/>, the card was played.</summary>
         Played,
 
         /// <summary>
@@ -62,7 +62,7 @@ namespace Cantrip
 
     /// <summary>
     /// The entry point for games: load content, set up actors and decks, then drive
-    /// battles through <see cref="StartBattle"/>, <see cref="Play(Entity, Entity)"/> and <see cref="EndTurn"/>, or
+    /// battles through <see cref="StartBattle"/>, <see cref="Play(Entity, Entity, Entity)"/> and <see cref="EndTurn"/>, or
     /// real-time play through <see cref="Tick"/> and <see cref="UseAbility"/>.
     /// </summary>
     public sealed class CardRuntime : IDisposable
@@ -149,6 +149,94 @@ namespace Cantrip
 
         public Entity? Player => State.Player;
 
+        /// <summary>
+        /// The living members of the party, in the order they take their steps. A game that never
+        /// declares a <c>hero</c> has one member: <see cref="Player"/>.
+        /// </summary>
+        public IReadOnlyList<Entity> Party => State.Party;
+
+        /// <summary>
+        /// Whose step it is, or null when the turn order has no single answer. <c>turns: sides</c>,
+        /// the only mode this release has, gives the whole party one turn and lets the game act
+        /// with its members in any order, so it is always null there and a game asks
+        /// <see cref="CanAct"/> of each member instead.
+        /// </summary>
+        public Entity? ActiveMember => State.ActiveMember;
+
+        /// <summary>
+        /// Whether this member still has its step this turn: it is a member, it is alive, a battle
+        /// is running, it is the party's turn, and it has not passed.
+        /// </summary>
+        public bool CanAct(Entity member)
+        {
+            if (member == null) throw new ArgumentNullException(nameof(member));
+            return State.InBattle
+                && State.ActiveTeam == Team.Player
+                && member.IsPartyMember
+                && member.IsAlive
+                && !State.Acted.Contains(member.Id);
+        }
+
+        /// <summary>
+        /// That member is done for this turn. When the last one that could act has passed, the
+        /// party's turn ends and the enemies take theirs — so for a party of one this is
+        /// <see cref="EndTurn"/>, to the byte.
+        /// </summary>
+        /// <returns>
+        /// <see cref="ActionResult.Played"/>, or <see cref="ActionResult.ChoicePending"/> when the
+        /// turn it ended stopped to ask the player something.
+        /// </returns>
+        /// <remarks>
+        /// It is a verb of its own rather than an <c>EndTurn(member)</c> overload because "end turn"
+        /// already means "end the side's turn" in the tests, the reference and the Godot node, and
+        /// one word meaning two things is exactly the silent break a frozen API cannot afford.
+        /// </remarks>
+        public ActionResult Pass(Entity member)
+        {
+            if (member == null) throw new ArgumentNullException(nameof(member));
+
+            int memberId = member.Id;
+            return Attempt(
+                () => { PassCore(member); return ActionResult.Played; },
+                () => Live(memberId) is Entity again ? Pass(again) : ActionResult.Played);
+        }
+
+        private void PassCore(Entity member)
+        {
+            if (!State.InBattle) throw new InvalidOperationException("No battle is running, so there is no turn to pass in.");
+            if (State.ActiveTeam != Team.Player) throw new InvalidOperationException("It is not the party's turn.");
+            if (!member.IsPartyMember)
+                throw new ArgumentException($"{member} is not a party member, so it has no step to pass. Only the leader and the heroes beside it take one.", nameof(member));
+
+            // A member that fell has no step left to give up, and marking it would be bookkeeping
+            // about somebody who is not in the party any more.
+            if (!member.IsAlive) return;
+            State.MarkActed(member);
+
+            foreach (Entity other in State.Party)
+            {
+                if (!State.Acted.Contains(other.Id)) return;
+            }
+
+            EndTurnCore();
+        }
+
+        /// <summary>
+        /// Every member of the party, living or fallen: what the end of a turn discards from and
+        /// what the end of a battle tidies up. <see cref="Party"/> is the living ones, which is who
+        /// still acts; this is who still owns cards and statuses.
+        /// </summary>
+        private List<Entity> AllMembers()
+        {
+            var members = new List<Entity>();
+            if (State.Player != null && State.Player.IsPartyMember && !State.Player.IsRemoved) members.Add(State.Player);
+            foreach (Entity entity in State.Entities)
+            {
+                if (entity.IsPartyMember && !entity.IsRemoved && entity != State.Player) members.Add(entity);
+            }
+            return members;
+        }
+
         /// <summary>Null while a battle is running or before the first one; then whether the player won.</summary>
         public bool? Won { get; private set; }
 
@@ -166,8 +254,42 @@ namespace Cantrip
             player.SetBase("block", 0);
             player.SetBase("max_energy", maxEnergy);
             player.SetBase("energy", maxEnergy);
+
+            // A party of one, and this member is the leader. Every rule the party added reads the
+            // same here as the rule it replaced, which is why a game that never calls
+            // <see cref="AddHero"/> plays exactly as it did.
+            player.IsPartyMember = true;
             State.Player = player;
             return player;
+        }
+
+        /// <summary>
+        /// Adds a party member from a <c>hero</c> definition: an actor on the player's side that
+        /// the game asks for input, with the abilities its <c>abilities</c> line grants.
+        /// </summary>
+        /// <param name="name">A <c>hero</c> declared in content.</param>
+        /// <param name="hp">Overrides the printed hp, as <see cref="SpawnEnemy"/> does.</param>
+        /// <remarks>
+        /// The leader <see cref="CreatePlayer"/> made is already a member, so a party of four is one
+        /// <c>CreatePlayer</c> and three <c>AddHero</c>. Content adds one with <c>create Vestal</c>,
+        /// which is the same arrival by a different door: a mid-run recruit, or a summon that acts.
+        /// </remarks>
+        public Entity AddHero(string name, int? hp = null)
+        {
+            if (State.Player == null) throw new InvalidOperationException("Create the party's leader with CreatePlayer before adding heroes.");
+
+            EntityDefinition definition = Require(name, "hero");
+            Entity hero = State.Instantiate(definition, null, Team.Player, Zones.Board);
+
+            if (hp.HasValue)
+            {
+                hero.SetBase("max_hp", hp.Value);
+                hero.SetBase("hp", hp.Value);
+            }
+            if (!hero.HasStat("block")) hero.SetBase("block", 0);
+
+            Interpreter.JoinParty(hero);
+            return hero;
         }
 
         public Entity AddCard(string name, string zone = Zones.Draw, Entity? owner = null)
@@ -318,7 +440,11 @@ namespace Cantrip
             if (State.ActiveTeam != Team.Player) throw new InvalidOperationException("It is not the player's turn.");
 
             if (EndTurnFor(Team.Player)) return;
-            DiscardHand(State.Player!);
+
+            // Every member's hand, not only the leader's. Before this a hero's hand was never
+            // discarded at all and grew by a full draw every round.
+            foreach (Entity member in AllMembers()) DiscardHand(member);
+            State.ClearActed();
 
             StartTurn(Team.Enemy);
             if (!State.InBattle) return;
@@ -343,6 +469,7 @@ namespace Cantrip
             {
                 State.Turn++;
                 State.ResetTurnHistory();
+                State.ClearActed();
             }
 
             foreach (Entity actor in State.Actors(team).ToArray())
@@ -374,10 +501,26 @@ namespace Cantrip
                 if (!State.InBattle) return;
             }
 
-            if (team == Team.Player && State.Player != null && State.Player.IsAlive)
+            // Each member draws from its own pile. One with no pile of its own draws nothing —
+            // Draw stops at an empty draw and an empty discard without touching the generator — and
+            // plays from the party's hand instead, which is the second of the two shapes and needs
+            // no setting to tell them apart.
+            if (team == Team.Player && State.Player != null && (State.Player.IsAlive || State.Party.Count > 0))
             {
-                if (_skipNextDraw) _skipNextDraw = false;
-                else Run(State.Player, context => Interpreter.Draw(State.Player, State.Rules.HandSize, context));
+                if (_skipNextDraw)
+                {
+                    _skipNextDraw = false;
+                }
+                else
+                {
+                    foreach (Entity member in State.Party)
+                    {
+                        if (!member.IsAlive) continue;
+                        Entity drawing = member;
+                        Run(drawing, context => Interpreter.Draw(drawing, State.Rules.HandSize, context));
+                        if (!State.InBattle) return;
+                    }
+                }
                 CheckBattleOver();
             }
         }
@@ -417,7 +560,11 @@ namespace Cantrip
         {
             if (!State.InBattle) return true;
 
-            if (State.Player != null && !State.Player.IsAlive)
+            // The battle is lost when no member of the party is alive, not when the leader dies. A
+            // summon standing beside the corpses does not keep the fight going, and a party that
+            // has lost its leader fights on. For a party of one the two readings are the same
+            // sentence, which is why nothing a game does today notices the change.
+            if (State.Player != null && State.Party.Count == 0)
             {
                 EndBattle(won: false);
                 return true;
@@ -459,15 +606,20 @@ namespace Cantrip
 
             if (player == null) return;
 
-            foreach (Entity status in player.Attached.ToArray())
+            // Every member is tidied up, not only the leader. Before this a hero carried its
+            // statuses and its whole hand into the next battle, because only the leader was cleaned.
+            foreach (Entity member in AllMembers())
             {
-                if (status.Definition != null && (status.Definition.Flags & StatusFlags.Persistent) != 0) continue;
-                State.Remove(status);
-            }
+                foreach (Entity status in member.Attached.ToArray())
+                {
+                    if (status.Definition != null && (status.Definition.Flags & StatusFlags.Persistent) != 0) continue;
+                    State.Remove(status);
+                }
 
-            foreach (string zone in new[] { Zones.Hand, Zones.Discard, Zones.Exhaust, Zones.Play, Zones.Powers })
-            {
-                foreach (Entity card in State.ZoneOf(player, zone).ToArray()) State.MoveTo(card, Zones.Draw);
+                foreach (string zone in new[] { Zones.Hand, Zones.Discard, Zones.Exhaust, Zones.Play, Zones.Powers })
+                {
+                    foreach (Entity card in State.ZoneOf(member, zone).ToArray()) State.MoveTo(card, Zones.Draw);
+                }
             }
         }
 
@@ -496,49 +648,68 @@ namespace Cantrip
         }
 
         /// <summary>Plays a card from hand: checks energy and target, pays, resolves, and drains triggers.</summary>
-        public ActionResult Play(Entity card, Entity? target = null)
+        /// <param name="card">The card to play, from whichever member's hand it is in.</param>
+        /// <param name="target">Who it is aimed at, or null to settle from the card's <c>target</c> line.</param>
+        /// <param name="performer">
+        /// The member doing it, or null for the card's own controller — which is what every game
+        /// before a party existed means, and what a party of one always has.
+        /// </param>
+        /// <remarks>
+        /// The cost is paid by the card's controller, because that is whose pool the card is in.
+        /// Everything else is the performer's: <c>card_played.source</c> is the performer, the
+        /// damage comes from the performer, <c>source:</c> filters match the performer, and the
+        /// performer's own statuses and modifiers apply. A card that draws draws into the
+        /// performer's pile, so a member with no pile of its own draws nothing — which is the same
+        /// sentence as the rule that gave it the party's hand to play from.
+        /// </remarks>
+        public ActionResult Play(Entity card, Entity? target = null, Entity? performer = null)
         {
             if (card == null) throw new ArgumentNullException(nameof(card));
 
             int cardId = card.Id;
             int targetId = target?.Id ?? 0;
+            int performerId = performer?.Id ?? 0;
             return Attempt(
-                () => PlayCore(card, target),
-                () => Live(cardId) is Entity again ? Play(again, Live(targetId)) : ActionResult.NotACard);
+                () => PlayCore(card, target, performer: performer),
+                () => Live(cardId) is Entity again ? Play(again, Live(targetId), Live(performerId)) : ActionResult.NotACard);
         }
 
         /// <summary>
-        /// The whole of playing a card. Used by <see cref="Play(Entity, Entity)"/> for a card the player
+        /// The whole of playing a card. Used by <see cref="Play(Entity, Entity, Entity)"/> for a card the player
         /// plays from hand, and by the <c>play</c> verb for a card an effect plays out of a pile.
         /// </summary>
         /// <param name="card">The card to play.</param>
         /// <param name="target">Who it is aimed at, or null to settle from the card's own <c>target</c> line.</param>
         /// <param name="from">
-        /// The zone the card must be in. <see cref="Play(Entity, Entity)"/> passes <c>hand</c>, which
+        /// The zone the card must be in. <see cref="Play(Entity, Entity, Entity)"/> passes <c>hand</c>, which
         /// is what playing a card means for a player. The <c>play</c> verb passes null, meaning any
         /// pile the card is sitting in — the whole point of "play the top card of your draw pile" —
         /// and a card that is already in <c>play</c> or <c>powers</c> is still refused, because a card
         /// being played cannot be played again.
         /// </param>
         /// <param name="free">Skips the payment. The card still sees its own cost, and an X cost still binds what the payer has.</param>
+        /// <param name="performer">The member doing it, or null for the card's own controller.</param>
         /// <param name="chain">
         /// The causal chain to continue. A nested play extends its caller's, so <c>once per chain</c>
         /// counts one chain across a cascade rather than restarting at every play boundary.
         /// </param>
-        private ActionResult PlayCore(Entity card, Entity? target, string? from = Zones.Hand, bool free = false, Chain? chain = null)
+        private ActionResult PlayCore(Entity card, Entity? target, string? from = Zones.Hand, bool free = false, Chain? chain = null, Entity? performer = null)
         {
             if (card.Kind != EntityKind.Card || card.IsRemoved) return ActionResult.NotACard;
             if (from != null ? card.Zone != from : NotInAPile(card)) return ActionResult.NotInHand;
             if (card.HasTag("unplayable")) return ActionResult.Unplayable;
 
-            Entity player = card.Controller;
+            // Who pays, and who does it. They are the same entity unless a party member was named,
+            // and they are always the same entity for a party of one.
+            Entity payer = card.Controller;
+            Entity player = performer != null && performer.Kind == EntityKind.Actor && performer.IsAlive ? performer : payer;
             int cost = CostOf(card);
             // A card priced in something else is refused the same way, so NotEnoughEnergy now means
             // "not enough of whatever this costs".
             string resource = CostResourceOf(card);
-            if (!free && !IsXCost(card) && player.GetInt(resource) < cost) return ActionResult.NotEnoughEnergy;
+            if (!free && !IsXCost(card) && payer.GetInt(resource) < cost) return ActionResult.NotEnoughEnergy;
 
-            if (!TryResolveTarget(card, ref target, automatic: from == null)) return ActionResult.InvalidTarget;
+            if (!TryResolveTarget(card, ref target, automatic: from == null, user: player)) return ActionResult.InvalidTarget;
 
             if (_runDepth == 0) Interpreter.ResetSteps();
             string startedIn = card.Zone;
@@ -566,7 +737,7 @@ namespace Cantrip
                     },
                     committed: () =>
                     {
-                        if (paid > 0) Interpreter.ChangeStat(player, resource, AssignOperator.Subtract, paid, context);
+                        if (paid > 0) Interpreter.ChangeStat(payer, resource, AssignOperator.Subtract, paid, context);
                         State.MoveTo(card, Zones.Play);
                         State.RecordHistory("cards_played", player, Num.One);
                         if (card.HasTag("attack")) State.RecordHistory("attacks", player, Num.One);
@@ -634,7 +805,7 @@ namespace Cantrip
         /// <summary>
         /// The entities this action may be pointed at right now, in board order, after its own
         /// <c>target … where</c> filter and content's <c>targetable</c> rules: exactly what
-        /// <see cref="Play(Entity, Entity)"/> and <see cref="UseAbility(Entity, Entity)"/> accept.
+        /// <see cref="Play(Entity, Entity, Entity)"/> and <see cref="UseAbility(Entity, Entity)"/> accept.
         /// Empty for one that takes no target. A <c>target any</c> action may also be played at
         /// nothing, which this list cannot say, so a UI that wants to offer that asks
         /// <see cref="TargetMode"/>.
@@ -649,7 +820,7 @@ namespace Cantrip
         }
 
         /// <summary>
-        /// Whether <see cref="Play(Entity, Entity)"/> would accept this card now, aimed somewhere legal: it is in
+        /// Whether <see cref="Play(Entity, Entity, Entity)"/> would accept this card now, aimed somewhere legal: it is in
         /// hand, playable, affordable, and a card that needs someone to point at has someone.
         /// Content can still cancel it while it resolves, which no check made in advance can see.
         /// </summary>
@@ -672,6 +843,7 @@ namespace Cantrip
         /// of your draw pile" contradicts the verb's reason for existing. A target is rolled instead,
         /// from the game's own snapshotted RNG, so the roll replays and saves like any other.
         /// </param>
+        /// <param name="user">Who is using it, or null for the action's own controller.</param>
         /// <remarks>
         /// Which candidates there are is <see cref="Interpreter.LegalTargets(TargetRule, Entity, Entity)"/>'s
         /// answer and nothing else's; what is left here is only what to do with the list — take the
@@ -679,9 +851,9 @@ namespace Cantrip
         /// through a <see cref="DeferredChooser"/> is answer number one and replays in the same
         /// place as any other choice the action goes on to make.
         /// </remarks>
-        private bool TryResolveTarget(Entity action, ref Entity? target, bool automatic = false)
+        private bool TryResolveTarget(Entity action, ref Entity? target, bool automatic = false, Entity? user = null)
         {
-            Entity user = action.Controller;
+            user ??= action.Controller;
             TargetRule rule = TargetRule.Of(action.Definition);
 
             switch (rule.Mode)
@@ -738,10 +910,22 @@ namespace Cantrip
         /// <summary>Picks an enemy's next move from its pattern, so the UI can show intents in advance.</summary>
         public void RollIntent(Entity enemy) => Interpreter.RollIntent(enemy);
 
+        /// <summary>
+        /// Who <paramref name="enemy"/> is telegraphing its next move against as things stand: the
+        /// member it rolled while that member is still a legal target, and otherwise the first who
+        /// is. Null when it has no intent. Recomputed on every ask, so a taunt applied mid-turn
+        /// changes what a UI shows with no event and no second roll.
+        /// </summary>
+        public Entity? IntentTargetOf(Entity enemy) =>
+            Interpreter.IntentTargetOf(enemy ?? throw new ArgumentNullException(nameof(enemy)));
+
         private void RunEnemyMove(Entity enemy)
         {
             if (!enemy.IsAlive || enemy.Intent == null || enemy.Definition == null) return;
-            UseMove(enemy, enemy.Intent, State.Player);
+
+            // The move goes at the member the enemy telegraphed, which for a party of one is that
+            // one member and so is the player, exactly as it was.
+            UseMove(enemy, enemy.Intent, IntentTargetOf(enemy) ?? State.Player);
             enemy.LastMove = enemy.Intent;
             CheckBattleOver();
         }
@@ -797,6 +981,42 @@ namespace Cantrip
         }
 
         public bool IsReady(Entity ability) => ability.GetBase("ready_at") <= Num.FromInt(State.Clock.Now);
+
+        /// <summary>
+        /// Whether <see cref="UseAbility(Entity, Entity)"/> would accept this ability now: it is an
+        /// ability, its owner is alive, it is off cooldown, and one that needs somebody to point at
+        /// has somebody. The companion of <see cref="CanPlay"/>, and the answer a UI greys a button
+        /// out on.
+        /// </summary>
+        public bool CanUse(Entity ability)
+        {
+            if (ability == null) throw new ArgumentNullException(nameof(ability));
+            if (ability.Kind != EntityKind.Ability || ability.IsRemoved) return false;
+            if (ability.Owner == null || !ability.Owner.IsAlive) return false;
+            if (!IsReady(ability)) return false;
+
+            return !TargetRule.Of(ability.Definition).NeedsSomeone || LegalTargets(ability).Count > 0;
+        }
+
+        /// <summary>
+        /// Brings a fallen actor back at <paramref name="hp"/> hp, raising <c>revived</c>. Content
+        /// writes <c>revive Vestal 10</c>; this is the same thing from C#.
+        /// </summary>
+        /// <returns>True when the actor is alive afterwards. False for one that was never dead.</returns>
+        /// <remarks>
+        /// It exists because <c>heal</c> refuses a dead target, deliberately, and so there was no
+        /// way at all to put a fallen party member back on its feet.
+        /// </remarks>
+        public bool Revive(Entity actor, int hp = 1)
+        {
+            if (actor == null) throw new ArgumentNullException(nameof(actor));
+            if (!actor.IsDead || actor.IsRemoved) return false;
+
+            bool revived = false;
+            Run(State.Player, context => revived = Interpreter.Revive(actor, Num.FromInt(hp), context));
+            if (State.InBattle) CheckBattleOver();
+            return revived;
+        }
 
         /// <summary>Uses an ability if it is off cooldown.</summary>
         /// <returns>

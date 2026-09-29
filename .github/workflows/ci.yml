@@ -102,6 +102,17 @@ jobs:
       - name: Simulate samples/board
         run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- sim samples/board --runs 100
 
+      # A party of heroes: more than one actor on the player's side that the game asks for input,
+      # abilities that honour their own target line, an enemy that says who it is going to hit, and
+      # a battle that is lost only when the last member falls. A change that quietly went back to
+      # "the player is the party" would fail here rather than in somebody's game. There is no
+      # scenario: a bot plays the leader and nobody else, which is a later release's work.
+      - name: Lint samples/party
+        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- lint samples/party --warnings-as-errors
+
+      - name: DSL tests (samples/party)
+        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- test samples/party
+
       # Pack the two NuGet packages and follow docs/quickstart.md word for word against them, in an
       # empty folder. This is what a new user does first, so it is what must never break. Linux
       # only: the packages are the same on both, and the script is bash.

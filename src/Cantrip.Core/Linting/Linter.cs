@@ -65,7 +65,13 @@ namespace Cantrip.Linting
         public const string PercentageWhereACountIsMeant = "CT324";
         public const string WrongClock = "CT325";
 
-        // CT326 is the party work's `player` rule and is not ours to use.
+        /// <summary>
+        /// <c>player</c> written where a party member is meant. It is an error rather than a
+        /// warning because the alternative is a party game whose every enemy move hits one hero
+        /// forever, silently — and a silent wrong answer is the one class of change this project
+        /// has a written policy against.
+        /// </summary>
+        public const string PlayerWhereAMemberIsMeant = "CT326";
 
         public const string OffTheBoard = "CT327";
         public const string PlaceAssigned = "CT328";
@@ -74,6 +80,9 @@ namespace Cantrip.Linting
         public const string ReachWithoutATarget = "CT331";
         public const string ReachLimitsNothing = "CT332";
         public const string RowOfOne = "CT333";
+
+        /// <summary>A `turns:` or `order:` setting whose value this release does not implement.</summary>
+        public const string TurnSettingNotYetBuilt = "CT334";
 
         /// <summary>Below this many runs, a scenario's numbers move about from one run to the next (CT318).</summary>
         private const int FewRuns = 100;
@@ -298,6 +307,12 @@ namespace Cantrip.Linting
         private readonly HashSet<string> _tags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, CommandNode> _emitted = new Dictionary<string, CommandNode>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _listened = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Whether this content declares a <c>hero</c>. CT326 only applies to content that has a
+        /// party, because `player` is the right word everywhere else and always was.
+        /// </summary>
+        private bool _hasParty;
         private readonly HashSet<string> _calledVerbs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         private Linter(ContentLibrary content, LintOptions? options)
@@ -334,6 +349,7 @@ namespace Cantrip.Linting
                 CheckPositionReads(body);
                 CheckSpatialSelectors(body);
                 CheckRowSelectors(body);
+                CheckPlayerInAParty(body);
             }
 
             foreach (EntityDefinition definition in _content.Definitions) CheckReach(definition);
@@ -437,6 +453,8 @@ namespace Cantrip.Linting
 
         private void CollectGlobalFacts()
         {
+            _hasParty = _content.Definitions.Any(d => d.IsHero);
+
             // Verbs: everything a runtime would register, plus content, host and (in tests) test verbs.
             var probe = new CardRuntime(_content);
             _verbs.UnionWith(probe.Interpreter.VerbNames);
@@ -1055,6 +1073,68 @@ namespace Cantrip.Linting
         }
 
         /// <summary>
+        /// CT326: <c>player</c> written inside an enemy's move or a card's or ability's effect, in
+        /// content that has a party.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <c>player</c> means exactly one entity and always will: the party's leader, the one
+        /// <c>CreatePlayer</c> made, the one that holds the run's relics and gold. In a game with no
+        /// <c>hero</c> that is the whole party, so the word is never wrong and this check never
+        /// fires. In a game with a party it is almost always the wrong word in these three places:
+        /// <c>deal 5 to player</c> in an enemy move hits the leader however carefully the enemy
+        /// telegraphed somebody else, and it does it quietly.
+        /// </para>
+        /// <para>
+        /// So it is an error, not a warning. It costs nothing to content that has no party,
+        /// because it only applies to content that declares a <c>hero</c>, and the three words that
+        /// do what was meant are in the message: <c>target</c> for who this action is aimed at,
+        /// <c>leader</c> for the run's own actor when that really is who is meant, and <c>party</c>
+        /// for all of them.
+        /// </para>
+        /// <para>
+        /// Everywhere else <c>player</c> stays legal and stays right: a relic's listener, a run's
+        /// gold, a test's own lines, a scenario's setup. The rule is about the three bodies where
+        /// somebody is being acted on, not about the word.
+        /// </para>
+        /// </remarks>
+        private void CheckPlayerInAParty(Body body)
+        {
+            if (!_hasParty) return;
+
+            string? place = PartyBody(body);
+            if (place == null) return;
+
+            foreach (NameExpr name in body.Facts.Names)
+            {
+                if (!string.Equals(name.Name, "player", StringComparison.OrdinalIgnoreCase)) continue;
+                if (body.Facts.Locals.Contains(name.Name)) continue;
+
+                Error(
+                    PlayerWhereAMemberIsMeant,
+                    $"`player` in {place} means the party's leader, not the member being acted on, and this content has a party. " +
+                    "Write `target` for whoever this is aimed at, `leader` if the run's own actor really is meant, or `party` for all of them.",
+                    name.Span,
+                    "target");
+            }
+        }
+
+        /// <summary>
+        /// Which of the three bodies CT326 is about this is, in words for the message, or null when
+        /// it is none of them. An enemy's move, a card's effect, an ability's effect: the places
+        /// where a line acts on somebody and the somebody is settled by the rules, not by the word.
+        /// </summary>
+        private static string? PartyBody(Body body)
+        {
+            if (body.Kind != BodyKind.Effect || body.Owner == null || !(body.Anchor is BlockMemberNode block)) return null;
+
+            string kind = body.Owner.KindName.ToLowerInvariant();
+            if (kind == "enemy" && block.Name == "move") return "an enemy's move";
+            if (block.Name != "effect") return null;
+            return kind == "card" ? "a card's effect" : kind == "ability" ? "an ability's effect" : null;
+        }
+
+        /// <summary>
         /// CT323: a named clause a built-in verb does not read. The parser knows the clause words
         /// and attaches no meaning to them, so one a verb does not read used to be dropped in
         /// silence: <c>block 8 for 2 turns</c> gave ordinary block, <c>apply Poison 3 at target</c>
@@ -1412,6 +1492,14 @@ namespace Cantrip.Linting
                 {
                     if (argument is BinaryExpr { Operator: BinaryOperator.On }) aimed.Add(argument);
                 }
+
+                // `play Cleanse by Sister on Templar`: `on` is an operator and `by` is a clause, so
+                // the aim lands inside the clause's own value. It is still an aim, and reading it
+                // as "that many stacks of the status Sister" is how it used to be reported.
+                foreach (ClauseNode clause in command.Clauses)
+                {
+                    if (clause.Value is BinaryExpr { Operator: BinaryOperator.On }) aimed.Add(clause.Value);
+                }
             }
 
             foreach (BinaryExpr on in body.Facts.OnExpressions)
@@ -1484,6 +1572,12 @@ namespace Cantrip.Linting
                         break;
                     case "grant":
                         RequireDefinitions(body, TestNames(command), "ability");
+                        break;
+
+                    // `hero Crusader hp 30`: the name always comes first, and what follows it is
+                    // stat pairs, so only the first word is a definition to look up.
+                    case "hero" when body.Kind == BodyKind.Test:
+                        RequireDefinition(body, command.Arguments.FirstOrDefault(), "hero");
                         break;
                     case "battle" when body.Kind == BodyKind.Scenario:
                         RequireDefinitions(body, TestNames(command), "enemy");

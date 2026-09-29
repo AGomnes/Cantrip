@@ -19,7 +19,7 @@ namespace Cantrip.Testing
     /// <summary>
     /// The half of a <c>test</c> or a <c>scenario</c> that builds the game up: the verbs
     /// <c>enemy</c>, <c>player</c>, <c>hand</c>, <c>deck</c>, <c>discard_pile</c>, <c>relic</c>,
-    /// <c>seed</c>, <c>answer</c>, <c>realtime</c> and <c>grant</c>, registered on a runtime, and
+    /// <c>seed</c>, <c>answer</c>, <c>realtime</c> and <c>board</c>, registered on a runtime, and
     /// the statement loop that runs a line. A test adds <c>play</c>, <c>end turn</c>, <c>cast</c>,
     /// <c>tick</c> and <c>expect</c> on top; what plays a scenario adds <c>battle</c> instead. Both
     /// get the same setup, so a line cannot mean one thing in a test and another in a scenario.
@@ -39,6 +39,7 @@ namespace Cantrip.Testing
         private readonly ScriptedChooser _chooser;
         private readonly EvalContext _context;
         private int _enemies;
+        private int _heroes;
 
         /// <param name="runtime">The runtime to set up. Its player is made here if it has none.</param>
         /// <param name="chooser">Where <c>answer</c> queues its answers. Give the runtime the same one.</param>
@@ -84,7 +85,12 @@ namespace Cantrip.Testing
             ("answer", s => call => { foreach (string name in Names(call)) s._chooser.Enqueue(name); }),
             ("realtime", s => _ => { }),
             ("board", s => s.Board),
-            ("grant", s => call => { foreach (string name in Names(call)) s._runtime.GrantAbility(s.Defined(name, call.Span, "ability", "ability"), s.State.Player!); }),
+            ("hero", s => s.Hero),
+
+            // `grant` is not here. It used to be a verb only a test had; it is a rule verb now, and
+            // `grant Cleave` with nothing after it means the same thing to the rules as it meant
+            // here — the ability goes to whoever is running the line, which in a test's setup is
+            // the leader. One word, one meaning, and one fewer thing for a test to shadow.
         };
 
         /// <summary><c>enemy hp 6</c>, <c>enemy "Jaw Worm"</c>, <c>enemy Slime hp 12 Poison 3</c>.</summary>
@@ -139,6 +145,28 @@ namespace Cantrip.Testing
             _enemies++;
             if (_enemies == 1) _context.SetLocal("enemy", Value.FromEntity(enemy));
             _context.SetLocal("enemy" + _enemies, Value.FromEntity(enemy));
+        }
+
+        /// <summary>
+        /// <c>hero Crusader</c>, <c>hero Vestal hp 20</c>: adds a party member from a <c>hero</c>
+        /// declaration, with its abilities. Binds <c>hero1</c>, <c>hero2</c>… and <c>hero</c> for
+        /// the first — and the member's own name, so <c>expect Vestal.hp == 28</c> reads the live
+        /// hero rather than the printed stat on its definition, which is what a bare content name
+        /// otherwise means.
+        /// </summary>
+        private void Hero(VerbCall call)
+        {
+            IReadOnlyList<ExprNode> nodes = call.Node.Arguments;
+            string? named = nodes.Count > 0 ? nodes[0] switch { NameExpr n => n.Name, StringExpr s => s.Value, _ => null } : null;
+            if (named == null) throw Fail("`hero` needs the name of a hero, as in `hero Crusader`.", call.Span);
+
+            Entity member = _runtime.AddHero(Defined(named, call.Span, "hero", "hero"));
+            SetStats(member, call, 1);
+
+            _heroes++;
+            if (_heroes == 1) _context.SetLocal("hero", Value.FromEntity(member));
+            _context.SetLocal("hero" + _heroes, Value.FromEntity(member));
+            _context.SetLocal(member.Name, Value.FromEntity(member));
         }
 
         /// <summary><c>board "Floor"</c>: fights the rest of this test on a board content declares.</summary>
