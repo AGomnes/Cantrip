@@ -93,8 +93,10 @@ namespace Cantrip.Runtime
         Sides,
 
         /// <summary>
-        /// Every combatant takes its step in one order across both sides. Not in this release; the
-        /// word is here so content can be read, and writing it is refused rather than ignored.
+        /// Every combatant takes its step in one order across both sides, so a hero acts between two
+        /// enemies. Each one's <c>turn_start</c> and <c>turn_end</c> fire at its own step, which is
+        /// the natural reading of "at the start of your turn"; the round ends when every living
+        /// combatant has taken one, and only then does <c>State.Turn</c> move.
         /// </summary>
         Initiative,
     }
@@ -108,7 +110,11 @@ namespace Cantrip.Runtime
         /// </summary>
         Position,
 
-        /// <summary>By the <c>speed</c> stat, descending. Not in this release.</summary>
+        /// <summary>
+        /// By the <c>speed</c> stat, descending; ties broken by where they stand and then by id, so
+        /// the order is total and two runs agree. An actor with no <c>speed</c> reads 0, which is
+        /// why a game that never writes the stat gets position order under another name.
+        /// </summary>
         Speed,
     }
 
@@ -276,19 +282,17 @@ namespace Cantrip.Runtime
 
                     case "turns":
                         if (words.Contains("sides") || words.Contains("side")) rules.Turns = TurnMode.Sides;
-                        else if (words.Contains("initiative"))
-                            diagnostics.Error("CT334", "`turns: initiative` is not in this release. Every combatant taking its own step in one interleaved order is the half a later release adds; write `turns: sides`, where the party acts and then the enemies do.", setting.Span, "sides");
+                        else if (words.Contains("initiative")) rules.Turns = TurnMode.Initiative;
                         else
-                            diagnostics.Error("CT0202", $"Unknown value `{string.Join(" ", words)}` for `turns`. Write `turns: sides`.", setting.Span,
+                            diagnostics.Error("CT0202", $"Unknown value `{string.Join(" ", words)}` for `turns`. Write `turns: sides` or `turns: initiative`.", setting.Span,
                                 Suggest.Closest(words.FirstOrDefault() ?? string.Empty, new[] { "sides", "initiative" }));
                         break;
 
                     case "order":
                         if (words.Contains("position") || words.Contains("rank")) rules.Order = PartyOrder.Position;
-                        else if (words.Contains("speed"))
-                            diagnostics.Error("CT334", "`order: speed` is not in this release. Ordering the party by a `speed` stat is the half a later release adds; write `order: position`, which is where the members stand.", setting.Span, "position");
+                        else if (words.Contains("speed")) rules.Order = PartyOrder.Speed;
                         else
-                            diagnostics.Error("CT0202", $"Unknown value `{string.Join(" ", words)}` for `order`. Write `order: position`.", setting.Span,
+                            diagnostics.Error("CT0202", $"Unknown value `{string.Join(" ", words)}` for `order`. Write `order: position` or `order: speed`.", setting.Span,
                                 Suggest.Closest(words.FirstOrDefault() ?? string.Empty, new[] { "position", "speed" }));
                         break;
 

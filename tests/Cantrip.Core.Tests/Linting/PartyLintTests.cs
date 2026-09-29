@@ -7,9 +7,9 @@ using Xunit;
 namespace Cantrip.Tests.Linting
 {
     /// <summary>
-    /// CT326 and CT334: the two things the party added to the linter. CT326 is the rule that keeps
-    /// <c>player</c> honest in a game that has a party; CT334 is the answer a designer gets for a
-    /// turn setting whose value this release does not implement yet.
+    /// CT326 and CT335: the two things the party added to the linter. CT326 is the rule that keeps
+    /// <c>player</c> honest in a game that has a party; CT335 is what a designer is told when a
+    /// turn order is written into a game whose clock has no turns to order.
     /// </summary>
     public sealed class PartyLintTests
     {
@@ -115,28 +115,39 @@ namespace Cantrip.Tests.Linting
                 """, Linter.PlayerWhereAMemberIsMeant));
         }
 
-        // CT334 ----------------------------------------------------------------------------------
-
-        [Theory]
-        [InlineData("turns: initiative", "sides")]
-        [InlineData("order: speed", "position")]
-        public void A_turn_setting_this_release_does_not_implement_says_so(string setting, string instead)
-        {
-            ContentLibrary library = ContentLibrary.FromText("ruleset\n  " + setting + "\n");
-
-            Diagnostic error = Assert.Single(library.Diagnostics, d => d.Code == Linter.TurnSettingNotYetBuilt);
-            Assert.Equal(DiagnosticSeverity.Error, error.Severity);
-            Assert.Contains("not in this release", error.Message);
-            Assert.Equal(instead, error.Suggestion);
-        }
+        // CT335 ----------------------------------------------------------------------------------
 
         [Theory]
         [InlineData("turns: sides")]
+        [InlineData("turns: initiative")]
         [InlineData("order: position")]
-        public void The_settings_this_release_does_implement_are_accepted(string setting)
+        [InlineData("order: speed")]
+        public void Every_turn_setting_is_accepted_on_a_turn_clock(string setting)
         {
-            ContentLibrary library = ContentLibrary.FromText("ruleset\n  " + setting + "\n");
-            Assert.DoesNotContain(library.Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
+            Assert.Empty(Coded("ruleset\n  clock turns\n  " + setting + "\n", Linter.TurnOrderWithoutTurns));
+            Assert.DoesNotContain(ContentLibrary.FromText("ruleset\n  clock turns\n  " + setting + "\n").Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
+        }
+
+        [Theory]
+        [InlineData("turns: initiative", "never fire")]
+        [InlineData("turns: sides", "never fire")]
+        [InlineData("order: speed", "continuous time")]
+        public void A_turn_order_in_a_game_with_no_turns_says_so(string setting, string because)
+        {
+            Diagnostic error = Assert.Single(Coded("ruleset\n  clock ticks\n  " + setting + "\n", Linter.TurnOrderWithoutTurns));
+            Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+            Assert.Contains("clock ticks", error.Message);
+            Assert.Contains(because, error.Message);
+        }
+
+        /// <summary>
+        /// A game that says nothing about its clock is a turn game, where the setting is not idle,
+        /// so nothing is reported and content that never mentions a clock is left alone.
+        /// </summary>
+        [Fact]
+        public void A_turn_order_with_no_clock_stated_is_left_alone()
+        {
+            Assert.Empty(Coded("ruleset\n  turns: initiative\n", Linter.TurnOrderWithoutTurns));
         }
 
         /// <summary>

@@ -2,6 +2,10 @@
 
 enemy "Slime"
   hp 30
+
+  # `to target` rather than `to player`: the move hits whoever it telegraphed against, which for a
+  # party of one is the leader and so is the same blow it always was. With a Scout standing beside
+  # the leader it is whichever of them the Slime named, and `DescribeIntent` says which.
   move "Swipe":
-    deal 4 to player
+    deal 4 to target
   pattern cycle Swipe

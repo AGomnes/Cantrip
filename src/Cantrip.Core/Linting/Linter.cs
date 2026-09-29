@@ -81,8 +81,12 @@ namespace Cantrip.Linting
         public const string ReachLimitsNothing = "CT332";
         public const string RowOfOne = "CT333";
 
-        /// <summary>A `turns:` or `order:` setting whose value this release does not implement.</summary>
-        public const string TurnSettingNotYetBuilt = "CT334";
+        /// <summary>
+        /// A turn order written into a game whose clock has no turns. CT334 was the `turns:` and
+        /// `order:` values the first party release had not built yet; both are built, and a value
+        /// nothing recognises is already CT0202, so the code was retired rather than re-used.
+        /// </summary>
+        public const string TurnOrderWithoutTurns = "CT335";
 
         /// <summary>Below this many runs, a scenario's numbers move about from one run to the next (CT318).</summary>
         private const int FewRuns = 100;
@@ -661,6 +665,8 @@ namespace Cantrip.Linting
             ClockKind declared = _content.BuildRuleset(new DiagnosticBag()).Clock;
             if (declared == ClockKind.Unstated) return;
 
+            CheckTurnOrder(declared);
+
             IGameClock clock = declared == ClockKind.Ticks ? new TickClock() : (IGameClock)new TurnClock();
             string stated = declared == ClockKind.Ticks ? "ticks" : "turns";
             string measures = declared == ClockKind.Ticks
@@ -702,6 +708,32 @@ namespace Cantrip.Linting
                 {
                     if (schedule.Delay is NumberExpr delay) Check(delay.Value, delay.Unit, delay.Span, "This delay");
                 }
+            }
+        }
+
+        /// <summary>
+        /// CT335: <c>turns:</c> or <c>order:</c> in a game that says <c>clock ticks</c>. Both say how
+        /// a turn is shared out, and a real-time game has no turns to share: <c>turn_start</c> and
+        /// <c>turn_end</c> never fire there, and the engine ignores both settings. Written on a tick
+        /// clock, <c>turns: initiative</c> asks for an interleaved order that will never run and
+        /// says so nowhere, which is the same silence CT325 exists for.
+        /// </summary>
+        private void CheckTurnOrder(ClockKind declared)
+        {
+            if (declared != ClockKind.Ticks || _content.RulesetSyntax is not RulesetDeclNode ruleset) return;
+
+            foreach (PropertyNode setting in ruleset.Settings)
+            {
+                bool turns = string.Equals(setting.Name, "turns", StringComparison.OrdinalIgnoreCase);
+                if (!turns && !string.Equals(setting.Name, "order", StringComparison.OrdinalIgnoreCase)) continue;
+
+                Error(TurnOrderWithoutTurns,
+                    $"`{setting.Name}:` says how a turn is shared out, and this game says `clock ticks`, so it has none. " +
+                    (turns
+                        ? "`turns: initiative` cannot interleave steps that never happen: `turn_start` and `turn_end` never fire on a tick clock. "
+                        : "There is no order to offer the party in: in continuous time every member acts whenever its abilities are ready. ") +
+                    $"Drop the `{setting.Name}:` line, or say `clock turns` if this game does take turns.",
+                    setting.Span);
             }
         }
 

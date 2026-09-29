@@ -151,8 +151,12 @@ namespace Cantrip.GodotAdapter
             string flavour,
             SegmentView? cost,
             IReadOnlyList<SegmentView> segments,
-            IReadOnlyList<TooltipView> tooltips)
+            IReadOnlyList<TooltipView> tooltips,
+            string against,
+            string line)
         {
+            Against = against;
+            Line = line;
             Name = name;
             Level = level;
             Plain = plain;
@@ -182,6 +186,18 @@ namespace Cantrip.GodotAdapter
         public IReadOnlyList<SegmentView> Segments { get; }
 
         public IReadOnlyList<TooltipView> Tooltips { get; }
+
+        /// <summary>
+        /// Who this is aimed at, by name: the member an enemy is telegraphing against. Empty for
+        /// everything that has no target of its own, which is every description but a rolled intent.
+        /// </summary>
+        public string Against { get; }
+
+        /// <summary>
+        /// The whole thing on one line, as an intent panel shows it: "Cutthroat → Vestal: Deal 8
+        /// damage and apply 2 Bleeding." For a card it is its name and its text.
+        /// </summary>
+        public string Line { get; }
 
         /// <summary>True when there is nothing to show, as for an intent before it has been rolled.</summary>
         public bool IsEmpty => Plain.Length == 0;
@@ -214,7 +230,9 @@ namespace Cantrip.GodotAdapter
                 description.Flavour ?? string.Empty,
                 description.Cost == null ? null : SegmentView.Of(description.Cost, forOpponent),
                 segments.Count == 0 ? NoSegments : segments,
-                tooltips ?? NoTooltips);
+                tooltips ?? NoTooltips,
+                description.Against ?? string.Empty,
+                description.ToLine());
         }
 
         /// <summary>

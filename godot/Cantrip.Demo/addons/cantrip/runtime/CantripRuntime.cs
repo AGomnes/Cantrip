@@ -230,6 +230,29 @@ namespace Cantrip.GodotAdapter
             return core.CreatePlayer(name, hp, max_energy).Id;
         }
 
+        /// <summary>
+        /// Adds a party member from a <c>hero</c> declaration, with the abilities its
+        /// <c>abilities</c> line grants, and returns its id. 0 when nothing of that name is
+        /// declared as a <c>hero</c>.
+        /// </summary>
+        /// <param name="hp">
+        /// Overrides the health its content declares when positive; 0 takes the content's own, as
+        /// it does nowhere else on this node, because a hero with no health is not a thing a party
+        /// can be asked for and there is no negative convention to preserve here.
+        /// </param>
+        /// <remarks>
+        /// The leader <see cref="CreatePlayer"/> made is already a member, so a party of four is one
+        /// <c>CreatePlayer</c> and three of these.
+        /// </remarks>
+        public int AddHero(string name, int hp = 0)
+        {
+            CardRuntime core = EnsureRuntime();
+            _loop.Guard();
+            if (Content.Find(name ?? string.Empty, "hero") == null) return VariantMap.NoEntity;
+
+            return Act(() => core.AddHero(name!, hp > 0 ? (int?)hp : null).Id);
+        }
+
         public int AddCard(string name, string zone = Zones.Draw)
         {
             CardRuntime core = EnsureRuntime();
@@ -383,27 +406,76 @@ namespace Cantrip.GodotAdapter
         /// "unplayable", "not_enough_energy", "invalid_target" or "cancelled"; "pending" means the
         /// rules need a decision and a <c>choice_requested</c> signal is on its way.
         /// </summary>
-        public string Play(int card_id, int target_id = 0)
+        public string Play(int card_id, int target_id = 0) => PlayBy(card_id, target_id, VariantMap.NoEntity);
+
+        /// <summary>
+        /// The same play, made by a named party member: the one whose <c>source</c> the card's
+        /// effect reads, whose damage it is and whose statuses apply to it. The cost still comes out
+        /// of the card owner's pool, because those are the owner's cards. A <paramref name="by_id"/>
+        /// of 0 is <see cref="Play"/>, and for a party of one the two are the same actor.
+        /// </summary>
+        /// <remarks>
+        /// A method of its own rather than a third parameter on <see cref="Play"/>, for the reason
+        /// <c>docs/godot.md</c> states at the top: a C# default argument is not a default in
+        /// GDScript, so every parameter has to be passed. Adding one to <see cref="Play"/> would
+        /// have broken every <c>rules.Play(card, target)</c> written against a preview — and
+        /// <see cref="Play"/> is not ambiguous for a party the way <c>GetHand</c> was, because a
+        /// card played with nobody named is played by whoever owns it, which is a definite answer.
+        /// It is the same reasoning that gave <see cref="Pass"/> its own name beside
+        /// <see cref="EndTurn"/>.
+        /// </remarks>
+        public string PlayBy(int card_id, int target_id, int by_id)
         {
             CardRuntime core = EnsureRuntime();
             Entity? card = core.State.Find(card_id);
             if (card == null) return Words.ActionName(ActionResult.NotACard);
 
             Entity? target = target_id == VariantMap.NoEntity ? null : core.State.Find(target_id);
-            return Act(() => Words.ActionName(core.Play(card, target)));
+            Entity? by = by_id == VariantMap.NoEntity ? null : core.State.Find(by_id);
+            return Act(() => Words.ActionName(core.Play(card, target, by)));
         }
 
         /// <summary>Plays the first card of that name in hand, for a game that thinks in names.</summary>
-        public string PlayNamed(string card_name, int target_id = 0)
+        public string PlayNamed(string card_name, int target_id = 0) => PlayNamedBy(card_name, target_id, VariantMap.NoEntity);
+
+        /// <summary>
+        /// The same, by a named member: the card is looked for in that member's own hand first and
+        /// then in the party's. <see cref="PlayBy"/> says why this is a method rather than a third
+        /// parameter.
+        /// </summary>
+        public string PlayNamedBy(string card_name, int target_id, int by_id)
         {
             CardRuntime core = EnsureRuntime();
             Entity? target = target_id == VariantMap.NoEntity ? null : core.State.Find(target_id);
-            return Act(() => Words.ActionName(core.Play(card_name, target)));
+            Entity? by = by_id == VariantMap.NoEntity ? null : core.State.Find(by_id);
+            return Act(() => Words.ActionName(core.Play(card_name, target, by)));
         }
 
+        /// <summary>
+        /// Ends the party's turn: every member that has not acted gives its step up and the enemies
+        /// answer. <see cref="Pass"/> is the same thing for one member.
+        /// </summary>
         public void EndTurn() => Act(() =>
         {
             EnsureRuntime().EndTurn();
+            return true;
+        });
+
+        /// <summary>
+        /// That member is done for this turn. When the last one that could act has passed, the
+        /// party's turn ends and the enemies take theirs, so for a party of one this is
+        /// <see cref="EndTurn"/>. Does nothing when the id names nobody or names somebody who is
+        /// not a party member.
+        /// </summary>
+        /// <remarks>
+        /// Void, like <see cref="EndTurn"/>, whose per-member form this is: what a game does with a
+        /// turn that stopped to ask a question is read from <see cref="HasPendingChoice"/>, not from
+        /// a return value.
+        /// </remarks>
+        public void Pass(int actor_id) => Act(() =>
+        {
+            CardRuntime core = EnsureRuntime();
+            if (core.State.Find(actor_id) is Entity member && member.IsPartyMember) core.Pass(member);
             return true;
         });
 
@@ -488,11 +560,70 @@ namespace Cantrip.GodotAdapter
 
         public int PlayerId() => EnsureRuntime().Player?.Id ?? VariantMap.NoEntity;
 
+        /// <summary>
+        /// The living party, in the order the engine offers its members: the actors this game asks
+        /// for input. A game that declares no <c>hero</c> gets one id, <see cref="PlayerId"/>.
+        /// </summary>
+        /// <remarks>
+        /// Not the same as <see cref="GetAllies"/>, which is everyone on the side — a summoned
+        /// minion is an ally and takes no step.
+        /// </remarks>
+        public Godot.Collections.Array GetParty() => VariantMap.Ids(EnsureRuntime().Party);
+
+        /// <summary>
+        /// The member whose step it is, or 0 when none of the party's is: outside a battle, on the
+        /// enemies' turn, and once every member has acted.
+        /// </summary>
+        /// <remarks>
+        /// Under <c>turns: initiative</c> it is binding and a game drives its turn off it. Under
+        /// <c>turns: sides</c> the party shares one turn and may act in any order, so this is the
+        /// one the engine would offer next — a suggestion for a UI to highlight. The rule is
+        /// <see cref="CanAct"/>, which is true of every waiting member there.
+        /// </remarks>
+        public int ActiveMemberId() => EnsureRuntime().ActiveMember?.Id ?? VariantMap.NoEntity;
+
+        /// <summary>
+        /// Whether this member still has a step this turn. False for an id that names nobody, for
+        /// anyone who is not a party member, and for a member that has already passed.
+        /// </summary>
+        public bool CanAct(int actor_id)
+        {
+            CardRuntime core = EnsureRuntime();
+            return core.State.Find(actor_id) is Entity member && member.IsPartyMember && core.CanAct(member);
+        }
+
+        /// <summary>
+        /// Whether <see cref="UseAbility"/> would fire this one now: off cooldown, affordable, and
+        /// with something legal to aim at if it needs one. False for an id that is not an ability.
+        /// </summary>
+        public bool CanUse(int ability_id)
+        {
+            CardRuntime core = EnsureRuntime();
+            return core.State.Find(ability_id) is Entity ability && ability.Kind == EntityKind.Ability && core.CanUse(ability);
+        }
+
+        /// <summary>
+        /// Brings a fallen actor back at <paramref name="hp"/> health and returns whether it rose.
+        /// False for an id that names nobody, for somebody already alive, and when content cancelled
+        /// the <c>revived</c> event.
+        /// </summary>
+        /// <remarks>
+        /// It is its own call because <c>heal</c> refuses a dead target and always will: healing a
+        /// corpse would make every drain and every regeneration a resurrection.
+        /// </remarks>
+        public bool Revive(int actor_id, int hp = 1)
+        {
+            CardRuntime core = EnsureRuntime();
+            if (!(core.State.Find(actor_id) is Entity actor)) return false;
+            return Act(() => core.Revive(actor, hp));
+        }
+
         /// <summary>Everything a UI shows about one entity. Empty when the id is unknown.</summary>
         public Godot.Collections.Dictionary GetEntity(int entity_id)
         {
-            Entity? entity = EnsureRuntime().State.Find(entity_id);
-            return entity == null ? new Godot.Collections.Dictionary() : VariantMap.Entity(EntityView.Of(entity));
+            CardRuntime core = EnsureRuntime();
+            Entity? entity = core.State.Find(entity_id);
+            return entity == null ? new Godot.Collections.Dictionary() : VariantMap.Entity(EntityView.Of(entity, null, core.State));
         }
 
         /// <summary>One stat after modifiers, which is the number the rules would use now.</summary>
@@ -555,7 +686,16 @@ namespace Cantrip.GodotAdapter
             return VariantMap.Description(DescriptionView.Of(Describer().Describe(entity, core, target)));
         }
 
-        /// <summary>What an enemy will do next. Empty until intents have been rolled.</summary>
+        /// <summary>
+        /// What an enemy will do next, and who to. Empty until intents have been rolled.
+        /// </summary>
+        /// <remarks>
+        /// Beside the keys every description has, this one's <c>target</c> is the member it is
+        /// telegraphing against and <c>target_name</c> is that member's name, with <c>line</c>
+        /// reading "Cutthroat → Vestal: Deal 8 damage and apply 2 Bleeding." The target is asked
+        /// afresh on every call, so a taunt applied since the intent was rolled has already moved
+        /// it, with no event to listen for and no second roll.
+        /// </remarks>
         public Godot.Collections.Dictionary DescribeIntent(int enemy_id)
         {
             CardRuntime core = EnsureRuntime();
@@ -563,7 +703,9 @@ namespace Cantrip.GodotAdapter
             if (enemy == null) return new Godot.Collections.Dictionary();
 
             // Read by the player the move is aimed at, so a bigger number is worse news, not better.
-            return VariantMap.Description(DescriptionView.Of(Describer().DescribeIntent(enemy, core), forOpponent: true));
+            return VariantMap.Description(
+                DescriptionView.Of(Describer().DescribeIntent(enemy, core), forOpponent: true),
+                core.IntentTargetOf(enemy)?.Id ?? VariantMap.NoEntity);
         }
 
         /// <summary>

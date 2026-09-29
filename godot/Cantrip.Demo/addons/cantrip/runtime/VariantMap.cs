@@ -92,6 +92,8 @@ namespace Cantrip.GodotAdapter
                 ["intent"] = view.Intent,
                 ["owner"] = view.Owner,
                 ["source"] = view.Source,
+                ["party_member"] = view.PartyMember,
+                ["acted"] = view.Acted,
                 ["tags"] = Strings(view.Tags),
                 ["stats"] = stats,
                 ["statuses"] = statuses,
@@ -117,7 +119,11 @@ namespace Cantrip.GodotAdapter
 
         // Descriptions ---------------------------------------------------------------------------
 
-        public static Godot.Collections.Dictionary Description(DescriptionView view)
+        /// <param name="targetId">
+        /// Who the description is aimed at, for an intent. <see cref="NoEntity"/> everywhere else,
+        /// so every description dictionary has the same keys whatever made it.
+        /// </param>
+        public static Godot.Collections.Dictionary Description(DescriptionView view, int targetId = NoEntity)
         {
             if (view == null) throw new ArgumentNullException(nameof(view));
 
@@ -141,6 +147,9 @@ namespace Cantrip.GodotAdapter
             {
                 ["cost"] = view.Cost == null ? default(Variant) : Segment(view.Cost),
                 ["name"] = view.Name,
+                ["target"] = targetId,
+                ["target_name"] = view.Against,
+                ["line"] = view.Line,
                 ["level"] = view.Level,
                 ["plain"] = view.Plain,
                 ["bbcode"] = view.BBCode,

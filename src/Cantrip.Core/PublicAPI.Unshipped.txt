@@ -84,7 +84,8 @@ Cantrip.CardRuntime.Answer(System.Collections.Generic.IEnumerable<int>! entityId
 Cantrip.CardRuntime.EndTurn() -> Cantrip.ActionResult
 Cantrip.CardRuntime.Execute(string! statements, Cantrip.Runtime.Entity? self = null, Cantrip.Runtime.Entity? target = null) -> Cantrip.ActionResult
 *REMOVED*Cantrip.CardRuntime.Play(Cantrip.Runtime.Entity! card, Cantrip.Runtime.Entity? target = null) -> Cantrip.ActionResult
-Cantrip.CardRuntime.Play(string! cardName, Cantrip.Runtime.Entity? target = null) -> Cantrip.ActionResult
+*REMOVED*Cantrip.CardRuntime.Play(string! cardName, Cantrip.Runtime.Entity? target = null) -> Cantrip.ActionResult
+Cantrip.CardRuntime.Play(string! cardName, Cantrip.Runtime.Entity? target = null, Cantrip.Runtime.Entity? performer = null) -> Cantrip.ActionResult
 Cantrip.CardRuntime.StartBattle(bool shuffle = true, bool drawOpeningHand = true, string? board = null) -> Cantrip.ActionResult
 Cantrip.CardRuntime.UseAbility(Cantrip.Runtime.Entity! ability, Cantrip.Runtime.Entity? target = null) -> Cantrip.ActionResult
 *REMOVED*Cantrip.Content.Scenario
@@ -264,4 +265,10 @@ Cantrip.Runtime.TurnMode.Initiative = 1 -> Cantrip.Runtime.TurnMode
 Cantrip.Runtime.TurnMode.Sides = 0 -> Cantrip.Runtime.TurnMode
 const Cantrip.Runtime.BuiltinEvents.Revived = "revived" -> string!
 const Cantrip.Linting.Linter.PlayerWhereAMemberIsMeant = "CT326" -> string!
-const Cantrip.Linting.Linter.TurnSettingNotYetBuilt = "CT334" -> string!
+const Cantrip.Linting.Linter.TurnOrderWithoutTurns = "CT335" -> string!
+Cantrip.Runtime.GameState.TurnOrder.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.Runtime.GameState.HasActed(Cantrip.Runtime.Entity! actor) -> bool
+Cantrip.Descriptions.Description.Against.get -> string?
+Cantrip.Descriptions.Description.ToLine() -> string!
+*REMOVED*Cantrip.Descriptions.DescriptionBuilder.DescribeMove(Cantrip.Content.EntityDefinition! definition, string! moveName, Cantrip.CardRuntime? runtime = null, Cantrip.Runtime.Entity? enemy = null) -> Cantrip.Descriptions.Description!
+Cantrip.Descriptions.DescriptionBuilder.DescribeMove(Cantrip.Content.EntityDefinition! definition, string! moveName, Cantrip.CardRuntime? runtime = null, Cantrip.Runtime.Entity? enemy = null, Cantrip.Runtime.Entity? against = null) -> Cantrip.Descriptions.Description!

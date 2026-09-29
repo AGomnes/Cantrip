@@ -47,7 +47,11 @@ hero "Vestal"
   hp 28
   abilities Mend, Judgement
 
+# A cooldown, because without one it is a free unlimited nuke: a bot simply casts it six times and
+# ends the fight on turn one, which is what `cantrip sim samples/party` reported the first time it
+# was run against this file.
 ability "Smite"
+  cooldown 1 turns
   target enemy
   effect:
     deal 9 to target

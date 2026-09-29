@@ -114,9 +114,14 @@ namespace Cantrip.Sim
             if (runtime == null) throw new ArgumentNullException(nameof(runtime));
             if (trials == null) throw new ArgumentNullException(nameof(trials));
 
+            Party.EachMember(runtime, member => PlayFor(runtime, member, trials, log));
+        }
+
+        private void PlayFor(CardRuntime runtime, Entity member, Trials trials, Action<string>? log)
+        {
             for (int guard = 0; guard < MaxPlaysPerTurn && runtime.Won == null; guard++)
             {
-                List<Option> options = Options.Legal(runtime);
+                List<Option> options = Options.Legal(runtime, member);
                 if (options.Count == 0) return;
 
                 // Nothing can be tried while an effect is resolving or a block is waiting that a
@@ -177,7 +182,11 @@ namespace Cantrip.Sim
             if (runtime.Won == true) return Won;
             if (runtime.Won == false) return -Won;
 
-            double score = 1.5 * runtime.Player!.GetInt("hp");
+            // The party's hp against the enemies'. For a party of one that is the leader's hp and
+            // the sum it always was. For a party of four it is a worse heuristic, not a better one,
+            // which is why a party scenario's `wins`, `hp_left` and `turns` are reported unchecked.
+            double score = 0;
+            foreach (Entity member in runtime.Party) score += 1.5 * member.GetInt("hp");
             foreach (Entity enemy in runtime.State.Actors(Team.Enemy)) score -= enemy.GetInt("hp");
             return score;
         }
@@ -211,14 +220,17 @@ namespace Cantrip.Sim
         {
             if (runtime == null) throw new ArgumentNullException(nameof(runtime));
 
-            for (int guard = 0; guard < MaxPlaysPerTurn && runtime.Won == null; guard++)
+            Party.EachMember(runtime, member =>
             {
-                List<Option> options = Options.Legal(runtime);
-                if (options.Count == 0) return;
+                for (int guard = 0; guard < MaxPlaysPerTurn && runtime.Won == null; guard++)
+                {
+                    List<Option> options = Options.Legal(runtime, member);
+                    if (options.Count == 0) return;
 
-                _rng.Shuffle(options);
-                if (!Options.TakeAny(runtime, options, log)) return;
-            }
+                    _rng.Shuffle(options);
+                    if (!Options.TakeAny(runtime, options, log)) return;
+                }
+            });
         }
     }
 }

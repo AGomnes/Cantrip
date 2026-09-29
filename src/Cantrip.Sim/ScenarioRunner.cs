@@ -438,7 +438,7 @@ namespace Cantrip.Sim
                     _log?.Invoke($"  threw at {_result.At}: {_result.Error}");
                 }
 
-                _result.HpLeft = _runtime.Player?.GetInt("hp") ?? 0;
+                _result.HpLeft = PartyHp();
                 foreach (Entity card in _runtime.State.Entities.Where(e => e.Kind == EntityKind.Card && !e.IsRemoved))
                     _facts.CardsOwned.Add(card.Name);
 
@@ -457,7 +457,7 @@ namespace Cantrip.Sim
 
                 var battle = new BattleResult(++_battles, string.Join(" + ", names));
                 Entity player = _runtime.Player ?? throw Refuse("the scenario has no player to fight with.", call);
-                int hpBefore = player.GetInt("hp");
+                int hpBefore = PartyHp();
 
                 // The hp ledger watches from the first fight: before that a statement may set hp
                 // outright, which is a number the engine raises nothing for and so nothing to
@@ -482,19 +482,37 @@ namespace Cantrip.Sim
                     Observe();
                     log?.Invoke($"    turn {battle.Turns}  {Watch.Board(_runtime)}");
                     if (log != null && Watch.Hand(_runtime) is string hand) log("      " + hand);
+
+                    int round = _runtime.State.Turn;
                     _bot.PlayTurn(_runtime, _trials, log == null ? null : new Action<string>(line => log("      " + line)));
                     if (_runtime.Won != null) break;
-                    _runtime.EndTurn();
+
+                    // A bot with a party passes its members, and the last of those passes ends the
+                    // turn. Ending it again would skip a whole round. A bot with a party of one
+                    // never passes, so the turn is ended here exactly as it always was.
+                    if (_runtime.State.Turn == round) _runtime.EndTurn();
                 }
 
                 battle.Won = _runtime.Won;
-                battle.HpLost = Math.Max(0, hpBefore - player.GetInt("hp"));
+                battle.HpLost = Math.Max(0, hpBefore - PartyHp());
                 _result.Battles.Add(battle);
-                _log?.Invoke($"    {(battle.Won == true ? "won" : battle.Won == false ? "lost" : "turn limit")} after {battle.Turns} turn(s), {player.GetInt("hp")} hp left");
+                _log?.Invoke($"    {(battle.Won == true ? "won" : battle.Won == false ? "lost" : "turn limit")} after {battle.Turns} turn(s), {PartyHp()} hp left");
 
                 // Losing ends the run, and so does a battle that never ended: there is no honest
                 // way to carry on from either.
                 if (battle.Won != true) _over = true;
+            }
+
+            /// <summary>
+            /// The health the party has between them. For a party of one this is the leader's hp and
+            /// always was; for a party it is the whole side's, because an hp column that counted
+            /// only the leader would read 0 lost in a fight that nearly killed everybody else.
+            /// </summary>
+            private int PartyHp()
+            {
+                int hp = 0;
+                foreach (Entity member in _runtime.Party) hp += member.GetInt("hp");
+                return hp;
             }
 
             /// <summary>
@@ -503,8 +521,11 @@ namespace Cantrip.Sim
             /// </summary>
             private void Observe()
             {
-                foreach (Entity card in _runtime.State.ZoneOf(_runtime.Player, Zones.Hand)) _facts.CardsHeld.Add(card.Name);
-                foreach (string name in Options.CardNames(_runtime, Options.Legal(_runtime))) _facts.CardsPlayable.Add(name);
+                foreach (Entity member in _runtime.Party)
+                {
+                    foreach (Entity card in _runtime.State.ZoneOf(member, Zones.Hand)) _facts.CardsHeld.Add(card.Name);
+                    foreach (string name in Options.CardNames(_runtime, Options.Legal(_runtime, member))) _facts.CardsPlayable.Add(name);
+                }
             }
 
             private static InvalidOperationException Refuse(string message, VerbCall call) =>

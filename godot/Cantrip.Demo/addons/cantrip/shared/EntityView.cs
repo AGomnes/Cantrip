@@ -128,11 +128,15 @@ namespace Cantrip.GodotAdapter
             string intent,
             int owner,
             int source,
+            bool partyMember,
+            bool acted,
             IReadOnlyList<string> tags,
             IReadOnlyDictionary<string, int> stats,
             IReadOnlyList<StatusView> statuses,
             IReadOnlyList<int> abilities)
         {
+            PartyMember = partyMember;
+            Acted = acted;
             Id = id;
             Name = name;
             Kind = kind;
@@ -197,6 +201,19 @@ namespace Cantrip.GodotAdapter
         /// <summary>Whoever applied or created it, which is what <c>source:</c> filters compare. Zero for none.</summary>
         public int Source { get; }
 
+        /// <summary>
+        /// True for an actor the game is asked for input for: the leader and the heroes beside it.
+        /// A summoned minion is an ally and not a member, which is what decides whether it takes a
+        /// step of its own and whether the battle is lost when it falls.
+        /// </summary>
+        public bool PartyMember { get; }
+
+        /// <summary>
+        /// True when this combatant has already taken its step this round. False for anything that
+        /// is not in the turn order, and for a view read without a live game beside it.
+        /// </summary>
+        public bool Acted { get; }
+
         public IReadOnlyList<string> Tags { get; }
 
         /// <summary>Current stats, after modifiers, ordinally keyed.</summary>
@@ -215,7 +232,11 @@ namespace Cantrip.GodotAdapter
         /// Which stats to read, or null for every stat the entity has. A game that shows three bars
         /// per actor passes those three: each stat read runs the modifier pipeline.
         /// </param>
-        public static EntityView Of(Entity entity, IReadOnlyList<string>? stats = null)
+        /// <param name="state">
+        /// The live game, for the one fact an entity does not carry on its own: whether it has taken
+        /// its step this round. Null leaves <see cref="Acted"/> false.
+        /// </param>
+        public static EntityView Of(Entity entity, IReadOnlyList<string>? stats = null, GameState? state = null)
         {
             if (entity == null) throw new ArgumentNullException(nameof(entity));
 
@@ -233,6 +254,8 @@ namespace Cantrip.GodotAdapter
                 entity.Intent ?? string.Empty,
                 entity.Owner?.Id ?? 0,
                 entity.Source?.Id ?? 0,
+                entity.IsPartyMember,
+                state != null && state.HasActed(entity),
                 SortedTags(entity.Tags),
                 ReadStats(entity, stats),
                 ReadStatuses(entity),

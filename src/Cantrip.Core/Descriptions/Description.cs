@@ -162,8 +162,10 @@ namespace Cantrip.Descriptions
             IReadOnlyList<DescriptionSegment> segments,
             string? flavour,
             IReadOnlyList<KeywordTooltip> tooltips,
-            DescriptionSegment? cost)
+            DescriptionSegment? cost,
+            string? against = null)
         {
+            Against = against;
             Name = name;
             Definition = definition;
             Level = level;
@@ -175,6 +177,17 @@ namespace Cantrip.Descriptions
 
         /// <summary>Display name, localized when the localizer supplies one.</summary>
         public string Name { get; }
+
+        /// <summary>
+        /// Who this is aimed at, by name, for a description that has a target of its own: the member
+        /// an enemy is telegraphing against. Null for everything else, including an intent that has
+        /// not been rolled.
+        /// </summary>
+        /// <remarks>
+        /// It is a name rather than an entity because a description is data a UI keeps across a
+        /// frame, and an entity is not. A game that wants the id asks the runtime.
+        /// </remarks>
+        public string? Against { get; }
 
         public EntityDefinition? Definition { get; }
 
@@ -221,6 +234,21 @@ namespace Cantrip.Descriptions
                 if (segment.IsChanged) text.Append("~~").Append(segment.BaseText).Append("~~ ");
                 text.Append(segment.Text);
             }
+            return text.ToString();
+        }
+
+        /// <summary>
+        /// The whole thing on one line, as an intent panel shows it: "Cutthroat → Vestal: Deal 8
+        /// damage and apply 2 Bleeding." The name and the target are left out when there are none,
+        /// so a description with neither is just its text.
+        /// </summary>
+        public string ToLine()
+        {
+            string body = ToPlainText();
+            var text = new StringBuilder(Name);
+
+            if (!string.IsNullOrEmpty(Against)) text.Append(" → ").Append(Against);
+            if (body.Length > 0) text.Append(text.Length > 0 ? ": " : string.Empty).Append(body);
             return text.ToString();
         }
 

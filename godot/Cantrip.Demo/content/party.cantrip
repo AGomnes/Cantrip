@@ -1,0 +1,14 @@
+# One hero beside the leader, so the addon's party surface has something to answer about: a game
+# with a `hero` in it is the only kind that can tell `GetParty`, `ActiveMemberId`, `Pass` and
+# `Revive` apart from doing nothing. Nothing here is created until a game calls `AddHero`, so the
+# demo battle and the headless tests are the party of one they always were.
+
+hero "Scout"
+  hp 22
+  abilities Snipe
+
+ability "Snipe"
+  cooldown 2 turns
+  target enemy
+  effect:
+    deal 7 to target

@@ -316,11 +316,13 @@ When the last member that could act has passed, the enemies take their turn and 
 | `Party` | the living members, in the order they take their steps |
 | `Player` | the leader: the one `CreatePlayer` made, the one that holds the run's relics and gold |
 | `AddHero(name, hp = null)` | adds a member from a `hero` declaration, with its abilities |
-| `CanAct(member)` | a battle is running, it is the party's turn, the member is alive and has not passed |
+| `CanAct(member)` | a battle is running, the member is alive and has not passed, and it is the party's turn — or, under `turns: initiative`, this member's own step |
 | `Pass(member)` | that member is done this turn; the last one ends the turn |
-| `ActiveMember` | whose step it is, under a turn order that has one. Null under `turns: sides`, which is the only mode this release has: there the game acts with its members in any order and asks `CanAct` of each |
+| `ActiveMember` | the member whose step it is, or null when none of ours is. Binding under `turns: initiative`; under `turns: sides` it is the one the engine would offer next — the first that has not acted — which a UI highlights and `CanAct` overrules |
 | `Revive(actor, hp = 1)` | brings a fallen actor back. False for one that was never dead |
 | `Entity.IsPartyMember` | true for the leader and every `hero`; false for a summon standing beside them |
+| `State.TurnOrder` | every living combatant on both sides, in the one order `turns: initiative` runs them in — what an order bar draws |
+| `State.HasActed(actor)` | whether that combatant has already taken its step this round |
 
 **Playing a card with a named performer.** `Play(card, target, performer)` is how one member plays out of the party's hand: the cost comes out of the card controller's pool, and everything else is the performer's — `card_played`'s source, the damage, `source:` filters, that member's own statuses and modifiers. With no performer it means what it always meant, the card's own controller.
 
@@ -329,6 +331,20 @@ runtime.Play(sanctuary, crusader, performer: vestal);
 ```
 
 **Abilities.** `CanUse(ability)` is `CanPlay`'s companion: the owner is alive, the cooldown is up, and one that needs somebody to point at has somebody. `LegalTargets` and `TargetMode` answer for an ability as well as a card, so the same targeting UI serves both. A cooldown belongs to the ability entity, so two members with the same ability have two of them.
+
+**Two turn modes.** `turns: sides` is the default: the party takes one turn between them, every member's `turn_start` fires at its start, and the game acts with them in any order. `turns: initiative` puts both sides in one order — set by `order: position` or `order: speed` — so a hero acts between two enemies and each combatant's `turn_start` and `turn_end` fire at its own step. There, `ActiveMember` drives the loop:
+
+```csharp
+while (runtime.Won == null)
+{
+    Entity? up = runtime.ActiveMember;              // null while the enemies are taking their steps
+    if (up == null) break;
+    // ... let the player act with this member ...
+    runtime.Pass(up);                               // runs the round on to the next of ours
+}
+```
+
+`Pass` on anyone but `ActiveMember` throws there, because the order is the rule rather than a suggestion. `EndTurn` still means "pass everyone of ours who has not acted", and the rest of the round happens around them. **One round is one turn in both modes**: `State.Turn` is the round number and the clock advances once a round, so `once per turn`, `on every N turns` and every saved turn number mean what they always meant. For a party of one against one enemy the two modes play the same round.
 
 **Losing.** The battle is lost when no member is alive, not when the leader dies. A surviving summon does not keep it going.
 

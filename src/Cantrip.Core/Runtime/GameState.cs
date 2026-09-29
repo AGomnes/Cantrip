@@ -183,7 +183,6 @@ namespace Cantrip.Runtime
         private Team _activeTeam = Team.Player;
         private bool _inBattle;
         private Entity? _player;
-        private Entity? _activeMember;
         private BoardShape _board;
 
         // Modifiers can read `turn` and friends, so each of these bumps the version when it changes.
@@ -238,21 +237,88 @@ namespace Cantrip.Runtime
                 {
                     if (actor.IsPartyMember) members.Add(actor);
                 }
+                if (Rules.Order == PartyOrder.Speed) members.Sort(BySpeed);
                 return members;
             }
         }
 
         /// <summary>
-        /// Whose step it is, under a turn order that has one. <c>turns: sides</c> — the only mode
-        /// this release has — gives the whole party one turn and lets the game act with its members
-        /// in any order, so there is no single active member and this is null. A game in that mode
-        /// asks <see cref="CardRuntime.CanAct"/> of each member instead.
+        /// Every living combatant on both sides in the one order <c>turns: initiative</c> runs them
+        /// in. Under <c>order: position</c> the party comes first, in the order it stands in, and
+        /// then the enemies, so a party of one against one enemy takes the same two steps it always
+        /// did; under <c>order: speed</c> the two sides interleave by the <c>speed</c> stat.
         /// </summary>
+        /// <remarks>
+        /// Derived every time it is asked, like <see cref="Party"/>: a death, a summon or a change
+        /// of <c>speed</c> mid-round changes who is up next with no bookkeeping and nothing extra in
+        /// the snapshot. <see cref="HasActed"/> is what says who has already had their step, and it
+        /// holds ids rather than places for exactly this reason.
+        /// </remarks>
+        public IReadOnlyList<Entity> TurnOrder
+        {
+            get
+            {
+                var order = new List<Entity>(Actors());
+                if (Rules.Order == PartyOrder.Speed) order.Sort(BySpeed);
+                else order.Sort(BySide);
+                return order;
+            }
+        }
+
+        /// <summary>Fastest first, then where they stand, then id, so the order is total.</summary>
+        private static int BySpeed(Entity a, Entity b)
+        {
+            int speed = b.GetInt("speed").CompareTo(a.GetInt("speed"));
+            return speed != 0 ? speed : BySlot(a, b);
+        }
+
+        /// <summary>The player's side first, then where they stand: position order across both sides.</summary>
+        private static int BySide(Entity a, Entity b)
+        {
+            int team = ((int)a.Team).CompareTo((int)b.Team);
+            return team != 0 ? team : BySlot(a, b);
+        }
+
+        /// <summary>
+        /// The member whose step it is, or null when none of the party's is: outside a battle, on
+        /// the enemies' turn, and once every member has acted.
+        /// </summary>
+        /// <remarks>
+        /// Under <c>turns: initiative</c> it is binding: that member and no other may act, and the
+        /// round does not move on until it passes. Under <c>turns: sides</c> the whole party shares
+        /// one turn and a game may act with its members in any order it likes, so this is the one
+        /// the engine <em>would</em> offer next — the first that has not acted — and a suggestion
+        /// rather than a rule. A game that wants the rule asks <see cref="CardRuntime.CanAct"/>.
+        /// It used to be null in <c>sides</c>, which meant a host polling it got nothing to show.
+        /// </remarks>
         public Entity? ActiveMember
         {
-            get => _activeMember;
-            internal set { if (_activeMember != value) { _activeMember = value; Touch(); } }
+            get
+            {
+                if (!InBattle) return null;
+
+                if (Rules.Turns == TurnMode.Initiative)
+                {
+                    foreach (Entity combatant in TurnOrder)
+                    {
+                        if (_acted.Contains(combatant.Id)) continue;
+                        return combatant.IsPartyMember ? combatant : null;
+                    }
+                    return null;
+                }
+
+                if (ActiveTeam != Team.Player) return null;
+                foreach (Entity member in Party)
+                {
+                    if (!_acted.Contains(member.Id)) return member;
+                }
+                return null;
+            }
         }
+
+        /// <summary>Whether this combatant has already taken its step this round.</summary>
+        public bool HasActed(Entity actor) =>
+            actor != null ? _acted.Contains(actor.Id) : throw new ArgumentNullException(nameof(actor));
 
         /// <summary>The party members that have already acted this turn.</summary>
         internal HashSet<int> Acted => _acted;
@@ -1091,9 +1157,9 @@ namespace Cantrip.Runtime
             Mix((long)ActiveTeam);
             Mix(InBattle ? 1 : 0);
             Mix(Player?.Id ?? 0);
-            Mix(_activeMember?.Id ?? 0);
             // Who has already acted decides who still may, so it belongs in the hash beside the
-            // turn. Sorted, because a set has no order of its own.
+            // turn. Sorted, because a set has no order of its own. `ActiveMember` is not mixed: it
+            // is read off this set and the turn order, so it could only ever repeat them.
             foreach (int id in _acted.OrderBy(i => i)) Mix(id);
             Mix(-1);
             Mix(Clock.Now);

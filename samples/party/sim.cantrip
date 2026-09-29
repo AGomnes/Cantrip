@@ -1,0 +1,28 @@
+# The party fought many times by a bot that acts with every member before the turn ends. Until
+# this release a bot played the leader and nobody else, so a party scenario measured a hero with
+# no cards and no abilities standing still while two others were never asked.
+#
+# What the report checks is the bottom two lines: nothing throws, and no run reaches the turn
+# limit. `wins`, `hp_left` and `turns` are printed and not checked, here more than anywhere else:
+# every bot weighs the party's hp against the enemies', and three members make that heuristic worse
+# rather than better — it will spend the Vestal's heal on whoever is nearest to dead, with no idea
+# that keeping her alive is what wins the fight.
+#
+# The `hp lost` column is the party's health between them, which is what makes it worth reading
+# here: the Brigands aim at whoever has the least, so a column that counted the leader alone would
+# read 0 through a fight the Vestal spent on her knees. `max_hp 40` on the leader is there so the
+# Vestal's Mend cannot heal him past where he started and take the column below zero.
+#
+# Run:  dotnet run --project src/Cantrip.Cli -- sim samples/party
+
+scenario "The Brigand, met by a party"
+  runs 200
+
+  player hp 40 max_hp 40
+  hero Crusader
+  hero Vestal
+
+  battle Brigand, Brigand
+
+  expect no stalls
+  expect no errors

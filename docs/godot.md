@@ -347,6 +347,7 @@ that is the value to pass if you have no other in mind.
 | `ApplyStatus(status: String, target_id: int, stacks: int) -> int` | Applies a status, as the player. Returns the status's id, or 0 when the target is unknown or nothing of that name is loaded. Default stacks: `1`. |
 | `GrantAbility(name: String, owner_id: int) -> int` | Attaches an ability to an actor. Returns its id, or 0 when the owner is unknown or nothing of that name is loaded. |
 | `RemoveCard(card_id: int) -> bool` | Takes a card out of the game for good, as `destroy` does in content, which hears it as `destroyed`. False, having changed nothing, when the id is not a card still in the game. |
+| `AddHero(name: String, hp: int) -> int` | Adds a party member from a `hero` declaration, with the abilities its `abilities` line grants. A positive `hp` overrides the content's; 0 takes the content's own. Returns 0 when nothing of that name is declared as a `hero`. Default: `0`. |
 | `NewRun() -> void` | Starts a new run: the rules begin again from the loaded content, with no player, cards or enemies, and read `Seed` and the other exports again. See [Between battles](#between-battles). |
 
 **Playing**
@@ -356,7 +357,11 @@ that is the value to pass if you have no other in mind.
 | `StartBattle(shuffle: bool, draw_opening_hand: bool) -> void` | Starts a battle. Defaults: `true, true`. |
 | `Play(card_id: int, target_id: int) -> String` | Plays a card from the hand, aimed at `target_id`, or 0 for none. Default target: `0`. |
 | `PlayNamed(card_name: String, target_id: int) -> String` | Plays the first card of that name in the hand |
-| `EndTurn() -> void` | Ends the player's turn; the enemies act, and the next turn starts |
+| `PlayBy(card_id: int, target_id: int, by_id: int) -> String` | The same play, made by a named party member. The cost still comes out of the card owner's pool; everything else — `source`, the damage, the statuses that apply — is the performer's. `by_id` 0 is `Play`. |
+| `PlayNamedBy(card_name: String, target_id: int, by_id: int) -> String` | The same, by name: the card is looked for in that member's own hand first, then in the party's |
+| `EndTurn() -> void` | Ends the party's turn: every member that has not acted gives its step up, the enemies act, and the next turn starts |
+| `Pass(actor_id: int) -> void` | One member is done for this turn. When the last one that could act has passed, the enemies take theirs — so for a party of one this is `EndTurn`. Does nothing for an id that names nobody, or somebody who is not a party member. |
+| `Revive(actor_id: int, hp: int) -> bool` | Brings a fallen actor back, and says whether it rose. False for an unknown id, for somebody already alive, and when content cancelled the `revived` event. `heal` refuses a corpse and always will, which is why this is its own call. Default: `1`. |
 | `Tick(count: int) -> void` | Advances a real-time clock by `count` ticks. Default: `1`. In a turn game it fails with an error saying the runtime uses turns. |
 | `UseAbility(ability_id: int, target_id: int) -> String` | Uses an ability, answering with the same words `Play` does. An ability with a `target` line settles its own target from 0, the way a card does, and answers `invalid_target` when there is nobody legal to aim it at. Default target: `0`. |
 | `Execute(statements: String, self_id: int, target_id: int) -> void` | Runs statements as content would, for a console, a cheat key or a heal between battles. `self_id` 0 runs them as the player; `target_id` 0 means nobody. Defaults: `0, 0`. |
@@ -372,7 +377,11 @@ it is still on cooldown. `not_ready` never comes back from `Play`, and `not_in_h
 
 | Method | |
 |---|---|
-| `PlayerId() -> int` | The player's id, or 0 before `CreatePlayer` |
+| `PlayerId() -> int` | The leader's id, or 0 before `CreatePlayer` |
+| `GetParty() -> Array` | The living party, in the order the engine offers its members: the actors this game is asked for input for. A game that declares no `hero` gets one id, `PlayerId()`. Not the same as `GetAllies`, which counts summons. |
+| `ActiveMemberId() -> int` | The member whose step it is, or 0 when none of the party's is. Binding under `turns: initiative`; under `turns: sides` it is the one the engine would offer next, which a UI highlights and `CanAct` overrules. |
+| `CanAct(actor_id: int) -> bool` | Whether that member still has a step this turn. False for an unknown id, for anyone who is not a party member, and for one that has passed. |
+| `CanUse(ability_id: int) -> bool` | `CanPlay` for an ability: off cooldown, affordable, and with something legal to aim at if it needs one. False for an id that is not an ability. |
 | `GetZone(owner_id: int, zone: String) -> Array` | Ids in one of an owner's zones; `owner_id` 0 means the player. The player's hand is `GetZone(PlayerId(), "hand")`. |
 | `GetEnemies() -> Array`, `GetAllies() -> Array`, `GetActors() -> Array` | Ids of the living enemies, the living actors on the player's side, or both |
 | `GetEntity(entity_id: int) -> Dictionary` | Everything a UI shows about one entity; empty for an unknown id |
@@ -391,7 +400,7 @@ it is still on cooldown. `not_ready` never comes back from `Play`, and `not_in_h
 | Method | |
 |---|---|
 | `Describe(entity_id: int, target_id: int) -> Dictionary` | Rules text with live values, for a card frame or a tooltip. `target_id` counts that target's statuses, or 0 for none. |
-| `DescribeIntent(enemy_id: int) -> Dictionary` | What an enemy will do next, with live values. Until intents have been rolled, its `empty` is true, its text is `""`, and its `name` is the enemy's own name rather than a move's. |
+| `DescribeIntent(enemy_id: int) -> Dictionary` | What an enemy will do next and who to, with live values. `target` is the member it is telegraphing against and `target_name` is that member's name, so `line` reads `"Cutthroat → Vestal: Deal 8 damage and apply 2 Bleeding."` The target is asked afresh on every call, so a taunt applied since the intent was rolled has already moved it. Until intents have been rolled, its `empty` is true, its text is `""`, its `target` is 0, and its `name` is the enemy's own name rather than a move's. |
 | `DescribeDefinition(name: String, kind: String) -> Dictionary` | A definition's rules text with its printed values, for something not in play, such as a reward. `kind` `""` takes the first definition of that name. Empty when none is loaded. Default kind: `""`. |
 
 **Two vocabularies called kind.** `GetDefinitions` and `DescribeDefinition` take the keyword that
@@ -466,6 +475,8 @@ nothing will ever draw from, and answers no differently from the zone you meant.
 | `alive`, `dead`, `removed` | A body still on the board is `dead`: neither alive nor removed |
 | `intent` | An enemy's next move, such as `"Claw"`; `""` before the battle starts |
 | `owner`, `source` | Whose it is (a card's player, a status's host) and who made or applied it; 0 for none |
+| `party_member` | True for an actor the game is asked for input for: the leader and every `hero`. A summoned minion is an ally and not a member, which is what decides whether it takes a step and whether the battle is lost when it falls. |
+| `acted` | True when it has already taken its step this round |
 | `tags` | Its tags, sorted |
 | `stats` | Every stat after modifiers, such as `{"hp": 24, "max_hp": 30, "block": 0}` |
 | `statuses` | Its statuses and keywords, in the order they arrived; each as below |
@@ -488,6 +499,8 @@ leaves out.
 | `name` | The definition's name, or for an intent the move's name once intents have been rolled |
 | `flavour` | The flavour line, never mixed into the rules text; `""` when there is none |
 | `level` | Where the words came from: `"auto"`, `"custom"` (a `text:` line) or `"override"` (a `text_override:` line, shown as written, without live values) |
+| `target`, `target_name` | For an intent, the member it is telegraphed against, by id and by name. 0 and `""` for everything else, and for an intent before it has been rolled. |
+| `line` | The whole thing on one line, as an intent panel shows it: `"Cutthroat → Vestal: Deal 8 damage and apply 2 Bleeding."` For a card it is its name and its text. |
 | `empty` | True when there is nothing to show, as for an intent before the battle starts |
 
 Each segment has `kind` (`"text"` or `"value"`), `text` (what to show), `placeholder` (the value

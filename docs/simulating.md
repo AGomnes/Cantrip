@@ -135,9 +135,16 @@ Three of them, and two play by default.
 | `random` | Plays legal cards and abilities at random until it can play no more. | The floor, and the fastest way to fuzz: it tries nothing first, so it is eight to eleven times quicker than the other two. |
 
 None of them knows a card, status, ability or enemy by name, so new content needs no change to
-any of them. A position is scored on hp alone — one and a half times the player's, less the
+any of them. A position is scored on hp alone — one and a half times the party's, less the
 enemies' — taken after the enemies have answered, so a block that stopped a hit shows up as hp the
 player still has.
+
+**A party takes its turn a member at a time.** Each bot asks every member that still has a step,
+plays with it and passes, and the turn ends when the last one has — which under
+[`turns: initiative`](language.md#the-turn) is the only way the round moves at all. A game with no
+`hero` in it has a party of one, is never passed, and plays the run it always did, to the seed.
+The `hp lost` column is the party's health between them, so a fight the heroes are losing while
+the leader stands untouched reads as the loss it is.
 
 **They are wrong in the same direction.** All three share that one way of weighing a position, so
 they all undervalue a card that draws, a card that gives energy, and anything else that pays off
@@ -243,8 +250,11 @@ the flag removed the player on one seed of the slice "lost 60 hp" while the mete
 no gold. A rest, a relic picked up or a curse taken is written as a statement where it happens, so
 a scenario measures only what it says.
 
-**A win rate is a fact about the bot, not about your content.** On the slice, over the same 500
-seeds, the cautious bot finished 70.8% of its runs, the patient bot 74.0% and the random bot 0.6%.
+**A win rate is a fact about the bot, not about your content**, and never more so than for a party.
+On the slice, over the same 500 seeds, the cautious bot finished 70.8% of its runs, the patient bot
+74.0% and the random bot 0.6%. With several heroes it is worse again: every bot weighs the party's
+hp against the enemies', which cannot see that keeping the healer alive is what wins the fight, so
+it will spend her heal on whoever is nearest to dead.
 That is one piece of content and three answers. So the report prints each bot's level under a
 heading that says not to quote it, next to the other bot's, and `expect wins >= 55%`,
 `expect hp_left >= 20` and `expect turns <= 12` are reported as *not checked* rather than answered

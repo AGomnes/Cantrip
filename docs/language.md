@@ -502,9 +502,26 @@ hero "Vestal"
 
 ### The turn
 
-**One round is one turn.** `turn` is the round number in every mode, because `on every N turns`, `once per turn`, the history counters, the saved turn number and `sim`'s stall limit all key off it. The party acts, then the enemies do.
+**One round is one turn.** `turn` is the round number in **both** modes, because `on every N turns`, `once per turn`, the history counters, the saved turn number and `sim`'s stall limit all key off it. Four members must not make it mean four things.
 
-Within the party's turn each member takes its own step, in whatever order the game likes. `turn_start` and `turn_end` fire per member, as they always have. A game asks whether a member still has its step with [`CanAct`](csharp.md#the-party) and says it is done with `Pass`; when the last one that could act has passed, the enemies take their turn. For a party of one, `Pass` is `EndTurn`.
+There are two modes, set with [`turns:`](#rulesets):
+
+| `turns:` | The round |
+|---|---|
+| `sides` | the default: the party acts, then the enemies. Every member's `turn_start` fires at the party's turn start, and the game acts with them in whatever order it likes. |
+| `initiative` | one order over both sides, so a hero acts between two enemies. Each combatant's `turn_start` and `turn_end` fire at **its own step**, and the round ends when every living one has taken one. |
+
+Under `sides`, a game asks whether a member still has its step with [`CanAct`](csharp.md#the-party) and says it is done with `Pass`; when the last one that could act has passed, the enemies take their turn. `ActiveMember` is the one the engine would offer next — a suggestion for a UI, not a rule, because any waiting member may act.
+
+Under `initiative`, `ActiveMember` **is** the rule: that member and no other may act, `Pass` on anyone else is refused, and passing runs the round on through the enemy steps until one of ours is up again. `EndTurn` is still "pass everyone of ours who has not acted", so the rest of the round happens around them. For a party of one against one enemy the two modes play the same round, to the turn number and the hp.
+
+`order:` says who goes first. `position` is the default — where they stand, `(lane, rank)`, with the party's side before the enemies' — and `speed` sorts by the `speed` stat descending, ties broken by where they stand and then by id. `speed` orders the party under `sides` too, where it decides which member the engine offers first and the order they draw in. An actor with no `speed` reads 0.
+
+**The clock moves once a round in both modes.** Under `sides` it moves after the side's turn has started, so `in 1 turn:` work lands after the turn-start resets. Under `initiative` the combatants start their turns one at a time and there is no moment at which they all have, so it moves at the **start** of the round, before anybody's step: `on every 2 turns` fires for everyone before anyone acts, and work hung on `in N turns:` arrives ahead of the turn-start resets. Content that wants its own reset first writes `next turn:`, which fires at that actor's own step.
+
+The order is read off the living every time it is asked, never stored. So a member that falls mid-round is skipped with no bookkeeping, one revived after its step does not take a second one — who has acted is remembered by id — and one revived or summoned before its place still takes the step it had not taken.
+
+A summoned `actor` on your side is in the order but is not a member, so under `initiative` its step runs straight through: its `turn_start` and `turn_end` fire, which is how a minion that attacks from its own turn end attacks, and nobody is asked what it does. That is the same division `sides` makes, where a summon's turn events fire with the side's and only members are passed.
 
 **`once per turn` is once per round, per listening entity.** A status on each of four members fires four times a round — once each, because each is a different listener. A relic on the leader fires once. That was always true and is worth saying twice.
 
@@ -1175,7 +1192,7 @@ card "Fuse"
 ```
 
 - `next turn:` runs at the start of the controller's next turn, after its turn-start event.
-- `in N turns:` (or `in 3s:` on a tick clock) runs when the clock reaches that time. The turn clock advances once per round, after the player's turn has started, so the block runs after turn-start resets.
+- `in N turns:` (or `in 3s:` on a tick clock) runs when the clock reaches that time. The turn clock advances once per round, after the player's turn has started, so the block runs after turn-start resets. Under [`turns: initiative`](#the-turn) the clock moves at the start of the round instead, before anybody's step, so the block runs *before* them; hang work that has to survive a reset on `next turn:`.
 - `until <event>:` runs now and undoes its changes when `<event>` next happens to its owner, after that event's listeners. It undoes statuses and stacks it applied (only those stacks), tags it added and changes to non-resource stats. Damage and other resource changes are not refunded. The end of a battle undoes every pending `until`.
 
 ## Rulesets
@@ -1202,8 +1219,8 @@ ruleset
 | `modifier_layers` | `add, multiply, clamp, override` | modifier layer order |
 | `triggers` | `queued` | `immediate` runs after listeners inline |
 | `new_listeners` | `hear_the_event` | whether a listener that comes into play during an event hears that event. See below. |
-| `turns` | `sides` | whether [the party](#the-party) acts as a side or in one interleaved order. `sides` is the only value this release implements; `initiative` is error CT334. |
-| `order` | `position` | the order the party's members are offered in: where they stand, `(lane, rank)`. `speed` is error CT334. |
+| `turns` | `sides` | `sides` or `initiative`: whether [the party](#the-party) acts as a side or every combatant takes its own step in one interleaved order. |
+| `order` | `position` | `position` or `speed`: the order combatants are offered in — where they stand, `(lane, rank)`, or by the `speed` stat descending with ties broken by where they stand. |
 | `hand_size` | 5 | cards drawn each turn |
 | `max_hand_size` | 10 | cards drawn beyond this go to the discard pile |
 | `max_steps` | 100000 | interpreter steps per top-level action before it is stopped with a runtime error (see [When content fails at runtime](csharp.md#when-content-fails-at-runtime)) |
@@ -1366,7 +1383,7 @@ The body is statements, as a test's is, and most of it is ordinary DSL: `heal 12
 | `runs N` | How many times to play the scenario |
 | `expect <measurement> <op> <number>` | Fails the scenario if it does not hold. `expect no stalls` is the same as `expect stalls == 0`. |
 
-Setup is shared with a test, and each verb means the same thing in both: `player`, `deck`, `hand`, `discard_pile`, `relic`, `grant`, `seed` and `answer`. See [Tests](#tests) for what each one does. A `setup:` block groups them here too, though nothing turns on where setup ends: a scenario starts a battle where it says `battle`, and nowhere else.
+Setup is shared with a test, and each verb means the same thing in both: `player`, `hero`, `deck`, `hand`, `discard_pile`, `relic`, `grant`, `seed` and `answer`. See [Tests](#tests) for what each one does. A `setup:` block groups them here too, though nothing turns on where setup ends: a scenario starts a battle where it says `battle`, and nowhere else.
 
 **A scenario never plays a card itself.** `play`, `cast`, `end turn` and `tick` belong to a test: a bot plays a scenario, and a line choosing a card by hand would fight it. `realtime` is out for the same reason — when to act in continuous time is the game's own frame loop, not a bot's.
 
@@ -1502,7 +1519,7 @@ Codes with four digits come from reading and loading the files. An error among t
 | CT331 | warning | `range` on something that points at nobody, so nothing ever reads it. | Add a `target` line, or take the `range` off. |
 | CT332 | warning | A `range` that decides nothing: as wide as the widest board this game declares, written backwards (`range 3..1`), or `range 0` at an enemy, which on a facing board is a slot no enemy ever stands on. | Give it a reach the board can narrow. `range 1` is what melee is written as. |
 | CT333 | warning | `lane(...)` on a board one rank deep, or `rank(...)` on a board one lane wide. One actor stands on a slot, so the row is that actor and nobody else. | Write the actor itself, or give the board a second rank or lane. |
-| CT334 | error | A `turns:` or `order:` [ruleset](#rulesets) value this release does not implement: `turns: initiative` or `order: speed`. The words are known so that content written for a later release can be read and refused rather than ignored. | Write `turns: sides` or `order: position`, which is what every game gets by saying nothing. |
+| CT335 | error | `turns:` or `order:` in a game that says `clock ticks`. Both say how a turn is shared out, and a real-time game has no turns: `turn_start` and `turn_end` never fire there and the engine ignores the setting, so `turns: initiative` asks for an order that will never run. | Drop the line, or say `clock turns` if this game does take turns. |
 
 **Descriptions**
 

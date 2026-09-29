@@ -66,6 +66,7 @@ func _run() -> void:
 	_check_saving(rules)
 	_check_answers(rules)
 	_check_between_battles(rules)
+	_check_party(rules)
 
 	_finish()
 
@@ -198,6 +199,62 @@ func _check_callbacks(rules: CantripRuntime, enemy: int) -> void:
 	hp = rules.GetStat(enemy, "hp")
 	rules.Execute("deal three to target", 0, enemy)
 	_check("and a plain method still answers", rules.GetStat(enemy, "hp") == hp - 3, str(rules.GetStat(enemy, "hp")))
+
+# The party surface: the calls a game with more than one member makes, and the two keys an entity
+# dictionary grew. A game with one member can call every one of these and cannot tell the answers
+# from what it did before, which is the promise; this adds a second member so they differ.
+func _check_party(rules: CantripRuntime) -> void:
+	var leader: int = rules.PlayerId()
+	var scout: int = rules.AddHero("Scout", 0)
+	_check("AddHero answers an id of its own", scout != 0 and scout != leader, str(scout))
+	_check("and a name no hero is declared under answers 0", rules.AddHero("Nothing", 0) == 0)
+
+	rules.StartBattle(false, false)
+	var party: Array = rules.GetParty()
+	_check("the party is the leader and the hero, in the order they stand in", party == [leader, scout], str(party))
+	_check("which is not the same as the allies", rules.GetAllies().size() == 2)
+
+	_check("the leader is the one the engine would offer", rules.ActiveMemberId() == leader, str(rules.ActiveMemberId()))
+	_check("and both may act, because turns: sides gives the party one turn", rules.CanAct(leader) and rules.CanAct(scout))
+	_check("an id that names nobody cannot act", not rules.CanAct(999999))
+
+	var view: Dictionary = rules.GetEntity(scout)
+	_check("an entity says whether it is a party member and whether it has acted",
+		view["party_member"] and not view["acted"], str(view.get("acted")))
+	_check("and an enemy is neither", not rules.GetEntity(rules.GetEnemies()[0])["party_member"])
+
+	rules.Pass(leader)
+	_check("passing one member leaves the other's step", rules.CanAct(scout) and not rules.CanAct(leader))
+	_check("the one that passed says it acted", rules.GetEntity(leader)["acted"], str(rules.GetEntity(leader)))
+	_check("so the hero is now the one offered", rules.ActiveMemberId() == scout, str(rules.ActiveMemberId()))
+
+	var snipe: int = rules.GetEntity(scout)["abilities"][0]
+	_check("CanUse is true for an ability off cooldown", rules.CanUse(snipe))
+	_check("and false for an id that is not an ability", not rules.CanUse(scout) and not rules.CanUse(999999))
+	_check("using it works", rules.UseAbility(snipe, rules.GetEnemies()[0]) == "played")
+	_check("and puts it on cooldown, which CanUse answers for", not rules.CanUse(snipe))
+
+	var ember: int = rules.AddCard("Ember", "hand")
+	_check("a card out of the party's hand can be played by a named member",
+		rules.PlayBy(ember, rules.GetEnemies()[0], scout) == "played")
+	_check("and a card named rather than held is looked for in that member's hand first",
+		rules.PlayNamedBy("Guard", 0, scout) == "not_in_hand")
+	_check("while Play itself still takes the two arguments every preview script wrote",
+		rules.Play(rules.AddCard("Guard", "hand"), 0) == "played")
+
+	var intent: Dictionary = rules.DescribeIntent(rules.GetEnemies()[0])
+	_check("an intent names who it is telegraphed against", intent["target"] != 0, str(intent.get("target")))
+	_check("by name as well as by id", party.has(intent["target"]) and not intent["target_name"].is_empty(), str(intent))
+	_check("and reads as one line, move and target together",
+		intent["line"].begins_with("Swipe") and intent["line"].contains(intent["target_name"]), intent["line"])
+
+	rules.Execute("kill target", 0, scout)
+	_check("a fallen member leaves the party", not rules.GetParty().has(scout), str(rules.GetParty()))
+	_check("but the battle goes on, because the leader still stands", rules.IsInBattle())
+	_check("Revive brings it back, where a heal refuses", rules.Revive(scout, 5) and rules.GetStat(scout, "hp") == 5)
+	_check("reviving the living answers false", not rules.Revive(scout, 5))
+	_check("as does an id that names nobody", not rules.Revive(999999, 1))
+
 
 func _plus(args: Array, _context: Dictionary, amount: int) -> Variant:
 	return int(args[0]) + amount

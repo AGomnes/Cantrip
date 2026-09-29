@@ -70,6 +70,7 @@ namespace Cantrip.GodotAdapter.Demo
                 TrackedStatsAreReadLiveWhereverTheyShow();
                 TheDebugChannelAnswersTheEditor();
                 DefaultInterfaceMembersDispatchInThisEngine();
+                APartyTakesItsTurnAMemberAtATime();
 
                 code = _failures.Count == 0 ? 0 : 1;
             }
@@ -238,7 +239,56 @@ namespace Cantrip.GodotAdapter.Demo
             Check("a card describes itself", described["plain"].AsString() == "Gain 6 Block.", described["plain"].AsString());
 
             Godot.Collections.Dictionary intent = rules.DescribeIntent(slime);
-            Check("an intent describes the move", intent["plain"].AsString() == "Deal 4 damage to the player.", intent["plain"].AsString());
+            Check("an intent describes the move", intent["plain"].AsString() == "Deal 4 damage.", intent["plain"].AsString());
+            Check("and names who it is telegraphed against", intent["target"].AsInt32() == rules.PlayerId() && intent["target_name"].AsString() == "Player", intent["target_name"].AsString());
+            Check("and reads as one line, move and target together", intent["line"].AsString() == "Swipe → Player: Deal 4 damage.", intent["line"].AsString());
+            Check("while a card has no target of its own to name", described["target"].AsInt32() == 0 && described["target_name"].AsString().Length == 0, described["target_name"].AsString());
+
+            rules.QueueFree();
+        }
+
+        /// <summary>
+        /// The party surface from C#: the same calls the GDScript smoke test makes, checked here
+        /// too because this is where a failure names the line rather than the frame.
+        /// </summary>
+        private void APartyTakesItsTurnAMemberAtATime()
+        {
+            CantripRuntime rules = Loaded();
+            int leader = rules.CreatePlayer();
+            int scout = rules.AddHero("Scout");
+            Check("AddHero answers an id of its own", scout != 0 && scout != leader, scout.ToString());
+            Check("and a name no hero is declared under answers 0", rules.AddHero("Nothing") == 0);
+
+            int slime = rules.SpawnEnemy("Slime");
+            rules.StartBattle(false, false);
+
+            Check("the party is the leader and the hero", rules.GetParty().Count == 2 && rules.GetParty()[0].AsInt32() == leader);
+            Check("the leader is the one the engine would offer", rules.ActiveMemberId() == leader, rules.ActiveMemberId().ToString());
+            Check("and both may act, because turns: sides gives the party one turn", rules.CanAct(leader) && rules.CanAct(scout));
+            Check("the hero says it is a party member and has not acted",
+                rules.GetEntity(scout)["party_member"].AsBool() && !rules.GetEntity(scout)["acted"].AsBool());
+            Check("and the slime is neither", !rules.GetEntity(slime)["party_member"].AsBool());
+
+            rules.Pass(leader);
+            Check("passing one member leaves the other's step", rules.CanAct(scout) && !rules.CanAct(leader));
+            Check("and the one that passed says so", rules.GetEntity(leader)["acted"].AsBool());
+            Check("so the hero is now the one offered", rules.ActiveMemberId() == scout, rules.ActiveMemberId().ToString());
+
+            int snipe = rules.GetEntity(scout)["abilities"].AsGodotArray()[0].AsInt32();
+            Check("CanUse is true for an ability off cooldown", rules.CanUse(snipe));
+            Check("and false for anything that is not one", !rules.CanUse(scout) && !rules.CanUse(999999));
+            Check("using it works", rules.UseAbility(snipe, slime) == "played");
+            Check("and puts it on cooldown", !rules.CanUse(snipe));
+
+            int ember = rules.AddCard("Ember", "hand");
+            Check("a card out of the party's hand can be played by a named member", rules.PlayBy(ember, slime, scout) == "played");
+
+            rules.Execute("kill target", 0, scout);
+            Check("a fallen member leaves the party", rules.GetParty().Count == 1);
+            Check("but the battle goes on, because the leader still stands", rules.IsInBattle());
+            Check("Revive brings it back, where a heal refuses", rules.Revive(scout, 5) && rules.GetStat(scout, "hp") == 5);
+            Check("reviving the living answers false", !rules.Revive(scout, 5));
+            Check("as does an id that names nobody", !rules.Revive(999999, 1));
 
             rules.QueueFree();
         }

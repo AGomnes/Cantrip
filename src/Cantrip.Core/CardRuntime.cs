@@ -164,18 +164,24 @@ namespace Cantrip
         public Entity? ActiveMember => State.ActiveMember;
 
         /// <summary>
-        /// Whether this member still has its step this turn: it is a member, it is alive, a battle
-        /// is running, it is the party's turn, and it has not passed.
+        /// Whether this member still has its step this round: it is a member, it is alive, a battle
+        /// is running, and it has not passed. Under <c>turns: sides</c> it also has to be the
+        /// party's turn; under <c>turns: initiative</c> it has to be this member's own step, because
+        /// there the order is the rule rather than a suggestion.
         /// </summary>
         public bool CanAct(Entity member)
         {
             if (member == null) throw new ArgumentNullException(nameof(member));
-            return State.InBattle
-                && State.ActiveTeam == Team.Player
-                && member.IsPartyMember
-                && member.IsAlive
-                && !State.Acted.Contains(member.Id);
+            if (!State.InBattle || !member.IsPartyMember || !member.IsAlive) return false;
+            if (State.Acted.Contains(member.Id)) return false;
+
+            return Initiative
+                ? ReferenceEquals(State.ActiveMember, member)
+                : State.ActiveTeam == Team.Player;
         }
+
+        /// <summary>Whether every combatant takes its own step in one order across both sides.</summary>
+        private bool Initiative => State.Rules.Turns == TurnMode.Initiative;
 
         /// <summary>
         /// That member is done for this turn. When the last one that could act has passed, the
@@ -211,6 +217,21 @@ namespace Cantrip
             // A member that fell has no step left to give up, and marking it would be bookkeeping
             // about somebody who is not in the party any more.
             if (!member.IsAlive) return;
+
+            if (Initiative)
+            {
+                // The order is the rule here, so passing out of turn is refused rather than
+                // silently reordering the round.
+                if (!ReferenceEquals(State.ActiveMember, member))
+                    throw new InvalidOperationException($"It is not {member}'s step. Under `turns: initiative` the combatants act in one order, and ActiveMember says whose step it is.");
+
+                EndMemberStep(member);
+                if (!State.InBattle) return;
+                State.MarkActed(member);
+                AdvanceInitiative();
+                return;
+            }
+
             State.MarkActed(member);
 
             foreach (Entity other in State.Party)
@@ -420,7 +441,7 @@ namespace Cantrip
             Run(player, context => Interpreter.Raise(new GameEvent("battle_start") { Source = player }, context));
             if (CheckBattleOver()) return;
 
-            StartTurn(Team.Player);
+            if (Initiative) StartRound(); else StartTurn(Team.Player);
         }
 
         /// <summary>Ends the player's turn, runs the enemies' turn, and starts the next player turn.</summary>
@@ -438,6 +459,8 @@ namespace Cantrip
         {
             if (!State.InBattle) return;
             if (State.ActiveTeam != Team.Player) throw new InvalidOperationException("It is not the player's turn.");
+
+            if (Initiative) { EndRoundEarly(); return; }
 
             if (EndTurnFor(Team.Player)) return;
 
@@ -459,6 +482,163 @@ namespace Cantrip
             foreach (Entity enemy in State.Actors(Team.Enemy)) RollIntent(enemy);
 
             StartTurn(Team.Player);
+        }
+
+        // Initiative ---------------------------------------------------------------------------
+        //
+        // One round is one turn here too. `State.Turn` is the round number in both modes, because
+        // `on every N turns`, `once per turn`, the history counters, the saved turn and the
+        // simulator's stall limit all key off it, and four heroes must not make it mean four things.
+        // What changes is where each combatant's `turn_start` and `turn_end` fall: at its own step
+        // rather than all at once at the side's.
+
+        /// <summary>
+        /// A round cannot take more steps than this. Each step but a party member's marks somebody
+        /// as having acted, so the only way to reach it is content that summons without end; the
+        /// round is cut short rather than the process hanging.
+        /// </summary>
+        private const int MaxStepsPerRound = 512;
+
+        /// <summary>Begins a round: the turn number, the histories, the clock, then the first step.</summary>
+        private void StartRound()
+        {
+            State.Turn++;
+            State.ResetTurnHistory();
+            State.ClearActed();
+
+            // Time moves once a round, as it does under `turns: sides`, but at the round's start
+            // rather than after the side's turn starts: here the combatants start their turns one
+            // at a time and there is no moment at which they all have. So `on every 2 turns` fires
+            // for everybody before anybody acts, which is the answer a game can reason about; work
+            // hung on `in N turns:` lands there too, ahead of the turn-start resets, and content
+            // that wants it after its own reset writes `next turn:`, which fires at its own step.
+            if (State.Turn > 1 && State.Clock is TurnClock turns)
+            {
+                turns.AdvanceTurn();
+                if (!State.InBattle) return;
+            }
+
+            AdvanceInitiative();
+        }
+
+        /// <summary>
+        /// Runs steps until a living party member's is next — at which point the game is asked what
+        /// it does — or until the round is over.
+        /// </summary>
+        private void AdvanceInitiative()
+        {
+            for (int step = 0; step < MaxStepsPerRound; step++)
+            {
+                Entity? next = NextUp();
+                if (next == null) { EndRound(); return; }
+
+                State.ActiveTeam = next.Team;
+                BeginStep(next);
+                if (!State.InBattle) return;
+
+                // The party is who the game is asked about, so its step is where control goes back.
+                // A member that its own turn start killed has no step to take, and is marked so
+                // that the round moves past it rather than waiting on a corpse.
+                if (next.IsPartyMember && next.IsAlive) return;
+
+                if (next.IsAlive)
+                {
+                    // A summoned minion takes a step of its own — its `turn_start` and `turn_end`
+                    // fire, which is how a Monster Train or Hearthstone minion attacks — but nobody
+                    // is asked what it does, so the round runs straight on through it. Stopping
+                    // there would wait forever for a pass that only a member can give.
+                    if (next.Team == Team.Enemy) RunEnemyMove(next);
+                    if (!State.InBattle) return;
+                    EndStep(next);
+                    if (!State.InBattle) return;
+                }
+
+                State.MarkActed(next);
+            }
+
+            EndRound();
+        }
+
+        /// <summary>
+        /// The next combatant with a step still to take, or null when the round is done. Read off
+        /// the live order every time, so a death, a summon or a revival mid-round is already in it.
+        /// </summary>
+        private Entity? NextUp()
+        {
+            foreach (Entity combatant in State.TurnOrder)
+            {
+                if (!State.Acted.Contains(combatant.Id)) return combatant;
+            }
+            return null;
+        }
+
+        /// <summary>One combatant's turn beginning: its <c>turn_start</c>, its scheduled work, its draw.</summary>
+        private void BeginStep(Entity actor)
+        {
+            // Only work scheduled before this step began runs now, as under `turns: sides`.
+            var due = State.Scheduled.Where(s => s.Timing == ScheduleTiming.NextTurn && s.Owner == actor).ToList();
+
+            Run(actor, context => Interpreter.Raise(new GameEvent("turn_start") { Source = actor, Target = actor }, context));
+
+            foreach (ScheduledAction action in due)
+            {
+                State.Unschedule(action);
+                Run(actor, _ => Interpreter.RunScheduled(action));
+            }
+
+            if (CheckBattleOver()) return;
+
+            // A member draws its own hand at its own step, which is where `sides` draws it too —
+            // there, every member's turn starts at once. One with no pile of its own draws nothing.
+            if (actor.IsPartyMember && actor.IsAlive && !_skipNextDraw)
+            {
+                Run(actor, context => Interpreter.Draw(actor, State.Rules.HandSize, context));
+                CheckBattleOver();
+            }
+        }
+
+        /// <summary>One combatant's turn ending: its <c>turn_end</c>, and nothing else.</summary>
+        private void EndStep(Entity actor)
+        {
+            Run(actor, context => Interpreter.Raise(new GameEvent("turn_end") { Source = actor, Target = actor }, context));
+            CheckBattleOver();
+        }
+
+        /// <summary>A member's turn ending: its <c>turn_end</c>, then its hand.</summary>
+        private void EndMemberStep(Entity member)
+        {
+            EndStep(member);
+            if (!State.InBattle) return;
+            DiscardHand(member);
+        }
+
+        /// <summary>Every living enemy re-telegraphs, and the next round begins.</summary>
+        private void EndRound()
+        {
+            // The opening hand is skipped for the whole of the first round, not only for whoever
+            // stepped first.
+            _skipNextDraw = false;
+
+            foreach (Entity enemy in State.Actors(Team.Enemy)) RollIntent(enemy);
+            if (!State.InBattle) return;
+
+            StartRound();
+        }
+
+        /// <summary>
+        /// <c>EndTurn</c> under <c>turns: initiative</c>: every member of ours that still has a step
+        /// this round gives it up, and the round runs to its end around them — the enemies still
+        /// take their steps, in their places. For a party of one that is exactly the old
+        /// <c>EndTurn</c>: pass the one member, the enemies answer, the next round begins.
+        /// </summary>
+        private void EndRoundEarly()
+        {
+            int round = State.Turn;
+            for (int step = 0; step < MaxStepsPerRound && State.InBattle && State.Turn == round; step++)
+            {
+                if (!(State.ActiveMember is Entity member)) return;
+                PassCore(member);
+            }
         }
 
         private void StartTurn(Team team)
@@ -788,11 +968,24 @@ namespace Cantrip
         private static bool NotInAPile(Entity card) =>
             card.Zone.Length == 0 || card.Zone == Zones.Play || card.Zone == Zones.Powers;
 
-        public ActionResult Play(string cardName, Entity? target = null)
+        /// <summary>Plays the first card of that name in hand, for a game that thinks in names.</summary>
+        /// <param name="cardName">The card to look for, matched without regard to case.</param>
+        /// <param name="target">What to aim it at, or null for one that needs no target.</param>
+        /// <param name="performer">
+        /// The member making the play, or null for the card's controller. The card is looked for in
+        /// that member's own hand first and then in the party's, which is the leader's — the same
+        /// two shapes a party can take, told apart by whether the member has a hand at all.
+        /// </param>
+        public ActionResult Play(string cardName, Entity? target = null, Entity? performer = null)
         {
             Entity player = State.Player ?? throw new InvalidOperationException("There is no player.");
-            Entity? card = State.ZoneOf(player, Zones.Hand).FirstOrDefault(c => string.Equals(c.Name, cardName, StringComparison.OrdinalIgnoreCase));
-            return card == null ? ActionResult.NotInHand : Play(card, target);
+
+            // With no performer there is only the leader's hand, which is where this always looked.
+            Entity? card = Named(performer ?? player) ?? (performer == null ? null : Named(player));
+            return card == null ? ActionResult.NotInHand : Play(card, target, performer);
+
+            Entity? Named(Entity owner) =>
+                State.ZoneOf(owner, Zones.Hand).FirstOrDefault(c => string.Equals(c.Name, cardName, StringComparison.OrdinalIgnoreCase));
         }
 
         /// <summary>

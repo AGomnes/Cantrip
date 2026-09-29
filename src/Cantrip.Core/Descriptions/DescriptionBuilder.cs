@@ -64,7 +64,15 @@ namespace Cantrip.Descriptions
         /// you", not the enemy's whole repertoire. Pass the runtime and the enemy as well to get the
         /// numbers it would actually deal now, modifiers and all.
         /// </summary>
-        public Description DescribeMove(EntityDefinition definition, string moveName, CardRuntime? runtime = null, Entity? enemy = null)
+        /// <param name="definition">The enemy's definition, which is where the move is written.</param>
+        /// <param name="moveName">The move to describe, by the name its header gives it.</param>
+        /// <param name="runtime">The live game, for the numbers the move would deal now.</param>
+        /// <param name="enemy">The enemy making it, whose own modifiers are part of those numbers.</param>
+        /// <param name="against">
+        /// Who the move is aimed at, for the numbers and for the line it prints. Null reads the
+        /// leader, which is what it meant when a side had one member.
+        /// </param>
+        public Description DescribeMove(EntityDefinition definition, string moveName, CardRuntime? runtime = null, Entity? enemy = null, Entity? against = null)
         {
             if (definition == null) throw new ArgumentNullException(nameof(definition));
             if (moveName == null) throw new ArgumentNullException(nameof(moveName));
@@ -78,16 +86,18 @@ namespace Cantrip.Descriptions
                     nameof(moveName));
             }
 
-            Live? live = runtime != null && enemy != null ? new Live(runtime, enemy, runtime.Player) : null;
+            Entity? aim = against ?? runtime?.Player;
+            Live? live = runtime != null && enemy != null ? new Live(runtime, enemy, aim) : null;
             var session = new Session(this, definition, live);
             List<DescriptionSegment> segments = session.RenderMove(move);
 
-            return new Description(move.Name, definition, DescriptionLevel.Auto, Merge(segments), null, Tooltips(definition, session.References), null);
+            return new Description(move.Name, definition, DescriptionLevel.Auto, Merge(segments), null, Tooltips(definition, session.References), null, against?.Name);
         }
 
         /// <summary>
-        /// Describes what an enemy intends to do on its next turn. Empty while intents have not been
-        /// rolled, which is also what a UI should show then.
+        /// Describes what an enemy intends to do on its next turn, and who to: "Cutthroat → Vestal:
+        /// Deal 8 damage and apply 2 Bleeding" as <see cref="Description.ToLine"/> prints it. Empty
+        /// while intents have not been rolled, which is also what a UI should show then.
         /// </summary>
         public Description DescribeIntent(Entity enemy, CardRuntime runtime)
         {
@@ -97,7 +107,9 @@ namespace Cantrip.Descriptions
             if (enemy.Definition == null || enemy.Intent == null)
                 return new Description(enemy.Name, enemy.Definition, DescriptionLevel.Auto, new List<DescriptionSegment>(), null, new KeywordTooltip[0], null);
 
-            return DescribeMove(enemy.Definition, enemy.Intent, runtime, enemy);
+            // Who it is telegraphing against, asked now rather than when the intent was rolled, so
+            // a taunt applied since then has already moved the name the panel shows.
+            return DescribeMove(enemy.Definition, enemy.Intent, runtime, enemy, runtime.IntentTargetOf(enemy));
         }
 
         /// <summary>
@@ -1254,7 +1266,13 @@ namespace Cantrip.Descriptions
                     case NameExpr name:
                         switch (name.Name.ToLowerInvariant())
                         {
-                            case "target": return implicitTarget && IsCard ? string.Empty : Word("who.target") ?? "the target";
+                            // "to the target" is left off a move for the same reason it is left off
+                            // a card: it says nothing a reader did not already know, and an enemy's
+                            // move now names who it is aimed at beside the text rather than inside
+                            // it — "Cutthroat → Vestal: Deal 8 damage" instead of "Deal 8 damage to
+                            // the target". It is still written out where the word is not the
+                            // subject of the sentence, such as "Pull the target to the front".
+                            case "target": return implicitTarget && (IsCard || IsEnemy) ? string.Empty : Word("who.target") ?? "the target";
                             case "owner": return Word(IsStatus ? "who.holder" : "who.you") ?? name.Name;
                             case "self": return Word(IsEnemy ? "who.itself" : IsCard ? "who.this_card" : "who.you") ?? name.Name;
                             case "player": return Word(IsEnemy || IsStatus ? "who.player" : "who.you") ?? name.Name;

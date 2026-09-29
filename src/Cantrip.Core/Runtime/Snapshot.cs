@@ -82,15 +82,17 @@ namespace Cantrip.Runtime
         public List<int> PartyIds { get; set; } = new List<int>();
 
         /// <summary>
-        /// Whose step it is, under a turn order that has one. Zero under <c>turns: sides</c>, which
-        /// is the only mode this release has: there the party takes one turn between them and
-        /// <see cref="ActedIds"/> is what says who is still to act.
+        /// Whose step it was when this was written, or zero when none of the party's was. It is
+        /// written for a reader — a save browser, a bug report — and never read back: the restore
+        /// works it out again from <see cref="ActedIds"/> and the party, so a save that carries a
+        /// stale one cannot contradict the game it restores.
         /// </summary>
         public int ActiveMemberId { get; set; }
 
         /// <summary>
-        /// The members that have already taken their step this turn. Ids rather than slots, so a
-        /// member that moves mid-turn keeps having acted.
+        /// Everyone who has already taken their step this round — the party under
+        /// <c>turns: sides</c>, both sides under <c>turns: initiative</c>. Ids rather than slots, so
+        /// a member that moves, dies or is revived mid-round keeps having acted.
         /// </summary>
         public List<int> ActedIds { get; set; } = new List<int>();
 
@@ -483,6 +485,8 @@ namespace Cantrip.Runtime
                 ActiveTeam = (int)ActiveTeam,
                 InBattle = InBattle,
                 PlayerId = Player?.Id ?? 0,
+                // Written for a reader rather than for the restore: it is read back off ActedIds
+                // and the party, which are both here, so nothing loads it.
                 ActiveMemberId = ActiveMember?.Id ?? 0,
                 NextEntityId = _nextId,
                 NextSequence = _nextSequence,
@@ -767,7 +771,6 @@ namespace Cantrip.Runtime
 
             _acted.Clear();
             foreach (int id in snapshot.ActedIds ?? new List<int>()) _acted.Add(id);
-            ActiveMember = Lookup(snapshot.ActiveMemberId);
 
             _nextId = snapshot.NextEntityId;
             _nextSequence = snapshot.NextSequence;

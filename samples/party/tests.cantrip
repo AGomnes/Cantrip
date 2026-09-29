@@ -53,7 +53,8 @@ test "party an ability is on cooldown for the member that used it, not for the p
   cast Smite by Vestal on enemy
   expect enemy.hp == 37
 
-  # The Crusader's own Smite has no cooldown and is a different entity, so it is still ready.
+  # The Crusader's own Smite is a different entity with a cooldown of its own, so spending the
+  # Vestal's left his untouched.
   cast Smite by Crusader on enemy
   expect enemy.hp == 28
 

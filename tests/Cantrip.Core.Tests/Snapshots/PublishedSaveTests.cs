@@ -37,14 +37,14 @@ namespace Cantrip.Tests.Snapshots
         /// actor has a lane as well as a rank and says whether it is in the party, every game is
         /// played on a named board, and an enemy records who it is telegraphing against. So every
         /// hash of every game moved at once, which <c>docs/stability.md</c> allows and the
-        /// changelog records. What may not move is the save, and that is what the rest of this
+        /// changelog records. The party's second half moved them once more, for the opposite kind of reason: whose step it is stopped being mixed in at all, because it is read off who has already acted and who is standing, and both of those are mixed already. What may not move is the save, and that is what the rest of this
         /// file checks: the restored game is the same game, on the one-lane board that <em>is</em>
         /// preview.5's, with the party of one it was played as.
         /// </remarks>
-        private const ulong Saved = 15977894833483203837UL;
+        private const ulong Saved = 5776687334757442109UL;
 
         /// <summary>And the hash after playing one more turn from there. Was 6355761473111257813.</summary>
-        private const ulong OneTurnOn = 7805772150322525358UL;
+        private const ulong OneTurnOn = 2777102712212752942UL;
 
         [Fact]
         public void A_save_written_by_0_1_0_preview_5_restores_into_this_build()

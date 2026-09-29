@@ -18,7 +18,7 @@ namespace Cantrip.Content
         /// </summary>
         public static IReadOnlyCollection<string> SetupVerbs { get; } = new[]
         {
-            "player", "deck", "hand", "discard_pile", "relic", "grant", "seed", "answer",
+            "player", "deck", "hand", "discard_pile", "relic", "grant", "seed", "answer", "hero",
         };
 
         /// <summary>

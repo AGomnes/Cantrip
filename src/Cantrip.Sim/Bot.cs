@@ -135,23 +135,77 @@ namespace Cantrip.Sim
         }
     }
 
-    /// <summary>One thing the player could do now: play a card, or use an ability.</summary>
+    /// <summary>
+    /// How a bot takes a turn with a party rather than with one hero. The whole of the difference
+    /// between the two is here, so that a bot stays a scoring policy and nothing else.
+    /// </summary>
+    internal static class Party
+    {
+        /// <summary>A turn that asks this many members is a rules loop rather than a turn.</summary>
+        private const int MaxMembersPerTurn = 64;
+
+        /// <summary>
+        /// Plays the turn with every member that has a step in it, passing each one it is done with.
+        /// </summary>
+        /// <remarks>
+        /// A party of one is not passed at all: the runner's <c>EndTurn</c> ends its turn, exactly
+        /// as it did before a party existed, so every call the engine sees on a one-hero game is
+        /// the call it saw before. With more than one member, passing is how the turn moves on —
+        /// under <c>turns: initiative</c> it is the only way the next member ever comes up.
+        /// </remarks>
+        public static void EachMember(CardRuntime runtime, Action<Entity> play)
+        {
+            if (runtime.Party.Count <= 1)
+            {
+                if (runtime.Party.Count == 1) play(runtime.Party[0]);
+                return;
+            }
+
+            // The turn this is playing. Passing the last member ends it, and the next round's
+            // members are immediately waiting again — so without this the loop would play a whole
+            // battle inside one turn, and the runner would count it as one.
+            int round = runtime.State.Turn;
+
+            for (int step = 0; step < MaxMembersPerTurn && runtime.Won == null && runtime.State.Turn == round; step++)
+            {
+                List<Entity> waiting = Options.StillToAct(runtime);
+                if (waiting.Count == 0) return;
+
+                Entity member = waiting[0];
+                play(member);
+                if (runtime.Won != null || runtime.State.Turn != round) return;
+
+                // It fell while acting, so there is nothing of its own left to give up.
+                if (!runtime.CanAct(member)) continue;
+                if (runtime.Pass(member) != ActionResult.Played) return;
+            }
+        }
+    }
+
+    /// <summary>One thing a member of the party could do now: play a card, or use an ability.</summary>
     internal readonly struct Option
     {
-        public Option(int source, int target, bool ability)
+        public Option(int source, int target, bool ability, int by = 0)
         {
             Source = source;
             Target = target;
             Ability = ability;
+            By = by;
         }
 
-        /// <summary>The card in hand, or the ability attached to the player.</summary>
+        /// <summary>The card in hand, or the ability attached to the member.</summary>
         public int Source { get; }
 
         /// <summary>Who it is aimed at, or 0 for a play that resolves its own target.</summary>
         public int Target { get; }
 
         public bool Ability { get; }
+
+        /// <summary>
+        /// The member performing it, or 0 for the card's own controller — which is what a party of
+        /// one always is, and why nothing about a one-hero game reads differently here.
+        /// </summary>
+        public int By { get; }
     }
 
     /// <summary>
@@ -160,40 +214,56 @@ namespace Cantrip.Sim
     /// </summary>
     internal static class Options
     {
-        public static List<Option> Legal(CardRuntime runtime)
+        /// <param name="actor">
+        /// The member whose options these are, or null for the leader. A member with a hand of its
+        /// own plays from it; one without plays from the party's, which is the leader's, and the
+        /// play names it as the performer. For a party of one both readings are the same actor,
+        /// which is why a game with no <c>hero</c> in it cannot tell this parameter exists.
+        /// </param>
+        public static List<Option> Legal(CardRuntime runtime, Entity? actor = null)
         {
             var options = new List<Option>();
             Entity player = runtime.Player!;
+            Entity who = actor ?? player;
+            bool performing = !ReferenceEquals(who, player);
 
-            foreach (Entity card in runtime.State.ZoneOf(player, Zones.Hand).ToArray())
+            Entity holder = runtime.State.ZoneOf(who, Zones.Hand).Count > 0 ? who : player;
+            foreach (Entity card in runtime.State.ZoneOf(holder, Zones.Hand).ToArray())
             {
-                if (runtime.CanPlay(card)) Aim(runtime, card, ability: false, options);
+                if (runtime.CanPlay(card)) Aim(runtime, card, ability: false, options, performing ? who.Id : 0);
             }
 
             // A fight with no cards in it is still a fight, so an ability off cooldown is a play too.
-            foreach (Entity ability in player.Attached.ToArray())
+            foreach (Entity ability in who.Attached.ToArray())
             {
                 if (ability.Kind == EntityKind.Ability && !ability.IsRemoved && runtime.IsReady(ability))
-                    Aim(runtime, ability, ability: true, options);
+                    Aim(runtime, ability, ability: true, options, 0);
             }
 
             return options;
         }
 
         /// <summary>
+        /// The members that still have a step this turn, in the order the engine offers them. For a
+        /// party of one that is the leader, until it has passed.
+        /// </summary>
+        public static List<Entity> StillToAct(CardRuntime runtime) =>
+            runtime.Party.Where(runtime.CanAct).ToList();
+
+        /// <summary>
         /// Adds one option per legal target for something that needs one, or a single option for
         /// anything else, which resolves its own target as a self card does.
         /// </summary>
-        private static void Aim(CardRuntime runtime, Entity source, bool ability, List<Option> options)
+        private static void Aim(CardRuntime runtime, Entity source, bool ability, List<Option> options, int by)
         {
             string mode = runtime.TargetMode(source);
             if (mode == "enemy" || mode == "ally")
             {
-                foreach (Entity target in runtime.LegalTargets(source)) options.Add(new Option(source.Id, target.Id, ability));
+                foreach (Entity target in runtime.LegalTargets(source)) options.Add(new Option(source.Id, target.Id, ability, by));
             }
             else
             {
-                options.Add(new Option(source.Id, 0, ability));
+                options.Add(new Option(source.Id, 0, ability, by));
             }
         }
 
@@ -203,9 +273,10 @@ namespace Cantrip.Sim
             if (source == null) return false;
 
             Entity? target = option.Target == 0 ? null : runtime.State.Find(option.Target);
+            Entity? by = option.By == 0 ? null : runtime.State.Find(option.By);
             return (option.Ability
                 ? runtime.UseAbility(source, target)
-                : runtime.Play(source, target)) == ActionResult.Played;
+                : runtime.Play(source, target, by)) == ActionResult.Played;
         }
 
         public static string Describe(CardRuntime runtime, Option option)
