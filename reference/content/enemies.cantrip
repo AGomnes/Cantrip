@@ -1,0 +1,102 @@
+# Every enemy here carries the same two lines:
+#
+#     on every 3 turns:
+#       gain 1 Fervour
+#
+# The water rises, and it has to, because without it the chapel allows a fight that never ends:
+# heals and block on our side, a fixed hit on theirs. `cantrip sim` found three battles at the
+# turn limit the first time it was run. They are copied six times because a `.cantrip` file has
+# no base declaration, no template and no way to say "every enemy also does this".
+#
+# Everything in the chapel telegraphs who it is going to hit, with `at`. A Guard re-aims that
+# telegraph without rolling anything again, which is what makes a taunt readable.
+#
+# Nothing here writes `player`: with a `hero` declared, `deal 5 to player` inside a move would
+# hit the leader however carefully the move telegraphed somebody else, and the parser refuses it
+# (CT326). `target` is whoever the move was aimed at; `enemies` inside an enemy is our side.
+
+enemy "Drowned Acolyte"
+  hp 24
+  speed 0
+  attack 6
+  on every 3 turns:          # the water rises; see the note at the top of the file
+    gain 1 Fervour
+  move "Clutch" at lowest hp enemies:
+    deal attack to target
+    apply Soaked 1 to target
+  move "Gurgle" at random enemies:
+    deal 4 to target
+  pattern cycle Clutch, Gurgle
+
+# A reach of its own, in its move header, measured by exactly the rule a card's `range` is.
+enemy "Bell Warden"
+  hp 32
+  speed 1
+  attack 8
+  on every 3 turns:          # the water rises; see the note at the top of the file
+    gain 1 Fervour
+  move "Toll" range 1..3 at highest hp enemies:
+    deal attack to target
+    apply Rust 2 to target
+  move "Brace":
+    block 10
+  pattern cycle Toll, Brace
+
+# A summoner. Its young land on its own aisle, and an aisle with no room turns the summon away
+# rather than growing: two ranks, so the third Tooth in an aisle is never made.
+enemy "Choir of Teeth"
+  hp 20
+  speed 0
+  attack 5
+  on every 3 turns:          # the water rises; see the note at the top of the file
+    gain 1 Fervour
+  move "Spawn":
+    create Tooth
+  move "Bite" at lowest rank enemies:
+    deal attack to target
+  pattern cycle Spawn, Bite
+
+actor "Tooth"
+  hp 6
+  attack 3
+  on every 3 turns:          # the water rises; see the note at the top of the file
+    gain 1 Fervour
+  tags summoned
+  on turn_end:
+    deal attack to lowest rank enemies
+
+# Movement from the other side of the board: it drags whoever it hits one rank back, which takes
+# that hero out of a melee card's reach until somebody spends a Wade or a Punt putting them back.
+# Seepage puts a curse in the deck the long way round; see the note on `Seeping` in statuses.
+enemy "Tidewalker"
+  hp 28
+  speed 2
+  attack 7
+  on every 3 turns:          # the water rises; see the note at the top of the file
+    gain 1 Fervour
+  move "Drag" at lowest hp enemies:
+    deal attack to target
+    target.rank += 1
+  move "Seepage":
+    apply Seeping 1 to leader
+  pattern cycle Drag, Seepage
+
+enemy "The Antiphonary"
+  hp 72
+  speed 1
+  attack 10
+  on every 3 turns:          # the water rises; see the note at the top of the file
+    gain 1 Fervour
+  phase Sealed when hp > max_hp / 2
+  phase Unbound when hp <= max_hp / 2, retelegraph
+  move "Recitation" phase Sealed at highest hp enemies:
+    deal attack to target
+    apply Dread 2 to target
+  move "Hymnal" phase Sealed:
+    block 8
+    gain 1 Fervour
+  move "Cataract" phase Unbound at random enemies:
+    deal 12 to target
+  move "Antiphon of Teeth" phase Unbound:
+    create Tooth
+    deal 6 to enemies

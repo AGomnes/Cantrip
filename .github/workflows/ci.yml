@@ -117,6 +117,28 @@ jobs:
       - name: Simulate samples/party
         run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- sim samples/party --runs 100
 
+      # The reference game: a whole roguelite built with the library from the published docs, a
+      # party on a board under `turns: initiative`, cards and abilities together, and a run above
+      # the battle written in C#. It is the sample that has to keep working as a *game* rather
+      # than as an illustration of one feature, so a change that only shows up when several of
+      # them are used at once fails here. See reference/FINDINGS.md.
+      - name: Lint reference/content
+        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- lint reference/content --warnings-as-errors
+
+      - name: DSL tests (reference/content)
+        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- test reference/content
+
+      - name: Simulate reference/content
+        run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- sim reference/content --runs 100
+
+      # A whole descent, played headlessly, on eight seeds, each one saved part-way down and
+      # restored into a separate runtime that then has to play the rest of the run identically.
+      # That is the promise 1.x makes about saves, checked against a real run rather than a unit.
+      - name: The reference game plays itself
+        run: |
+          dotnet build reference/host/Cantrip.Reference.csproj -c Release
+          dotnet run --project reference/host -c Release --no-build -- --check
+
       # Pack the two NuGet packages and follow docs/quickstart.md word for word against them, in an
       # empty folder. This is what a new user does first, so it is what must never break. Linux
       # only: the packages are the same on both, and the script is bash.
@@ -186,6 +208,21 @@ jobs:
 
       - name: Editor dock self-test
         run: timeout 300 "$GODOT" --headless --path godot/Cantrip.Demo --import -- --cantrip-selftest
+
+      # The reference game as a Godot project of its own. assemble.sh puts the addon and the
+      # content in place, because Godot finds scripts by path inside the project and neither is
+      # in the repository twice.
+      - name: Assemble the reference game
+        run: |
+          bash reference/godot/assemble.sh
+          dotnet build reference/godot/Cantrip.Reference.Godot.csproj
+          timeout 300 "$GODOT" --headless --path reference/godot --import
+
+      - name: The reference game answers for the node
+        run: timeout 300 "$GODOT" --headless --path reference/godot res://game/checks.tscn
+
+      - name: The reference game plays a whole descent in Godot
+        run: timeout 300 "$GODOT" --headless --path reference/godot res://game/chapel.tscn -- --chapel-auto
 
       # The addon as a user gets it: the release zip unzipped into a blank Godot project outside the
       # repository, Cantrip.Core added the way docs/godot.md says, then a battle from GDScript. The

@@ -1,0 +1,21 @@
+<Project Sdk="Godot.NET.Sdk/4.6.2">
+
+  <!--
+    Godot 4.6 .NET builds with net8.0. The addon's C# sources live under addons/cantrip in this
+    project, put there by assemble.sh: Godot finds scripts by path inside the project's own
+    assembly, so the addon cannot be a package or a project reference. Only the rules engine
+    underneath it can be, and in this repository that is the project next door.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <AssemblyName>Cantrip.Reference.Godot</AssemblyName>
+    <RootNamespace>Cantrip.GodotAdapter</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Cantrip.Core\Cantrip.Core.csproj" SetConfiguration="Configuration=Release" />
+  </ItemGroup>
+
+</Project>

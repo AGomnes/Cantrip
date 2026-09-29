@@ -1,0 +1,36 @@
+; The Drowned Chapel, as a Godot game.
+;
+; This is a Godot project of its own rather than a scene inside godot/Cantrip.Demo, because a
+; game is not a sample: it has its own content folder, its own main scene and its own assembly,
+; and the demo project's dock lints every .cantrip file in its project, so two games in one
+; project would clash on names.
+;
+; `addons/cantrip` and `content/` are NOT in the repository. They are assembled by
+; reference/godot/assemble.sh from the one copy of each -- the addon under
+; godot/Cantrip.Demo/addons/cantrip and the content under reference/content -- because Godot
+; finds scripts by path inside the project, so an addon cannot be referenced, only placed.
+;
+;   bash reference/godot/assemble.sh
+;   dotnet build reference/godot/Cantrip.Reference.Godot.csproj
+;   Godot_v4.6.2-stable_mono_win64.exe --path reference/godot
+
+config_version=5
+
+[application]
+
+config/name="The Drowned Chapel"
+config/description="The reference game for Cantrip: a party of three descends a flooded chapel."
+config/features=PackedStringArray("4.6", "C#")
+run/main_scene="res://game/chapel.tscn"
+
+[cantrip]
+
+content/folder="res://content"
+
+[dotnet]
+
+project/assembly_name="Cantrip.Reference.Godot"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/cantrip/plugin.cfg")

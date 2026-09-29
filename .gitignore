@@ -56,3 +56,9 @@ scratch/
 
 ## Design notes (kept local, not published)
 gameplay-effects-dsl.md
+
+## The reference game's Godot project is assembled, not committed: the addon is only in
+## godot/Cantrip.Demo/addons/cantrip and the content is only in reference/content.
+## reference/godot/assemble.sh puts both in place.
+reference/godot/addons/
+reference/godot/content/

@@ -1,0 +1,43 @@
+# The Drowned Chapel — the reference game for Cantrip 1.0.
+#
+# A party of three descends seven floors of a flooded chapel: five fights, a shrine and a
+# vestry. The battles are Cantrip's; the floors, the gold, the shop, the rewards and the save
+# file are the game's own code, because Cantrip does not model a run. See reference/README.md.
+#
+# Run:  dotnet run --project reference/host -- --seed 7
+#       dotnet cantrip test reference/content
+#       dotnet cantrip sim  reference/content
+
+ruleset
+  clock turns
+
+  # `initiative`, not `sides`. A chapel fight is about who is standing where and who acts when,
+  # so one order over both sides is the rule the game wants: the Ferryman's speed is worth as
+  # much as his damage, and a Warden who takes his step late has already been hit.
+  #
+  # It costs the host an `ActiveMember` loop rather than a free-order pass loop, and it costs the
+  # content one thing that is easy to miss: the leader holds the party's hand, so the leader's
+  # own step is when the party draws. The Acolyte is given `speed 6` for that reason alone.
+  turns: initiative
+  order: speed
+
+  hand_size 5
+  max_hand_size 10
+
+# The leader is made by `CreatePlayer`, which reads no declaration, so `speed` has to be a
+# resource for the host to be able to write one onto it at all. Every hero gets its speed from
+# its own `hero` block; only the leader needs this.
+resource "speed"
+  min 0
+  max 99
+
+# Two aisles, two ranks, mirrored. Small on purpose: three heroes and up to four enemies fill it,
+# so the front rank is contested and `range` means something. The words are the chapel's.
+board "Chapel"
+  lanes 2
+  ranks 2
+  facing
+  metric manhattan
+  on_vacated gap
+  lane_word "aisle"
+  rank_word "rank"

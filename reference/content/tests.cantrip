@@ -1,0 +1,316 @@
+# Every test here starts a party: `player` makes the leader and each `hero` line adds a member,
+# who is also bound to its own name, so `Warden.hp` reads the live member.
+#
+# `speed 6` on the leader is not decoration. Under `turns: initiative` with `order: speed`, the
+# leader's own step is when the party's hand is drawn, and a leader with no speed reads 0 and
+# takes that step last.
+#
+# Where everyone stands, with three of ours and four of theirs on a 2x2 facing board. Both
+# sides fill the first aisle before the second, so the order is (0,0), (0,1), (1,0), (1,1):
+#
+#   ours                              theirs
+#   (0,0) leader  (1,0) Cantor        (0,0) enemy   (1,0) enemy3
+#   (0,1) Warden  (1,1) Ferryman      (0,1) enemy2  (1,1) enemy4
+#
+# Across the sides the slot term is a.rank + b.rank + 1, so leader-to-enemy is 1,
+# Warden-to-enemy is 2, Warden-to-enemy3 is 3, and anything in the other aisle is one further.
+
+# --- the board and reach ---------------------------------------------------------------------
+
+test "the party fills the first aisle, then the second"
+  player hp 40 speed 6
+  hero Warden
+  hero Cantor
+  enemy "Drowned Acolyte"
+  expect player.lane == 0
+  expect player.rank == 0
+  expect Warden.rank == 1
+  expect Cantor.lane == 1
+
+test "a facing board puts the two front ranks one step apart"
+  player hp 40 speed 6
+  hero Warden
+  enemy "Drowned Acolyte"
+  expect distance(player, enemy) == 1
+  expect distance(Warden, enemy) == 2
+
+test "Censer reaches the enemy front rank from our back rank"
+  player hp 40 speed 6
+  hero Warden
+  hand Censer
+  enemy "Drowned Acolyte"
+  play Censer by Warden on enemy
+  expect enemy.hp == 17
+
+test "and from back there it can reach three steps but not four"
+  player hp 40 speed 6
+  hero Warden
+  hand Censer
+  enemy "Drowned Acolyte"
+  enemy "Drowned Acolyte"
+  enemy "Drowned Acolyte"
+  enemy "Drowned Acolyte"
+  expect count(enemies) == 4
+  expect distance(Warden, enemy3) == 3
+  expect distance(Warden, enemy4) == 4
+  play Censer by Warden on enemy3
+  expect enemy3.hp == 17
+  expect enemy4.hp == 24
+
+test "Pike's own where takes the front rank, and no modifier can rewrite it"
+  player hp 40 speed 6
+  hero Warden
+  hand Pike
+  enemy "Drowned Acolyte"
+  enemy "Drowned Acolyte"
+  enemy "Drowned Acolyte"
+  play Pike
+  expect enemy.hp == 15
+  expect enemy3.hp == 24
+
+test "Rust shortens a card that printed no range at all"
+  player hp 40 speed 6
+  hero Warden
+  hand Pike
+  enemy "Drowned Acolyte"
+  apply Rust 2 to player
+  expect player.Rust == 2
+  play Pike
+  expect enemy.hp == 15
+
+test "Wade moves an ally a rank, and the hole it leaves is a swap"
+  player hp 40 speed 6
+  hero Warden
+  hand Wade
+  enemy "Drowned Acolyte"
+  expect Warden.rank == 1
+  play Wade by Warden on Warden
+  expect Warden.rank == 0
+  expect player.rank == 1
+
+test "Harpoon drags an enemy to the front, swapping it with whoever stood there"
+  player hp 40 speed 6
+  hero Warden
+  hand Wade
+  enemy "Drowned Acolyte"
+  enemy "Drowned Acolyte"
+  expect enemy.rank == 0
+  expect enemy2.rank == 1
+
+  # The Warden has to come forward first: from our back rank the enemy back rank is three
+  # steps away, and Harpoon reaches two.
+  play Wade by Warden on Warden
+  expect Warden.rank == 0
+  cast Harpoon by Warden on enemy2
+  expect enemy2.hp == 17
+  expect enemy2.rank == 0
+  expect enemy.rank == 1
+
+# --- the party -------------------------------------------------------------------------------
+
+test "a member performs a play out of the leader's hand, and the leader pays"
+  player hp 40 speed 6 energy 3
+  hero Cantor
+  hand Litany
+  enemy "Drowned Acolyte"
+  play Litany by Cantor on Cantor
+  expect player.energy == 2
+  expect Cantor.Fervour == 1
+  expect player.Fervour == 0
+
+test "Pilgrim's Token asks who spoke the words, not who owns the card"
+  player hp 40 speed 6
+  hero Warden
+  hero Cantor
+  relic "Pilgrim's Token"
+  hand Litany, Litany
+  deal 10 to Cantor
+  deal 10 to Warden
+  enemy "Drowned Acolyte"
+  play Litany by Cantor on Cantor
+  expect Cantor.hp == 16
+  play Litany by Warden on Warden
+  expect Warden.hp == 24
+
+test "the Baton buffs the whole party, which of party would not"
+  player hp 40 speed 6
+  hero Warden
+  relic "Choirmaster's Baton"
+  hand Censer, Censer
+  enemy "Drowned Acolyte"
+  play Censer on enemy
+  expect enemy.hp == 15
+  play Censer by Warden on enemy
+  expect enemy.hp == 6
+
+test "a cooldown belongs to the member, so two of them are two cooldowns"
+  player hp 40 speed 6
+  hero Warden
+  hero Ferryman
+  enemy "Drowned Acolyte"
+  cast Bulwark by Warden on Warden
+  expect Warden.block == 9
+  cast Punt by Ferryman on Warden
+  expect Warden.rank == 0
+
+test "Dirge waits three rounds"
+  player hp 40 speed 6
+  hero Cantor
+  enemy "Drowned Acolyte"
+  cast Dirge by Cantor on enemy
+  end turn
+  end turn
+  end turn
+  cast Dirge by Cantor on enemy
+  expect enemy.Dread == 2
+
+test "Bell Rope halves it, through a status it hands the party"
+  player hp 40 speed 6
+  hero Cantor
+  relic "Bell Rope"
+  enemy "Drowned Acolyte"
+  expect Cantor.Quickened == 1
+  cast Dirge by Cantor on enemy
+  end turn
+  end turn
+  cast Dirge by Cantor on enemy
+  expect enemy.Dread == 2
+
+test "the battle is lost only when the last member falls"
+  player hp 40 speed 6
+  hero Warden
+  enemy "Drowned Acolyte"
+  deal 99 to player
+  expect player.dead
+  expect Warden.alive
+  expect not enemy.dead
+
+test "the fallen leave the party, and nothing in content can name them again"
+  player hp 40 speed 6
+  hero Warden
+  hero Cantor
+  enemy "Drowned Acolyte"
+  expect party.count == 3
+  deal 99 to Cantor
+  expect party.count == 2
+  expect count(everyone where zone:dead) == 0
+
+# --- statuses, taunts and telegraphs ---------------------------------------------------------
+
+test "Guard re-aims a telegraph that was already rolled"
+  player hp 40 speed 6
+  hero Warden
+  hero Cantor
+  deal 20 to Cantor
+  enemy "Drowned Acolyte"
+  expect enemy.intent == "Clutch"
+  expect enemy.intent_target == Cantor
+  cast Bulwark by Warden on Warden
+  expect enemy.intent_target == Warden
+
+test "Soaked ticks on its host's turn end and washes off with Antiphon"
+  player hp 40 speed 6
+  hero Warden
+  hero Cantor
+  enemy "Drowned Acolyte"
+  apply Soaked 3 to Warden
+  cast Antiphon by Cantor on Warden
+  expect Warden.Soaked == 0
+
+test "Dread is a duration on the enemy, so it covers that enemy's next turns"
+  player hp 40 speed 6
+  hero Cantor
+  enemy "Drowned Acolyte"
+  cast Dirge by Cantor on enemy
+  expect enemy.Dread == 2
+  end turn
+  expect enemy.Dread == 1
+
+test "Benediction is persistent, so the run carries it between battles"
+  player hp 40 speed 6
+  hero Warden
+  hand Grace
+  enemy "Drowned Acolyte"
+  play Grace by Warden on Warden
+  expect Warden.Benediction == 1
+  expect Warden.hp == 34
+
+test "Benediction takes 1 off every hit the member takes"
+  player hp 40 speed 6
+  hero Warden
+  enemy "Drowned Acolyte"
+  apply Benediction 2 to Warden
+  deal 9 to Warden
+  expect Warden.hp == 27
+
+# --- the enemies -----------------------------------------------------------------------------
+
+test "an aisle two ranks deep holds the Choir and one Tooth, and turns the next away"
+  player hp 40 speed 6
+  enemy "Choir of Teeth"
+  expect enemy.intent == "Spawn"
+  end turn
+  end turn
+  end turn
+  end turn
+  end turn
+  end turn
+  expect count(enemies where name:Tooth) == 1
+
+test "the Tidewalker drags a hero back a rank, out of a melee card's reach"
+  player hp 40 speed 6
+  hero Warden
+  hand Wade
+  enemy Tidewalker
+  expect enemy.intent == "Drag"
+  play Wade by Warden on Warden
+  expect Warden.rank == 0
+  end turn
+  expect Warden.rank == 1
+
+test "Seepage puts a curse in the leader's deck"
+  player hp 40 speed 6
+  hero Warden
+  enemy Tidewalker
+  end turn
+  end turn
+  expect count(deck where name:Brine) == 1
+  expect player.Seeping == 1
+
+test "the Antiphonary opens its Unbound phase with Cataract"
+  player hp 40 speed 6
+  enemy "The Antiphonary"
+  expect enemy.phase == "Sealed"
+  expect enemy.intent == "Recitation"
+  deal 40 to enemy
+  expect enemy.phase == "Unbound"
+  expect enemy.intent == "Cataract"
+
+test "Tideglass gives the whole party block on the first turn of a battle"
+  player hp 40 speed 6
+  hero Warden
+  hero Cantor
+  relic Tideglass
+  enemy "Drowned Acolyte"
+  expect player.block == 8
+  expect Warden.block == 8
+  expect Cantor.block == 8
+
+test "Drowned Coin turns a kill into gold the run can spend"
+  player hp 40 speed 6
+  relic "Drowned Coin"
+  enemy "Drowned Acolyte"
+  enemy "Drowned Acolyte"
+  expect player.gold == 0
+  deal 99 to enemy
+  expect player.gold == 2
+
+test "Reliquary pays each member once a turn for a holy card"
+  player hp 40 speed 6
+  hero Warden
+  hand Reliquary, Litany, Litany
+  enemy "Drowned Acolyte"
+  play Reliquary
+  expect Warden.Fervour == 1
+  play Litany by Warden on Warden
+  expect Warden.block == 9

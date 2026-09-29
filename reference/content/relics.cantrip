@@ -1,0 +1,44 @@
+# Relics belong to the leader, which is what makes them the run's: besides hp, the deck and
+# Benediction they are the only thing a player carries out of a battle.
+#
+# Two of them are written the long way round, and the comments say why. A relic in a party game
+# is where the difference between "the holder" and "the party" bites hardest.
+
+relic "Tideglass"
+  on turn_start once per battle:
+    block 8 to party
+
+# The run's currency, earned inside a battle and spent outside it. `gold` is a stat on the leader,
+# so it is saved and restored with the battle rather than with the game's own run file, which is
+# the one piece of the run above the battle that Cantrip does keep for you.
+relic "Drowned Coin"
+  on killed(target:enemies):
+    gain 2 gold
+
+# `of everyone ... source:allies`, not `of party`.
+#
+# A bare `modify damage: +2` anchors to the holder, and a hero is its own controller, so it buffs
+# the leader's own plays and nobody else's. `of party` and `of allies` buff nothing the party
+# does at all: on the `damage` channel an `of` group is matched against the damage's *target*.
+# `of everyone` is the only group that makes the query run, and `source:allies` puts back the
+# side the `of` was supposed to name. See reference/FINDINGS.md #1.
+relic "Choirmaster's Baton"
+  modify damage of everyone where tag:holy, source:allies: +2
+  text: "The party's holy cards deal 2 more damage."
+
+relic "Pilgrim's Token"
+  on card_played(tag:holy):
+    if event.source.has(tag:devout):
+      heal 2 to event.source
+
+# `modify cooldown: x50%` on a relic reaches the leader's own abilities and no hero's, and no `of`
+# group reaches one either, so the shortening is pushed onto each member as a status instead.
+# See reference/FINDINGS.md #2.
+relic "Bell Rope"
+  on battle_start:
+    apply Quickened 1 to party
+  text: "Every ability the party uses recharges twice as fast."
+
+relic "Lantern of Ebb"
+  on instead_of_died(target:owner) once per run:
+    heal 20

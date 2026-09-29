@@ -1,0 +1,84 @@
+# The party. The leader — the Acolyte — is made by the host with `CreatePlayer` and holds the
+# run: the deck, the relics, the gold and the party's energy. These two start beside him; the
+# Ferryman is recruited at a shrine, part-way down.
+
+hero "Warden"
+  hp 34
+  speed 2
+  tags armoured
+  abilities Bulwark, Harpoon
+
+hero "Cantor"
+  hp 24
+  speed 1
+  tags devout
+  abilities Antiphon, Dirge
+
+hero "Ferryman"
+  hp 28
+  speed 3
+  abilities Punt, Gaff
+
+# --- the leader's own ability, granted by the host with GrantAbility ------------------------
+
+ability "Invocation"
+  cooldown 3 turns
+  effect:
+    draw 2
+    gain 1 energy
+  text: "Draw {draw} and gain 1 energy."
+
+# --- the Warden -----------------------------------------------------------------------------
+
+ability "Bulwark"
+  cooldown 2 turns
+  target ally
+  effect:
+    block 9 to target
+    apply Guard 1 to target
+
+# `range 1..2` is a reach, not a number of slots anybody had to count: on a facing board the
+# front ranks of the two sides are one step apart, so this reaches the enemy front from either
+# of our ranks and the enemy back rank only from ours.
+ability "Harpoon"
+  cooldown 2 turns
+  range 1..2
+  target enemy
+  effect:
+    deal 7 to target
+    target.rank = 0
+  text: "Deal {damage} damage and drag the target to the front rank."
+
+# --- the Cantor -----------------------------------------------------------------------------
+
+ability "Antiphon"
+  cooldown 2 turns
+  target ally
+  effect:
+    heal 8 to target
+    remove tag:curse from target
+
+# The front rank only: a dirge is sung to whoever is close enough to hear it.
+ability "Dirge"
+  cooldown 3 turns
+  target enemy where it.rank <= 0
+  effect:
+    deal 5 to target
+    apply Dread 2 to target
+
+# --- the Ferryman ---------------------------------------------------------------------------
+
+ability "Punt"
+  cooldown 1 turns
+  target ally
+  effect:
+    target.rank -1
+  text: "Push an ally one rank forward."
+
+ability "Gaff"
+  cooldown 2 turns
+  range 1..2
+  target enemy
+  effect:
+    deal 6 to target
+    apply Rust 2 to target

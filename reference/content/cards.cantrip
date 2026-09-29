@@ -1,0 +1,111 @@
+# The Acolyte's book. One hand and one energy pool, held by the leader; any member may perform a
+# play, so the cost comes out of the leader's pool and everything else — the damage, the tags,
+# `source` — is the performer's.
+
+card "Censer"
+  cost 1
+  target enemy
+
+  # 1..3, not 1..2. On a 2x2 facing board the far aisle back rank is 3 steps from our front
+  # rank and 4 from our back one, so at 1..2 a Tooth could stand where no card in the starter
+  # deck could reach it and the fight could not end. Nothing warned about that: it is not a
+  # stall the linter can see, and `cantrip sim` only found it because the scenario happened to
+  # buy Aspersion. See reference/FINDINGS.md.
+  range 1..3
+  tags attack, holy, starter
+  effect:
+    deal 7 to target
+
+card "Litany"
+  cost 1
+  target ally
+  tags holy, starter
+  effect:
+    block 6 to target
+    apply Fervour 1 to source
+
+card "Wade"
+  cost 0
+  target ally
+  tags starter
+  effect:
+    target.rank -1
+  text: "Move an ally one rank forward."
+
+card "Aspersion"
+  cost 2
+  target enemy
+  tags attack, holy, reward
+  effect:
+    deal 4 to enemies in within(target, 1)
+
+# The front rank only, written on the card's own `target` line, where no stranger's modifier can
+# rewrite it. A Rust on the performer shortens `range`; it cannot touch this.
+card "Pike"
+  cost 1
+  target enemy where it.rank <= 0
+  tags attack, reward
+  effect:
+    deal 9 to target
+
+card "Grace"
+  cost 1
+  target ally
+  tags holy, reward
+  effect:
+    heal 6 to target
+    apply Benediction 1 to target
+
+card "Requiem"
+  cost 3
+  target enemy
+  tags attack, holy, reward
+  effect:
+    deal 12 to target
+    if target.dead:
+      draw 2
+
+# A power: it goes to the powers zone and its listener works for the rest of the battle.
+# `event.source` is the member that played the holy card, which for a party is the point.
+card "Reliquary"
+  cost 2
+  tags power, holy, reward
+  effect:
+    apply Fervour 1 to party
+  on card_played(tag:holy) once per turn:
+    block 3 to event.source
+  text: "Give the party 1 Fervour. The first holy card each member plays gives them 3 block."
+
+# --- what the shop sells ---------------------------------------------------------------------
+
+card "Censer+"
+  cost 1
+  target enemy
+  range 1..3
+  tags attack, holy, upgraded
+  effect:
+    deal 11 to target
+
+card "Pike+"
+  cost 1
+  target enemy where it.rank <= 0
+  tags attack, upgraded
+  effect:
+    deal 14 to target
+
+card "Grace+"
+  cost 1
+  target ally
+  tags holy, upgraded
+  effect:
+    heal 9 to target
+    apply Benediction 2 to target
+
+# --- what the chapel puts in the deck ----------------------------------------------------------
+
+card "Brine"
+  cost 0
+  tags curse, unplayable
+  on turn_end:
+    lose 2 hp
+  text: "Unplayable. Lose 2 hp at the end of your turn while this is in hand."

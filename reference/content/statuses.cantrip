@@ -1,0 +1,61 @@
+# Guard is the taunt, written exactly as samples/party writes it: while it is on somebody,
+# nobody else on their side may be aimed at by the other side. It re-aims an enemy's telegraph
+# with no new event and no second roll.
+status "Guard"
+  tags buff
+  stacking none
+  modify targetable of allies where source:enemies, not it.has(Guard): set 0
+
+# The chapel's water. A curse tag, so Antiphon can wash it off by tag rather than by name.
+status "Soaked"
+  tags debuff, dot, curse
+  stacking intensity
+  on owner.turn_end:
+    deal stacks to owner, ignore block
+    stacks -1
+
+# Applied to an enemy, so the enemy hits softer. `duration`, so N covers the enemy's next N turns.
+status "Dread"
+  tags debuff
+  stacking duration
+  modify damage: x60%
+
+status "Fervour"
+  tags buff
+  stacking intensity
+  modify damage: +stacks
+
+# The one status that survives a battle, which is what makes it a run reward rather than a
+# combat trick: `persistent`, so the tidy-up at the end of a battle leaves it alone.
+status "Benediction"
+  tags buff
+  stacking intensity
+  flags persistent
+  modify damage_taken: -stacks
+
+# What the Bell Warden's toll does to a hero: everything that hero points at becomes melee.
+status "Rust"
+  tags debuff
+  stacking duration
+  modify range: set 1
+
+# The workaround for a relic that cannot reach a party member's cooldown: the relic hands this
+# out at the start of each battle instead. Not `persistent`, so it is handed out again.
+status "Quickened"
+  tags buff
+  stacking none
+  modify cooldown: x50%
+
+# The Tidewalker's leak, and a workaround rather than a design.
+#
+# What this wants to be is one line in the Tidewalker's move: `create Brine into discard to
+# leader`. An enemy that creates a card creates it in *its own* discard pile, and the `to` clause
+# is accepted and ignored, so the curse never reaches the player's deck and nothing says so.
+# A card made by something the leader controls does land in the leader's pile, so the move applies
+# this to the leader and this makes the card. See reference/FINDINGS.md #7.
+status "Seeping"
+  tags debuff
+  stacking none
+  on status_applied(Seeping, target:owner):
+    create Brine into discard
+  text: "Brine seeps into your deck."

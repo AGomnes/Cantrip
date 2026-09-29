@@ -1,0 +1,40 @@
+# The descent, played by bots. This is the same five floors the host plays in
+# reference/host/Run.cs, with the choices taken out: no map, no rewards offered, no shop. What a
+# scenario can say about a run is what happens if you take the middle of every decision, so the
+# rewards are written in as the statements a bot cannot choose, and the shrine is a `heal`.
+#
+# The two lines at the bottom are what this is for. `wins`, `hp_left` and `turns` are printed and
+# not checked: three members make every bot's hp heuristic worse rather than better, and under
+# `turns: initiative` a bot that spends the Ferryman's step on a Punt has spent a whole step on
+# a card that deals nothing. A win rate here is a fact about the bot.
+#
+# Run:  dotnet run --project src/Cantrip.Cli -- sim reference/content
+
+scenario "The Drowned Chapel"
+  runs 200
+
+  player hp 40 max_hp 40 energy 3 speed 6
+  hero Warden
+  hero Cantor
+  deck 3 Censer, 3 Litany, 2 Wade, Pike, Grace
+
+  battle "Drowned Acolyte"
+
+  relic "Drowned Coin"
+  battle "Drowned Acolyte", "Choir of Teeth"
+
+  # The shrine. The host offers a rest, a recruit or a raise here; a scenario takes one.
+  heal 12
+  hero Ferryman
+  battle "Bell Warden", Tidewalker
+
+  # The shop, spent for the party rather than chosen.
+  relic "Choirmaster's Baton"
+  deck Requiem, Aspersion
+  battle "Bell Warden", "Drowned Acolyte", "Choir of Teeth"
+
+  relic Tideglass
+  battle "The Antiphonary"
+
+  expect no stalls
+  expect no errors
