@@ -100,7 +100,7 @@ namespace Cantrip.Tests.Snapshots
         private static readonly Lazy<string> SampleContent = new Lazy<string>(() =>
             File.ReadAllText(Path.Combine(RepositoryRoot(), "samples", "basic", "content.cantrip")));
 
-        public static CardRuntime NewBattle(ulong seed)
+        public static CardRuntime NewBattle(long seed)
         {
             var runtime = new CardRuntime(ContentLibrary.FromText(SampleContent.Value, "content.cantrip"), new RuntimeOptions { Seed = seed });
             runtime.CreatePlayer(hp: 60);

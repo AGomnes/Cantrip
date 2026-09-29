@@ -52,7 +52,7 @@ card "Arcane Shot"
 actor "Kobold Geomancer"
   hp 2
   attack 2
-  modify damage of enemies where tag:spell, source:player: +1
+  modify damage of player where tag:spell: +1
 
 # --- 5. ref Dire Wolf Alpha: adjacent minions have +1 attack ------------------------------------------------
 

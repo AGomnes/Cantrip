@@ -385,6 +385,42 @@ namespace Cantrip.Tests.Linting
             Assert.Contains("`damaged`", d.Message);
         }
 
+        /// <summary>
+        /// The relic every roguelite ships. <c>gain</c> covers a resource and a status with one
+        /// word, so its table has to name a death and a status applied; earning gold on a kill does
+        /// neither, and CT306 used to call it a loop with itself. A folder where several relics pay
+        /// out on a kill printed one of these each, which is how a note teaches a reader to ignore
+        /// the code.
+        /// </summary>
+        [Fact]
+        public void Earning_a_resource_on_a_kill_is_not_a_cycle()
+        {
+            IReadOnlyList<Diagnostic> diagnostics = Lint("""
+                relic "Drowned Coin"
+                  on killed(target:enemies):
+                    gain 2 gold
+
+                relic "Bone Collector"
+                  on killed(kind:actor):
+                    gain 1 bones to player
+                """);
+
+            Assert.DoesNotContain(diagnostics, d => d.Code == Linter.EventCycle);
+        }
+
+        /// <summary>The other half: losing hp really can kill, so that cycle is still found.</summary>
+        [Fact]
+        public void Losing_hp_on_a_kill_is_still_a_cycle()
+        {
+            Diagnostic d = Single(Lint("""
+                relic "Blood Price"
+                  on killed:
+                    lose 1 hp
+                """), Linter.EventCycle);
+
+            Assert.Contains("`killed`", d.Message);
+        }
+
         [Fact]
         public void Cycles_through_several_events_and_content_verbs_are_found_once()
         {
@@ -404,6 +440,33 @@ namespace Cantrip.Tests.Linting
             Diagnostic d = Single(diagnostics, Linter.EventCycle);
             Assert.Contains("`healed`", d.Message);
             Assert.Contains("`pinged`", d.Message);
+        }
+
+        // CT336 a scope that can never match ---------------------------------------------------
+
+        [Fact]
+        public void An_of_group_of_cards_on_a_channel_that_belongs_to_an_actor_is_warned()
+        {
+            Diagnostic d = Single(Lint("""
+                relic "Misfiled"
+                  modify damage of hand where tag:fire: +2
+                """), Linter.ScopeCannotMatch);
+
+            Assert.Equal(DiagnosticSeverity.Warning, d.Severity);
+            Assert.Contains("`hand`", d.Message);
+            Assert.Contains("party", d.Message);
+        }
+
+        [Fact]
+        public void But_a_group_of_cards_on_a_channel_a_card_carries_is_fine()
+        {
+            Assert.DoesNotContain(Lint("""
+                relic "Pyre"
+                  modify cost of cards where tag:fire: -1
+
+                relic "Reach"
+                  modify range of hand: +1
+                """), d => d.Code == Linter.ScopeCannotMatch);
         }
 
         // CT307 / CT308 event misuse ----------------------------------------------------------

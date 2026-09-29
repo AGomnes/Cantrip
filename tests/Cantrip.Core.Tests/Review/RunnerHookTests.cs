@@ -79,7 +79,7 @@ namespace Cantrip.Tests.Review
                 },
                 ConfigureRuntime = runtime =>
                 {
-                    Assert.Null(runtime.Player);
+                    Assert.False(runtime.HasPlayer);
                     Assert.Same(hosts[hosts.Count - 1], runtime.Interpreter.Host);
                     RegisterCorrupt(runtime);
                     configured.Add(runtime);

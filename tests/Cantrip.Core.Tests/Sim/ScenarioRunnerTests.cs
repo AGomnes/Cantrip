@@ -258,6 +258,72 @@ scenario ""What never happens""
         }
 
         /// <summary>
+        /// A curse is never playable on purpose, so it is not a finding. It used to be the headline
+        /// of the report, above both bots' tables — the one line in the one report meant to hold
+        /// whoever plays that could never be acted on and would never go away.
+        /// </summary>
+        [Fact]
+        public void A_card_tagged_unplayable_is_not_reported_as_never_playable()
+        {
+            ScenarioOutcome result = Play(@"
+card Zap
+  cost 1
+  target enemy
+  effect:
+    deal 6 to target
+
+card Brine
+  cost 0
+  tags curse, unplayable
+
+enemy Idol
+  hp 30
+  move Stare:
+    block 1
+  pattern cycle Stare
+
+scenario ""A curse in the deck""
+  runs 2
+  player hp 40 energy 3
+  deck 4 Zap, Brine
+  battle Idol
+", new ScenarioOptions().Bot());
+
+            Assert.Empty(result.Facts.NeverPlayable);
+        }
+
+        /// <summary>
+        /// A battle's label spells each enemy as its declaration does. A bare name after a comma
+        /// arrives as a clause keyword, which the parser lower-cases, so the label read
+        /// "Bell Warden + tidewalker" while the hp table under it said "Tidewalker".
+        /// </summary>
+        [Fact]
+        public void A_battle_label_spells_an_enemy_the_way_its_declaration_does()
+        {
+            ScenarioOutcome result = Play(@"
+card Zap
+  cost 1
+  target enemy
+  effect:
+    deal 99 to target
+
+enemy ""Bell Warden""
+  hp 5
+
+enemy Tidewalker
+  hp 5
+
+scenario ""Two of them""
+  runs 1
+  player hp 40 energy 3
+  deck 4 Zap
+  battle ""Bell Warden"", Tidewalker
+", new ScenarioOptions().Bot());
+
+            Assert.Equal("Bell Warden + Tidewalker", result.Runs.First().Battles[0].Label);
+        }
+
+        /// <summary>
         /// A card made part way through a turn and played from the hand it was made into. Reading
         /// the hand only at the start of a turn never sees it, so the report would say it never
         /// reached a hand and was never playable — both false, and both said in the block that is

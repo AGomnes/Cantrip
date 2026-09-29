@@ -110,15 +110,25 @@ namespace Cantrip.Sim
         /// <summary>Every card that was affordable, with somewhere to aim it, when a turn began.</summary>
         internal HashSet<string> CardsPlayable { get; } = new HashSet<string>(StringComparer.Ordinal);
 
+        /// <summary>
+        /// Cards tagged <c>unplayable</c>: a curse, a wound, a status card. Never being playable is
+        /// the whole of what they are, so one is not a finding.
+        /// </summary>
+        internal HashSet<string> CardsNeverMeantToBePlayable { get; } = new HashSet<string>(StringComparer.Ordinal);
+
         /// <summary>How many moves the enemies that were fought have between them.</summary>
         public int MoveCount => MovesDefined.Count;
 
         /// <summary>How many different cards the player ever had. Zero in a fight with no cards in it.</summary>
         public int CardCount => CardsOwned.Count;
 
-        /// <summary>Cards the player held that were never once playable, in name order.</summary>
+        /// <summary>
+        /// Cards the player held that were never once playable, in name order. A card tagged
+        /// <c>unplayable</c> is left out: it is the one line in this report that could never go away,
+        /// and a finding that cannot be acted on teaches a reader to skip the block it is in.
+        /// </summary>
         public IReadOnlyList<string> NeverPlayable =>
-            CardsHeld.Except(CardsPlayable).OrderBy(c => c, StringComparer.Ordinal).ToList();
+            CardsHeld.Except(CardsPlayable).Except(CardsNeverMeantToBePlayable).OrderBy(c => c, StringComparer.Ordinal).ToList();
 
         /// <summary>Cards the player owned that never reached a hand, in name order.</summary>
         public IReadOnlyList<string> NeverHeld =>

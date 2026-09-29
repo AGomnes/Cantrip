@@ -127,6 +127,33 @@ namespace Cantrip.Runtime
             _ => throw call.Error("the destination must be a zone name such as `hand`, `draw` or `discard`."),
         };
 
+        /// <summary>
+        /// Whose pile a <c>create</c> or a <c>copy</c> lands in: the <c>to</c> clause, or null when
+        /// there is none and the one running the line keeps what it makes.
+        /// </summary>
+        /// <remarks>
+        /// A card is controlled by an actor, so a <c>to</c> naming a card or a status means the
+        /// actor holding it. A <c>to</c> naming a pile is the old spelling and is refused by name,
+        /// because leaving it to mean the pile is what made the clause ambiguous in the first place.
+        /// </remarks>
+        private Entity? Recipient(VerbCall call)
+        {
+            ExprNode? node = call.Node.Clause("to");
+            if (node == null) return null;
+
+            if (node is NameExpr name && Zones.IsWellKnown(NormalizeZone(name.Name)))
+                throw call.Error($"`to` says whose it is; `{name.Name}` is a pile. Write `into {name.Name}` for the pile, and `to <who>` for whose.");
+
+            Value who = Evaluate(node, call.Context);
+            foreach (Entity entity in who.AsEntities())
+            {
+                if (entity.IsRemoved) continue;
+                return entity.Kind == EntityKind.Actor ? entity : entity.Controller;
+            }
+
+            throw call.Error($"`to {AstPrinter.Print(node)}` names nobody to give it to. Write `to <who>`, or leave `to` off and whoever is running this keeps it.");
+        }
+
         private static string NormalizeZone(string zone) => zone.ToLowerInvariant() switch
         {
             "draw_pile" => Zones.Draw,
@@ -135,12 +162,22 @@ namespace Cantrip.Runtime
             var other => other,
         };
 
-        /// <summary><c>create Shiv 2 into hand</c>, <c>create Slime</c>.</summary>
+        /// <summary>
+        /// <c>create Shiv 2 into hand</c>, <c>create Brine into discard to leader</c>,
+        /// <c>create Slime</c>.
+        /// </summary>
         /// <remarks>
         /// A status, keyword or ability is refused by name, the way <c>copy</c> refuses one. Those
         /// three belong to whoever has them rather than to a zone, and <c>create Poison 2</c> made
         /// two Poisons attached to nobody: they raised <c>created</c>, so listeners fired, and they
         /// went into saves. `apply` is the verb that gives one to someone.
+        /// <para>
+        /// <c>into</c> says which pile and <c>to</c> says whose, as <c>to</c> does for every other
+        /// verb in the language. All three clause words used to mean the pile, so <c>to</c> was read
+        /// and thrown away: an enemy's <c>create Brine into discard to leader</c> made the curse in
+        /// the *enemy's* discard pile, which is a card that reads as one thing and does another —
+        /// the thing CT323 exists to stop.
+        /// </para>
         /// </remarks>
         private void VerbCreate(VerbCall call)
         {
@@ -157,9 +194,15 @@ namespace Cantrip.Runtime
                         : $"Write `apply {spelt} {Math.Max(1, count)} to <who>` to give one."));
             }
 
-            ExprNode? zoneNode = call.Node.Clause("into") ?? call.Node.Clause("to") ?? call.Node.Clause("onto");
+            ExprNode? zoneNode = call.Node.Clause("into") ?? call.Node.Clause("onto");
             string? zone = zoneNode == null ? null : ZoneName(zoneNode, call);
-            Entity? owner = call.Context.Controller;
+
+            // `to` names who gets it. For a card that is whose pile it lands in; for an actor there
+            // is no pile, so it is whose side it joins, which is the only thing "whose" can mean of
+            // somebody standing on a board.
+            Entity? recipient = Recipient(call);
+            Entity? owner = recipient ?? call.Context.Controller;
+            Team? side = recipient != null && definition.Kind == EntityKind.Actor ? recipient.Team : (Team?)null;
 
             // A summon a full lane refuses makes nothing, so `created` is short by one — empty, when
             // every one of them was refused. The statements after this read what was made, which is
@@ -167,7 +210,7 @@ namespace Cantrip.Runtime
             var created = new List<Entity>();
             for (int i = 0; i < count; i++)
             {
-                if (Create(definition, owner, zone, call.Context) is Entity one) created.Add(one);
+                if (Create(definition, owner, zone, call.Context, side) is Entity one) created.Add(one);
             }
             call.Context.SetLocal("created", Value.FromEntities(created));
         }
@@ -206,8 +249,11 @@ namespace Cantrip.Runtime
             }
 
             int count = call.Amount(1, Num.One).ToInt();
-            ExprNode? zoneNode = call.Node.Clause("into") ?? call.Node.Clause("to") ?? call.Node.Clause("onto");
+            ExprNode? zoneNode = call.Node.Clause("into") ?? call.Node.Clause("onto");
             string? zone = zoneNode == null ? null : ZoneName(zoneNode, call);
+
+            // The same division as `create`: `into` is the pile, `to` is whose.
+            Entity? recipient = Recipient(call);
 
             var copied = new List<Entity>();
             foreach (Entity original in what.AsEntities().ToArray())
@@ -226,7 +272,7 @@ namespace Cantrip.Runtime
 
                 for (int i = 0; i < count; i++)
                 {
-                    if (Copy(original, zone, call.Context) is Entity one) copied.Add(one);
+                    if (Copy(original, zone, call.Context, recipient) is Entity one) copied.Add(one);
                 }
             }
 

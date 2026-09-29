@@ -67,7 +67,7 @@ actor "Tooth"
 
 # Movement from the other side of the board: it drags whoever it hits one rank back, which takes
 # that hero out of a melee card's reach until somebody spends a Wade or a Punt putting them back.
-# Seepage puts a curse in the deck the long way round; see the note on `Seeping` in statuses.
+# Seepage puts a curse straight into the leader's deck: `into` is the pile and `to` is whose.
 enemy "Tidewalker"
   hp 28
   speed 2
@@ -78,7 +78,7 @@ enemy "Tidewalker"
     deal attack to target
     target.rank += 1
   move "Seepage":
-    apply Seeping 1 to leader
+    create Brine into discard to leader
   pattern cycle Drag, Seepage
 
 enemy "The Antiphonary"

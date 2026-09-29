@@ -20,7 +20,7 @@ namespace Cantrip.Tests.Battle
                 draw 2
             """;
 
-        private static string[] ShuffledDrawPile(ulong seed)
+        private static string[] ShuffledDrawPile(long seed)
         {
             CardRuntime runtime = BattleKit.Create(Content, seed);
             runtime.CreatePlayer();

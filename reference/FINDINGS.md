@@ -7,6 +7,11 @@ Engine source was read only where noted, and each time that is a finding of its 
 
 Ranked by how much each would hurt a real developer.
 
+**Every finding here has been read and acted on.** Each one now carries a **Fixed** or **Kept**
+line saying what happened; the findings themselves are left as they were written, because they are
+the record of why these things changed. The game in `reference/` no longer carries any of the
+workarounds below: where one is quoted, the file it was quoted from now says the natural thing.
+
 ---
 
 
@@ -60,6 +65,16 @@ continue inside the handler.
 crash with no diagnostic, on the most obvious line of code a game will write, and nothing in the
 docs forbids it. A read is fine and a write is fatal, which is the hardest kind of rule to learn
 by accident.
+
+**Fixed.** It works. The node recorded the end-of-battle transition *after* emitting the signal, so
+a handler that acted came back round to a check that had not yet noticed the battle was over, and
+told the game again, for ever. The transition is now written down the moment it is noticed, which
+also means a handler that starts the next battle is recorded properly and that battle tells its own
+end when it comes. `docs/godot.md` has an [Acting from a
+signal](../docs/godot.md#acting-from-a-signal) section stating the rule, `docs/csharp.md` separates
+it from the `OnEvent` rule it was being confused with, and `docs/stability.md` has lost the
+limitation. `game/reentry.tscn` is deleted, as its note said it should be; `game/chapel.gd` hands
+out the reward in the handler and its self-play loop no longer yields a frame per step.
 ## 2. `modify <channel> of <group>` matches the *target*, and the docs never say so
 
 **Trying to do.** A relic that makes the whole party's holy cards hit for 2 more:
@@ -111,6 +126,15 @@ supposed to say. The natural spelling would have been `of party`.
 designer writes most, in exactly the game shape 1.0 is adding party support for. A shipped game
 would have a relic that does nothing, and no way to find out but a test that guessed the number.
 
+**Fixed.** An `of` group now names whoever the value **belongs to**, and which end of an action
+that is the channel decides â the same end the bare form uses. So `of party` on `damage` is
+"the party deals", `of party` on `damage_taken` is "the party takes", and the two spellings that
+read as widenings of each other finally are. `docs/language.md` has the table. Two lines in
+`samples/corpus` were written against the old behaviour and now say what they mean
+(`modify damage of player where card:Shiv`, `modify damage of allies`), and the Baton in this game
+is `modify damage of party where tag:holy: +2` with no `source:` propping it up. A group that can
+never hold what the channel names â `modify damage of hand` â is now **CT336**, a warning.
+
 ---
 
 
@@ -151,6 +175,10 @@ flag `persistent`, so that it is re-applied each battle.
 **How bad.** Severe. Unlike #1 the failure is semi-loud (the ability simply is never ready), but
 the documented sentence is true only for a party of one.
 
+**Fixed, by #2.** On `cooldown` the value belongs to whoever is waiting for the ability, so
+`modify cooldown of party: x50%` reaches every member's abilities. `Bell Rope` is that one line
+now, and the `Quickened` status is gone.
+
 ---
 
 ## 4. Nothing in content can name a dead ally, so `revive` cannot be spelled
@@ -183,6 +211,13 @@ and no ability in the game revives.
 **How bad.** Severe for the genre -- every party roguelite has an in-combat raise -- and the
 clearest "cannot express at all" of the round. The natural spelling would have been a `target
 fallen` word, or `fallen` as a group name beside `party` and `allies`.
+
+**Fixed.** `fallen` is a group name beside `party` and `allies`: the dead of the running side, in
+the order they fell. `revive fallen.first 8` and `choose 1 from fallen as who` both work, and
+`Last Rites` in this game's deck is the first of those. C# gets `runtime.Fallen` and
+`State.Fallen(team)`, GDScript gets `GetFallen()`, and the Chapel's shrine reads that instead of
+walking its own roster. The roster is still there, because a run wants to know who it recruited and
+when, but nothing needs it to find a corpse any more.
 
 ---
 
@@ -232,6 +267,12 @@ natural spelling would have been `create Brine into discard to leader` doing wha
 **How bad.** High. It is a mechanic in three of the nine games docs/coverage.md re-creates, it is
 not listed as a gap there, and the workaround is not discoverable -- nothing in the docs suggests
 that who *runs* a `create` decides whose pile it lands in.
+
+**Fixed: `to` works.** `into` is the pile and `to` is whose, which is what `to` means for every
+other verb in the language; `onto` stays a second spelling of `into`. `create Brine into discard to
+leader` is the Tidewalker's whole move now, and the `Seeping` status is gone. `copy` takes the same
+pair. `to` naming a pile (`create Shiv 2 to hand`) is refused by name rather than left meaning two
+things, because that ambiguity is what made the clause droppable in the first place.
 ## 6. `CreatePlayer` cannot give the leader a stat, and under `order: speed` that decides the game
 
 **Trying to do.** `turns: initiative` with `order: speed`. Each `hero` declares its own `speed`.
@@ -261,6 +302,12 @@ runtime.Execute("speed = 6");   // the only documented way to put a stat on the 
 the way to finish creating the player, and a reader of csharp.md would not find it. The natural
 spelling would have been `hero` working for the leader too, or `CreatePlayer` taking the name of a
 `hero` declaration.
+
+**Fixed.** `runtime.SetStat(leader, "speed", 6)` -- a typed call that does exactly what content's
+`speed = 6` does, bounds and `<stat>_changed` included -- with `ChangeStat` beside it for
+`gain`/`lose`. It is documented in the party table in `docs/csharp.md`, next to `CreatePlayer`
+rather than three sections away, and the Godot node has both. That also answers 7(c): the shop
+spends gold with `ChangeStat(Leader, "gold", -amount)` instead of interpolating a statement.
 
 ---
 
@@ -306,6 +353,10 @@ private IEnumerable<Entity> Fallen()
 That list has to be saved, versioned and kept in step with the snapshot. It exists only because
 there is no `runtime.Fallen` and no `State.Actors(Team.Player, includeDead: true)`.
 
+**Fixed.** `runtime.Fallen`, `State.Fallen(team)` and the node's `GetFallen()`, and `fallen` in
+content. The roster is still saved, because it is the run's own record of who joined and when, but
+nothing needs it to find a corpse.
+
 **(b) Two saves that must be written as one.** `runtime.Capture()` holds the battle, the party,
 the deck, the relics and the gold. It does not hold which floor you are on, which rewards have
 been offered or the run's random stream, and it cannot: Cantrip has no idea what a run is. So the
@@ -325,6 +376,9 @@ This is the right shape and the docs never show it. csharp.md's `SaveFile` has `
 no roguelite at all. One extra field in that example, with one sentence, would have saved an hour
 of deciding whether I was missing an API.
 
+**Fixed.** csharp.md's `SaveFile` has a `Run` field and three sentences saying what belongs in it
+and why the file is a pair.
+
 **(c) Gold is on the leader, and the purse is the run's.** `gold` is a built-in resource, a relic
 earns it inside a battle (`on killed(target:enemies): gain 2 gold`) and the shop spends it outside
 one. That is a genuinely good seam -- the run gets a currency that saves and restores for free.
@@ -337,6 +391,9 @@ private void Spend(int amount) => runtime.Execute($"lose {amount} gold");
 A string-interpolated statement, unchecked until it runs, for subtracting an integer. I would be
 embarrassed to show that to another developer, and it is the only way the docs offer.
 
+**Fixed with #6.** `runtime.ChangeStat(Leader, "gold", -amount)`, and `SetStat` for an outright
+write. The seam itself was right and is unchanged.
+
 **(d) Removing and upgrading a card.** godot.md has `RemoveCard` on the node and a worked
 `upgrade_card`. `CardRuntime` has no `RemoveCard`, and csharp.md gives instead:
 
@@ -347,6 +404,10 @@ runtime.Execute("destroy target", target: wound);
 So the C# half and the Godot half of the same operation are a typed call on one side and a parsed
 string on the other, and only the Godot one is written up as a recipe. The upgrade is then two
 calls and a naming convention (`"Censer" + "+"`), reimplemented in both languages.
+
+**Fixed.** `CardRuntime.RemoveCard(card)`, the same call the node has had all along, written up in
+csharp.md's Between battles beside the upgrade it is half of. The naming convention is still the
+game's, which is right: Cantrip does not know what an upgrade is.
 
 **What it did not cost.** Carrying the party between battles is free and exactly right: hp, max
 hp, the deck, exhausted cards, relics, `once per run` limits and `persistent` statuses all come
@@ -381,6 +442,9 @@ the next person does not have to redo it, and a test that pins both ends (`dista
 "`range 1..2` cannot reach rank 1 of lane 1 from any slot on your side of board Chapel" would
 have cost me nothing to read and saved the whole detour.
 
+**Kept.** Deferred as design work rather than a fix: what "cannot reach" means depends on where a
+side may stand, which a summon changes mid-fight. The workaround stays, arithmetic and all.
+
 ## 9. `InvalidTarget` is one word for four different refusals
 
 `play Censer by Warden on enemy2` answers `InvalidTarget` and nothing says why. On a `facing`
@@ -395,6 +459,9 @@ Lint already reports CT327 when a written rank could never be a slot, so it has 
 A `range` a card can never satisfy from where its own side stands is the same class of mistake.
 
 **How bad.** Moderate. Recoverable, but it cost the first hour of this build.
+
+**Kept.** Deferred: splitting `InvalidTarget` adds vocabulary to a frozen enum, and which refusals
+are worth telling apart is a question the four answers here do not settle.
 
 ---
 
@@ -421,6 +488,9 @@ it came from.
 **How bad.** Moderate. It is one table row in csharp.md's "What a battle screen reads", and it is
 the single most useful call for anyone testing that their save works.
 
+**Fixed.** It is that table row now, naming `runtime.State.ComputeHash()` and how the node prints
+it. The comment in the reference host saying where the call came from is gone.
+
 ---
 
 ## 11. The Godot node cannot choose a board
@@ -435,6 +505,13 @@ Godot is the primary engine and the board is the newest feature. The reference g
 with it by declaring exactly one board.
 
 **How bad.** Moderate for a Godot game with a train or a corridor, invisible otherwise.
+
+**Fixed.** `StartBattleOn(board, shuffle, draw_opening_hand)` -- a method of its own, not a third
+argument, because a C# default is not a default in GDScript and a third parameter would have broken
+every game that already calls `StartBattle`, at parse time. `docs/godot.md` has a
+[Boards](../docs/godot.md#boards) section now. This game declares a second board, the Nave, and both
+halves of it name one: `StartBattle(board:)` in C#, `StartBattleOn` in GDScript. `board` is also a
+`scenario` verb now, so `cantrip sim` plays the fight on the board the game plays it on.
 
 ---
 
@@ -458,6 +535,11 @@ an ergonomics gap rather than a wrong answer -- but a check I wrote from the DSL
 failed silently against 0, which is exactly the shape of bug that ships.
 
 **How bad.** Moderate. Every Godot game with statuses writes this helper.
+
+**Fixed.** `CounterOf(entity_id, status)` on the node, which is content's `Warden.Fervour` and
+C#'s `entity.CounterOf` under a third name rather than a fourth shape. `GetStat`'s row in the
+methods table now says a status is not a stat and points at it. `game/checks.gd` has lost its
+helper.
 
 
 ---
@@ -486,6 +568,9 @@ declaration, no template, no mixin and no "apply this to every enemy". The alter
 **How bad.** Low today, high at scale. Six copies is fine; a game with forty enemies and three
 rules that apply to all of them is 120 lines that must not drift.
 
+**Kept.** Deferred: a base declaration, a template and a mixin are three different languages, and
+picking one is design work rather than a fix. The six copies are still six copies.
+
 ---
 
 ## 14. Lint reports CT306 for a listener that cannot re-trigger itself
@@ -504,30 +589,49 @@ prints one of these each and teaches the reader to ignore CT306.
 
 **How bad.** Low, and cosmetic -- but noise in a linter is how a real warning gets missed.
 
+**Fixed.** `gain`, `lose` and `change` cover a resource and a status with one word, so the verb
+table has to list a death and a status applied for all three; CT306 now reads the word the line
+actually names, and only `hp` kills. `reference/content` lints clean, and so does Inscryption's
+`on killed: gain 1 bones` in `samples/corpus`.
+
 ## 15. Small things, each cheap to fix
+
+**All but the last are fixed**; each entry says what happened.
 
 - **`RuntimeOptions.Seed` is `ulong`.** csharp.md's `new RuntimeOptions { Seed = 12345 }` compiles
   because it is a literal. `Seed = seed` with an `int` variable does not, and godot.md says "Any
   64-bit number is a seed of its own, 0 and negative ones included", which reads like `long`. Every
   host that seeds a run from a number it computed writes `(ulong)(uint)seed`.
+  **Fixed:** it is `long`, which is what the Godot node's own export already was. The reference
+  host writes `Seed = seed`.
 - **`CardRuntime.Player` is nullable.** csharp.md writes `runtime.Player` bare in five places. In a
   project with `<Nullable>enable</Nullable>` -- which this repository's own
   `Directory.Build.props` sets, with `WarningsAsErrors=nullable` -- every one of those is a build
   error. The reference host has a `private Entity Leader => runtime.Player!;` for exactly this.
+  **Fixed:** `Player` is not nullable. Before `CreatePlayer` it throws, with a message naming the
+  call to make, and `HasPlayer` is the question for the few lines where that is genuinely in doubt.
+  The reference host's `Leader` has lost its `!` and its comment.
 - **`created` is a group, and a group answers 0 for `zone` and `controller`.** `log created.zone`
   printed `0`, and `created.controller.name` failed with `` `0` has no property `name` ``. The
   documented group members are `count`, `size`, `length`, `first`, `last`, `empty`, `any`, `lane`,
   `rank` and stats, so `zone` fell through to "a stat nothing has". `created.first.zone` is right
   and reads `discard`. The fall-through to 0 for an unknown member on a group is the same trap
   language.md's "One is a group of one" paragraph describes fixing for `.first`.
+  **Fixed:** `zone`, `controller` and `name` answer for a group the way `lane` and `rank` already
+  did -- from the first of them.
 - **`cantrip sim` reports an `unplayable` card as a finding.** "1 card(s) were held but never
   playable: Brine" is the headline block, above the bots' tables, for a card tagged
   `curse, unplayable` -- which is never being playable on purpose. The one report in the tool that
   is meant to hold whoever plays now has a line in it that will never go away.
+  **Fixed:** a card tagged `unplayable` is left out of that finding. Everything else about the
+  block is unchanged.
 - **`cantrip sim` lowercases a bare enemy name in its battle labels.** `battle "Bell Warden",
   Tidewalker` prints as `Bell Warden + tidewalker`, while the hp table below it says `Tidewalker`.
   The label appears to use the raw token rather than the definition's name.
-- **`test` cannot assert a refusal.** language.md says so plainly ("check that a play was refused,
+  **Fixed:** the label spells each enemy as its declaration does. (The guess was right: a bare name
+  after a comma arrives as a clause keyword, and the parser lower-cases those.)
+- **Kept: `test` cannot assert a refusal.** Deferred with #9, which is the same gap seen from the
+  other side. language.md says so plainly ("check that a play was refused,
   since `play` fails the test when a card cannot be played"), and on a board it bites harder than
   it does elsewhere: the whole point of `range` and `target ... where` is what they *exclude*, and
   the only way to test exclusion is to play the card with no target and check which one it picked.

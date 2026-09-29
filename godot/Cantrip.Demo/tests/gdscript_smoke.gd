@@ -148,6 +148,23 @@ func _check_between_battles(rules: CantripRuntime) -> void:
 	_check("a new run has no player and no battle", rules.PlayerId() == 0 and not rules.IsInBattle() and rules.GetWon() == null)
 	_check("and sets up again", rules.CreatePlayer("Player", 80, 3) != 0 and rules.SpawnEnemy("Slime", -1) != 0)
 
+	# Every parameter, spelled out. StartBattleOn is a method of its own rather than a third
+	# argument to StartBattle for exactly this reason: a C# default is not a default here, so
+	# adding one would have been a parse error in every game that already calls StartBattle.
+	rules.StartBattleOn("", false, false)
+	_check("StartBattleOn keeps the board in play when no name is given", rules.IsInBattle())
+
+	var leader: int = rules.PlayerId()
+	_check("a stat is written and read back", rules.SetStat(leader, "gold", 9) == 9 and rules.GetStat(leader, "gold") == 9)
+	_check("and changed by an amount", rules.ChangeStat(leader, "gold", -4) == -4 and rules.GetStat(leader, "gold") == 5)
+
+	# The number a status bar wants, without building the whole entity dictionary per frame.
+	var slime: int = rules.GetEnemies()[0]
+	rules.Execute("apply Burn 3 to target", 0, slime)
+	_check("a status counter is one call", rules.CounterOf(slime, "Burn") == 3, str(rules.CounterOf(slime, "Burn")))
+	_check("and a status is still not a stat", rules.GetStat(slime, "Burn") == 0)
+
+
 # An answer that is turned away says why in a snake_case word, like every other word the node gives.
 func _check_answers(rules: CantripRuntime) -> void:
 	var early: Dictionary = rules.AnswerChoice(1, [])
@@ -250,6 +267,7 @@ func _check_party(rules: CantripRuntime) -> void:
 
 	rules.Execute("kill target", 0, scout)
 	_check("a fallen member leaves the party", not rules.GetParty().has(scout), str(rules.GetParty()))
+	_check("and turns up in the fallen, which nothing else lists", rules.GetFallen() == [scout], str(rules.GetFallen()))
 	_check("but the battle goes on, because the leader still stands", rules.IsInBattle())
 	_check("Revive brings it back, where a heal refuses", rules.Revive(scout, 5) and rules.GetStat(scout, "hp") == 5)
 	_check("reviving the living answers false", not rules.Revive(scout, 5))

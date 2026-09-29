@@ -726,6 +726,43 @@ namespace Cantrip.Runtime
             return result;
         }
 
+        /// <summary>
+        /// The dead, optionally for one side, in the order they fell. Content says <c>fallen</c>,
+        /// and this is the same list: the group <c>revive fallen.first 8</c> reads, and what
+        /// <see cref="Actors(Team?)"/>, <see cref="Party"/> and <c>allies</c> all deliberately leave
+        /// out.
+        /// </summary>
+        /// <remarks>
+        /// A game with a party needs this before it needs anything else above the battle, because a
+        /// fallen member is in none of the other lists and a run has to be able to offer to raise
+        /// one. Without it the only way to find a corpse was to keep a roster of ids from the moment
+        /// they were created and check each one, outside the save the engine writes.
+        /// <para>
+        /// A dead actor is still on the board until it is buried, so that its own <c>on died</c>
+        /// listeners can hear the death; those come last here, because they are the ones still
+        /// falling.
+        /// </para>
+        /// </remarks>
+        public IReadOnlyList<Entity> Fallen(Team? team = null)
+        {
+            var result = new List<Entity>();
+            foreach (Entity entity in ZoneOf(null, Zones.Dead))
+            {
+                if (entity.Kind != EntityKind.Actor || entity.IsRemoved || !entity.IsDead) continue;
+                if (team.HasValue && entity.Team != team.Value) continue;
+                result.Add(entity);
+            }
+
+            foreach (Entity entity in ZoneOf(null, Zones.Board))
+            {
+                if (entity.Kind != EntityKind.Actor || entity.IsRemoved || !entity.IsDead) continue;
+                if (team.HasValue && entity.Team != team.Value) continue;
+                result.Add(entity);
+            }
+
+            return result;
+        }
+
         /// <summary>Where an actor stands, then its id, so the order is total and deterministic.</summary>
         private static int BySlot(Entity a, Entity b)
         {

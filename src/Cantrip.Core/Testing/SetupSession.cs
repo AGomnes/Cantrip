@@ -49,7 +49,7 @@ namespace Cantrip.Testing
             _chooser = chooser ?? throw new ArgumentNullException(nameof(chooser));
 
             // The caller's ConfigureRuntime may have made the player already.
-            Entity player = runtime.Player ?? runtime.CreatePlayer();
+            Entity player = runtime.HasPlayer ? runtime.Player : runtime.CreatePlayer();
             _context = new EvalContext(player) { Source = player };
             foreach (var (name, bind) in SetupVerbTable) Interpreter.RegisterVerb(name, bind(this));
         }

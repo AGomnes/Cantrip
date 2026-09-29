@@ -38,12 +38,11 @@ var rules: CantripRuntime
 
 # The run above the battle, which the rules know nothing about and a save has to carry itself.
 var floor_index := 0
-var roster: Array = []          # [{id, name}], because a fallen hero leaves GetParty() entirely
+var roster: Array = []          # [{id, name}]: the run's own record of who it recruited and when
 var run_seed := 7
 var run_rng := RandomNumberGenerator.new()
 var auto := false
 var selected_card := 0
-var _won_last := false
 
 var _log: RichTextLabel
 var _party_box: VBoxContainer
@@ -83,9 +82,8 @@ func _begin_run(seed_value: int) -> void:
 
 	var leader: int = rules.CreatePlayer("Acolyte", 40, 3)
 	# The leader is the one member no declaration describes, so the speed that decides the whole
-	# initiative order is written afterwards, as a statement, against a `resource "speed"`
-	# declared only so that there is something to write.
-	rules.Execute("speed = 6", 0, 0)
+	# initiative order is written onto it afterwards.
+	rules.SetStat(leader, "speed", 6)
 	rules.Execute("grant Invocation", 0, 0)
 	roster.append({"id": leader, "name": "Acolyte"})
 	roster.append({"id": rules.AddHero("Warden", 0), "name": "Warden"})
@@ -108,22 +106,16 @@ func _enter_floor() -> void:
 
 	for name in encounter:
 		rules.SpawnEnemy(name, -1)
-	# StartBattle takes no board: the Godot node cannot pick one, so a game with more than one
-	# `board` declared is stuck with the first. The Chapel is the only one here.
-	rules.StartBattle(true, true)
+	# The Antiphonary sits in the nave, a rank deeper than the rest of the chapel. StartBattleOn
+	# takes every argument, because a C# default is not a default in GDScript.
+	rules.StartBattleOn("Nave" if floor_index == FLOORS.size() - 1 else "Chapel", true, true)
 	_say("[b]Floor %d[/b]: %s." % [floor_index + 1, ", ".join(encounter)])
 	_refresh()
 
-# Deferred, and it must be. Any CantripRuntime call that goes through an action -- Execute,
-# Play, Pass, AddCard -- made from inside a `BattleEnded` handler re-enters the handler and
-# recurses until the process dies with a stack overflow. game/reentry.tscn reproduces it in
-# fifteen lines. Read-only calls are safe. See reference/FINDINGS.md.
+# The reward is handed out here, in the handler, which is where anybody would write it: the
+# battle is over by the time this runs and acting again is ordinary. Starting the next battle
+# from inside it is ordinary too, and that is what `_reward` goes on to do.
 func _on_battle_ended(won: bool) -> void:
-	_won_last = won
-	call_deferred("_after_battle")
-
-func _after_battle() -> void:
-	var won: bool = _won_last
 	if not won:
 		_say("[color=#d48f8f]The water closes over them.[/color]")
 		_offer([])
@@ -131,10 +123,9 @@ func _after_battle() -> void:
 
 	# `gold` is a stat on the leader, so the run pays into the rules rather than keeping a purse
 	# of its own. It is the one field the part Cantrip models and the part it does not both use.
-	rules.Execute("gain 30 gold", 0, 0)
-	for entry in roster:
-		if rules.GetEntity(entry["id"]).get("dead", false):
-			_say("  %s did not get up." % entry["name"])
+	rules.ChangeStat(rules.PlayerId(), "gold", 30)
+	for id in rules.GetFallen():
+		_say("  %s did not get up." % rules.GetEntity(id)["name"])
 	floor_index += 1
 	_reward()
 
@@ -164,14 +155,12 @@ func _shrine() -> void:
 	_say("[b]Floor 3[/b]: a shrine above the water line.")
 	var options: Array = []
 
-	# Raising a fallen hero lives here rather than on a card because nothing in content can name
-	# one: `target ally` and `target any` both want somebody living, `allies` and `party` leave
-	# the dead out, and `everyone where zone:dead` binds nothing. The node's Revive takes an id,
-	# and the run kept the ids.
-	for entry in roster:
-		var who: Dictionary = rules.GetEntity(entry["id"])
-		if who.get("dead", false):
-			options.append({"label": "Raise %s" % entry["name"], "act": func(): _raise(entry)})
+	# GetFallen is the list: the dead of the party, which GetParty and GetAllies both leave out.
+	# Content can spell a raise too -- Last Rites is `revive fallen.first 8` -- so this is the run
+	# offering one rather than the only way to get one.
+	for id in rules.GetFallen():
+		var who: Dictionary = rules.GetEntity(id)
+		options.append({"label": "Raise %s" % who["name"], "act": func(): _raise(id)})
 
 	if not _has("Ferryman"):
 		options.append({"label": "Recruit the Ferryman", "act": func(): _recruit()})
@@ -183,10 +172,11 @@ func _has(name: String) -> bool:
 		if entry["name"] == name: return true
 	return false
 
-func _raise(entry: Dictionary) -> void:
-	var half: int = max(1, int(rules.GetStat(entry["id"], "max_hp") / 2.0))
-	rules.Revive(entry["id"], half)
-	_say("  %s is raised at %d hp." % [entry["name"], half])
+func _raise(id: int) -> void:
+	var half: int = max(1, int(rules.GetStat(id, "max_hp") / 2.0))
+	var who: String = rules.GetEntity(id)["name"]
+	rules.Revive(id, half)
+	_say("  %s is raised at %d hp." % [who, half])
 	floor_index += 1
 	_enter_floor()
 
@@ -226,7 +216,7 @@ func _gold() -> int:
 
 func _spend(amount: int) -> void:
 	# There is no call that changes a stat, so the shop writes DSL text from GDScript.
-	rules.Execute("lose %d gold" % amount, 0, 0)
+	rules.ChangeStat(rules.PlayerId(), "gold", -amount)
 
 func _holds(relic: String) -> bool:
 	for id in rules.GetZone(rules.PlayerId(), "relics"):
@@ -362,11 +352,17 @@ func _refresh() -> void:
 
 	_fill(_party_box, rules.GetAllies(), func(id): return _party_line(id, member))
 	_fill(_enemy_box, rules.GetEnemies(), func(id): return _enemy_line(id))
-	_clear(_choice_box)
 
+	# Between battles the choice box is the screen -- the reward, the shrine, the shop -- and
+	# whoever put it there owns it. The reward is handed out from inside `BattleEnded`, which
+	# runs while the play that won is still returning, so the refresh that follows that play must
+	# leave the new screen alone rather than wipe it.
+	if not rules.IsInBattle(): return
+
+	_clear(_choice_box)
 	_clear(_hand_box)
 	_clear(_ability_box)
-	if member == 0 or not rules.IsInBattle(): return
+	if member == 0: return
 	for card in rules.GetZone(rules.PlayerId(), "hand"):
 		var button := Button.new()
 		var text: Dictionary = rules.Describe(card, 0)
@@ -389,6 +385,8 @@ func _refresh() -> void:
 func _party_line(id: int, active: int) -> String:
 	var who: Dictionary = rules.GetEntity(id)
 	var marks: Array = []
+	# The bar reads the whole entity because it wants every status a member has; one number by
+	# name is rules.CounterOf(id, "Fervour").
 	for status in who["statuses"]:
 		if not status["hidden"]: marks.append("%s %d" % [status["name"], status["counter"]])
 	return "%s%s  %d/%d hp  %d block  aisle %d rank %d  %s" % [
@@ -490,9 +488,6 @@ func _build_ui() -> void:
 
 func _play_itself() -> void:
 	for step in range(4000):
-		# A frame between steps, because the work after a battle has to be deferred out of the
-		# BattleEnded handler.
-		await get_tree().process_frame
 		if rules.IsInBattle():
 			var member: int = _active()
 			if member == 0:

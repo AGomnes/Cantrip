@@ -497,6 +497,7 @@ hero "Vestal"
 | `player`, `leader` | one entity: the party's leader, the one that holds the run's relics and gold |
 | `party` | the living members, in the order they take their steps |
 | `allies` | everyone on the side, members and summons both |
+| `fallen` | the dead of the side, in the order they fell â the group the other three leave out |
 
 `player` keeps meaning the leader and always will. In content that declares a `hero`, writing it inside an enemy's move or a card's or ability's effect is error **CT326**, because `deal 5 to player` in an enemy move would hit one hero however carefully the enemy telegraphed somebody else — quietly, which is the one class of wrong answer this project refuses to ship. Write `target` for whoever the line is aimed at, `leader` where the run's own actor really is meant, or `party` for all of them. Everywhere else — a relic's listener, a run's gold, a test's own lines — `player` is still the right word and is left alone.
 
@@ -547,6 +548,23 @@ Restricting who may perform a card needs no new syntax — `on before_card_playe
 A fallen member is buried in the `dead` zone like a dead enemy and cleared at the next battle. It leaves `party`, `allies` and the turn order at once, because all three are derived from where the living actors stand and none of them is stored.
 
 `heal` refuses a dead target, deliberately and permanently, so bringing one back is its own verb: `revive <who> [N]`, which un-buries the actor at N hp (1 by default) and raises `revived`. It does nothing to somebody who was never dead, so a card that reads "bring back a fallen ally" cannot quietly become a heal.
+
+**`fallen` is how content names the argument.** `party` and `allies` hold the living by design, `target ally` and `target any` both want somebody alive, and `everyone where zone:dead` finds nobody, because `everyone` is the living too. `fallen` is the dead of the running side, in the order they fell:
+
+```
+card "Last Rites"
+  cost 2
+  effect:
+    if fallen.any:
+      revive fallen.first 8
+
+ability "Cull"
+  effect:
+    choose 1 from fallen as who
+    revive who 5
+```
+
+It reads like any other group: `fallen.count`, `fallen.first`, `fallen.last`, `for each one in fallen`. From C# it is [`runtime.Fallen`](csharp.md#the-party) and `State.Fallen(team)`, and from GDScript [`GetFallen()`](godot.md#methods).
 
 At the end of a battle **every** member is tidied up — statuses that are not `persistent` removed, cards returned to that member's draw pile — and at the end of a turn **every** member's hand is discarded. Before 1.0 both touched the leader only.
 
@@ -795,6 +813,9 @@ relic "Pyromancer's Codex"
 
 relic "Siege Engine"
   modify damage_taken of enemies where hp > 20: +2
+
+relic "Choirmaster's Baton"
+  modify damage of party where tag:holy: +2
 ```
 
 **Amounts** pick the layer: `+N` or `-N` (add), `xN` or `*N` (multiply; `x50%` is half), `clamp A..B` or `clamp N` (clamp; a single number is a ceiling), `=N` or `set N` (override). Values pass through the layers in ruleset order, add, multiply, clamp, override by default. Within the override layer the most recently created source wins. Damage, block and healing are rounded down after modifiers.
@@ -811,7 +832,23 @@ relic "Siege Engine"
 | `range` | the card or ability itself, when written on one; otherwise everything its controller points at |
 | any stat | that stat on the anchor |
 
-**`of` scope** replaces the default: the modifier applies when the value being computed belongs to someone in the group. The group is read from the modifier owner's side, so `of enemies` on the player's relic always means the player's enemies. A `where` on the group reads stats from the candidate (`hp > 20`) but tests qualifiers such as `tag:` and `source:` against the value being computed, like a `where` on the modifier.
+**`of` scope** replaces the default: the modifier applies when the value being computed **belongs to** someone in the group. Which end of an action that is, the channel decides â and it is **the same end the bare form uses**, so `of party` is a widening of `modify damage` and never its opposite.
+
+| Channel | `of <group>` names |
+|---|---|
+| `damage`, `block`, `heal`, `draw` | whoever deals, gains, heals or draws it |
+| `damage_taken`, `block_taken`, `heal_taken` | whoever receives it |
+| `targetable` | whoever is being aimed at |
+| `cost` | whose card it is â or the card itself, so `of cards` and `of hand` both work |
+| `cooldown` | whose ability it is â or the ability itself |
+| `range` | whoever is reaching â or the card or ability doing the reaching |
+| any stat | whoever holds the stat |
+
+So `modify damage of party: +2` is "the party deals 2 more" and `modify damage_taken of party: +2` is "the party takes 2 more"; `modify damage of enemies: +2` is "the enemies hit 2 harder" and `modify damage_taken of enemies: +2` is "the enemies take 2 more". The channel says which end, the group says who, and the two are never the same question.
+
+The group is read from the modifier owner's side, so `of enemies` on the player's relic always means the player's enemies, whoever is acting. A `where` on the group reads stats from the one that matched (`hp > 20`, `it.has(tag:devout)`) but tests qualifiers such as `tag:` and `source:` against the value being computed, like a `where` on the modifier.
+
+A group that can never hold what the channel names is **CT336**, a warning: `modify damage of hand` names a pile of cards on a channel whose value belongs to an actor, so it would apply to nothing and say nothing about it.
 
 **Filters** (`where`) see the value being computed: `tag:fire` checks the damage's tags and the card's tags, `source:self` compares the source's controller with the modifier owner's. Roles and group names such as `source:enemies` and `allies.count` are read from the modifier owner's side, whoever is acting.
 
@@ -843,7 +880,7 @@ relic "Arcane Vestments"
   modify cooldown: x0.5
 ```
 
-On a relic or a status that shortens every ability its holder has; written on the ability itself it shortens only that one — the same division `cost` makes between a card and its owner's cards. Modifiers see the cooldown already converted into clock units, so a multiplier means the same thing whether the ability was written `8s` or `2 turns`. An additive amount is therefore in clock units, ticks in real time and turns otherwise, which is why a multiplier is the spelling that travels between clocks. The result rounds up, the way a duration rounds up when it converts, and never falls below nothing. The text a card prints still shows the cooldown as written, as a printed cost does.
+On a relic or a status that shortens every ability its holder has; written on the ability itself it shortens only that one — the same division `cost` makes between a card and its owner's cards. A relic belongs to the leader and a `hero` is its own controller, so "your abilities recharge faster" for a whole party is the `of` form: `modify cooldown of party: x50%`. Modifiers see the cooldown already converted into clock units, so a multiplier means the same thing whether the ability was written `8s` or `2 turns`. An additive amount is therefore in clock units, ticks in real time and turns otherwise, which is why a multiplier is the spelling that travels between clocks. The result rounds up, the way a duration rounds up when it converts, and never falls below nothing. The text a card prints still shows the cooldown as written, as a printed cost does.
 
 Stat reads are cached and the cache is invalidated by any change to the game state.
 
@@ -1001,8 +1038,8 @@ A bare name resolves in this order: local variables (`let` bindings, `for each` 
 | `remove` | `remove Status [from who]`, `remove tag:x from who` (every status with the tag, and the tag), `remove who` (destroys it). |
 | `gain`, `lose` | `gain N Status` adjusts a status; `gain N stat` changes a stat. `[to who]`, else yourself. |
 | `change` | `change stat by N [to who]`, or `change hp -5 on target`. |
-| `create` | `create Card [N] [into zone]` (default hand), `create Relic`, `create Enemy`. Makes a fresh one from the definition, so it arrives with its printed stats. Binds `created`. A status, keyword or ability is refused (CT320): those belong to whoever has them, and `apply` is the verb that gives one. |
-| `copy` | `copy [who] [N] [into zone]` duplicates something that is **in the game**, as it stands now — an upgraded card, a wounded minion, a discounted power. Defaults to itself. Binds `copied`, always a list. See below. |
+| `create` | `create Card [N] [into zone] [to who]` (default hand, and whoever is running the line), `create Relic`, `create Enemy`. Makes a fresh one from the definition, so it arrives with its printed stats. Binds `created`. A status, keyword or ability is refused (CT320): those belong to whoever has them, and `apply` is the verb that gives one. |
+| `copy` | `copy [who] [N] [into zone] [to who]` duplicates something that is **in the game**, as it stands now — an upgraded card, a wounded minion, a discounted power. Defaults to itself. Binds `copied`, always a list. See below. |
 | `shuffle` | `shuffle` (discard into draw), `shuffle Card [N] [into zone]` (creates copies), `shuffle cards into zone`. `into` says which pile the cards land in and which pile is then shuffled; without it, the draw pile. |
 | `move` | `move cards to zone [, top]` |
 | `transform` | `transform [who] into Definition` replaces what something is while it keeps its place, its id and everything holding it. Defaults to the effect's target. Binds nothing. See below. |
@@ -1047,6 +1084,8 @@ The grammar knows thirteen clause words, four of which — `at`, `over`, `agains
 
 **`into`** binds what a verb actually achieved, so an effect can act on it: `deal 4 to all enemies into dealt`, then `heal dealt`. The number is what landed, summed across the targets — after modifiers changed the amount, after block absorbed what it could, and counting only what a dying target could still take, which is rarely the number the line asked for. Available on `deal`, `damage`, `attack`, `heal` and `block`: a heal stops at full health and block goes through its own modifiers, so those two are worth asking about for the same reason. It binds a **new name**, so do not reuse the name of a stat: `heal 5 into hp` binds a local called `hp` that shadows the stat for the rest of the effect. On `create`, `copy`, `move` and `shuffle`, `into` names a **zone** instead.
 
+**`into` is the pile and `to` is whose.** `create Brine into discard to leader` makes the curse in the *leader's* discard pile, whoever ran the line â which is how an enemy puts a Wound in the player's deck, and it is the same `to` every other verb uses for the one on the receiving end. Without `to`, whoever is running the line keeps what it makes, so an enemy's `create Brine into discard` fills its own pile. `to` naming a pile (`create Shiv 2 to hand`) is refused and says to write `into`; `onto` is a second spelling of `into`. The same division holds for `copy`.
+
 **`copy`** is the other half of `create`. `create Strike` makes a Strike as it is printed; `copy picked` makes one as it *is* — with the buff it was given this battle, the cost it was discounted to, the wound it is carrying. That is the only difference between the two verbs, and it is the whole point of this one:
 
 ```
@@ -1059,7 +1098,7 @@ card "Dual Wield"
 
 Two rules decide what a copy is:
 
-- **Its side and owner come from the original**, never from whoever is copying. A player's card that copies an enemy's minion gives the *enemy* a second minion. Without this, an `actor` declaration summoned by an enemy would change sides the moment anything copied it.
+- **Its side and owner come from the original** unless `to` says otherwise, never from whoever is copying. A player's card that copies an enemy's minion gives the *enemy* a second minion. Without this, an `actor` declaration summoned by an enemy would change sides the moment anything copied it.
 - **It is placed by kind, where a new one would go**: an actor on the board in the next free slot, a relic or item into `relics`, anything else into hand, and `into <zone>` overrides. A copy never inherits the original's zone — copying an active power would otherwise put a second live power into `powers` that nobody played, and copying an exhausted card would put it where nothing can reach it.
 
 Everything the original has now comes across: its live stats, its runtime tags, and a new instance of every status and keyword on it with the same `stacks`, `duration` and `expires_at`. Those arrive silently — no `status_applied` is raised and `immune` is never asked — because a copy is a snapshot of a state, not a new application.
@@ -1520,6 +1559,7 @@ Codes with four digits come from reading and loading the files. An error among t
 | CT332 | warning | A `range` that decides nothing: as wide as the widest board this game declares, written backwards (`range 3..1`), or `range 0` at an enemy, which on a facing board is a slot no enemy ever stands on. | Give it a reach the board can narrow. `range 1` is what melee is written as. |
 | CT333 | warning | `lane(...)` on a board one rank deep, or `rank(...)` on a board one lane wide. One actor stands on a slot, so the row is that actor and nobody else. | Write the actor itself, or give the board a second rank or lane. |
 | CT335 | error | `turns:` or `order:` in a game that says `clock ticks`. Both say how a turn is shared out, and a real-time game has no turns: `turn_start` and `turn_end` never fire there and the engine ignores the setting, so `turns: initiative` asks for an order that will never run. | Drop the line, or say `clock turns` if this game does take turns. |
+| CT336 | warning | An `of` group that can never hold what the channel names: a pile of cards (`hand`, `discard`, `deck`, `cards`) on a channel whose value belongs to an actor, such as `damage` or `heal_taken`. The modifier would apply to nothing, whatever the game does. | Name a group of actors — `party`, `allies`, `enemies`, `everyone` — or move the rule to a channel a card carries, such as `cost`. |
 
 **Descriptions**
 

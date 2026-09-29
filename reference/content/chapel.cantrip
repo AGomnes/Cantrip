@@ -41,3 +41,17 @@ board "Chapel"
   on_vacated gap
   lane_word "aisle"
   rank_word "rank"
+
+# The nave the Antiphonary sits in: a rank deeper than the rest of the chapel, so the boss's own
+# aisle has room for a second Tooth standing behind it. Changing boards leaves anybody who still
+# fits where they stand, so the party keeps its places from the fight before and only what is
+# placed next — the boss, and what it summons — feels the extra rank. Two boards, so the game has
+# to say which fight is fought where: `StartBattle(board:)` in C#, `StartBattleOn` in GDScript.
+board "Nave"
+  lanes 2
+  ranks 3
+  facing
+  metric manhattan
+  on_vacated gap
+  lane_word "aisle"
+  rank_word "rank"

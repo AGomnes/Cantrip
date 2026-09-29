@@ -402,6 +402,30 @@ namespace Cantrip.GodotAdapter
         }
 
         /// <summary>
+        /// Starts a battle on a named <c>board</c>, for a game with more than one: a corridor, a
+        /// train with two kinds of floor, a boss arena a fight wider than the rest happens in. An
+        /// empty name keeps the board in play, which before the first battle is the content's
+        /// default.
+        /// </summary>
+        /// <remarks>
+        /// A separate method rather than a third argument, because a C# default is not a default in
+        /// GDScript: a script has to pass every parameter, so adding one to <c>StartBattle</c> would
+        /// break every game that calls it, at parse time. Content owns the shapes, so a name no
+        /// <c>board</c> declaration matches is refused rather than invented.
+        /// </remarks>
+        public void StartBattleOn(string board, bool shuffle, bool draw_opening_hand)
+        {
+            CardRuntime core = EnsureRuntime();
+            Act(() =>
+            {
+                core.StartBattle(shuffle, draw_opening_hand, string.IsNullOrEmpty(board) ? null : board);
+                return true;
+            });
+
+            if (core.State.InBattle) EmitSignal(SignalName.BattleStarted);
+        }
+
+        /// <summary>
         /// Plays a card. The answer is one of "played", "pending", "not_a_card", "not_in_hand",
         /// "unplayable", "not_enough_energy", "invalid_target" or "cancelled"; "pending" means the
         /// rules need a decision and a <c>choice_requested</c> signal is on its way.
@@ -548,7 +572,7 @@ namespace Cantrip.GodotAdapter
             CardRuntime core = EnsureRuntime();
             VariantMap.WarnUnknownZone(zone, nameof(GetZone));
 
-            Entity? owner = owner_id == VariantMap.NoEntity ? core.Player : core.State.Find(owner_id);
+            Entity? owner = owner_id == VariantMap.NoEntity ? core.State.Player : core.State.Find(owner_id);
             return VariantMap.Ids(core.State.ZoneOf(owner, zone));
         }
 
@@ -558,7 +582,11 @@ namespace Cantrip.GodotAdapter
 
         public Godot.Collections.Array GetActors() => VariantMap.Ids(EnsureRuntime().State.Actors());
 
-        public int PlayerId() => EnsureRuntime().Player?.Id ?? VariantMap.NoEntity;
+        public int PlayerId()
+        {
+            CardRuntime core = EnsureRuntime();
+            return core.HasPlayer ? core.Player.Id : VariantMap.NoEntity;
+        }
 
         /// <summary>
         /// The living party, in the order the engine offers its members: the actors this game asks
@@ -569,6 +597,18 @@ namespace Cantrip.GodotAdapter
         /// minion is an ally and takes no step.
         /// </remarks>
         public Godot.Collections.Array GetParty() => VariantMap.Ids(EnsureRuntime().Party);
+
+        /// <summary>
+        /// The party's dead, in the order they fell — what <see cref="GetParty"/> and
+        /// <see cref="GetAllies"/> leave out, and what content calls <c>fallen</c>. Pair it with
+        /// <see cref="Revive"/> for the shrine that offers to raise one.
+        /// </summary>
+        /// <remarks>
+        /// A fallen member used to be in none of these lists, so a run that wanted to offer a raise
+        /// had to keep its own list of ids from the moment it created them, save it and keep it in
+        /// step with the snapshot. It was always in the save; only the way to ask was missing.
+        /// </remarks>
+        public Godot.Collections.Array GetFallen() => VariantMap.Ids(EnsureRuntime().Fallen);
 
         /// <summary>
         /// The member whose step it is, or 0 when none of the party's is: outside a battle, on the
@@ -626,11 +666,59 @@ namespace Cantrip.GodotAdapter
             return entity == null ? new Godot.Collections.Dictionary() : VariantMap.Entity(EntityView.Of(entity, null, core.State));
         }
 
-        /// <summary>One stat after modifiers, which is the number the rules would use now.</summary>
+        /// <summary>
+        /// One stat after modifiers, which is the number the rules would use now. A status is not a
+        /// stat: for the number of Fervour somebody is holding, ask <see cref="CounterOf"/>.
+        /// </summary>
         public int GetStat(int entity_id, string stat)
         {
             Entity? entity = EnsureRuntime().State.Find(entity_id);
             return entity == null ? 0 : entity.GetInt(stat);
+        }
+
+        /// <summary>
+        /// How many of a status somebody is holding: stacks for a stacking status, and 1 or 0 for
+        /// one that does not stack. 0 for an id that names nobody, and for somebody without it.
+        /// </summary>
+        /// <remarks>
+        /// Content reads this as <c>Warden.Fervour</c> and C# as <c>entity.CounterOf("Fervour")</c>.
+        /// There was no third spelling, so a status bar walked the whole
+        /// <c>GetEntity(id)["statuses"]</c> dictionary — every stat, every tag and every status
+        /// built to answer one number — once per member per frame, and
+        /// <c>GetStat(warden, "Fervour")</c>, which is what the DSL's own vocabulary suggests,
+        /// answered 0 without saying why.
+        /// </remarks>
+        public int CounterOf(int entity_id, string status)
+        {
+            Entity? entity = EnsureRuntime().State.Find(entity_id);
+            return entity == null ? 0 : entity.CounterOf(status ?? string.Empty);
+        }
+
+        /// <summary>
+        /// Writes a stat: the same thing content's <c>speed = 6</c> does, with the resource's bounds,
+        /// the <c>&lt;stat&gt;_changed</c> event and death when hp reaches zero. Returns the change
+        /// actually applied, which a bound or a listener may have cut short.
+        /// </summary>
+        /// <remarks>
+        /// This is how a leader gets a <c>speed</c> under <c>order: speed</c>, where an actor with
+        /// none reads 0 and takes its step last — and the leader's step is when the party's hand is
+        /// drawn. Before it, the only way was to build a statement and call <c>Execute</c>.
+        /// </remarks>
+        public int SetStat(int entity_id, string stat, int value)
+        {
+            CardRuntime core = EnsureRuntime();
+            Entity? entity = core.State.Find(entity_id);
+            if (entity == null) return 0;
+            return Act(() => core.SetStat(entity, stat ?? string.Empty, value).ToInt());
+        }
+
+        /// <summary>Adds to a stat, or takes away with a negative amount: <c>gain</c> and <c>lose</c>.</summary>
+        public int ChangeStat(int entity_id, string stat, int by)
+        {
+            CardRuntime core = EnsureRuntime();
+            Entity? entity = core.State.Find(entity_id);
+            if (entity == null) return 0;
+            return Act(() => core.ChangeStat(entity, stat ?? string.Empty, by).ToInt());
         }
 
         public int CostOf(int card_id)
@@ -1085,9 +1173,18 @@ namespace Cantrip.GodotAdapter
 
                 SyncChoice();
 
+                // Written down before the signal goes out, not after. A handler that acts — which
+                // is the first thing anybody writes here, since the battle is over and the reward
+                // is due — comes back through this method, and with the old value still standing it
+                // saw the same end-of-battle transition again and told the game again, for ever,
+                // until the stack died. Recording the transition the moment it is noticed is what
+                // makes it tell exactly once. It is not a flag held across the emit, because a
+                // handler that starts the next battle records that battle from inside the signal
+                // and nothing after the emit may overwrite it.
                 bool inBattle = _node._core != null && _node._core.State.InBattle;
-                if (_node._wasInBattle && !inBattle) _node.EmitSignal(SignalName.BattleEnded, _node._core?.Won ?? false);
+                bool justEnded = _node._wasInBattle && !inBattle;
                 _node._wasInBattle = inBattle;
+                if (justEnded) _node.EmitSignal(SignalName.BattleEnded, _node._core?.Won ?? false);
             }
 
             /// <summary>Tells the game about a decision the rules are waiting on, once per request.</summary>
@@ -1146,7 +1243,7 @@ namespace Cantrip.GodotAdapter
             {
                 // Every value is its own seed. It used to be clamped up to 1, so 0, 1 and -5 all
                 // played the same game and nothing said why.
-                Seed = unchecked((ulong)Seed),
+                Seed = Seed,
                 Trace = Trace,
                 Host = _host,
                 Chooser = new DeferredChooser(),

@@ -331,7 +331,7 @@ namespace Cantrip.Tests.Snapshots
                 gain 10 gold
             """;
 
-        private static RuntimeOptions RealTime(ulong seed) => new RuntimeOptions { Seed = seed, Clock = new TickClock(10) };
+        private static RuntimeOptions RealTime(long seed) => new RuntimeOptions { Seed = seed, Clock = new TickClock(10) };
 
         [Fact]
         [Trait("Regression", "listener-record-is-positional")]

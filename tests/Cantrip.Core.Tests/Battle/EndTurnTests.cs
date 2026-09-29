@@ -95,7 +95,7 @@ namespace Cantrip.Tests.Battle
               pattern random
             """;
 
-        private static CardRuntime Setup(out Entity player, BattleEventRecorder? recorder = null, ulong seed = 1)
+        private static CardRuntime Setup(out Entity player, BattleEventRecorder? recorder = null, long seed = 1)
         {
             CardRuntime runtime = BattleKit.Create(Content, seed, host: recorder);
             player = runtime.CreatePlayer();
@@ -409,7 +409,7 @@ namespace Cantrip.Tests.Battle
         [Fact]
         public void Random_intents_come_from_the_seeded_game_rng()
         {
-            List<string> Rolls(ulong seed)
+            List<string> Rolls(long seed)
             {
                 CardRuntime runtime = Setup(out _, seed: seed);
                 Entity weighted = runtime.SpawnEnemy("Picky");

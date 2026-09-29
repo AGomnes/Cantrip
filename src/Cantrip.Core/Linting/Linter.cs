@@ -88,6 +88,13 @@ namespace Cantrip.Linting
         /// </summary>
         public const string TurnOrderWithoutTurns = "CT335";
 
+        /// <summary>
+        /// An <c>of</c> group that can never hold the one the value belongs to: a pile of cards on a
+        /// channel that belongs to an actor. A modifier that cannot match is worth saying out loud
+        /// rather than leaving to a test that guessed the number.
+        /// </summary>
+        public const string ScopeCannotMatch = "CT336";
+
         /// <summary>Below this many runs, a scenario's numbers move about from one run to the next (CT318).</summary>
         private const int FewRuns = 100;
 
@@ -161,7 +168,7 @@ namespace Cantrip.Linting
         /// <summary>Names that only ever mean actors, never a card.</summary>
         private static readonly HashSet<string> ActorWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "player", "controller", "enemy", "enemies", "allies", "everyone", "actors",
+            "player", "leader", "controller", "enemy", "enemies", "allies", "everyone", "actors", "party", "fallen",
         };
 
         /// <summary>Verbs that act on the effect's target when they have no <c>to</c> clause.</summary>
@@ -353,6 +360,7 @@ namespace Cantrip.Linting
                 CheckPositionReads(body);
                 CheckSpatialSelectors(body);
                 CheckRowSelectors(body);
+                CheckModifierScope(body);
                 CheckPlayerInAParty(body);
             }
 
@@ -1047,6 +1055,44 @@ namespace Cantrip.Linting
         }
 
         /// <summary>
+        /// CT336: an <c>of</c> group that can never hold the one the value belongs to. On
+        /// <c>damage</c> and its neighbours the value belongs to an actor, so a group that only ever
+        /// holds cards matches nothing whatever the game does. Warned rather than refused, because
+        /// a game may name a group of its own that the linter cannot see into; these are the built-in
+        /// piles, where there is no doubt.
+        /// </summary>
+        private void CheckModifierScope(Body body)
+        {
+            if (!(body.Anchor is ModifyNode modify) || modify.Scope == null) return;
+            if (!ChannelBelongsToAnActor(modify.Channel)) return;
+
+            ExprNode scope = modify.Scope;
+            while (scope is WhereExpr where) scope = where.Source;
+            if (!(scope is NameExpr name) || !CardPileWords.Contains(name.Name)) return;
+
+            Warn(ScopeCannotMatch,
+                $"`{name.Name}` holds cards, and `{modify.Channel}` belongs to whoever an action is by or to, " +
+                $"so `of {name.Name}` can never match and this modifier will never apply. Name a group of actors — " +
+                "`party`, `allies`, `enemies`, `everyone` — or move the rule to a channel a card carries, such as `cost`.",
+                scope.Span);
+        }
+
+        /// <summary>Channels whose value belongs to an actor and never to a card.</summary>
+        private static bool ChannelBelongsToAnActor(string channel) =>
+            ActorOnlyChannels.Contains(channel);
+
+        private static readonly HashSet<string> ActorOnlyChannels = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "damage", "block", "heal", "draw", "damage_taken", "heal_taken", "block_taken", "targetable",
+        };
+
+        /// <summary>The built-in names that always mean a pile of cards.</summary>
+        private static readonly HashSet<string> CardPileWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "hand", "draw_pile", "discard", "discard_pile", "exhaust", "exhaust_pile", "powers", "deck", "cards",
+        };
+
+        /// <summary>
         /// CT333: a row selector on a board with only one actor in a row. <c>rank(who)</c> on a
         /// one-lane board is <c>who</c> and nobody else, because one actor stands on a slot — so
         /// "deal 4 to the target's rank" quietly hits the target alone.
@@ -1624,10 +1670,11 @@ namespace Cantrip.Linting
                         RequireDefinition(body, TestEnemyName(command), "enemy");
                         break;
 
-                    // `board "Corridor"` picks the board this test is fought on. A board is out of
-                    // name lookup, the way a resource is, so it is checked here against the boards
-                    // rather than left to CT302, which would call every board name undefined.
-                    case "board" when body.Kind == BodyKind.Test:
+                    // `board "Corridor"` picks the board this test or this scenario is fought on. A
+                    // board is out of name lookup, the way a resource is, so it is checked here
+                    // against the boards rather than left to CT302, which would call every board
+                    // name undefined.
+                    case "board":
                         RequireBoard(body, TestNames(command).FirstOrDefault());
                         break;
                 }
@@ -2335,11 +2382,42 @@ namespace Cantrip.Linting
             visiting.Remove(current);
         }
 
+        /// <summary>
+        /// Whether a command can really raise one of the events its verb's table lists. <c>gain</c>,
+        /// <c>lose</c> and <c>change</c> cover a resource and a status with one word, so the table
+        /// has to name a death and a status applied for all three; <c>gain 2 gold</c> does neither,
+        /// and only <c>hp</c> ever kills. Reading the word the command names is what stops CT306
+        /// calling <c>on killed: gain 2 gold</c> a loop with itself — one listener, paired with
+        /// itself, in the relic every roguelite ships.
+        /// </summary>
+        private static bool CanReallyRaise(CommandNode command, string raised)
+        {
+            string verb = command.Verb.ToLowerInvariant();
+            if (verb != "gain" && verb != "lose" && verb != "change") return true;
+
+            string? named = verb == "change"
+                ? (command.Arguments.Count > 0 ? StatOfChange(command.Arguments[0]) : null)
+                : WordAt(command, 1);
+
+            // Nothing to read — a computed name, or a shape this does not know — so say nothing.
+            if (named == null) return true;
+
+            bool status = StartsUpper(named);
+            if (raised == BuiltinEvents.Died || raised == BuiltinEvents.Killed)
+                return !status && string.Equals(named, "hp", StringComparison.OrdinalIgnoreCase);
+            if (raised == BuiltinEvents.StatusApplied || raised == BuiltinEvents.StatusResisted || raised == BuiltinEvents.StatusRemoved)
+                return status;
+            return true;
+        }
+
         private IEnumerable<string> RaisedEvents(Facts facts, Dictionary<string, Body> verbBodies, HashSet<string> visitingVerbs)
         {
             foreach (CommandNode command in facts.Commands)
             {
-                foreach (string raised in BuiltinEvents.RaisedBy(command.Verb)) yield return raised;
+                foreach (string raised in BuiltinEvents.RaisedBy(command.Verb))
+                {
+                    if (CanReallyRaise(command, raised)) yield return raised;
+                }
 
                 string verb = command.Verb.ToLowerInvariant();
                 if (verb == "emit" && WordAt(command, 0) is string emitted) yield return emitted;

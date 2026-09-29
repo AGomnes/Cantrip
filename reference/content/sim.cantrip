@@ -34,6 +34,10 @@ scenario "The Drowned Chapel"
   battle "Bell Warden", "Drowned Acolyte", "Choir of Teeth"
 
   relic Tideglass
+
+  # The last fight is in the nave, which is a rank deeper. The host and the Godot game both
+  # name it, so the scenario names it too and a bot plays the fight the game plays.
+  board Nave
   battle "The Antiphonary"
 
   expect no stalls

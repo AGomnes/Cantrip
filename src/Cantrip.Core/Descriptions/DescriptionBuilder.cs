@@ -86,7 +86,7 @@ namespace Cantrip.Descriptions
                     nameof(moveName));
             }
 
-            Entity? aim = against ?? runtime?.Player;
+            Entity? aim = against ?? (runtime != null && runtime.HasPlayer ? runtime.Player : null);
             Live? live = runtime != null && enemy != null ? new Live(runtime, enemy, aim) : null;
             var session = new Session(this, definition, live);
             List<DescriptionSegment> segments = session.RenderMove(move);

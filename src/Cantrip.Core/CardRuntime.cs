@@ -44,7 +44,16 @@ namespace Cantrip
 
     public sealed class RuntimeOptions
     {
-        public ulong Seed { get; set; } = 1;
+        /// <summary>
+        /// The run's seed. Any 64-bit number is a seed of its own, 0 and negative ones included, so
+        /// a host can hand it whatever number it computed.
+        /// </summary>
+        /// <remarks>
+        /// It used to be <c>ulong</c>, which compiled for the literal the guide shows and for
+        /// nothing a host works out for itself: every game that seeded a run from an <c>int</c>
+        /// wrote <c>(ulong)(uint)seed</c>, and Godot's own seed export is signed.
+        /// </remarks>
+        public long Seed { get; set; } = 1;
 
         /// <summary>Defaults to a <see cref="TurnClock"/>. Pass a <see cref="TickClock"/> for real-time games.</summary>
         public IGameClock? Clock { get; set; }
@@ -83,7 +92,7 @@ namespace Cantrip
             if (rules.Clock == ClockKind.Ticks && !(clock is TickClock))
                 throw new InvalidOperationException("This content says `clock ticks`, but the runtime was given a turn clock. Pass a `TickClock`, or change the ruleset.");
 
-            State = new GameState(content, rules, clock, options.Seed);
+            State = new GameState(content, rules, clock, unchecked((ulong)options.Seed));
             State.Trace.Enabled = options.Trace;
             Interpreter = new Interpreter(State, options.Host);
             if (options.Chooser != null) Interpreter.Chooser = options.Chooser;
@@ -147,13 +156,52 @@ namespace Cantrip
             set => Interpreter.Chooser = value ?? throw new ArgumentNullException(nameof(value), "A runtime always has a chooser; pass a FirstOptionChooser to keep the default.");
         }
 
-        public Entity? Player => State.Player;
+        /// <summary>
+        /// The party's leader: the actor <see cref="CreatePlayer"/> made, who holds the run's deck,
+        /// relics and gold.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">
+        /// Before <see cref="CreatePlayer"/>. Every other call that needs a player needs it too, so
+        /// the window in which this is empty is the few lines between building a runtime and setting
+        /// the game up — and a game that asks in that window has its order wrong rather than a
+        /// player that might not be there.
+        /// </exception>
+        /// <remarks>
+        /// Not nullable, deliberately. It used to be, and a host with
+        /// <c>&lt;Nullable&gt;enable&lt;/Nullable&gt;</c> — which this repository's own
+        /// <c>Directory.Build.props</c> sets, with <c>WarningsAsErrors=nullable</c> — could not
+        /// write <c>runtime.Player.GetInt("hp")</c>, the line the guide gives, without a <c>!</c>
+        /// the guide never mentions. <see cref="HasPlayer"/> is the question worth asking, and it is
+        /// asked once, at setup.
+        /// </remarks>
+        public Entity Player =>
+            State.Player ?? throw new InvalidOperationException(
+                "There is no player yet. Call CreatePlayer first; it is the one call every game makes before a battle.");
+
+        /// <summary>
+        /// Whether <see cref="CreatePlayer"/> has been called. False only between building a runtime
+        /// and setting the game up, and after <c>NewRun</c> on the Godot node.
+        /// </summary>
+        public bool HasPlayer => State.Player != null;
 
         /// <summary>
         /// The living members of the party, in the order they take their steps. A game that never
         /// declares a <c>hero</c> has one member: <see cref="Player"/>.
         /// </summary>
         public IReadOnlyList<Entity> Party => State.Party;
+
+        /// <summary>
+        /// The party's dead, in the order they fell — what <see cref="Party"/> and
+        /// <c>State.Actors</c> leave out, and what content calls <c>fallen</c>.
+        /// </summary>
+        /// <remarks>
+        /// A run that offers to raise a fallen member used to have to keep its own list of member
+        /// ids from the moment it created them, save it, version it and keep it in step with the
+        /// snapshot, because a corpse was in none of <c>Party</c>, <c>State.Actors</c> or the
+        /// content groups. It is in the snapshot like everyone else; only the way to ask was
+        /// missing.
+        /// </remarks>
+        public IReadOnlyList<Entity> Fallen => State.Fallen(Team.Player);
 
         /// <summary>
         /// Whose step it is, or null when the turn order has no single answer. <c>turns: sides</c>,
@@ -1209,6 +1257,67 @@ namespace Cantrip
             Run(State.Player, context => revived = Interpreter.Revive(actor, Num.FromInt(hp), context));
             if (State.InBattle) CheckBattleOver();
             return revived;
+        }
+
+        /// <summary>
+        /// Sets a stat on an actor, or on a card: the same thing content's <c>speed = 6</c> does, with
+        /// the resource's own bounds, the <c>&lt;stat&gt;_changed</c> event, and death when hp reaches
+        /// zero. Returns the change that was actually applied, which a bound or a listener may have
+        /// cut short.
+        /// </summary>
+        /// <remarks>
+        /// There was no typed way to write a number onto an entity at all, so a game that finished
+        /// creating its leader — a <c>speed</c> for <c>order: speed</c>, a starting shard count —
+        /// or spent gold in a shop had to build a statement and call <c>Execute</c>:
+        /// <c>runtime.Execute($"lose {amount} gold")</c>, a string-interpolated statement, unchecked
+        /// until it runs, for subtracting an integer.
+        /// </remarks>
+        public Num SetStat(Entity entity, string stat, long value) => WriteStat(entity, stat, AssignOperator.Set, value);
+
+        /// <summary>
+        /// Adds to a stat, or takes away with a negative amount: content's <c>gain 2 gold</c> and
+        /// <c>lose 3 gold</c>, from C#, with the same bounds, events and consequences.
+        /// </summary>
+        public Num ChangeStat(Entity entity, string stat, long by) => WriteStat(entity, stat, AssignOperator.Add, by);
+
+        private Num WriteStat(Entity entity, string stat, AssignOperator op, long amount)
+        {
+            if (entity == null) throw new ArgumentNullException(nameof(entity));
+            if (string.IsNullOrWhiteSpace(stat)) throw new ArgumentException("A stat has a name.", nameof(stat));
+
+            Num applied = Num.Zero;
+            Entity? actor = entity.Kind == EntityKind.Actor ? entity : entity.Controller;
+            Run(actor, context =>
+            {
+                context.Self = entity;
+                applied = Interpreter.ChangeStat(entity, stat, op, Num.FromInt(amount), context);
+            });
+            if (State.InBattle) CheckBattleOver();
+            return applied;
+        }
+
+        /// <summary>
+        /// Takes a card out of the game for good, as <c>destroy</c> does in content: the way to
+        /// remove a card from the deck between battles, or to swap one for its upgraded definition.
+        /// Content hears it as <c>destroyed</c>.
+        /// </summary>
+        /// <returns>
+        /// Whether the card is gone. False, having changed nothing, for anything that is not a card
+        /// still in the game.
+        /// </returns>
+        /// <remarks>
+        /// The Godot node has had this since the addon shipped, with a worked <c>upgrade_card</c>
+        /// recipe beside it, while C# was told to write <c>Execute("destroy target", target: card)</c>
+        /// — the same operation as a typed call on one side of the engine and a parsed string on the
+        /// other.
+        /// </remarks>
+        public bool RemoveCard(Entity card)
+        {
+            if (card == null) throw new ArgumentNullException(nameof(card));
+            if (card.Kind != EntityKind.Card || card.IsRemoved) return false;
+
+            Execute("destroy target", target: card);
+            return card.IsRemoved;
         }
 
         /// <summary>Uses an ability if it is off cooldown.</summary>

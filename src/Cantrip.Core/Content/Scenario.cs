@@ -16,9 +16,14 @@ namespace Cantrip.Content
         /// Verbs a scenario shares with a <c>test</c>, which set the game up and mean the same thing
         /// in both. Every one of them is also in <see cref="Testing.DslTestRunner.TestVerbs"/>.
         /// </summary>
+        /// <remarks>
+        /// <c>board</c> is one of them. Which board a fight is fought on is part of stating the
+        /// fight, and without it a game with more than one board could not be simulated the way it
+        /// is played: the host would name a board the scenario could not.
+        /// </remarks>
         public static IReadOnlyCollection<string> SetupVerbs { get; } = new[]
         {
-            "player", "deck", "hand", "discard_pile", "relic", "grant", "seed", "answer", "hero",
+            "player", "deck", "hand", "discard_pile", "relic", "grant", "seed", "answer", "hero", "board",
         };
 
         /// <summary>

@@ -400,7 +400,7 @@ namespace Cantrip.Tests.Battle
         [Fact]
         public void The_play_verb_rolls_the_same_target_from_the_same_seed()
         {
-            static int Struck(ulong seed)
+            static int Struck(long seed)
             {
                 CardRuntime runtime = BattleKit.Create(Content, seed: seed);
                 runtime.CreatePlayer();
@@ -413,7 +413,7 @@ namespace Cantrip.Tests.Battle
                 return alpha.GetInt("hp");
             }
 
-            for (ulong seed = 1; seed <= 8; seed++) Assert.Equal(Struck(seed), Struck(seed));
+            for (long seed = 1; seed <= 8; seed++) Assert.Equal(Struck(seed), Struck(seed));
         }
 
         // Rolling back and replaying ---------------------------------------------------------------

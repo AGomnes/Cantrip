@@ -158,6 +158,7 @@ namespace Cantrip.Sim
             CardInHand = (card, played) =>
             {
                 facts.CardsHeld.Add(card.Name);
+                if (card.HasTag("unplayable")) facts.CardsNeverMeantToBePlayable.Add(card.Name);
 
                 // A card that was played was playable, whether or not it could have been played at
                 // the start of the turn: the energy for it may have arrived halfway through.
@@ -381,7 +382,7 @@ namespace Cantrip.Sim
                 var chooser = new ScenarioChooser(answers, _bot.Chooser, meter);
                 var options = new RuntimeOptions
                 {
-                    Seed = seed,
+                    Seed = unchecked((long)seed),
                     Chooser = chooser,
                     Host = meter,
                 };
@@ -455,8 +456,13 @@ namespace Cantrip.Sim
                 IReadOnlyList<string> names = SetupSession.Names(call);
                 if (names.Count == 0) throw Refuse("`battle` names no enemy, so there is nothing to fight.", call);
 
-                var battle = new BattleResult(++_battles, string.Join(" + ", names));
-                Entity player = _runtime.Player ?? throw Refuse("the scenario has no player to fight with.", call);
+                // The declaration's own name, not the word as written. A bare name after a comma
+                // arrives as a clause keyword, which the parser lower-cases, so
+                // `battle "Bell Warden", Tidewalker` labelled itself "Bell Warden + tidewalker"
+                // while the hp table under it said "Tidewalker".
+                var battle = new BattleResult(++_battles, string.Join(" + ", names.Select(Declared)));
+                if (!_runtime.HasPlayer) throw Refuse("the scenario has no player to fight with.", call);
+                Entity player = _runtime.Player;
                 int hpBefore = PartyHp();
 
                 // The hp ledger watches from the first fight: before that a statement may set hp
@@ -523,10 +529,17 @@ namespace Cantrip.Sim
             {
                 foreach (Entity member in _runtime.Party)
                 {
-                    foreach (Entity card in _runtime.State.ZoneOf(member, Zones.Hand)) _facts.CardsHeld.Add(card.Name);
+                    foreach (Entity card in _runtime.State.ZoneOf(member, Zones.Hand))
+                    {
+                        _facts.CardsHeld.Add(card.Name);
+                        if (card.HasTag("unplayable")) _facts.CardsNeverMeantToBePlayable.Add(card.Name);
+                    }
                     foreach (string name in Options.CardNames(_runtime, Options.Legal(_runtime, member))) _facts.CardsPlayable.Add(name);
                 }
             }
+
+            /// <summary>An enemy's name as its declaration spells it, for a label a reader compares.</summary>
+            private string Declared(string name) => _owner._content.Find(name, "enemy")?.Name ?? name;
 
             private static InvalidOperationException Refuse(string message, VerbCall call) =>
                 new InvalidOperationException($"`{call.Verb}`: {message}");

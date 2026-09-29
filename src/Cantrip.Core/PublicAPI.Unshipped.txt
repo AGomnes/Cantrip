@@ -272,3 +272,18 @@ Cantrip.Descriptions.Description.Against.get -> string?
 Cantrip.Descriptions.Description.ToLine() -> string!
 *REMOVED*Cantrip.Descriptions.DescriptionBuilder.DescribeMove(Cantrip.Content.EntityDefinition! definition, string! moveName, Cantrip.CardRuntime? runtime = null, Cantrip.Runtime.Entity? enemy = null) -> Cantrip.Descriptions.Description!
 Cantrip.Descriptions.DescriptionBuilder.DescribeMove(Cantrip.Content.EntityDefinition! definition, string! moveName, Cantrip.CardRuntime? runtime = null, Cantrip.Runtime.Entity? enemy = null, Cantrip.Runtime.Entity? against = null) -> Cantrip.Descriptions.Description!
+const Cantrip.Linting.Linter.ScopeCannotMatch = "CT336" -> string!
+*REMOVED*Cantrip.CardRuntime.Player.get -> Cantrip.Runtime.Entity?
+*REMOVED*Cantrip.RuntimeOptions.Seed.get -> ulong
+Cantrip.CardRuntime.Player.get -> Cantrip.Runtime.Entity!
+Cantrip.CardRuntime.HasPlayer.get -> bool
+Cantrip.CardRuntime.Fallen.get -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.RuntimeOptions.Seed.get -> long
+Cantrip.Runtime.GameState.Fallen(Cantrip.Team? team = null) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+*REMOVED*Cantrip.Runtime.Interpreter.Copy(Cantrip.Runtime.Entity! original, string? zone, Cantrip.Runtime.EvalContext! context) -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.Interpreter.Copy(Cantrip.Runtime.Entity! original, string? zone, Cantrip.Runtime.EvalContext! context, Cantrip.Runtime.Entity? owner = null) -> Cantrip.Runtime.Entity?
+*REMOVED*Cantrip.Runtime.Interpreter.Create(Cantrip.Content.EntityDefinition! definition, Cantrip.Runtime.Entity? owner, string? zone, Cantrip.Runtime.EvalContext! context) -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.Interpreter.Create(Cantrip.Content.EntityDefinition! definition, Cantrip.Runtime.Entity? owner, string? zone, Cantrip.Runtime.EvalContext! context, Cantrip.Team? side = null) -> Cantrip.Runtime.Entity?
+Cantrip.CardRuntime.SetStat(Cantrip.Runtime.Entity! entity, string! stat, long value) -> Cantrip.Num
+Cantrip.CardRuntime.ChangeStat(Cantrip.Runtime.Entity! entity, string! stat, long by) -> Cantrip.Num
+Cantrip.CardRuntime.RemoveCard(Cantrip.Runtime.Entity! card) -> bool

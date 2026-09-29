@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Cantrip.Content;
 using Cantrip.Testing;
+using Cantrip.Runtime;
 using Xunit;
 
 namespace Cantrip.Tests.Runtime
@@ -124,6 +125,85 @@ namespace Cantrip.Tests.Runtime
               expect hand.first.name == "Shiv"
               expect allies.count == 2
             """);
+
+        /// <summary>
+        /// Slay the Spire's Wound, Monster Train's Pyre damage, Inscryption's decay: an enemy puts a
+        /// card into the player's deck. <c>into</c> is the pile and <c>to</c> is whose.
+        /// </summary>
+        /// <remarks>
+        /// All three clause words used to mean the pile, so <c>to</c> was read and thrown away and
+        /// the curse was made in the <em>enemy's</em> discard pile, where the player would never see
+        /// it. A clause a verb does not read is CT323 precisely so that a card cannot read as one
+        /// thing and do another; this one was read, just not for this.
+        /// </remarks>
+        [Fact]
+        [Trait("Regression", "create-to-is-ignored")]
+        public void To_says_whose_pile_a_card_lands_in()
+        {
+            CardRuntime runtime = CardRuntime.FromText("""
+                card "Brine"
+                  cost 0
+                  tags curse
+
+                enemy "Tidewalker"
+                  hp 40
+                """);
+            Entity player = runtime.CreatePlayer();
+            Entity tidewalker = runtime.SpawnEnemy("Tidewalker");
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+
+            runtime.Execute("create Brine into discard to leader", self: tidewalker);
+
+            IReadOnlyList<Entity> ours = runtime.State.ZoneOf(player, Zones.Discard);
+            Assert.Empty(runtime.State.ZoneOf(tidewalker, Zones.Discard));
+            Assert.Single(ours);
+            Assert.Equal("Brine", ours[0].Name);
+            Assert.Same(player, ours[0].Controller);
+        }
+
+        [Fact]
+        public void And_with_no_to_whoever_made_it_keeps_it()
+        {
+            CardRuntime runtime = CardRuntime.FromText("""
+                card "Brine"
+                  cost 0
+
+                enemy "Tidewalker"
+                  hp 40
+                """);
+            Entity player = runtime.CreatePlayer();
+            Entity tidewalker = runtime.SpawnEnemy("Tidewalker");
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+
+            runtime.Execute("create Brine into discard", self: tidewalker);
+
+            Assert.Single(runtime.State.ZoneOf(tidewalker, Zones.Discard));
+            Assert.Empty(runtime.State.ZoneOf(player, Zones.Discard));
+        }
+
+        /// <summary>The old spelling is refused by name rather than left to mean two things.</summary>
+        [Fact]
+        public void To_naming_a_pile_says_to_write_into()
+        {
+            string failure = FirstFailure("""
+                card "Shiv"
+                  cost 0
+
+                card "Knives"
+                  cost 0
+                  effect:
+                    create Shiv 2 to hand
+
+                test "to a pile is refused"
+                  enemy hp 50
+                  hand Knives
+                  player energy 9
+                  play Knives
+                """);
+
+            Assert.Contains("`to` says whose it is; `hand` is a pile", failure);
+            Assert.Contains("Write `into hand` for the pile", failure);
+        }
 
         // Helpers ----------------------------------------------------------------------------
 

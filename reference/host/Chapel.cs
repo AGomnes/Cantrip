@@ -12,6 +12,9 @@ public sealed class Chapel
 {
     public const int Floors = 7;
 
+    /// <summary>The last floor, where the Antiphonary is: the one fight in the nave.</summary>
+    private const int LastFloor = Floors - 1;
+
     private static readonly string[][] Encounters =
     {
         new[] { "Drowned Acolyte" },
@@ -52,7 +55,7 @@ public sealed class Chapel
     public void Begin(int seed)
     {
         runtime.Dispose();
-        runtime = new CardRuntime(content, new RuntimeOptions { Seed = (ulong)(uint)seed });
+        runtime = new CardRuntime(content, new RuntimeOptions { Seed = seed });
         run = new RunState { Seed = seed, Floor = 0, RunRng = (ulong)(uint)seed * 2654435761ul + 1ul };
         rng = new RunRandom(run.RunRng);
         Alive = true;
@@ -60,11 +63,10 @@ public sealed class Chapel
 
         Entity leader = runtime.CreatePlayer("Acolyte", hp: 40, maxEnergy: 3);
 
-        // The leader is the one party member no declaration describes. `CreatePlayer` takes a
-        // name, hp and energy and nothing else, so the speed that decides the whole initiative
-        // order has to be written afterwards, with a statement, against a `resource "speed"`
-        // declared only so that there is something to write.
-        runtime.Execute("speed = 6");
+        // The leader is the one party member no declaration describes, so the speed that decides
+        // the whole initiative order is written onto it afterwards. SetStat is the same thing
+        // content's `speed = 6` does, with the resource's bounds and its event.
+        runtime.SetStat(leader, "speed", 6);
         runtime.Execute("grant Invocation");
 
         Remember(leader, "Acolyte");
@@ -108,7 +110,9 @@ public sealed class Chapel
     private void Fight(int floor, string[] encounter)
     {
         foreach (string name in encounter) runtime.SpawnEnemy(name);
-        runtime.StartBattle(board: "Chapel");
+        // The Antiphonary sits in the nave, which is a rank deeper than the rest of the chapel.
+        // The Godot half of this game says the same thing with StartBattleOn.
+        runtime.StartBattle(board: floor == LastFloor ? "Nave" : "Chapel");
         say($"Floor {floor + 1}: {string.Join(", ", encounter)}.");
 
         bool won = new Tactician(runtime, say).FightToTheEnd();
@@ -122,7 +126,7 @@ public sealed class Chapel
         // The purse is the run's, but `gold` is a stat on the leader, so the run pays into the
         // rules rather than keeping a number of its own. That is the one place where the part
         // Cantrip does not model and the part it does share a field.
-        runtime.Execute("gain 30 gold");
+        runtime.ChangeStat(Leader, "gold", 30);
         say($"  Won on turn {runtime.State.Turn}. {PartyLine()}  gold {Gold()}");
         Reward();
         BuryTheFallen();
@@ -153,16 +157,14 @@ public sealed class Chapel
     // --- the shrine -------------------------------------------------------------------------
 
     /// <summary>
-    /// Rest, recruit or raise. The raise is here, rather than on a card, because nothing in
-    /// content can name a fallen ally: target ally and target any both want somebody living,
-    /// allies and party both leave the dead out, and everyone where zone:dead binds nothing.
-    /// The host can do it only because the host kept the entity ids itself.
+    /// Rest, recruit or raise. Content can spell a raise too -- Last Rites is `revive fallen.first
+    /// 8` -- so this is the run offering one rather than the only way to get one.
     /// </summary>
     private void Shrine()
     {
         say("Floor 3: a shrine above the water line.");
 
-        Entity? fallen = Fallen().FirstOrDefault();
+        Entity? fallen = runtime.Fallen.FirstOrDefault();
         if (fallen != null)
         {
             runtime.Revive(fallen, hp: Math.Max(1, fallen.GetInt("max_hp") / 2));
@@ -197,11 +199,11 @@ public sealed class Chapel
     {
         say($"Floor 5: the vestry. {Gold()} gold.");
 
-        // A curse costs 15 to lift. Execute("destroy target", target: card) is how a game takes
-        // a card out of the deck: there is no RemoveCard on CardRuntime, only on the Godot node.
+        // A curse costs 15 to lift. RemoveCard is how a game takes a card out of the deck, and it
+        // is the same call the Godot node has had all along.
         while (Gold() >= 15 && FirstInDeck("Brine") is { } brine)
         {
-            runtime.Execute("destroy target", target: brine);
+            runtime.RemoveCard(brine);
             Spend(15);
             say("  A Brine is lifted out of the book.");
         }
@@ -213,7 +215,7 @@ public sealed class Chapel
         {
             if (Gold() < price) break;
             if (FirstInDeck(from) is not { } card) continue;
-            runtime.Execute("destroy target", target: card);
+            runtime.RemoveCard(card);
             runtime.AddCard(to);
             Spend(price);
             say($"  {from} is rewritten as {to}.");
@@ -229,33 +231,22 @@ public sealed class Chapel
         }
     }
 
-    // `CardRuntime.Player` is nullable, so every read of the leader in a game that has certainly
-    // created one carries a `!`. csharp.md writes `runtime.Player` bare throughout.
-    private Entity Leader => runtime.Player!;
+    private Entity Leader => runtime.Player;
 
     private int Gold() => Leader.GetInt("gold");
 
-    // Gold is a stat on the leader, so spending it is a statement: there is no C# call that
-    // changes a stat the way content's own gain and lose do. A shop writes DSL text from C#.
-    private void Spend(int amount) => runtime.Execute($"lose {amount} gold");
+    // Gold is a stat on the leader, so the shop spends it through the rules rather than keeping a
+    // purse of its own -- and it saves and restores with the battle for nothing.
+    private void Spend(int amount) => runtime.ChangeStat(Leader, "gold", -amount);
 
     private Entity? FirstInDeck(string name) =>
         runtime.State.ZoneOf(Leader, Zones.Draw).FirstOrDefault(c => c.Name == name);
 
     // --- the party between battles -----------------------------------------------------------
 
-    private IEnumerable<Entity> Fallen()
-    {
-        foreach (RunState.RosterEntry entry in run.Roster)
-        {
-            Entity? member = runtime.State.Find(entry.Id);
-            if (member != null && member.IsDead) yield return member;
-        }
-    }
-
     private void BuryTheFallen()
     {
-        foreach (Entity member in Fallen()) say($"  {member.Name} did not get up.");
+        foreach (Entity member in runtime.Fallen) say($"  {member.Name} did not get up.");
     }
 
     private string PartyLine()

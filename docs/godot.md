@@ -319,7 +319,7 @@ or reads the game brings the rules into being, so set them before that, and agai
 | `EffectEvent(effect_event: Dictionary)` | Once for each event, after the action that raised it has resolved and before the call that started it returns; for an action taken in a handler, see [Events](#events). Not emitted while a `Presenter` is set. |
 | `ChoiceRequested(request: Dictionary)` | The rules are waiting for the player to choose. Emitted after the action's events. |
 | `BattleStarted()` | `StartBattle` has started a battle |
-| `BattleEnded(won: bool)` | The action that won or lost the battle has finished |
+| `BattleEnded(won: bool)` | The action that won or lost the battle has finished. **Act freely here**: hand out the reward, take the gold, start the next battle. See [Acting from a signal](#acting-from-a-signal). |
 | `ContentReloaded(report: Dictionary)` | `ReloadContent` has run, and carries the same report it returned |
 
 ### Methods
@@ -354,7 +354,8 @@ that is the value to pass if you have no other in mind.
 
 | Method | |
 |---|---|
-| `StartBattle(shuffle: bool, draw_opening_hand: bool) -> void` | Starts a battle. Defaults: `true, true`. |
+| `StartBattle(shuffle: bool, draw_opening_hand: bool) -> void` | Starts a battle on whichever board is in play, which before the first battle is the content's default. Defaults: `true, true`. |
+| `StartBattleOn(board: String, shuffle: bool, draw_opening_hand: bool) -> void` | The same, on a named `board`. `""` keeps the board in play. See [Boards](#boards). |
 | `Play(card_id: int, target_id: int) -> String` | Plays a card from the hand, aimed at `target_id`, or 0 for none. Default target: `0`. |
 | `PlayNamed(card_name: String, target_id: int) -> String` | Plays the first card of that name in the hand |
 | `PlayBy(card_id: int, target_id: int, by_id: int) -> String` | The same play, made by a named party member. The cost still comes out of the card owner's pool; everything else — `source`, the damage, the statuses that apply — is the performer's. `by_id` 0 is `Play`. |
@@ -379,13 +380,17 @@ it is still on cooldown. `not_ready` never comes back from `Play`, and `not_in_h
 |---|---|
 | `PlayerId() -> int` | The leader's id, or 0 before `CreatePlayer` |
 | `GetParty() -> Array` | The living party, in the order the engine offers its members: the actors this game is asked for input for. A game that declares no `hero` gets one id, `PlayerId()`. Not the same as `GetAllies`, which counts summons. |
+| `GetFallen() -> Array` | The party's dead, in the order they fell. `GetParty`, `GetAllies` and `GetActors` all leave them out, so this is the list a shrine that offers to raise somebody reads. Pair it with `Revive`. Content calls the same group `fallen`. |
 | `ActiveMemberId() -> int` | The member whose step it is, or 0 when none of the party's is. Binding under `turns: initiative`; under `turns: sides` it is the one the engine would offer next, which a UI highlights and `CanAct` overrules. |
 | `CanAct(actor_id: int) -> bool` | Whether that member still has a step this turn. False for an unknown id, for anyone who is not a party member, and for one that has passed. |
 | `CanUse(ability_id: int) -> bool` | `CanPlay` for an ability: off cooldown, affordable, and with something legal to aim at if it needs one. False for an id that is not an ability. |
 | `GetZone(owner_id: int, zone: String) -> Array` | Ids in one of an owner's zones; `owner_id` 0 means the player. The player's hand is `GetZone(PlayerId(), "hand")`. |
 | `GetEnemies() -> Array`, `GetAllies() -> Array`, `GetActors() -> Array` | Ids of the living enemies, the living actors on the player's side, or both |
 | `GetEntity(entity_id: int) -> Dictionary` | Everything a UI shows about one entity; empty for an unknown id |
-| `GetStat(entity_id: int, stat: String) -> int` | One stat after modifiers, which is the number the rules would use now; 0 both when the id is unknown and when the entity has no such stat |
+| `GetStat(entity_id: int, stat: String) -> int` | One stat after modifiers, which is the number the rules would use now; 0 both when the id is unknown and when the entity has no such stat. A status is **not** a stat: ask `CounterOf`. |
+| `CounterOf(entity_id: int, status: String) -> int` | How many of a status somebody is holding: stacks for a stacking status, 1 or 0 for one that does not stack. This is content's `Warden.Fervour` and C#'s `entity.CounterOf("Fervour")`. 0 for an unknown id and for somebody without it. A status bar wants this rather than `GetEntity(id)["statuses"]`, which builds every stat, tag and status to answer one number. |
+| `SetStat(entity_id: int, stat: String, value: int) -> int` | Writes a stat, exactly as content's `speed = 6` does: the resource's own bounds, the `<stat>_changed` event, and death when hp reaches zero. Returns the change actually applied, which a bound or a listener may have cut short. 0 for an unknown id. |
+| `ChangeStat(entity_id: int, stat: String, by: int) -> int` | Adds to a stat, or takes away with a negative amount: content's `gain 2 gold` and `lose 2 gold`. The way a shop spends the run's purse. |
 | `CostOf(card_id: int) -> int` | What the card costs now; 0 for an unknown id |
 | `CanPlay(card_id: int) -> bool` | Whether `Play` would accept it: in hand, affordable, with a legal target if it needs one |
 | `GetTargetMode(card_id: int) -> String` | What the card is aimed at: whatever word content wrote after `target`, usually `"enemy"`, `"ally"`, `"self"`, `"any"` or `"none"`. An ability id works here too, and answers about its `target` line. `""` for an id that names nothing, which is how a stale id is told from a card needing no target. |
@@ -460,6 +465,40 @@ Those eleven are the whole list. The rules take any other string as a zone too, 
 invent one, but `AddCard` and `GetZone` say so in the Output panel when they are given a name that
 is not one of them — because `AddCard("Guard", "hnd")` otherwise makes a real card in a pile
 nothing will ever draw from, and answers no differently from the zone you meant.
+
+### Boards
+
+A battle is fought on a **board**: lanes across and ranks along the facing axis, both counting from
+0. Content declares the shapes â [Boards](language.md#boards) in the language reference says how â
+and a game with more than one says which fight is fought where:
+
+```gdscript
+rules.StartBattleOn("Nave", true, true)   # this fight is in the nave
+rules.StartBattle(true, true)             # this one is wherever the last one was
+```
+
+`StartBattleOn` is a method of its own rather than a third argument to `StartBattle` for the reason
+under [Two rules for GDScript](#two-rules-for-gdscript): a C# default is not a default here, so a
+third parameter would have been a parse error in every game that already calls `StartBattle`. An
+empty name keeps the board in play, which before the first battle is the content's default. A name
+no `board` declaration matches is refused rather than invented, because the linter has to know how
+deep a board is to check what reaches across it.
+
+With no `board` declared at all, content gets one lane, unbounded ranks, facing sides and a
+manhattan metric â today's board, spelled out â so a game that never mentions one never notices any
+of this.
+
+Where each actor stands is in its entity dictionary, as `lane` and `rank`:
+
+```gdscript
+var who: Dictionary = rules.GetEntity(id)
+print("aisle %d, rank %d" % [who["lane"], who["rank"]])
+```
+
+Those two are the whole of a board a front end needs: lay the party out by `(lane, rank)`, and
+`GetLegalTargets` already answers what is in reach, so a highlight needs no distance arithmetic of
+its own. Content moves an actor by writing `target.rank = 0`; nothing on the node does, because
+where somebody stands is a rule and not a view.
 
 ### Dictionaries
 
@@ -572,9 +611,7 @@ The rules resolve an action completely and at once; presentation watches afterwa
   such as answering a choice or playing the next card, because by then nothing is resolving. An
   action taken in an `EffectEvent` handler resolves at once as well, and its events are emitted
   after the rest of those already on their way, still before the outer call returns; `BattleEnded`
-  comes after all of them. Start the next battle only once the handler has returned, though:
-  one started from a handler can lose a `BattleEnded`, as
-  [Known limitations](stability.md#known-limitations) explains. What is refused, with an error, is acting from a
+  comes after all of them. What is refused, with an error, is acting from a
   [callback](#callbacks-from-content): those run in the middle of an effect.
 - **They arrive in completion order, innermost first.** An event that wraps others completes after
   them: playing a card reports `damaged`, then `status_applied`, then `card_played`.
@@ -606,6 +643,34 @@ A Strike on the Ghoul, the first card played in a battle set up as in
 | `time` | The game clock when it happened: the tick in a real-time game. In a turn game it counts turns from 0 and does not start again with each battle, so it is not the turn number; `GetTurn()` gives that. |
 | `replaced` | True when an `instead` listener ran in place of the usual action |
 | `phase` | Always `"after"` |
+
+### Acting from a signal
+
+**A signal handler may do anything a game may do.** By the time one runs, the action that caused
+it has resolved, so `Execute`, `Play`, `Pass`, `AddCard`, `StartBattle` and the rest are ordinary
+calls there, and whatever they raise is told before the outer call returns. Hand out the reward
+where you would write it:
+
+```gdscript
+func _on_battle_ended(won: bool) -> void:
+	if not won:
+		show_game_over()
+		return
+	rules.ChangeStat(rules.PlayerId(), "gold", 30)   # the reward, right here
+	show_reward_screen()                              # which calls StartBattle when it closes
+```
+
+**Starting the next battle from inside `BattleEnded` is ordinary too.** The battle it starts is
+the one in play when the handler returns, and its own end is told when it comes. There is one thing
+to know about the screen rather than the rules: a `BattleEnded` handler runs *while the play that
+won is still returning*, so whatever that play does afterwards â a `_refresh()` that rebuilds the
+hand â runs after your reward screen is already up. Leave the between-battles screen alone when
+`IsInBattle()` is false.
+
+Until 1.0 the first of those was a hard crash: a call from a `BattleEnded` handler re-entered it,
+and the process died with a stack overflow and no diagnostic. Reads were fine and writes were
+fatal. Nothing about it needs a workaround now, and `call_deferred` around the reward is no longer
+doing anything for you.
 
 ## Pacing events with a BattlePresenter
 
@@ -726,7 +791,11 @@ heal, spawn the next encounter and start again:
 
 ```gdscript
 func _on_battle_ended(won: bool) -> void:
-	print("Won" if won else "Lost")  # show the reward or game-over screen here
+	if not won:
+		show_game_over()
+		return
+	rules.ChangeStat(rules.PlayerId(), "gold", 30)  # the reward, in the handler that says it is due
+	show_reward_screen()  # which calls start_next_battle when it closes
 
 func start_next_battle() -> void:  # when the reward screen closes
 	rules.AddCard("Curse", "draw")  # a reward
@@ -735,6 +804,8 @@ func start_next_battle() -> void:  # when the reward screen closes
 	rules.SpawnEnemy("Ghoul", -1)  # the next encounter, at the hp its content gives it
 	rules.StartBattle(true, true)
 ```
+
+Either function may act: see [Acting from a signal](#acting-from-a-signal).
 
 Outside the `BattleEnded` handler, `GetWon()` says how the last battle ended: `true` or `false`,
 or `null` while a battle is running and before the first one has ended.

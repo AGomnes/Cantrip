@@ -1,8 +1,8 @@
 # Relics belong to the leader, which is what makes them the run's: besides hp, the deck and
 # Benediction they are the only thing a player carries out of a battle.
 #
-# Two of them are written the long way round, and the comments say why. A relic in a party game
-# is where the difference between "the holder" and "the party" bites hardest.
+# Two of them say `of party`, and the comments say why. A relic in a party game is where the
+# difference between "the holder" and "the party" bites hardest.
 
 relic "Tideglass"
   on turn_start once per battle:
@@ -15,15 +15,12 @@ relic "Drowned Coin"
   on killed(target:enemies):
     gain 2 gold
 
-# `of everyone ... source:allies`, not `of party`.
-#
-# A bare `modify damage: +2` anchors to the holder, and a hero is its own controller, so it buffs
-# the leader's own plays and nobody else's. `of party` and `of allies` buff nothing the party
-# does at all: on the `damage` channel an `of` group is matched against the damage's *target*.
-# `of everyone` is the only group that makes the query run, and `source:allies` puts back the
-# side the `of` was supposed to name. See reference/FINDINGS.md #1.
+# `of party`, because that is whose damage it is. An `of` group names whoever the value belongs
+# to, and on `damage` that is whoever deals it -- the same end the bare form means. The bare form
+# would anchor to the holder, and a hero is its own controller, so it would buff the leader's own
+# plays and nobody else's.
 relic "Choirmaster's Baton"
-  modify damage of everyone where tag:holy, source:allies: +2
+  modify damage of party where tag:holy: +2
   text: "The party's holy cards deal 2 more damage."
 
 relic "Pilgrim's Token"
@@ -31,12 +28,10 @@ relic "Pilgrim's Token"
     if event.source.has(tag:devout):
       heal 2 to event.source
 
-# `modify cooldown: x50%` on a relic reaches the leader's own abilities and no hero's, and no `of`
-# group reaches one either, so the shortening is pushed onto each member as a status instead.
-# See reference/FINDINGS.md #2.
+# The bare form would shorten the holder's own abilities, and the holder is the leader. `of party`
+# is the widening: on `cooldown` the value belongs to whoever is waiting for the ability.
 relic "Bell Rope"
-  on battle_start:
-    apply Quickened 1 to party
+  modify cooldown of party: x50%
   text: "Every ability the party uses recharges twice as fast."
 
 relic "Lantern of Ebb"

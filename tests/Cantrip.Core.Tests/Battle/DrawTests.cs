@@ -22,7 +22,7 @@ namespace Cantrip.Tests.Battle
                 cancel
             """;
 
-        private static CardRuntime Setup(out Entity player, BattleEventRecorder? recorder = null, Ruleset? rules = null, ulong seed = 1)
+        private static CardRuntime Setup(out Entity player, BattleEventRecorder? recorder = null, Ruleset? rules = null, long seed = 1)
         {
             CardRuntime runtime = BattleKit.Create(Content, seed, rules: rules, host: recorder);
             player = runtime.CreatePlayer();
@@ -79,7 +79,7 @@ namespace Cantrip.Tests.Battle
         [Fact]
         public void The_reshuffle_order_follows_the_seed()
         {
-            string[] Reshuffled(ulong seed)
+            string[] Reshuffled(long seed)
             {
                 CardRuntime runtime = Setup(out _, seed: seed);
                 runtime.AddDeck();

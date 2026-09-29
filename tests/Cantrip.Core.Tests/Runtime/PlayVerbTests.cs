@@ -452,7 +452,7 @@ namespace Cantrip.Tests.Runtime
         [Fact]
         public void The_rolled_target_is_reproducible_and_survives_a_snapshot()
         {
-            int Aim(ulong seed)
+            int Aim(long seed)
             {
                 CardRuntime runtime = Aimed(new FirstOptionChooser(), seed);
                 Assert.Equal(ActionResult.Played, runtime.Play("Roll"));
@@ -806,7 +806,7 @@ namespace Cantrip.Tests.Runtime
 
         // Helpers ----------------------------------------------------------------------------
 
-        private static CardRuntime Aimed(IChoiceProvider chooser, ulong seed)
+        private static CardRuntime Aimed(IChoiceProvider chooser, long seed)
         {
             ContentLibrary content = Load(Aimless);
             var runtime = new CardRuntime(content, new RuntimeOptions { Seed = seed, Chooser = chooser });

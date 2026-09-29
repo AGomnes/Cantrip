@@ -43,7 +43,7 @@ namespace Cantrip.Tests.Battle
         /// <summary>Plays up to 60 decisions and returns the state hash after each one.</summary>
         private static ulong[] Simulate(ContentLibrary content, ulong seed)
         {
-            var runtime = new CardRuntime(content, new RuntimeOptions { Seed = seed, Chooser = new RandomChooser(seed ^ 0x5EEDUL) });
+            var runtime = new CardRuntime(content, new RuntimeOptions { Seed = unchecked((long)seed), Chooser = new RandomChooser(seed ^ 0x5EEDUL) });
             var decisions = new Rng(seed * 7919UL);
 
             Entity player = runtime.CreatePlayer(hp: 60);

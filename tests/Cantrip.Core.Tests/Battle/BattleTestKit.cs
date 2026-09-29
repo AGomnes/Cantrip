@@ -18,7 +18,7 @@ namespace Cantrip.Tests.Battle
     {
         public static CardRuntime Create(
             string content,
-            ulong seed = 1,
+            long seed = 1,
             IChoiceProvider? chooser = null,
             IGameClock? clock = null,
             Ruleset? rules = null,

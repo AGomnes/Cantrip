@@ -22,7 +22,7 @@ namespace Cantrip.Runtime
         /// </summary>
         internal static readonly string[] ReservedNames =
         {
-            "self", "owner", "source", "target", "it", "card", "player", "leader", "party", "controller", "true", "false", "none", "nothing",
+            "self", "owner", "source", "target", "it", "card", "player", "leader", "party", "fallen", "controller", "true", "false", "none", "nothing",
             "turn", "now", "enemies", "allies", "everyone", "actors", "enemy", "hand", "draw", "draw_pile", "discard",
             "discard_pile", "exhaust", "exhaust_pile", "powers", "relics", "deck", "cards", "statuses", "stacks", "event",
         };
@@ -144,6 +144,14 @@ namespace Cantrip.Runtime
                 // The living members of the party. Not `allies`, which is everyone on the side,
                 // summons included; a game with no `hero` has a party of exactly the leader.
                 case "party": return Value.FromEntities(State.Party);
+
+                // The dead of this side, in the order they fell. `heal` refuses a corpse and always
+                // will, so bringing one back is its own verb — and until this word existed there was
+                // no way to name its argument. `party` and `allies` leave the dead out by design,
+                // `target ally` and `target any` both want somebody living, and
+                // `everyone where zone:dead` binds nobody, because `everyone` is the living. An
+                // in-combat raise is what every party roguelite has, and it could not be spelt.
+                case "fallen": return Value.FromEntities(State.Fallen(Perspective(context)));
 
                 case "controller": return Value.FromEntity(controller);
                 case "true": return Value.True;
@@ -385,6 +393,17 @@ namespace Cantrip.Runtime
                 case "rank":
                 case "position":
                     return list.Count == 0 ? Value.None : Value.FromNumber(Num.FromInt(list[0].Rank));
+
+                // The same rule for the two other things a group can be asked that are not numbers
+                // at all. `log created.zone` printed 0 and `created.controller.name` failed with
+                // "`0` has no property `name`", because both fell through to the sum below, where a
+                // stat nothing has is 0. A group of one answers like the one it holds.
+                case "zone":
+                    return list.Count == 0 ? Value.None : Value.FromText(list[0].Zone);
+                case "controller":
+                    return list.Count == 0 ? Value.None : Value.FromEntity(list[0].Controller);
+                case "name":
+                    return list.Count == 0 ? Value.None : Value.FromText(list[0].Name);
             }
 
             // Anything else sums the stat across the group: `enemies.hp` is their total hp.

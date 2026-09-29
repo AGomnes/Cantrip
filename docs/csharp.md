@@ -26,7 +26,7 @@ var content = new ContentLibrary();
 content.LoadFolder("content");
 content.Diagnostics.ThrowIfErrors();
 
-var runtime = new CardRuntime(content, new RuntimeOptions { Seed = 12345 });
+var runtime = new CardRuntime(content, new RuntimeOptions { Seed = 12345 });   // any long is a seed, 0 and negatives too
 Entity player = runtime.CreatePlayer(hp: 80, maxEnergy: 3);
 runtime.AddDeck("Strike", "Strike", "Defend", "Fireball");
 runtime.AddRelic("Kindling");
@@ -71,6 +71,7 @@ Everything a battle screen draws comes from the live state:
 | What the content says about it | `entity.Definition`, an `EntityDefinition`: `HasTag`, `Word` for a word such as `rarity rare`, `ReadString` for a quoted string, and `Stats` for the numbers as written |
 | Candidates for a reward screen | `content.Pool("card")`, filtered with `HasTag` or `Word` |
 | The same entity later, even in a restored game | its `Id`, with `runtime.State.Find(id)` |
+| The whole state as one number, for checking that two runs agree | `runtime.State.ComputeHash()`, a `ulong`; the Godot node prints it as `ComputeHash().ToString("x16")` |
 
 For example:
 
@@ -131,7 +132,9 @@ A player expects to see the cause first, so present those two the other way roun
 - **A card the player plays.** The game knows the card and its target when it calls `Play`, so start the card's animation as soon as `Play` returns `Played` (or the `Answer` that finishes it does), and treat `card_played` as the animation's end, where the card lands in its pile.
 - **An enemy's move.** By the time `EndTurn` returns, the whole enemy turn is in the queue. The events a move's own lines raise name the enemy as their `Source`, so when one of them comes up while that enemy's `move` is still waiting further on, show the move first. The enemy's `turn_start` and `turn_end` name it too, but are not part of its move.
 
-Never call back into the runtime from `OnEvent`, under either chooser: the call that raised the event has not returned yet. Record the event and act once the call is over, as this screen does:
+Never call back into the runtime from `OnEvent`, under either chooser: the call that raised the event has not returned yet. Record the event and act once the call is over, as this screen does.
+
+That rule is about `OnEvent` and the other [host callbacks](#the-host), which the interpreter invokes in the middle of resolving. It is not about a game noticing that a battle has ended: once `Play`, `EndTurn` or `Execute` has returned, `runtime.Won` is settled and acting again — the reward, the gold, the next `StartBattle` — is ordinary. The Godot node says the same thing with a signal, and [Acting from a signal](godot.md#acting-from-a-signal) spells it out there.
 
 ```csharp
 sealed class BattleScreen
@@ -299,6 +302,11 @@ A chooser that answers on the spot handles offers by overriding `IChoiceProvider
 ```csharp
 Entity leader = runtime.CreatePlayer("Crusader", hp: 38);
 Entity vestal = runtime.AddHero("Vestal");          // with the abilities its declaration lists
+
+// The leader is the one member no declaration describes, so a stat it needs is written onto it.
+// Under `order: speed` this decides the whole round: an actor with no `speed` reads 0 and takes
+// its step last, and the leader's step is when the party's hand is drawn.
+runtime.SetStat(leader, "speed", 6);
 runtime.StartBattle();
 
 foreach (Entity member in runtime.Party)            // the living members, in step order
@@ -314,12 +322,15 @@ When the last member that could act has passed, the enemies take their turn and 
 | Member | What it answers |
 |---|---|
 | `Party` | the living members, in the order they take their steps |
-| `Player` | the leader: the one `CreatePlayer` made, the one that holds the run's relics and gold |
+| `Fallen` | the party's dead, in the order they fell. `Party` and `State.Actors` both leave them out, so this is the list a shrine that offers to raise somebody reads; `State.Fallen(team)` answers for either side. Content calls the same group [`fallen`](language.md#death-and-revival). |
+| `Player` | the leader: the one `CreatePlayer` made, the one that holds the run's relics and gold. Not nullable: before `CreatePlayer` it throws, and `HasPlayer` is the question to ask in the few lines where that is in doubt |
 | `AddHero(name, hp = null)` | adds a member from a `hero` declaration, with its abilities |
 | `CanAct(member)` | a battle is running, the member is alive and has not passed, and it is the party's turn — or, under `turns: initiative`, this member's own step |
 | `Pass(member)` | that member is done this turn; the last one ends the turn |
 | `ActiveMember` | the member whose step it is, or null when none of ours is. Binding under `turns: initiative`; under `turns: sides` it is the one the engine would offer next — the first that has not acted — which a UI highlights and `CanAct` overrules |
 | `Revive(actor, hp = 1)` | brings a fallen actor back. False for one that was never dead |
+| `SetStat(entity, stat, value)` | writes a stat, exactly as content's `speed = 6` does: the resource's bounds, the `<stat>_changed` event, and death when hp reaches zero. Returns the change applied. This is how the leader gets a `speed` under `order: speed`, where an actor with none reads 0 and takes its step last |
+| `ChangeStat(entity, stat, by)` | adds to a stat, or takes away with a negative amount: content's `gain 2 gold` and `lose 2 gold`, and how a shop spends the run's purse |
 | `Entity.IsPartyMember` | true for the leader and every `hero`; false for a summon standing beside them |
 | `State.TurnOrder` | every living combatant on both sides, in the one order `turns: initiative` runs them in — what an order bar draws |
 | `State.HasActed(actor)` | whether that combatant has already taken its step this round |
@@ -372,7 +383,7 @@ if (runtime.Won == true)
 | Relics, and `once per run` limits | `until` effects, which are undone, and scheduled work, which is dropped |
 | | `once per battle` limits, the battle's history counters and the turn number |
 
-A card made during a battle, such as a Wound, stays in the deck like any other. To make it temporary, take it out between battles with `runtime.Execute("destroy target", target: wound)`.
+A card made during a battle, such as a Wound, stays in the deck like any other. To make it temporary, take it out between battles with `runtime.RemoveCard(wound)`, which is `destroy` in content and the same call the [Godot node](godot.md#removing-upgrading-rewards-and-a-new-run) has. An upgrade is the same two calls on either side: `RemoveCard(censer)` then `AddCard("Censer+")`.
 
 When a run is over and the game starts a new one with a new runtime, let the old one go with `runtime.Dispose()`. A runtime listens to its clock from the moment it is built — that is how scheduled work, `on every` triggers and timed statuses run — so a runtime given a clock through `RuntimeOptions.Clock` that the game keeps using goes on resolving effects on a game nobody is playing, and the clock holds it alive while it does. A runtime that made its own clock, which is every turn-based game that passes no clock, is collected with it either way. `Dispose` tears nothing else down: the state, the entities and the content are ordinary objects and still read afterwards.
 
@@ -430,6 +441,12 @@ sealed class SaveFile
 {
     public string Fingerprint { get; set; } = "";
     public GameSnapshot Game { get; set; } = new GameSnapshot();
+
+    // Your run: the floor, the map, which rewards have been offered, the run's own random stream.
+    // Cantrip has no idea what a run is, so `Game` holds the battle, the party, the deck, the
+    // relics and the gold, and nothing above them. The file is a pair, and every write and every
+    // read has to keep the two halves together or a restored game lands on the wrong floor.
+    public RunState Run { get; set; } = new RunState();
 }
 ```
 
@@ -437,7 +454,7 @@ sealed class SaveFile
 // using System.Text.Json;
 if (runtime.CanCapture)   // false while a save cannot be taken (mid-action included), so a save button can grey out
 {
-    var save = new SaveFile { Fingerprint = content.Fingerprint, Game = runtime.Capture() };
+    var save = new SaveFile { Fingerprint = content.Fingerprint, Game = runtime.Capture(), Run = run };
     File.WriteAllText("slot1.json", JsonSerializer.Serialize(save));
 }
 ```

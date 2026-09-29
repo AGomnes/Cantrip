@@ -16,11 +16,6 @@ func _check(what: String, ok: bool, detail: String = "") -> void:
 	if not ok:
 		_failures += 1
 
-func _counter(id: int, status: String) -> int:
-	for entry in rules.GetEntity(id)["statuses"]:
-		if entry["name"] == status: return entry["counter"]
-	return 0
-
 func _named(ids: Array, name: String) -> int:
 	for id in ids:
 		if rules.GetEntity(id)["name"] == name: return id
@@ -102,13 +97,12 @@ func _run() -> void:
 	_check("the cost came out of the leader's pool",
 		rules.GetStat(leader, "energy") == energy_before - 1,
 		"%d then %d" % [energy_before, rules.GetStat(leader, "energy")])
-	# GetStat does not read a status counter, although `Warden.Fervour` does in content and
-	# CounterOf does in C#. From GDScript the only way to a status number is the `statuses`
-	# array in the entity dictionary. See reference/FINDINGS.md.
+	# CounterOf is the one call: `Warden.Fervour` in content, `entity.CounterOf` in C#, and this
+	# in GDScript. A status is still not a stat, so GetStat still reads 0 for one.
 	_check("and the Fervour went to whoever spoke the words",
-		_counter(warden, "Fervour") == 1 and _counter(leader, "Fervour") == 0,
-		"warden %d leader %d, and GetStat says %d" % [_counter(warden, "Fervour"),
-			_counter(leader, "Fervour"), rules.GetStat(warden, "Fervour")])
+		rules.CounterOf(warden, "Fervour") == 1 and rules.CounterOf(leader, "Fervour") == 0,
+		"warden %d leader %d" % [rules.CounterOf(warden, "Fervour"), rules.CounterOf(leader, "Fervour")])
+	_check("while GetStat still says a status is not a stat", rules.GetStat(warden, "Fervour") == 0)
 
 	# Saving, part-way through, into a node that has only loaded its content.
 	var hash_before: String = rules.StateHash()

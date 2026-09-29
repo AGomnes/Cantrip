@@ -114,7 +114,7 @@ namespace Cantrip.GodotAdapter
                 Relay(agent, trace, inspector, CantripProtocol.TraceEnable, new Godot.Collections.Array { true, 200 });
                 Relay(agent, trace, inspector, CantripProtocol.TraceFetch, new Godot.Collections.Array { 0, 50 });
                 Relay(agent, trace, inspector, CantripProtocol.Entities, new Godot.Collections.Array { string.Empty, string.Empty });
-                Relay(agent, trace, inspector, CantripProtocol.Entity, new Godot.Collections.Array { runtime.Player == null ? 0 : runtime.Player.Id });
+                Relay(agent, trace, inspector, CantripProtocol.Entity, new Godot.Collections.Array { runtime.HasPlayer ? runtime.Player.Id : 0 });
 
                 report.Add($"debugger: 2 session tab(s) driven, {raised.Count} request(s) raised back");
                 report.Add(inspector.SelfTest());

@@ -67,7 +67,7 @@ enemy "Brute"
 # --- 4. ref Vladmir's Offering: allies deal more damage ---------------------------------------------------------
 
 relic "War Banner"
-  modify damage of everyone where source:allies: x1.25
+  modify damage of allies: x1.25
 
 # --- 5. ref cooldown reduction ------------------------------------------------------------------
 # `cooldown` is a modifier channel, so an item can shorten what every ability of its holder waits.

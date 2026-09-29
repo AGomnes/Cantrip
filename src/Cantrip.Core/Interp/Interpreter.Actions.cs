@@ -823,11 +823,23 @@ namespace Cantrip.Runtime
         }
 
         /// <summary>Creates cards, relics or actors from a definition, per the <c>create</c> verb.</summary>
-        public Entity? Create(EntityDefinition definition, Entity? owner, string? zone, EvalContext context) =>
+        /// <param name="definition">What to make.</param>
+        /// <param name="zone">Which pile it lands in, or null for the one its kind goes to.</param>
+        /// <param name="context">The effect this is part of.</param>
+        /// <param name="owner">
+        /// Whose pile a card lands in and whose relics a relic joins. This is what content's
+        /// <c>to</c> clause says, and it is how an enemy's move puts a curse in the player's discard
+        /// pile — the mechanic three of the nine games in <c>docs/coverage.md</c> are built on.
+        /// </param>
+        /// <param name="side">
+        /// The side an actor joins, for the same <c>to</c> clause. Null takes the side the
+        /// declaration says, which is what a summon with nothing after it means.
+        /// </param>
+        public Entity? Create(EntityDefinition definition, Entity? owner, string? zone, EvalContext context, Team? side = null) =>
             Materialise(
                 definition,
                 owner,
-                side: null,
+                side,
                 zone,
                 context,
                 copyOf: null,
@@ -838,13 +850,18 @@ namespace Cantrip.Runtime
         /// but its live stats, tags and statuses rather than the ones it was printed with.
         /// </summary>
         /// <remarks>
-        /// The side and owner come from <paramref name="original"/> and never from whoever is copying,
-        /// so a player's card that copies an enemy's minion gives the enemy a second minion. The copy
-        /// is then placed by <em>kind</em>, exactly where a new one would go — never in the zone the
-        /// original happens to sit in, which would drop a copied power straight into <c>powers</c> as
-        /// a second active power nobody played, and a copied exhausted card into the exhaust pile.
+        /// The side and owner come from <paramref name="original"/> unless <paramref name="owner"/>
+        /// says otherwise, so a player's card that copies an enemy's minion gives the enemy a second
+        /// minion. The copy is then placed by <em>kind</em>, exactly where a new one would go — never
+        /// in the zone the original happens to sit in, which would drop a copied power straight into
+        /// <c>powers</c> as a second active power nobody played, and a copied exhausted card into the
+        /// exhaust pile.
         /// </remarks>
-        public Entity? Copy(Entity original, string? zone, EvalContext context)
+        /// <param name="original">What to duplicate.</param>
+        /// <param name="zone">Which pile the copy lands in, or null for the one its kind goes to.</param>
+        /// <param name="context">The effect this is part of.</param>
+        /// <param name="owner">Who gets the copy, as content's <c>to</c> clause says. Null keeps the original's.</param>
+        public Entity? Copy(Entity original, string? zone, EvalContext context, Entity? owner = null)
         {
             if (original == null) throw new ArgumentNullException(nameof(original));
 
@@ -853,8 +870,8 @@ namespace Cantrip.Runtime
 
             return Materialise(
                 definition,
-                owner: original.Kind == EntityKind.Actor ? null : original.Owner,
-                side: original.RawTeam,
+                owner: owner ?? (original.Kind == EntityKind.Actor ? null : original.Owner),
+                side: owner != null ? owner.Team : original.RawTeam,
                 zone,
                 context,
                 copyOf: original,

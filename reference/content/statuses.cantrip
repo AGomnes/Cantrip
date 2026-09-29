@@ -39,23 +39,3 @@ status "Rust"
   stacking duration
   modify range: set 1
 
-# The workaround for a relic that cannot reach a party member's cooldown: the relic hands this
-# out at the start of each battle instead. Not `persistent`, so it is handed out again.
-status "Quickened"
-  tags buff
-  stacking none
-  modify cooldown: x50%
-
-# The Tidewalker's leak, and a workaround rather than a design.
-#
-# What this wants to be is one line in the Tidewalker's move: `create Brine into discard to
-# leader`. An enemy that creates a card creates it in *its own* discard pile, and the `to` clause
-# is accepted and ignored, so the curse never reaches the player's deck and nothing says so.
-# A card made by something the leader controls does land in the leader's pile, so the move applies
-# this to the leader and this makes the card. See reference/FINDINGS.md #7.
-status "Seeping"
-  tags debuff
-  stacking none
-  on status_applied(Seeping, target:owner):
-    create Brine into discard
-  text: "Brine seeps into your deck."

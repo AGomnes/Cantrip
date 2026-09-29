@@ -48,7 +48,7 @@ Content: [slay_the_spire.cantrip](../samples/corpus/slay_the_spire.cantrip). Tes
 | 4 | Heavy Blade | Titan Blade | Workaround | Strength must count three times; the extra two are written as `2 * player.Strength` because the Strength modifier already adds one |
 | 5 | Demon Form | Fiend Form | Works | A power with a turn-start listener |
 | 6 | Blade Dance | Knife Flurry | Works | Creates exhausting Shivs in hand |
-| 7 | Accuracy | Honed Edge | Works | `modify damage of enemies where card:Shiv` on the power card itself. A modifier with no scope is anchored to what it is written on — for a card, its own damage — and naming a scope reaches past that |
+| 7 | Accuracy | Honed Edge | Works | `modify damage of player where card:Shiv` on the power card itself. An `of` group names whoever the value belongs to, which on `damage` is whoever deals it. A modifier with no scope is anchored to what it is written on — for a card, its own damage — and naming a scope reaches past that |
 | 8 | Corruption | Rot Pact | Works | Skills cost 0 and exhaust |
 | 9 | Barricade | Bastion | Works | `on before_block_changed(target:owner): if event.reset: cancel`. The reset marks the change it raises, so this refuses that and nothing else — an effect that means to strip block still strips it |
 | 10 | Burst | Reverb | Workaround | The next skill is replayed. A listener that becomes active during an event also hears that event's after phase, so Echo needs `not card:Reverb`. A game that would rather it did not says `new_listeners: miss_the_event` in its ruleset; the corpus cannot, because one ruleset covers all nine games loaded together |
@@ -92,7 +92,7 @@ Content: [hearthstone.cantrip](../samples/corpus/hearthstone.cantrip). Tests: [h
 | 1 | Divine Shield | Aegis | Works | A before listener cancels the next hit and removes the shield |
 | 2 | Leper Gnome (Deathrattle) | Plague Gnome | Works | `on self.died: deal 2 to all enemies` |
 | 3 | Elven Archer (Battlecry) | Elven Archer | Works | The card's effect summons the minion and pings |
-| 4 | Kobold Geomancer (Spell Damage) | Kobold Geomancer | Works | `modify damage of enemies where tag:spell, source:player`. Naming a scope is how an outward modifier is written here, as War Banner does; without one it would be anchored to the minion itself |
+| 4 | Kobold Geomancer (Spell Damage) | Kobold Geomancer | Works | `modify damage of player where tag:spell`. Naming a scope is how an outward modifier is written here, as War Banner does; without one it would be anchored to the minion itself |
 | 5 | Dire Wolf Alpha (adjacency aura) | Dire Wolf | Works | `modify attack of adjacent(self): +1`. Until 1.0 this silently stopped working across a death: a minion summoned after a neighbour died landed one slot past the hole rather than in it, so it stood two slots from the wolf and got nothing. A freed slot is reusable now, and survivors still do not shift |
 | 6 | Knife Juggler | Knife Juggler | Workaround | A listener that becomes active during an event hears it, so the Juggler must leave its own summon out. `not target:self` says it as a filter rather than a guard in the body, but it still has to be said. `new_listeners: miss_the_event` drops the filter for a game that wants that rule throughout; the corpus keeps it, because one ruleset covers all nine games loaded together |
 | 7 | Minion combat | `trade` verb | Works | The `attack` verb makes each creature the source of its own hit. A content verb still spells the trade out, which is where combat rules belong |
@@ -128,7 +128,7 @@ Content: [dota2.cantrip](../samples/corpus/dota2.cantrip). Tests: [dota2.tests.c
 | 1 | Lifesteal | Lifesteal | Works | `heal event.amount * stacks / 100 to owner` |
 | 2 | Damage over time | Poison Sting | Works | The venom carries the ticking: a debuff applied `for 2s` with `on every 1s:` deals its damage once a second |
 | 3 | Skull Basher | Skull Basher | Works | Stun cancels its host's move in the before phase — `on before_move(source:owner): cancel` — so a stunned unit really does lose its turn |
-| 4 | Vladmir's Offering | War Banner | Works | `modify damage of everyone where source:allies: x1.25` |
+| 4 | Vladmir's Offering | War Banner | Works | `modify damage of allies: x1.25` |
 | 5 | Cooldown reduction | Arcane Vestments | Works | `modify cooldown: x0.5` on a relic shortens every ability its holder has; on an ability it shortens only that one. Modifiers see the duration already in clock units, so a multiplier reads the same on either clock |
 | 6 | Crystal Nova (area) | Crystal Nova | Works | `range 3` from the caster and `deal 6 to enemies in within(target, 1)` for the square it covers, on a declared `shared` board with a `chebyshev` metric. `within` with a *unit* — `5m` — still goes to the host, unchanged, for a game whose fight is in continuous space |
 | 7 | Blink | Blink | Works | `owner.rank -2` on a declared board. A move is instantaneous in the rules on both clocks; the engine never owns travel time. Still slots and never metres |

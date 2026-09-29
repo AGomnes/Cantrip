@@ -42,6 +42,7 @@ namespace Cantrip.GodotAdapter.Demo
                 ABattlePlaysOut();
                 EventsArriveAfterTheAction();
                 AnActionFromAnEventHandlerIsToldBeforeTheCallReturns();
+                AnActionFromTheBattleEndedHandlerRunsOnce();
                 ViewsAndDescriptionsTellTheTruth();
                 ADeferredChoiceRollsBackAndReplays();
                 AnAnswerTurnedAwaySaysWhyInOneWord();
@@ -71,6 +72,7 @@ namespace Cantrip.GodotAdapter.Demo
                 TheDebugChannelAnswersTheEditor();
                 DefaultInterfaceMembersDispatchInThisEngine();
                 APartyTakesItsTurnAMemberAtATime();
+                TheNodeAnswersACounterAStatAndABoard();
 
                 code = _failures.Count == 0 ? 0 : 1;
             }
@@ -220,6 +222,58 @@ namespace Cantrip.GodotAdapter.Demo
             rules.QueueFree();
         }
 
+        /// <summary>
+        /// Handing out a reward is the first line anybody writes in a <c>BattleEnded</c> handler, so
+        /// acting from one has to be ordinary. It used to re-enter for ever: the handler's own call
+        /// came back round to the end-of-battle check, which had not yet recorded that the battle
+        /// was over, told the game again, and died 789 frames deep with no diagnostic.
+        /// </summary>
+        private void AnActionFromTheBattleEndedHandlerRunsOnce()
+        {
+            CantripRuntime rules = Loaded();
+            rules.CreatePlayer();
+            int slime = rules.SpawnEnemy("Slime");
+            rules.StartBattle(false, false);
+
+            int handled = 0;
+            // Capped, so that the old behaviour reports a count rather than killing the process.
+            Action<bool> onEnded = _ => { if (++handled <= 4) rules.Execute("gain 30 gold", 0, 0); };
+            rules.BattleEnded += onEnded.Invoke;
+            rules.Execute("deal 99 to target", 0, slime);
+            rules.BattleEnded -= onEnded.Invoke;
+
+            Check("a reward handed out from BattleEnded does not tell the battle's end again", handled == 1, handled + " call(s)");
+            Check("and the reward reached the player", rules.GetStat(rules.PlayerId(), "gold") == 30, rules.GetStat(rules.PlayerId(), "gold").ToString());
+
+            // The other half of the rule: the next battle, started from inside the handler, is a
+            // battle the node knows it is in, so its own end is told when it comes.
+            CantripRuntime again = Loaded();
+            again.CreatePlayer();
+            int first = again.SpawnEnemy("Slime");
+            again.StartBattle(false, false);
+
+            var ends = new List<string>();
+            Action<bool> onSecond = won =>
+            {
+                ends.Add("ended " + won);
+                if (ends.Count == 1)
+                {
+                    again.SpawnEnemy("Slime");
+                    again.StartBattle(false, false);
+                }
+            };
+            again.BattleEnded += onSecond.Invoke;
+            again.Execute("deal 99 to target", 0, first);
+            Check("the battle a handler starts is in progress when the handler returns", again.IsInBattle(), string.Join(", ", ends));
+
+            if (again.IsInBattle()) again.Execute("deal 99 to target", 0, again.GetEnemies()[0].AsInt32());
+            again.BattleEnded -= onSecond.Invoke;
+            Check("and its own end is told once, in its turn", ends.Count == 2, string.Join(", ", ends));
+
+            again.QueueFree();
+            rules.QueueFree();
+        }
+
         private void ViewsAndDescriptionsTellTheTruth()
         {
             CantripRuntime rules = Loaded();
@@ -285,10 +339,51 @@ namespace Cantrip.GodotAdapter.Demo
 
             rules.Execute("kill target", 0, scout);
             Check("a fallen member leaves the party", rules.GetParty().Count == 1);
+            // The list a shrine that offers to raise somebody reads. Before it, a corpse was in
+            // none of the node's lists and a run had to keep its own roster of ids to find one.
+            Check("and turns up in the fallen", rules.GetFallen().Count == 1 && rules.GetFallen()[0].AsInt32() == scout);
             Check("but the battle goes on, because the leader still stands", rules.IsInBattle());
             Check("Revive brings it back, where a heal refuses", rules.Revive(scout, 5) && rules.GetStat(scout, "hp") == 5);
+            Check("and the fallen are empty again", rules.GetFallen().Count == 0);
             Check("reviving the living answers false", !rules.Revive(scout, 5));
             Check("as does an id that names nobody", !rules.Revive(999999, 1));
+
+            rules.QueueFree();
+        }
+
+        /// <summary>
+        /// The three the node could not answer: a status's counter, a stat a game writes, and a
+        /// board a game picks.
+        /// </summary>
+        private void TheNodeAnswersACounterAStatAndABoard()
+        {
+            CantripRuntime rules = Loaded();
+            int player = rules.CreatePlayer();
+            int slime = rules.SpawnEnemy("Slime");
+            rules.StartBattle(false, false);
+
+            int ember = rules.AddCard("Ember", "hand");
+            rules.Play(ember, slime);
+
+            // `Warden.Fervour` in content, `entity.CounterOf("Fervour")` in C#, and until now
+            // nothing at all in GDScript but walking the whole entity dictionary per frame.
+            Check("a status counter is one call", rules.CounterOf(slime, "Burn") == 2, rules.CounterOf(slime, "Burn").ToString());
+            Check("a status is not a stat, and GetStat still says so", rules.GetStat(slime, "Burn") == 0);
+            Check("a status nobody has is 0", rules.CounterOf(slime, "Fervour") == 0);
+            Check("as is an id that names nobody", rules.CounterOf(999999, "Burn") == 0);
+
+            // How a leader gets a speed under `order: speed`, where an actor with none reads 0 and
+            // takes its step last — and the leader's step is when the party's hand is drawn.
+            Check("a stat can be written", rules.SetStat(player, "gold", 12) == 12 && rules.GetStat(player, "gold") == 12);
+            Check("and changed by an amount", rules.ChangeStat(player, "gold", -5) == -5 && rules.GetStat(player, "gold") == 7);
+            Check("a resource's own bounds still hold", rules.SetStat(player, "hp", 9999) < 9999 && rules.GetStat(player, "hp") == rules.GetStat(player, "max_hp"));
+
+            // The board. An empty name keeps the one in play, which is the only thing a game with
+            // one board ever needs and the thing StartBattle could already do.
+            rules.Execute("deal 99 to target", 0, slime);
+            rules.SpawnEnemy("Slime");
+            rules.StartBattleOn(string.Empty, false, false);
+            Check("StartBattleOn with no name starts the battle", rules.IsInBattle());
 
             rules.QueueFree();
         }

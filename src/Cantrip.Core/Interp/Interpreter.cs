@@ -552,7 +552,7 @@ namespace Cantrip.Runtime
 
             if (modifier.Syntax.Scope != null)
             {
-                if (query.Subject == null || !InScope(modifier, modifier.Syntax.Scope, query, context)) return false;
+                if (InScope(modifier, modifier.Syntax.Scope, query, context) == null) return false;
             }
             else if (!InDefaultScope(modifier, query))
             {
@@ -563,28 +563,70 @@ namespace Cantrip.Runtime
         }
 
         /// <summary>
-        /// Whether a query's subject belongs to an <c>of ...</c> scope. The group is read from the
-        /// modifier owner's side, so <c>of enemies</c> on the player's relic means the player's
-        /// enemies whoever is attacking. A <c>where</c> on the scope reads stats from the candidate
-        /// but tests qualifiers such as <c>source:self</c> against the value being computed, the same
-        /// way a <c>where</c> on the modifier itself does.
+        /// The one in an <c>of ...</c> scope the value being computed belongs to, or null when the
+        /// scope does not cover this value at all. The group is read from the modifier owner's side,
+        /// so <c>of enemies</c> on the player's relic means the player's enemies whoever is acting.
+        /// A <c>where</c> on the scope reads stats from the one that matched but tests qualifiers
+        /// such as <c>source:self</c> against the value being computed, the same way a <c>where</c>
+        /// on the modifier itself does.
         /// </summary>
-        private bool InScope(Modifier modifier, ExprNode scope, ModifierQuery query, EvalContext context)
+        /// <remarks>
+        /// Which end of an action the group is matched against is <see cref="ValueOwner"/>'s answer,
+        /// and it is the end the bare form uses, so <c>of party</c> is a widening of
+        /// <c>modify damage</c> rather than its opposite. It used to be the query's subject on every
+        /// channel, which on <c>damage</c> is the one being hit: <c>modify damage of party: +2</c> on
+        /// a relic then matched nothing the party did and said nothing about it.
+        /// </remarks>
+        private Entity? InScope(Modifier modifier, ExprNode scope, ModifierQuery query, EvalContext context)
         {
             if (scope is WhereExpr where)
             {
-                if (!InScope(modifier, where.Source, query, context)) return false;
+                Entity? matched = InScope(modifier, where.Source, query, context);
+                if (matched == null) return null;
 
                 EvalContext probe = context.Derive();
-                probe.It = query.Subject;
+                probe.It = matched;
                 probe.ItIsFocus = false;
                 probe.Focus = query;
-                return EvaluateCondition(where.Predicate, probe);
+                return EvaluateCondition(where.Predicate, probe) ? matched : null;
             }
 
+            Entity? owner = ValueOwner(query);
+            Entity? printed = PrintedOn(query);
+            if (owner == null && printed == null) return null;
+
             var groupContext = new EvalContext(modifier.Owner) { Source = modifier.Owner };
-            return Evaluate(scope, groupContext).AsEntities().Contains(query.Subject!);
+            IReadOnlyList<Entity> group = Evaluate(scope, groupContext).AsEntities().ToList();
+
+            // The printed thing first, so `modify cost of cards where tag:fire` keeps naming the
+            // cards rather than the actor holding them.
+            if (printed != null && group.Contains(printed)) return printed;
+            return owner != null && group.Contains(owner) ? owner : null;
         }
+
+        /// <summary>
+        /// The actor a value on this channel belongs to: who deals the damage, who takes it, whose
+        /// card is being priced, whose ability is recharging, who is reaching. This is the end an
+        /// <c>of</c> group is matched against, and the same end <see cref="InDefaultScope"/> uses
+        /// when content names no group.
+        /// </summary>
+        internal static Entity? ValueOwner(ModifierQuery query) => query.Channel.ToLowerInvariant() switch
+        {
+            "damage" or "block" or "heal" or "draw" => query.Source,
+            "cost" or "cooldown" or RangeChannel => query.Source,
+            _ => query.Subject,
+        };
+
+        /// <summary>
+        /// The card or ability a value is printed on, where that is something other than the actor
+        /// it belongs to. An <c>of</c> group may name either, because a card is never an actor and
+        /// so the two can never be confused for one another.
+        /// </summary>
+        private static Entity? PrintedOn(ModifierQuery query) => query.Channel.ToLowerInvariant() switch
+        {
+            "cost" or "cooldown" or RangeChannel => query.Subject,
+            _ => null,
+        };
 
         Value IModifierEvaluator.Amount(Modifier modifier, ModifierQuery query)
         {

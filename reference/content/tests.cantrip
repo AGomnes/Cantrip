@@ -132,7 +132,7 @@ test "Pilgrim's Token asks who spoke the words, not who owns the card"
   play Litany by Warden on Warden
   expect Warden.hp == 24
 
-test "the Baton buffs the whole party, which of party would not"
+test "the Baton buffs the whole party, which is what `of party` says"
   player hp 40 speed 6
   hero Warden
   relic "Choirmaster's Baton"
@@ -164,12 +164,11 @@ test "Dirge waits three rounds"
   cast Dirge by Cantor on enemy
   expect enemy.Dread == 2
 
-test "Bell Rope halves it, through a status it hands the party"
+test "Bell Rope halves it, for a member the relic does not belong to"
   player hp 40 speed 6
   hero Cantor
   relic "Bell Rope"
   enemy "Drowned Acolyte"
-  expect Cantor.Quickened == 1
   cast Dirge by Cantor on enemy
   end turn
   end turn
@@ -275,7 +274,6 @@ test "Seepage puts a curse in the leader's deck"
   end turn
   end turn
   expect count(deck where name:Brine) == 1
-  expect player.Seeping == 1
 
 test "the Antiphonary opens its Unbound phase with Cataract"
   player hp 40 speed 6
@@ -314,3 +312,60 @@ test "Reliquary pays each member once a turn for a holy card"
   expect Warden.Fervour == 1
   play Litany by Warden on Warden
   expect Warden.block == 9
+
+# --- what the fixes made writable -------------------------------------------------------------
+
+test "Last Rites raises the first of the fallen"
+  player hp 40 speed 6
+  hero Warden
+  hero Cantor
+  hand "Last Rites"
+  enemy "Drowned Acolyte"
+  expect count(fallen) == 0
+  kill Warden
+  expect count(fallen) == 1
+  expect count(party) == 2
+  play "Last Rites"
+  expect Warden.hp == 8
+  expect count(fallen) == 0
+  expect count(party) == 3
+
+test "the Nave is one rank deeper than the Chapel"
+  board Nave
+  player hp 40 speed 6
+  hero Warden
+  hero Cantor
+  enemy "The Antiphonary"
+  expect player.rank == 0
+  expect Warden.rank == 1
+  expect Cantor.rank == 2
+  expect Cantor.lane == 0
+  expect distance(Cantor, enemy) == 3
+
+test "while on the Chapel the third member stands in the second aisle"
+  board Chapel
+  player hp 40 speed 6
+  hero Warden
+  hero Cantor
+  enemy "The Antiphonary"
+  expect Cantor.lane == 1
+  expect Cantor.rank == 0
+
+test "the nave has room behind the Antiphonary that the chapel has not"
+  board Nave
+  player hp 40 speed 6
+  enemy "The Antiphonary"
+  enemy "Tooth"
+  enemy "Tooth"
+  expect count(enemies) == 3
+  expect enemy3.lane == 0
+  expect enemy3.rank == 2
+
+test "on the chapel the third one is turned away from that aisle"
+  board Chapel
+  player hp 40 speed 6
+  enemy "The Antiphonary"
+  enemy "Tooth"
+  enemy "Tooth"
+  expect count(enemies) == 3
+  expect enemy3.lane == 1

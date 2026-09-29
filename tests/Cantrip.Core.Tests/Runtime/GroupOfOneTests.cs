@@ -106,6 +106,37 @@ namespace Cantrip.Tests.Runtime
               expect player.gold == 3
             """);
 
+        /// <summary>
+        /// The things a group can be asked that are not numbers. <c>created.zone</c> printed 0 and
+        /// <c>created.controller.name</c> failed with "`0` has no property `name`", because both
+        /// fell through to the stat sum, where a stat nothing has is 0 — the same trap this class
+        /// exists to close, on the members nobody had added.
+        /// </summary>
+        [Fact]
+        public void A_group_answers_where_it_is_and_whose_it_is() => Passes("""
+            card "Shiv"
+              cost 0
+
+            card "Knives"
+              cost 0
+              effect:
+                create Shiv into discard
+                if created.zone == "discard":
+                  gain 2 gold
+                if created.name == "Shiv":
+                  gain 5 gold
+                if created.controller.name == created.first.controller.name:
+                  gain 3 gold
+
+            test "a group says where it is and whose it is"
+              enemy hp 50
+              hand Knives
+              player energy 9
+              player gold 0
+              play Knives
+              expect player.gold == 10
+            """);
+
         private static void Passes(string dsl)
         {
             ContentLibrary content = ContentLibrary.FromText(dsl, "group-of-one.cantrip");

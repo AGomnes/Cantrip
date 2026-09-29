@@ -127,5 +127,52 @@ namespace Cantrip.Tests.Battle
             runtime.EndTurn();
             Assert.True(runtime.IsReady(patience));
         }
+
+        /// <summary>
+        /// "Your abilities recharge faster" for a party. A relic belongs to the leader and a hero is
+        /// its own controller, so the bare form reaches the leader alone; <c>of party</c> is the
+        /// widening, and it names whose ability is recharging.
+        /// </summary>
+        /// <remarks>
+        /// It used to reach nobody at all. An <c>of</c> group was matched against the query's
+        /// subject, which on this channel is the ability rather than an actor, so no group of actors
+        /// could ever contain it and the relic every roguelite ships could not be written.
+        /// </remarks>
+        [Fact]
+        public void A_relic_can_shorten_the_whole_partys_cooldowns()
+        {
+            const string party = """
+                ability "Bolt"
+                  cooldown 10s
+                  effect:
+                    deal 5 to enemies
+
+                hero "Warden"
+                  hp 30
+                  abilities Bolt
+
+                relic "Bell Rope"
+                  modify cooldown of party: x0.25
+
+                enemy "Dummy"
+                  hp 200
+                """;
+
+            CardRuntime runtime = BattleKit.Create(party, clock: new TickClock(10));
+            runtime.CreatePlayer();
+            Entity warden = runtime.AddHero("Warden");
+            runtime.SpawnEnemy("Dummy");
+            runtime.AddRelic("Bell Rope");
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+
+            Entity bolt = warden.FindAttached("Bolt")!;
+            Assert.Equal(ActionResult.Played, runtime.UseAbility(bolt));
+
+            runtime.Tick(24);
+            Assert.False(runtime.IsReady(bolt));
+
+            runtime.Tick(1);
+            Assert.True(runtime.IsReady(bolt));
+        }
     }
 }

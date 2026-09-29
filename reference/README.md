@@ -9,7 +9,7 @@ the relics, the gold, the Benediction on a member's soul and a hero who did not 
 
 | | |
 |---|---|
-| [`content/`](content) | The game, as `.cantrip`: a ruleset, a board, three heroes with abilities, thirteen cards, six statuses, six relics, five enemies and a boss, 28 tests and a scenario |
+| [`content/`](content) | The game, as `.cantrip`: a ruleset, two boards, three heroes with abilities, thirteen cards, six statuses, six relics, five enemies and a boss, 33 tests and a scenario |
 | [`host/`](host) | A C# host that plays a whole descent headlessly, and the run above the battle |
 | [`godot/`](godot) | The playable front end, a Godot project of its own |
 | [`FINDINGS.md`](FINDINGS.md) | What hurt while building it. The other half of the deliverable |
@@ -68,5 +68,4 @@ does the same thing by unzipping a release into its project folder.
 | Scene | |
 |---|---|
 | `game/chapel.tscn` | The game. Run with `-- --chapel-auto` and it plays itself and quits, which is what CI does |
-| `game/checks.tscn` | 30 checks of the node against this game's content: the board, the party, initiative, a taunt re-aiming an intent, a play by a named member, a save restored into a fresh node, and a revive |
-| `game/reentry.tscn` | Not a test. A fifteen-line reproduction of the crash in FINDINGS.md: a runtime call made from a `BattleEnded` handler recurses until the process dies |
+| `game/checks.tscn` | 31 checks of the node against this game's content: the board, the party, initiative, a taunt re-aiming an intent, a play by a named member, a status counter, a save restored into a fresh node, and a revive |

@@ -116,12 +116,13 @@ card "Knife Flurry"
 # --- 7. ref Accuracy: buff one named card ---------------------------------------------------
 # A modifier with no scope is anchored to whatever it is written on, and for a card that means
 # the card's own damage. Naming a scope reaches past that, so the power carries the modifier
-# itself and needs no status to hold it.
+# itself and needs no status to hold it. `of player` names whose damage it is: an `of` group on
+# `damage` means whoever deals it, the same end the bare form means.
 
 card "Honed Edge"
   cost 1
   tags power
-  modify damage of enemies where card:Shiv: +4
+  modify damage of player where card:Shiv: +4
 
 # --- 8. ref Corruption: skills cost 0 and exhaust -----------------------------------------
 

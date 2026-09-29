@@ -109,3 +109,15 @@ card "Brine"
   on turn_end:
     lose 2 hp
   text: "Unplayable. Lose 2 hp at the end of your turn while this is in hand."
+
+# The in-combat raise. `fallen` is the dead of our side, in the order they fell: the group
+# `party` and `allies` both leave out by design, and the one `revive` needed to have an argument
+# at all. Before it, raising somebody was a thing only the run could do, from a roster the host
+# kept in C#.
+card "Last Rites"
+  cost 2
+  tags holy, reward
+  effect:
+    if fallen.any:
+      revive fallen.first 8
+  text: "Raise the first of the fallen at 8 hp."
