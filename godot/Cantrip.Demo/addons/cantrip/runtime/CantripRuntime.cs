@@ -1170,10 +1170,10 @@ namespace Cantrip.GodotAdapter
             }
             catch (JsonException error)
             {
-                return VariantMap.Refused("wrong_format", "This does not look like a save file: " + error.Message);
+                return VariantMap.Refused(SaveCheck.NameOf(SaveRejection.WrongFormat), "This does not look like a save file: " + error.Message);
             }
 
-            if (file == null) return VariantMap.Refused("no_payload", "This save carries no game to restore.");
+            if (file == null) return VariantMap.Refused(SaveCheck.NameOf(SaveRejection.NoPayload), "This save carries no game to restore.");
 
             SaveEnvelope envelope = new SaveEnvelope(file.Format, file.Fingerprint, file.Snapshot);
             SaveCheck check = envelope.Check(Content.Fingerprint);
@@ -1190,10 +1190,10 @@ namespace Cantrip.GodotAdapter
             }
             catch (JsonException error)
             {
-                return VariantMap.Refused("wrong_format", "The game in this save cannot be read: " + error.Message);
+                return VariantMap.Refused(SaveCheck.NameOf(SaveRejection.WrongFormat), "The game in this save cannot be read: " + error.Message);
             }
 
-            if (snapshot == null) return VariantMap.Refused("no_payload", "This save carries no game to restore.");
+            if (snapshot == null) return VariantMap.Refused(SaveCheck.NameOf(SaveRejection.NoPayload), "This save carries no game to restore.");
 
             // The rules would refuse this too, but it is a save from another version of Cantrip.Core,
             // not one from other content, and a game may want to tell the player so. Only a save
@@ -1202,9 +1202,21 @@ namespace Cantrip.GodotAdapter
             int needs = GameSnapshot.ReaderNeededBy(snapshot);
             if (needs > GameSnapshot.CurrentFormat)
             {
-                return VariantMap.Refused("wrong_format",
+                return VariantMap.Refused(SaveCheck.NameOf(SaveRejection.WrongFormat),
                     "The game in this save is in format " + snapshot.FormatVersion + " and needs a Cantrip.Core that reads format "
                     + needs + "; this one reads up to format " + GameSnapshot.CurrentFormat + ".");
+            }
+
+            // The rules refuse this one too, and the refusal would arrive as "content_changed",
+            // which is a lie: nothing about the content changed. What changed is the rate the clock
+            // counts at, and a game may want to say so — or put the exported rate back.
+            int rate = core.State.Clock.UnitsPerSecond;
+            if (snapshot.ClockUnitsPerSecond != 0 && snapshot.ClockUnitsPerSecond != rate)
+            {
+                return VariantMap.Refused(SaveCheck.NameOf(SaveRejection.ClockChanged),
+                    "This save was made with a clock at " + snapshot.ClockUnitsPerSecond + " ticks a second and this game's runs at "
+                    + (rate == 0 ? "no rate at all, because it is turn-based" : rate.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                    + "; every cooldown and every duration in the save would mean a different length of time.");
             }
 
             try
@@ -1214,7 +1226,7 @@ namespace Cantrip.GodotAdapter
             catch (InvalidOperationException error)
             {
                 // The rules refuse before they change anything, so there is nothing to put back.
-                return VariantMap.Refused("content_changed", error.Message);
+                return VariantMap.Refused(SaveCheck.NameOf(SaveRejection.ContentChanged), error.Message);
             }
 
             _choices.Close();

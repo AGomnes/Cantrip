@@ -383,6 +383,46 @@ namespace Cantrip.Tests.Foundation
             }
         }
 
+        [Theory]
+        [InlineData(5_000_000L, "F2", "5.00")]
+        [InlineData(1_500_000L, "F0", "2")]
+        [InlineData(1_234_500L, "F3", "1.235")]
+        [InlineData(1_000_000_000L, "N0", "1,000")]
+        [InlineData(-2_250_000L, "F1", "-2.3")]
+        [InlineData(123_456L, "F4", "0.1235")]
+        public void ToString_honours_a_format_string(long raw, string format, string expected) =>
+            Assert.Equal(expected, Num.FromRaw(raw).ToString(format, CultureInfo.InvariantCulture));
+
+        [Fact]
+        public void An_interpolated_format_reaches_the_number_rather_than_being_dropped()
+        {
+            Num damage = Num.FromInt(5);
+
+            // The whole point: `$"{damage:F2}"` used to give the same text as `$"{damage}"`.
+            Assert.Equal("5.00", $"{damage:F2}");
+            Assert.NotEqual($"{damage}", $"{damage:F2}");
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData("G")]
+        [InlineData("g")]
+        public void No_format_and_the_general_format_are_this_type_s_own_form(string format)
+        {
+            // Not the framework's "G": the form Parse reads back, with its trailing zeros trimmed.
+            Assert.Equal("1.5", Num.FromRaw(1_500_000L).ToString(format, CultureInfo.InvariantCulture));
+            Assert.Equal("3", Num.FromRaw(3_000_000L).ToString(format, CultureInfo.InvariantCulture));
+        }
+
+        [Fact]
+        public void A_format_a_number_cannot_take_is_refused_rather_than_ignored()
+        {
+            // As every other number in .NET does: a single letter that is not a standard specifier
+            // is an error, while a longer run of letters is a custom format made of literal text.
+            Assert.Throws<FormatException>(() => Num.FromInt(1).ToString("Q", CultureInfo.InvariantCulture));
+            Assert.Equal("wat", Num.FromInt(1).ToString("wat", CultureInfo.InvariantCulture));
+        }
+
         [Fact]
         public void Parsing_and_formatting_ignore_the_current_culture()
         {

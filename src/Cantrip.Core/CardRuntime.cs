@@ -129,12 +129,6 @@ namespace Cantrip
         /// </summary>
         public bool Trace { get; set; }
 
-        /// <summary>
-        /// The pacing this runtime records. It is carried through to
-        /// <see cref="CardRuntime.Execution"/> and nothing reads it yet; see
-        /// <see cref="ExecutionMode"/>.
-        /// </summary>
-        public ExecutionMode Execution { get; set; } = ExecutionMode.Headless;
     }
 
     /// <summary>
@@ -180,7 +174,6 @@ namespace Cantrip
             State.Trace.Enabled = options.Trace;
             Interpreter = new Interpreter(State, options.Host);
             if (options.Chooser != null) Interpreter.Chooser = options.Chooser;
-            Execution = options.Execution;
 
             RegisterRuntimeVerbs();
             clock.Advanced += OnClockAdvanced;
@@ -243,14 +236,6 @@ namespace Cantrip
         /// a definition itself, and to reach the primitives a C# verb is written against.
         /// </summary>
         public Interpreter Interpreter { get; }
-
-        /// <summary>
-        /// The pacing this runtime was built with, settable at any time. <b>Nothing in the engine
-        /// reads it.</b> Only the tree-walking interpreter exists and it always drains the queue,
-        /// so a game that wants an animation between actions paces its own presentation; see
-        /// <see cref="ExecutionMode"/>.
-        /// </summary>
-        public ExecutionMode Execution { get; set; }
 
         /// <summary>
         /// Who answers a choice content asks for. Setting it to null throws rather than quietly
@@ -1182,28 +1167,36 @@ namespace Cantrip
         // Cards --------------------------------------------------------------------------------
 
         /// <summary>
-        /// Whether this card's cost is <c>X</c>: it spends everything the actor has rather than a fixed
-        /// amount. A UI has to ask, because such a card shows no number and is never refused for cost.
+        /// Whether this action's cost is <c>X</c>: it spends everything the actor has rather than a
+        /// fixed amount. A UI has to ask, because such a card shows no number and is never refused
+        /// for cost.
         /// </summary>
-        public bool IsXCost(Entity card) =>
-            card.Definition?.Property("cost")?.First is NameExpr { Name: var name } && string.Equals(name, "x", StringComparison.OrdinalIgnoreCase);
+        /// <param name="action">
+        /// The card or ability. It is not called <c>card</c> because only a card has a cost today
+        /// and this is the surface an ability's cost would arrive on, as
+        /// <see cref="LegalTargets(Entity)"/> is named for the same reason.
+        /// </param>
+        public bool IsXCost(Entity action) =>
+            action.Definition?.Property("cost")?.First is NameExpr { Name: var name } && string.Equals(name, "x", StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
-        /// The resource a card's cost is paid in: <c>energy</c>, or whatever its <c>cost</c> names.
+        /// The resource an action's cost is paid in: <c>energy</c>, or whatever its <c>cost</c> names.
         /// </summary>
-        public string CostResourceOf(Entity card) => card.Definition?.CostResource ?? "energy";
+        /// <param name="action">The card or ability; see <see cref="IsXCost"/> on the name.</param>
+        public string CostResourceOf(Entity action) => action.Definition?.CostResource ?? "energy";
 
         /// <summary>
-        /// The card's current cost after modifiers. An X cost spends everything the payer has of the
-        /// resource the card is priced in.
+        /// The action's current cost after modifiers. An X cost spends everything the payer has of
+        /// the resource it is priced in.
         /// </summary>
-        public int CostOf(Entity card)
+        /// <param name="action">The card or ability; see <see cref="IsXCost"/> on the name.</param>
+        public int CostOf(Entity action)
         {
-            if (IsXCost(card)) return card.Controller.GetInt(CostResourceOf(card));
+            if (IsXCost(action)) return action.Controller.GetInt(CostResourceOf(action));
 
-            // From the base cost: card.Get("cost") would already have run the cost channel once.
-            var query = new ModifierQuery("cost") { Subject = card, Source = card.Controller, Card = card, Tags = card.Tags.ToArray() };
-            Num cost = State.Modifiers.Compute(query, card.GetBase("cost"));
+            // From the base cost: action.Get("cost") would already have run the cost channel once.
+            var query = new ModifierQuery("cost") { Subject = action, Source = action.Controller, Card = action, Tags = action.Tags.ToArray() };
+            Num cost = State.Modifiers.Compute(query, action.GetBase("cost"));
             return Math.Max(0, cost.Floor().ToInt());
         }
 

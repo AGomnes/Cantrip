@@ -118,22 +118,4 @@ namespace Cantrip
         Global = 7,
     }
 
-    /// <summary>
-    /// Pacing of the action queue — a setting the engine carries and does not act on.
-    /// </summary>
-    /// <remarks>
-    /// Only the tree-walking interpreter exists in 1.0, and it always drains the queue. The value
-    /// is kept on <see cref="RuntimeOptions.Execution"/> and <see cref="CardRuntime.Execution"/>
-    /// so a game can record what it meant and a later release can honour it without a breaking
-    /// change, but today the two modes run identically. A game that wants an animation between
-    /// actions paces its own presentation from the events it hears.
-    /// </remarks>
-    public enum ExecutionMode
-    {
-        /// <summary>Drain the queue as fast as possible. What simulations and tests want, and what every runtime does.</summary>
-        Headless,
-
-        /// <summary>Yield between actions so presentation can keep up. Recorded, not yet honoured.</summary>
-        Live,
-    }
 }

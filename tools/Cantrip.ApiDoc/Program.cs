@@ -65,7 +65,14 @@ public static class Program
             new SourceSet(
                 "Cantrip.GodotAdapter",
                 "The Godot addon's script surface: the `CantripRuntime` node a scene holds, and everything it publishes to GDScript.",
-                Sources(Path.Combine(root, "godot", "Cantrip.Demo", "addons", "cantrip", "runtime")),
+                // Both halves of the addon. `shared/` is where the words a game compares against
+                // live -- SaveCheck.NameOf, ChoiceAnswer.NameOf, Words -- and docs/stability.md
+                // freezes "the Godot node's methods, signals and dictionary keys", so a reference
+                // that listed only `runtime/` left half of what freezes out of the list.
+                Sources(Path.Combine(root, "godot", "Cantrip.Demo", "addons", "cantrip", "runtime"))
+                    .Concat(Sources(Path.Combine(root, "godot", "Cantrip.Demo", "addons", "cantrip", "shared")))
+                    .OrderBy(f => f, StringComparer.Ordinal)
+                    .ToList(),
                 Array.Empty<string>()),
         };
 

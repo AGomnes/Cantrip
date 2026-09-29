@@ -81,12 +81,50 @@ namespace Cantrip.Tests.Foundation
         }
 
         [Fact]
+        public void A_restored_generator_names_no_seed_for_a_host_to_mistake_for_a_save()
+        {
+            // Reflection rather than `Assert.Null(rng.Seed)` so that this test says what it means
+            // against a build where Seed is a plain ulong: the type is half the fix.
+            PropertyInfo seed = typeof(Rng).GetProperty("Seed")!;
+            Assert.Equal(typeof(ulong?), seed.PropertyType);
+
+            var rng = new Rng(7);
+            Assert.Equal((object)7UL, seed.GetValue(rng));
+
+            rng.NextUInt64();
+            rng.SetState(new Rng(99).GetState());
+
+            // The seed named where it started, and it is no longer there. A host that saved this
+            // and called `new Rng(saved)` would have rewound the run to its first number.
+            Assert.Null(seed.GetValue(rng));
+            Assert.Null(seed.GetValue(new Rng(1, 2, 3, 4)));
+
+            // Drawing numbers does not clear it: it is still the label the run started from.
+            var fresh = new Rng(7);
+            fresh.NextUInt64();
+            Assert.Equal((object)7UL, seed.GetValue(fresh));
+        }
+
+        [Fact]
         public void A_state_of_the_wrong_size_is_refused_rather_than_half_restored()
         {
             var rng = new Rng(7);
 
             Assert.Throws<ArgumentException>(() => rng.SetState(new ulong[] { 1, 2, 3 }));
             Assert.Throws<ArgumentNullException>(() => rng.SetState(null!));
+        }
+
+        // Settings nothing reads ------------------------------------------------------------------
+
+        [Fact]
+        public void No_pacing_setting_is_frozen_for_a_feature_that_does_not_exist()
+        {
+            // ExecutionMode was carried on RuntimeOptions and CardRuntime and read by nothing. A
+            // 1.x that honoured it would change what every game that had set it did, so "keep it
+            // and honour it later" was never the additive move it looked like. It went before 1.0.
+            Assert.Null(typeof(CardRuntime).Assembly.GetType("Cantrip.ExecutionMode"));
+            Assert.Null(typeof(CardRuntime).GetProperty("Execution"));
+            Assert.Null(typeof(RuntimeOptions).GetProperty("Execution"));
         }
 
         // The causal chain -----------------------------------------------------------------------

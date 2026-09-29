@@ -24,7 +24,14 @@ namespace Cantrip.Runtime
         /// format up to its own: a save made by an earlier release loads here, brought forward by
         /// <see cref="Upgrade"/>, and only a save that needs a reader this build is not is refused.
         /// </summary>
-        public const int CurrentFormat = 3;
+        /// <remarks>
+        /// <c>static readonly</c> rather than <c>const</c>, and deliberately: C# bakes a
+        /// <c>const</c> into the assembly that reads it, so a game compiled against one release and
+        /// given a newer Cantrip.Core — which is exactly what swapping the addon's dll does — would
+        /// go on comparing saves against the number it was built with. The same goes for
+        /// <see cref="CurrentMinimumReader"/> and <see cref="CurrentRng"/>.
+        /// </remarks>
+        public static readonly int CurrentFormat = 3;
 
         /// <summary>
         /// The oldest reader a save this build writes can be given to, which a reader compares
@@ -33,14 +40,14 @@ namespace Cantrip.Runtime
         /// so that adding an optional field can bump <see cref="CurrentFormat"/> — saying honestly
         /// that the shape changed — without locking every earlier build out of the save.
         /// </summary>
-        public const int CurrentMinimumReader = 3;
+        public static readonly int CurrentMinimumReader = 3;
 
         /// <summary>
         /// The generator behind <see cref="Rng"/> in a save this build writes. A save that names
         /// another one is refused rather than read as four meaningless numbers; an empty name is
         /// this one, which is what a save made before the name was recorded carries.
         /// </summary>
-        public const string CurrentRng = "xoshiro256**";
+        public static readonly string CurrentRng = "xoshiro256**";
 
         /// <summary>The version of Cantrip.Core doing the writing, as <see cref="WrittenBy"/> records it.</summary>
         public static readonly string CurrentWriter = ReadVersion();
@@ -117,11 +124,23 @@ namespace Cantrip.Runtime
         /// <summary>The next causal-chain root to hand out, which is what <c>once per chain</c> counts by.</summary>
         public long NextChainRoot { get; set; }
 
-        /// <summary>
-        /// The clock's time in its own units. On a tick clock the rate is <em>not</em> saved, so a
-        /// restore into a clock at another rate reinterprets every duration in the game.
-        /// </summary>
+        /// <summary>The clock's time in its own units, as <see cref="ClockUnitsPerSecond"/> measures them.</summary>
         public long ClockNow { get; set; }
+
+        /// <summary>
+        /// The rate <see cref="ClockNow"/> is counted at: <see cref="IGameClock.UnitsPerSecond"/> as
+        /// it stood when the save was written. Zero for a turn clock, which has no rate, and in a
+        /// save written before the rate was recorded.
+        /// </summary>
+        /// <remarks>
+        /// A restore refuses a save whose recorded rate is not the live clock's, because a tick is
+        /// only a length of time while something says how many of them a second is: at half the
+        /// rate every cooldown, every <c>for 3s</c> and every <c>on every 2s</c> in the restored
+        /// game would run for twice as long, with nothing to show for it but a game that feels
+        /// wrong. Zero is read as "not recorded" and checked against nothing, which is what keeps
+        /// every save written before this field loading.
+        /// </remarks>
+        public int ClockUnitsPerSecond { get; set; }
 
         /// <summary>
         /// The generator <see cref="Rng"/> came from, empty for <see cref="CurrentRng"/>. Four
@@ -640,6 +659,7 @@ namespace Cantrip.Runtime
                 NextSequence = _nextSequence,
                 NextScheduleId = _nextScheduleId,
                 ClockNow = Clock.Now,
+                ClockUnitsPerSecond = Clock.UnitsPerSecond,
                 BoardName = Board.Name,
                 Board = BoardSnapshot.Of(Board),
             };
@@ -752,6 +772,21 @@ namespace Cantrip.Runtime
             }
 
             if (snapshot.FormatVersion < GameSnapshot.CurrentFormat) GameSnapshot.Upgrade(snapshot);
+
+            // The clock names its rate for the same reason the generator names itself: a tick is a
+            // length of time only while something says how many of them a second is, and a restore
+            // into a clock at another rate would quietly re-time every cooldown and every duration
+            // in the save. A save that records no rate is from before the field and is not checked.
+            if (snapshot.ClockUnitsPerSecond != 0 && snapshot.ClockUnitsPerSecond != Clock.UnitsPerSecond)
+            {
+                throw new InvalidOperationException(
+                    $"This save's clock runs at {snapshot.ClockUnitsPerSecond} units a second and this game's clock " +
+                    (Clock.UnitsPerSecond == 0
+                        ? "does not measure seconds at all"
+                        : $"runs at {Clock.UnitsPerSecond}") +
+                    $"; every cooldown and every duration in the save would mean a different length of time. " +
+                    $"The save was written by {Wrote(snapshot)}.");
+            }
 
             // Everything that can refuse the snapshot is looked up before the game is touched, so a
             // refused save leaves the game in progress exactly as it was.

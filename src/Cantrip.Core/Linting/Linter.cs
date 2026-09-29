@@ -256,6 +256,20 @@ namespace Cantrip.Linting
         /// </summary>
         public const string AbilityCost = "CT339";
 
+        /// <summary>
+        /// Error: a <c>target</c> line naming a word that is not one of <c>enemy</c>, <c>ally</c>,
+        /// <c>self</c>, <c>any</c> or <c>none</c>.
+        /// </summary>
+        /// <remarks>
+        /// The set is closed — nothing a game registers adds to it — and the engine falls through
+        /// to "nobody" for anything else, quietly. So <c>target freind</c> loaded, linted and
+        /// tested clean, and the card it was written on stopped asking for a target and stopped
+        /// checking the one it was handed: it would deal its damage to the party's own leader, or
+        /// to anything else a caller passed, for the whole life of the game. It is an error rather
+        /// than a warning for the same reason CT326 is: the alternative is a silent wrong answer.
+        /// </remarks>
+        public const string UnknownTargetMode = "CT340";
+
         /// <summary>Below this many runs, a scenario's numbers move about from one run to the next (CT318).</summary>
         private const int FewRuns = 100;
 
@@ -525,7 +539,11 @@ namespace Cantrip.Linting
                 CheckPlayerInAParty(body);
             }
 
-            foreach (EntityDefinition definition in _content.Definitions) CheckReach(definition);
+            foreach (EntityDefinition definition in _content.Definitions)
+            {
+                CheckTargetMode(definition);
+                CheckReach(definition);
+            }
 
             CheckBlocks();
             CheckClock();
@@ -1340,6 +1358,28 @@ namespace Cantrip.Linting
                         call.Span);
                 }
             }
+        }
+
+        /// <summary>
+        /// CT340: a <c>target</c> line naming a word no mode answers. The five modes are a closed
+        /// set, and everything outside it reaches nobody and checks nobody, in silence.
+        /// </summary>
+        private void CheckTargetMode(EntityDefinition definition)
+        {
+            PropertyNode? property = definition.Property("target");
+            if (property == null || property.Values.Count == 0) return;
+
+            string mode = TargetRule.Of(definition).Mode;
+            if (TargetRule.IsMode(mode)) return;
+
+            Error(
+                UnknownTargetMode,
+                $"`target {mode}` on {definition} names nobody: a `target` line takes " +
+                "`enemy`, `ally`, `self`, `any` or `none`. Anything else is never a side, so this " +
+                "action asks for no target and checks the one it is handed against nothing — it will " +
+                "point at whoever the game passes it, the party's own leader included.",
+                property.Span,
+                Suggest.Closest(mode, TargetRule.Modes));
         }
 
         /// <summary>

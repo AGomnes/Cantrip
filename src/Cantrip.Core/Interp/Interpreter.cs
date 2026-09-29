@@ -258,10 +258,16 @@ namespace Cantrip.Runtime
         /// <remarks>
         /// Area and random effects still resolve through the interpreter's own selectors, and do not
         /// ask: a taunt constrains what something may be pointed at, not what a blast reaches. The
-        /// query carries the card when there is one, so a <c>where</c> on the group must say
-        /// <c>it.</c> to mean the candidate; a bare <c>tag:</c> tests the card.
+        /// query carries the action when there is one, so a <c>where</c> on the group must say
+        /// <c>it.</c> to mean the candidate; a bare <c>tag:</c> tests the action.
         /// </remarks>
-        public bool IsTargetable(Entity candidate, Entity? source, Entity? card)
+        /// <param name="candidate">Who is being pointed at.</param>
+        /// <param name="source">Who is pointing, or null.</param>
+        /// <param name="action">
+        /// The card or ability being aimed, or null. Not <c>card</c>: an ability is aimed through
+        /// here too, which is why <see cref="CardRuntime.LegalTargets(Entity)"/> is named as it is.
+        /// </param>
+        public bool IsTargetable(Entity candidate, Entity? source, Entity? action)
         {
             if (candidate == null) return false;
             if (!State.Modifiers.HasChannel(TargetableChannel)) return true;
@@ -270,14 +276,17 @@ namespace Cantrip.Runtime
             {
                 Subject = candidate,
                 Source = source,
-                Card = card,
-                Tags = card == null ? Array.Empty<string>() : card.Tags.ToArray(),
+                Card = action,
+                Tags = action == null ? Array.Empty<string>() : action.Tags.ToArray(),
             };
             return State.Modifiers.Compute(query, Num.One) > Num.Zero;
         }
 
         /// <summary>Those of a group that may be aimed at, in the group's own order.</summary>
-        public IReadOnlyList<Entity> Targetable(IReadOnlyList<Entity> candidates, Entity? source, Entity? card)
+        /// <param name="candidates">Who is being pointed at.</param>
+        /// <param name="source">Who is pointing, or null.</param>
+        /// <param name="action">The card or ability being aimed, or null; see <see cref="IsTargetable"/>.</param>
+        public IReadOnlyList<Entity> Targetable(IReadOnlyList<Entity> candidates, Entity? source, Entity? action)
         {
             if (candidates == null || candidates.Count == 0) return Array.Empty<Entity>();
             if (!State.Modifiers.HasChannel(TargetableChannel)) return candidates;
@@ -285,7 +294,7 @@ namespace Cantrip.Runtime
             var allowed = new List<Entity>();
             foreach (Entity candidate in candidates)
             {
-                if (IsTargetable(candidate, source, card)) allowed.Add(candidate);
+                if (IsTargetable(candidate, source, action)) allowed.Add(candidate);
             }
             return allowed;
         }

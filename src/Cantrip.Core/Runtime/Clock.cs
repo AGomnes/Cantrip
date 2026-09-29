@@ -53,6 +53,19 @@ namespace Cantrip.Runtime
 
         /// <summary>Restores time from a snapshot without raising <see cref="Advanced"/>.</summary>
         void Restore(long now);
+
+        /// <summary>
+        /// How many of this clock's units make one second of game time, or 0 for a clock whose unit
+        /// is not a length of real time at all — which is every turn clock, and the default here.
+        /// </summary>
+        /// <remarks>
+        /// It is what turns <c>3s</c> in content into a number of units, so it is saved with the
+        /// game: <see cref="GameSnapshot.ClockUnitsPerSecond"/> records it and a restore refuses a
+        /// save written at another rate, rather than silently reinterpreting every cooldown, every
+        /// <c>for 3s</c> and every <c>on every 2s</c> in it. A clock that answers 0 both writes and
+        /// accepts 0, so nothing changes for a turn-based game.
+        /// </remarks>
+        int UnitsPerSecond => 0;
     }
 
     /// <summary>One unit per turn. The default for turn-based games.</summary>
@@ -109,9 +122,10 @@ namespace Cantrip.Runtime
         /// or every duration in the content is wrong by that ratio.
         /// </summary>
         /// <param name="ticksPerSecond">
-        /// Ticks in one second of game time. It cannot be changed afterwards, and it is not part of a
-        /// save: restoring into a clock running at another rate reinterprets every cooldown and every
-        /// timed status in it.
+        /// Ticks in one second of game time. It cannot be changed afterwards, and it is written into
+        /// a save as <see cref="GameSnapshot.ClockUnitsPerSecond"/>: a restore into a clock running
+        /// at another rate is refused rather than reinterpreting every cooldown and every timed
+        /// status in it.
         /// </param>
         /// <exception cref="ArgumentOutOfRangeException">Zero or fewer ticks per second.</exception>
         public TickClock(int ticksPerSecond = 60)
@@ -125,6 +139,12 @@ namespace Cantrip.Runtime
         /// is the one conversion the core cannot do for it.
         /// </summary>
         public int TicksPerSecond { get; }
+
+        /// <summary>
+        /// <see cref="TicksPerSecond"/>, under the name a save and a restore compare it by. See
+        /// <see cref="IGameClock.UnitsPerSecond"/>.
+        /// </summary>
+        public int UnitsPerSecond => TicksPerSecond;
 
         /// <summary>Ticks elapsed since the game began. It does not reset between battles, so a cooldown across a battle boundary still expires when it should.</summary>
         public long Now { get; private set; }

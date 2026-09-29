@@ -12,9 +12,9 @@ Cantrip.Runtime.ScheduledSnapshot.BlockAddress.get -> string?
 Cantrip.Runtime.ScheduledSnapshot.BlockAddress.set -> void
 Cantrip.Runtime.ScheduledSnapshot.UntilEvent.get -> string?
 Cantrip.Runtime.ScheduledSnapshot.UntilEvent.set -> void
-const Cantrip.Runtime.GameSnapshot.CurrentFormat = 3 -> int
-const Cantrip.Runtime.GameSnapshot.CurrentMinimumReader = 3 -> int
-const Cantrip.Runtime.GameSnapshot.CurrentRng = "xoshiro256**" -> string!
+static readonly Cantrip.Runtime.GameSnapshot.CurrentFormat -> int
+static readonly Cantrip.Runtime.GameSnapshot.CurrentMinimumReader -> int
+static readonly Cantrip.Runtime.GameSnapshot.CurrentRng -> string!
 static Cantrip.Runtime.GameSnapshot.ReaderNeededBy(Cantrip.Runtime.GameSnapshot! snapshot) -> int
 static readonly Cantrip.Runtime.GameSnapshot.CurrentWriter -> string!
 static Cantrip.Runtime.BuiltinEvents.VerbsThatRaise(string! eventName) -> System.Collections.Generic.IReadOnlyList<string!>!
@@ -37,8 +37,8 @@ Cantrip.Runtime.ClockKind.Turns = 1 -> Cantrip.Runtime.ClockKind
 Cantrip.Runtime.ClockKind.Unstated = 0 -> Cantrip.Runtime.ClockKind
 Cantrip.Runtime.Ruleset.Clock.get -> Cantrip.Runtime.ClockKind
 Cantrip.Runtime.Ruleset.Clock.set -> void
-Cantrip.Runtime.Interpreter.IsTargetable(Cantrip.Runtime.Entity! candidate, Cantrip.Runtime.Entity? source, Cantrip.Runtime.Entity? card) -> bool
-Cantrip.Runtime.Interpreter.Targetable(System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>! candidates, Cantrip.Runtime.Entity? source, Cantrip.Runtime.Entity? card) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+Cantrip.Runtime.Interpreter.IsTargetable(Cantrip.Runtime.Entity! candidate, Cantrip.Runtime.Entity? source, Cantrip.Runtime.Entity? action) -> bool
+Cantrip.Runtime.Interpreter.Targetable(System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>! candidates, Cantrip.Runtime.Entity? source, Cantrip.Runtime.Entity? action) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
 const Cantrip.Runtime.Interpreter.TargetableChannel = "targetable" -> string!
 Cantrip.Runtime.NewListeners
 Cantrip.Runtime.NewListeners.HearTheEvent = 0 -> Cantrip.Runtime.NewListeners
@@ -300,3 +300,23 @@ Cantrip.CardRuntime.Place(Cantrip.Runtime.Entity! actor, int lane, int rank) -> 
 Cantrip.Num.ToLong() -> long
 Cantrip.CardRuntime.ReadyIn(Cantrip.Runtime.Entity! ability) -> long
 Cantrip.CardRuntime.AbilitiesOf(Cantrip.Runtime.Entity! owner) -> System.Collections.Generic.IReadOnlyList<Cantrip.Runtime.Entity!>!
+*REMOVED*Cantrip.Rng.Seed.get -> ulong
+Cantrip.Rng.Seed.get -> ulong?
+Cantrip.Runtime.GameSnapshot.ClockUnitsPerSecond.get -> int
+Cantrip.Runtime.GameSnapshot.ClockUnitsPerSecond.set -> void
+Cantrip.Runtime.IGameClock.UnitsPerSecond.get -> int
+Cantrip.Runtime.TickClock.UnitsPerSecond.get -> int
+*REMOVED*Cantrip.ExecutionMode
+*REMOVED*Cantrip.ExecutionMode.Headless = 0 -> Cantrip.ExecutionMode
+*REMOVED*Cantrip.ExecutionMode.Live = 1 -> Cantrip.ExecutionMode
+*REMOVED*Cantrip.CardRuntime.Execution.get -> Cantrip.ExecutionMode
+*REMOVED*Cantrip.CardRuntime.Execution.set -> void
+*REMOVED*Cantrip.RuntimeOptions.Execution.get -> Cantrip.ExecutionMode
+*REMOVED*Cantrip.RuntimeOptions.Execution.set -> void
+*REMOVED*Cantrip.CardRuntime.CostOf(Cantrip.Runtime.Entity! card) -> int
+*REMOVED*Cantrip.CardRuntime.CostResourceOf(Cantrip.Runtime.Entity! card) -> string!
+*REMOVED*Cantrip.CardRuntime.IsXCost(Cantrip.Runtime.Entity! card) -> bool
+Cantrip.CardRuntime.CostOf(Cantrip.Runtime.Entity! action) -> int
+Cantrip.CardRuntime.CostResourceOf(Cantrip.Runtime.Entity! action) -> string!
+Cantrip.CardRuntime.IsXCost(Cantrip.Runtime.Entity! action) -> bool
+const Cantrip.Linting.Linter.UnknownTargetMode = "CT340" -> string!

@@ -36,6 +36,14 @@ namespace Cantrip.GodotAdapter
         /// It passes once that block has run. Only <c>CantripRuntime.Save</c> answers with this.
         /// </summary>
         ReloadPending,
+
+        /// <summary>
+        /// The save was written by a game whose clock ran at another rate than this one's, so every
+        /// cooldown and every duration in it would mean a different length of time. It is not the
+        /// content that changed: it is <c>CantripRuntime.TicksPerSecond</c>, or a turn-based game
+        /// being handed a real-time save. Only <c>CantripRuntime.LoadSave</c> answers with this.
+        /// </summary>
+        ClockChanged,
     }
 
     /// <summary>The verdict on one save file.</summary>
@@ -69,6 +77,7 @@ namespace Cantrip.GodotAdapter
             SaveRejection.ContentChanged => "content_changed",
             SaveRejection.Resolving => "resolving",
             SaveRejection.ReloadPending => "reload_pending",
+            SaveRejection.ClockChanged => "clock_changed",
             _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, "This rejection has no word for script yet."),
         };
 
@@ -102,7 +111,12 @@ namespace Cantrip.GodotAdapter
         /// brought forward by <see cref="Upgraded"/>, and only one from a newer addon, whose shape
         /// this addon cannot know, is refused.
         /// </summary>
-        public const int CurrentFormat = 1;
+        /// <remarks>
+        /// <c>static readonly</c> rather than <c>const</c> for the reason
+        /// <c>GameSnapshot.CurrentFormat</c> gives: a <c>const</c> is baked into whatever reads it,
+        /// and this addon's whole distribution model is a dll swapped into someone's project.
+        /// </remarks>
+        public static readonly int CurrentFormat = 1;
 
         public SaveEnvelope(int format, string? fingerprint, string? payload)
         {

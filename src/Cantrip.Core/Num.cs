@@ -355,14 +355,28 @@ namespace Cantrip
         public override string ToString() => ToString(null, CultureInfo.InvariantCulture);
 
         /// <summary>
-        /// The <see cref="IFormattable"/> form, which <b>ignores <paramref name="format"/></b>: there is
-        /// one representation of a <see cref="Num"/> and this is it, so <c>$"{damage:F2}"</c> gives the
-        /// same text as <c>$"{damage}"</c>. A caller that wants a fixed number of decimals formats
-        /// <see cref="ToDouble"/> instead, having read what that costs.
+        /// The <see cref="IFormattable"/> form. With no format, or <c>"G"</c>, it is the invariant,
+        /// trailing-zero-trimmed text <see cref="ToString()"/> writes and <see cref="Parse"/> reads
+        /// back. Any other standard or custom numeric format string is honoured, so
+        /// <c>$"{damage:F2}"</c> gives <c>5.00</c> and <c>$"{chance:P0}"</c> gives a percentage.
         /// </summary>
+        /// <remarks>
+        /// A format is applied to the exact value as a <see cref="decimal"/>, never through
+        /// <see cref="ToDouble"/>: six decimal places in 64 bits fit a decimal exactly, so the text
+        /// is the number rather than a rounding of it, and it is the same text on every machine.
+        /// This is presentation only — nothing in the rules formats a number — so it is outside the
+        /// determinism promise's reach either way.
+        /// </remarks>
+        /// <exception cref="FormatException"><paramref name="format"/> is not a valid numeric format string.</exception>
         public string ToString(string? format, IFormatProvider? formatProvider)
         {
             formatProvider ??= CultureInfo.InvariantCulture;
+
+            // "G" is this type's own form rather than the framework's general format, because that
+            // form is what Parse reads back and what a trace, a save and a test failure all hold.
+            if (!string.IsNullOrEmpty(format) && format != "G" && format != "g")
+                return ((decimal)Raw / Scale).ToString(format, formatProvider);
+
             if (Raw % Scale == 0) return (Raw / Scale).ToString(formatProvider);
 
             // Trim trailing zeros so 1.500000 prints as 1.5.

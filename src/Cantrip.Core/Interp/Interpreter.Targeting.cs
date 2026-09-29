@@ -39,6 +39,19 @@ namespace Cantrip.Runtime
         internal string Mode { get; }
 
         /// <summary>
+        /// Every word a <c>target</c> line may name, which is a closed set: nothing a game can
+        /// register adds to it, and the interpreter's <c>Candidates</c> and <c>OnSide</c> both fall
+        /// through to "nobody" for anything else. It is here so that the linter can refuse a word
+        /// no mode answers (CT340) rather than let a one-letter typo turn a targeted card into one
+        /// the engine points wherever it is handed.
+        /// </summary>
+        internal static readonly string[] Modes = { "enemy", "ally", "self", "any", "none" };
+
+        /// <summary>Whether <paramref name="mode"/> is one of <see cref="Modes"/>.</summary>
+        internal static bool IsMode(string? mode) =>
+            mode != null && Array.IndexOf(Modes, mode.ToLowerInvariant()) >= 0;
+
+        /// <summary>
         /// The predicates of <c>target enemy where …</c>, with <c>it</c> the candidate. Empty when
         /// the <c>target</c> line names a side and nothing more, which is the usual case.
         /// </summary>

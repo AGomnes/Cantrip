@@ -202,6 +202,7 @@ namespace Cantrip.GodotAdapter.Tests.Shared
                 [SaveRejection.ContentChanged] = "content_changed",
                 [SaveRejection.Resolving] = "resolving",
                 [SaveRejection.ReloadPending] = "reload_pending",
+                [SaveRejection.ClockChanged] = "clock_changed",
             };
 
             Assert.Equal(Enum.GetValues<SaveRejection>().OrderBy(r => r), words.Keys.OrderBy(r => r));

@@ -12,19 +12,48 @@ Part of [the API reference](README.md). The guides are [docs/csharp.md](../cshar
 | [`BattlePresenter.PresentEventHandler`](#battlepresenterpresenteventhandler) | One resolved event, in the dictionary shape the addon uses across the boundary. |
 | [`BattlePresenter.SettledEventHandler`](#battlepresentersettledeventhandler) | Everything queued has been presented; the game is idle again. |
 | [`CantripContentFile`](#cantripcontentfile) | One imported `.cantrip` file: its text, and the `res://` path it was written at. |
+| [`CantripDebugService`](#cantripdebugservice) | The game's half of the editor channel, with no engine in it: what the editor can ask a running game, and what it gets back. |
+| [`CantripDrafts`](#cantripdrafts) | The files the editor dock has open, each as two texts: what is on disk, and what the person has typed since. A draft is the difference between them. |
+| [`CantripExecuteResult`](#cantripexecuteresult) | What came of running statements from the editor's console. |
+| [`CantripHello`](#cantriphello) | What a game says about itself when the editor first reaches it. |
+| [`CantripIndent`](#cantripindent) | What one step of indentation is in a given `.cantrip` buffer, and how to keep a buffer written in one step from quietly acquiring another. |
+| [`CantripProtocol`](#cantripprotocol) | The names on the wire between the editor and a running game, and the shapes that travel on it. Engine-free on purpose: the interesting part is the batching, and that is worth testing without launching Godot. |
+| [`CantripReloadResult`](#cantripreloadresult) | What came of reloading content into a running game. |
 | [`CantripRuntime`](#cantripruntime) | The node a game drops into a scene, and the only surface script touches. It owns the rules engine, loads content the way an exported game must, and turns everything crossing the boundary into ids and dictionaries. |
 | [`CantripRuntime.BattleEndedEventHandler`](#cantripruntimebattleendedeventhandler) | The battle is over, and the action that ended it has finished. It is safe to act from here — hand out a reward, start the next battle — and the next battle will announce its own end when it comes. |
 | [`CantripRuntime.BattleStartedEventHandler`](#cantripruntimebattlestartedeventhandler) | A battle has begun. It is emitted only if the battle is still running once `battle_start` has resolved. |
 | [`CantripRuntime.ChoiceRequestedEventHandler`](#cantripruntimechoicerequestedeventhandler) | The rules stopped to ask the player something. The game has been rolled back to before the action, so nothing has happened yet; answer with `Answer` and the action replays. |
 | [`CantripRuntime.ContentReloadedEventHandler`](#cantripruntimecontentreloadedeventhandler) | Carries the whole report `CantripRuntime.ReloadContent(Nullable<Array>)` returns, not only its problems. |
 | [`CantripRuntime.EffectEventEventHandler`](#cantripruntimeeffecteventeventhandler) | One resolved event, as a dictionary with snake_case keys. It arrives *after* the whole action has finished, never during it, so a handler may call back into the node — and `after` carries the stats as they were at that event, which is what an animation should show rather than the live values. |
+| [`CantripStepState`](#cantripstepstate) | Where a game stands for a debugger: what is being held, and what would run next. |
+| [`ChoiceAnswer`](#choiceanswer) | The verdict on one answer from the UI, and the ids to pass on when it is good. |
+| [`ChoiceBridge`](#choicebridge) | Gives the core's `PendingChoice` an identity, so a late answer cannot be applied to the wrong question. |
+| [`ChoiceRejection`](#choicerejection) | Why an answer was not passed on to the runtime. |
+| [`ContentPaths`](#contentpaths) | The path rules the adapter needs on both sides of the engine boundary: which files are content, what order they load in, and whether a path is something the engine owns. |
+| [`DescriptionView`](#descriptionview) | A description ready for a label: the plain text, the same text as BBCode, the segments behind it, and the keywords it relies on. |
+| [`EntityDetail`](#entitydetail) | Everything about one live entity: what it is, what it is worth now against what it started with, and every rule currently attached to it. |
+| [`EntityView`](#entityview) | Everything a game shows about one entity, as plain data: no engine types, no live references, and every identity an `Int32`. |
+| [`EventBuffer`](#eventbuffer) | Holds the events of one action until it has finished resolving. |
+| [`EventRecord`](#eventrecord) | One resolved event, as the game will present it: what happened, to whom, and what the numbers were at that instant. |
 | [`GodotContentLoader`](#godotcontentloader) | Finds content files and reads them the way the engine wants, then hands the text to the rules library. |
 | [`GodotEffectHost`](#godoteffecthost) | The adapter's `IEffectHost`: it records resolved events for the game to animate later, and answers the names and functions the rules cannot know from Callables the game registered. |
 | [`IValueMarshal`](#ivaluemarshal) | Converts between the rules engine's values and Godot's, for the two places they meet: the arguments a host function is called with, and the answer it gives back. |
+| [`ListenerView`](#listenerview) | One registered `on ...:` block, as an inspector shows it. |
+| [`ModifierView`](#modifierview) | One active `modify` line, as an inspector shows it. |
+| [`SaveCheck`](#savecheck) | The verdict on one save file. |
+| [`SaveEnvelope`](#saveenvelope) | What a save file carries besides the snapshot itself: which addon wrote it, and which content it was taken against. |
+| [`SaveRejection`](#saverejection) | Why a save file was not restored. |
+| [`SegmentView`](#segmentview) | One run of a description: either words, or a number the rules produced. |
+| [`StatusView`](#statusview) | One status or keyword on an entity, as a status bar shows it. |
+| [`TickAccumulator`](#tickaccumulator) | Turns physics frames into whole simulation ticks. |
 | [`TickDriver`](#tickdriver) | Advances a real-time game from the engine's fixed step, in whole ticks. |
 | [`TickDriver.TickedEventHandler`](#tickdrivertickedeventhandler) | Whole ticks were run this frame. |
+| [`TooltipView`](#tooltipview) | A keyword the text leans on, explained in its own right. |
+| [`TraceBatch`](#tracebatch) | A slice of the trace: what happened after the cursor the editor last saw, how much was dropped before it got there, and whether there is more waiting. |
+| [`TraceDto`](#tracedto) | One recorded step, flattened for the wire. |
 | [`VariantMap`](#variantmap) | The one place plain adapter data becomes Godot data. Everything a game receives is a `Collections.Dictionary` or `Collections.Array` of primitives with snake_case keys, and every entity is an `Int32` id. |
 | [`VariantMap.Marshal`](#variantmapmarshal) | The marshal the host uses for game-supplied names and functions, so the addon converts values in exactly one way. |
+| [`Words`](#words) | The word script is given for each member of a core enum. |
 
 ---
 
@@ -173,6 +202,672 @@ public string Text { get; set; }
 ```
 
 The file's contents, verbatim. The DSL is whitespace-sensitive, so nothing is trimmed.
+
+---
+
+## CantripDebugService
+
+```csharp
+public sealed class CantripDebugService
+```
+
+The game's half of the editor channel, with no engine in it: what the editor can ask a running game, and what it gets back.
+
+Keeping this engine-free is what makes it testable. The Godot side is then a thin adapter that turns Variants into these calls and their results back into Variants, which is a shape worth keeping: the awkward part of a debug channel is deciding what to send and when, not the sending.
+
+### Constructors
+
+```csharp
+public CantripDebugService(CardRuntime runtime)
+```
+
+*Undocumented.*
+
+### Properties
+
+```csharp
+public ContentLibrary Content { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public CardRuntime Runtime { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public long Session { get; }
+```
+
+This service's own number, never shared with another in the same process. See `CantripHello.Session`.
+
+### Methods
+
+```csharp
+public CantripStepState Break(string file, int line, bool on)
+```
+
+Stops the game before any trigger written on one line.
+
+```csharp
+public CantripStepState BreakOnEvent(string eventName, bool on)
+```
+
+Stops the game before anything queued by one event, wherever it was written.
+
+```csharp
+public CantripStepState ClearBreakpoints()
+```
+
+*Undocumented.*
+
+```csharp
+public EntityDetail? Detail(int entityId)
+```
+
+Everything about one entity, including the listeners and modifiers it has registered and the line of content each came from. Null when the id is not in the game.
+
+```csharp
+public void EnableTrace(bool enabled, int capacity = 2000)
+```
+
+Turns the causality trace on or off from the editor, and bounds it. Tracing is not free, so it is off until someone asks, and the bound is what keeps a long session from growing without limit.
+
+```csharp
+public IReadOnlyList<EntityView> Entities(string? zone = null, string? team = null)
+```
+
+The live entities, in the order the game made them, optionally narrowed to one zone or side. Removed entities are left out: an inspector is for what is in play.
+
+```csharp
+public CantripExecuteResult Execute(string statements)
+```
+
+Runs DSL statements against the running game, which is the editor's console. A failure is reported rather than thrown: the point of a console is to try things that might not work.
+
+```csharp
+public TraceBatch Fetch(long sinceId = 0, int max = 200)
+```
+
+The steps recorded after a cursor. See `TraceBatch` for why it is pulled.
+
+```csharp
+public CantripHello Hello()
+```
+
+Who the game is, answered as soon as the editor says hello.
+
+```csharp
+public CantripStepState Pause()
+```
+
+Holds the queue. Whatever is running finishes; what it queued waits.
+
+```csharp
+public CantripReloadResult Reload(IEnumerable<KeyValuePair<string, string>> files)
+```
+
+Reloads content the editor has just saved and rebinds the running game to it. Files are loaded even when they are broken, so the editor can show why; the rebinding is what is held back until they are clean.
+
+```csharp
+public CantripStepState Resume()
+```
+
+*Undocumented.*
+
+```csharp
+public CantripStepState Step()
+```
+
+Resolves one queued trigger.
+
+A choice waiting to be answered refuses the step instead of taking it: answering one rolls its action back and replays it, which would undo the very triggers just stepped through. Everything else that cannot be stepped is reported the same way, because a debugger button that silently does nothing is worse than one that says why.
+
+```csharp
+public CantripStepState Stepping(string message = "")
+```
+
+Where the game stands, with an optional note about what was just refused.
+
+---
+
+## CantripDrafts
+
+```csharp
+public sealed class CantripDrafts
+```
+
+The files the editor dock has open, each as two texts: what is on disk, and what the person has typed since. A draft is the difference between them.
+
+Content is loaded a folder at a time, so a buffer cannot be checked on its own: a card that names a status defined next door is correct. What is checked is therefore the folder as saved, with every unsaved buffer put in place of its own file, and this is the book of those buffers. Keeping them here rather than in the view is what lets a person leave a file with changes pending, work on another, and come back to find their work where they left it.
+
+Nothing here writes anything. Saving belongs to the view, which calls `CantripDrafts.Saved(string, string)` afterwards; a draft that is byte-identical to the file is not a draft at all, so typing a character and taking it out again leaves nothing behind.
+
+Every text that arrives is put in the line endings the editor's buffer uses, because Godot's `CodeEdit` holds a line without its carriage return. Without that, a file written on Windows differs from its own buffer the moment it is read, and typing a character and taking it out again would leave it marked unsaved for ever. Nothing downstream cares: the lexer reads either.
+
+### Properties
+
+```csharp
+public IReadOnlyList<string> Unsaved { get; }
+```
+
+Every path with unsaved changes, ordinally sorted so a message reads the same twice.
+
+```csharp
+public int UnsavedCount { get; }
+```
+
+How many open files have unsaved changes.
+
+### Methods
+
+```csharp
+public static string AsBuffer(string? text)
+```
+
+Text with the line endings the editor's buffer holds. Godot's `CodeEdit` drops a carriage return on the way in and does not put it back, so every text is compared in the one form both sides can be in.
+
+```csharp
+public string? Buffer(string? path)
+```
+
+What the buffer holds, whether or not it differs from the file. Null when not open.
+
+```csharp
+public void Clear()
+```
+
+Forgets every draft, for a reload that starts from what is on disk.
+
+```csharp
+public void Closed(string? path)
+```
+
+Stops tracking a file, draft and all.
+
+```csharp
+public string? Disk(string? path)
+```
+
+What the file held when it was last read or written. Null when not open.
+
+```csharp
+public void DiskChanged(string? path, string? diskText)
+```
+
+Records what the file holds now, leaving the buffer as it is: the file changed underneath.
+
+```csharp
+public void Edited(string? path, string? bufferText)
+```
+
+Records what the buffer holds now. Text equal to the file's clears the draft.
+
+```csharp
+public bool IsDirty(string? path)
+```
+
+*Undocumented.*
+
+```csharp
+public bool IsOpen(string? path)
+```
+
+*Undocumented.*
+
+```csharp
+public void Opened(string? path, string? diskText)
+```
+
+Records what a file holds on disk, on opening it, saving it or rereading it.
+
+```csharp
+public bool SameAsDisk(string? path, string? diskText)
+```
+
+True when a file's text is what this book last recorded for it, whatever line endings it arrived in. This is the question the editor asks when the project's files change: a file saved from here as `\n` and read back as `\r\n` has not changed underneath anybody.
+
+```csharp
+public void Saved(string? path, string? savedText)
+```
+
+Records that the buffer was written to disk, so it is no longer a draft.
+
+```csharp
+public string? TextFor(string? path)
+```
+
+The text to load for a file: the unsaved buffer when there is one, otherwise null, which means "read the file". This is the whole of what a check sees differently from disk.
+
+### Events
+
+```csharp
+public event Action? Changed
+```
+
+Raised whenever the set of unsaved files changes, so a dock can mark itself.
+
+---
+
+## CantripExecuteResult
+
+```csharp
+public sealed class CantripExecuteResult
+```
+
+What came of running statements from the editor's console.
+
+### Properties
+
+```csharp
+public string Message { get; }
+```
+
+Empty when it worked; otherwise why it did not, ready to show.
+
+```csharp
+public bool Ok { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public SourceSpan Span { get; }
+```
+
+Where it went wrong, when the failure knows.
+
+### Methods
+
+```csharp
+public override string ToString()
+```
+
+*Undocumented.*
+
+---
+
+## CantripHello
+
+```csharp
+public sealed class CantripHello
+```
+
+What a game says about itself when the editor first reaches it.
+
+### Properties
+
+```csharp
+public int Definitions { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string Fingerprint { get; }
+```
+
+The content the game is running, as the core hashes it.
+
+```csharp
+public int Generation { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public bool InBattle { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public int Protocol { get; }
+```
+
+The protocol the game speaks, so an editor of another age can say so plainly.
+
+```csharp
+public long Session { get; }
+```
+
+Which game behind the channel this is. A new run on the same node is a new game, whose trace is numbered from 1 again, so an editor holding steps from another session starts its view afresh.
+
+```csharp
+public bool Tracing { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public int Turn { get; }
+```
+
+*Undocumented.*
+
+### Methods
+
+```csharp
+public override string ToString()
+```
+
+*Undocumented.*
+
+---
+
+## CantripIndent
+
+```csharp
+public static class CantripIndent
+```
+
+What one step of indentation is in a given `.cantrip` buffer, and how to keep a buffer written in one step from quietly acquiring another.
+
+The language is whitespace-sensitive: the lexer turns a change of indentation into Indent and Dedent tokens, and it counts a tab as `CantripIndent.TabWidth` columns. So an editor that inserts a tab into a file written with two spaces writes a line that is four columns deep and looks two deep, and a block ends somewhere nobody meant it to. Every rule here exists to stop that: the editor asks the buffer what a step already is and inserts exactly that, in spaces.
+
+This lives in `shared/` and names no engine type, so the rules are unit tested without starting Godot. The editor hands the answer to its `CodeEdit` once, and Godot's own indenting does the typing.
+
+### Fields and constants
+
+```csharp
+public const int DefaultWidth = 2
+```
+
+What a buffer with nothing indented in it yet is given. Every sample uses it.
+
+```csharp
+public const int MaxWidth = 8
+```
+
+Wider than this is a file doing something else, and is not taken as a step.
+
+```csharp
+public const int TabWidth = 4
+```
+
+The columns the core's lexer counts a tab as. It is repeated here because the lexer keeps it private; a test lexes a tabbed line and checks that the two still agree.
+
+### Methods
+
+```csharp
+public static string Continue(string? line, int width)
+```
+
+The whitespace a new line typed after `line` begins with: as deep as that line, one step deeper when it opens a block with `:`. This is the rule the editor hands to Godot's automatic indenting, stated here so that it can be tested.
+
+```csharp
+public static int Detect(string? text)
+```
+
+The step already used in `text`: the narrowest indentation any line begins with. A buffer indented with tabs answers `CantripIndent.TabWidth`, because that is what its tabs already mean to the lexer, so spaces typed from now on line up with them.
+
+```csharp
+public static bool HasIndentingTab(string? text)
+```
+
+True when a tab indents a line, which is the kind that changes what the file means.
+
+The cheap question is asked first. This runs on every keystroke, and splitting a file into lines to find out that it has no tab in it would allocate the whole buffer twice for nothing.
+
+```csharp
+public static bool HasTab(string? text)
+```
+
+True when a tab appears anywhere in the buffer, indenting or not.
+
+```csharp
+public static int LeadingCharacters(string? line)
+```
+
+How many characters of whitespace a line begins with.
+
+```csharp
+public static int LeadingColumns(string? line)
+```
+
+How many columns a line is indented by, counting a tab the way the lexer counts it: on to the next multiple of `CantripIndent.TabWidth` rather than as one column.
+
+```csharp
+public static bool OpensABlock(string? line)
+```
+
+True for a line whose last character before any comment is `:`, which is how every block in the language opens: `effect:`, `move "Swipe":`, `on damaged:`.
+
+```csharp
+public static string Unit(int width)
+```
+
+One step of indentation: spaces, never a tab.
+
+```csharp
+public static string WithoutComment(string? line)
+```
+
+The part of a line before a `#` that is not inside a string. The highlighter reads a comment the same way, because a comment must not decide whether a block opens.
+
+```csharp
+public static string WithoutTabs(string? text)
+```
+
+The same text with every indenting tab replaced by the spaces it already stood for, so the file reads to the lexer exactly as it did before. A tab after the first non-blank character is left alone: inside a string it is part of the text.
+
+---
+
+## CantripProtocol
+
+```csharp
+public static class CantripProtocol
+```
+
+The names on the wire between the editor and a running game, and the shapes that travel on it. Engine-free on purpose: the interesting part is the batching, and that is worth testing without launching Godot.
+
+Godot's debugger channel is capped — a live 4.6.1 run reports 2048 queued messages and 32768 characters a second — so nothing here streams per event. The game keeps a ring buffer and the editor pulls batches with a cursor, which also means a slow editor cannot back the game up.
+
+### Fields and constants
+
+```csharp
+public const string BreakClear = "break_clear"
+```
+
+*Undocumented.*
+
+```csharp
+public const string BreakEvent = "break_event"
+```
+
+*Undocumented.*
+
+```csharp
+public const string BreakLine = "break_line"
+```
+
+*Undocumented.*
+
+```csharp
+public const string Capture = "cantrip"
+```
+
+The capture the game registers and the editor plugin claims.
+
+```csharp
+public const string Entities = "entities"
+```
+
+*Undocumented.*
+
+```csharp
+public const string Entity = "entity"
+```
+
+*Undocumented.*
+
+```csharp
+public const string EntityDetail = "entity_detail"
+```
+
+*Undocumented.*
+
+```csharp
+public const string EntityList = "entity_list"
+```
+
+*Undocumented.*
+
+```csharp
+public const string Execute = "execute"
+```
+
+*Undocumented.*
+
+```csharp
+public const string Failed = "failed"
+```
+
+*Undocumented.*
+
+```csharp
+public const string Hello = "hello"
+```
+
+*Undocumented.*
+
+```csharp
+public const string Pause = "pause"
+```
+
+*Undocumented.*
+
+```csharp
+public const string Ran = "ran"
+```
+
+*Undocumented.*
+
+```csharp
+public const string Reload = "reload"
+```
+
+*Undocumented.*
+
+```csharp
+public const string Reloaded = "reloaded"
+```
+
+*Undocumented.*
+
+```csharp
+public const string Resume = "resume"
+```
+
+*Undocumented.*
+
+```csharp
+public const string Step = "step"
+```
+
+*Undocumented.*
+
+```csharp
+public const string StepState = "step_state"
+```
+
+*Undocumented.*
+
+```csharp
+public const string Trace = "trace"
+```
+
+*Undocumented.*
+
+```csharp
+public const string TraceEnable = "trace_enable"
+```
+
+*Undocumented.*
+
+```csharp
+public const string TraceFetch = "trace_fetch"
+```
+
+*Undocumented.*
+
+```csharp
+public const int Version = 1
+```
+
+Bumped when a shape changes, so an editor and a game of different ages can say so.
+
+```csharp
+public const string Welcome = "welcome"
+```
+
+*Undocumented.*
+
+### Methods
+
+```csharp
+public static string Message(string name)
+```
+
+The full message name, as both sides send it: `cantrip:trace`.
+
+```csharp
+public static bool TryName(string? message, out string name)
+```
+
+The bare name of a message addressed to this capture. Godot hands a capture its messages with the prefix already stripped in one direction and intact in the other, so this accepts either rather than making the caller care.
+
+---
+
+## CantripReloadResult
+
+```csharp
+public sealed class CantripReloadResult
+```
+
+What came of reloading content into a running game.
+
+### Properties
+
+```csharp
+public bool Applied { get; }
+```
+
+False when the new content has errors. The files are loaded either way, so the editor can show what is wrong, but nothing live is rebound: a designer saving a half-written file mid-battle should not have it applied.
+
+```csharp
+public IReadOnlyList<Diagnostic> Diagnostics { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public IReadOnlyList<string> Missing { get; }
+```
+
+Definitions live entities still use that the reloaded content no longer has.
+
+```csharp
+public int Rebound { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public bool RulesetChanged { get; }
+```
+
+The ruleset changed; a running game keeps the rules it started with.
+
+### Methods
+
+```csharp
+public override string ToString()
+```
+
+*Undocumented.*
 
 ---
 
@@ -828,6 +1523,945 @@ One resolved event, as a dictionary with snake_case keys. It arrives *after* the
 
 ---
 
+## CantripStepState
+
+```csharp
+public sealed class CantripStepState
+```
+
+Where a game stands for a debugger: what is being held, and what would run next.
+
+### Properties
+
+```csharp
+public int Breakpoints { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string Event { get; }
+```
+
+The event that queued it, empty for the engine's own follow-up work.
+
+```csharp
+public string Message { get; }
+```
+
+Why the last request did nothing, ready to show. Empty when it did something.
+
+```csharp
+public string Next { get; }
+```
+
+How the next trigger reads, or empty when nothing is waiting.
+
+```csharp
+public bool Paused { get; }
+```
+
+Whether the queue is held: nothing resolves except one step at a time.
+
+```csharp
+public int Pending { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public SourceSpan Span { get; }
+```
+
+The line of content behind the next trigger, for the editor to open.
+
+```csharp
+public bool Steppable { get; }
+```
+
+False when the ruleset resolves triggers as they are raised, so nothing ever queues and there is nothing a debugger could step through.
+
+### Methods
+
+```csharp
+public override string ToString()
+```
+
+*Undocumented.*
+
+---
+
+## ChoiceAnswer
+
+```csharp
+public sealed class ChoiceAnswer
+```
+
+The verdict on one answer from the UI, and the ids to pass on when it is good.
+
+### Properties
+
+```csharp
+public bool Accepted { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public IReadOnlyList<int> EntityIds { get; }
+```
+
+The ids to hand to `CardRuntime.Answer`, in the order they were given. For an offer of content they are positions in `PendingChoice.Definitions` instead.
+
+```csharp
+public string Message { get; }
+```
+
+Why it was rejected, ready to show or log. Empty when accepted.
+
+```csharp
+public ChoiceRejection Reason { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string ReasonName { get; }
+```
+
+The rejection as a snake_case word, for the dictionary that crosses into script.
+
+### Methods
+
+```csharp
+public static string NameOf(ChoiceRejection reason)
+```
+
+The word script is given for each rejection. Written out rather than made from the member's name, because a game's script compares against these words: renaming a member must not quietly change one.
+
+```csharp
+public override string ToString()
+```
+
+*Undocumented.*
+
+---
+
+## ChoiceBridge
+
+```csharp
+public sealed class ChoiceBridge
+```
+
+Gives the core's `PendingChoice` an identity, so a late answer cannot be applied to the wrong question.
+
+Answering a choice replays the action, which may immediately ask something else: a card that exhausts two cards asks twice, and both questions look alike from GDScript. A button press that arrives a frame after the first question was answered would otherwise be read as the answer to the second. Each question therefore gets a number that is never reused, and an answer carrying any other number is refused.
+
+### Properties
+
+```csharp
+public PendingChoice? Current { get; private set; }
+```
+
+The choice the runtime is waiting on, or null.
+
+```csharp
+public int CurrentId { get; private set; }
+```
+
+The id of `ChoiceBridge.Current`; 0 when nothing is pending.
+
+```csharp
+public bool IsPending { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public IReadOnlyList<int> OptionIds { get; }
+```
+
+Ids of the options, snapshotted when the request opened.
+
+### Methods
+
+```csharp
+public void Close()
+```
+
+Forgets the pending request, whether it was answered or abandoned. The next question gets a new id, so answers to this one stop being accepted from here on.
+
+```csharp
+public static int OfferId(int position)
+```
+
+The option id of the candidate at `position` in an offer: its place, counted from 1.
+
+From 1 and not from 0 because 0 is "no entity" everywhere else an id crosses. Answer code that filters 0 out, which is the obvious thing to write, used to drop the first candidate of every offer and say nothing.
+
+```csharp
+public static int OfferPosition(int optionId)
+```
+
+The place in `PendingChoice.Definitions` that an offer's option id names.
+
+```csharp
+public int Open(PendingChoice choice)
+```
+
+Gives a pending choice its id, or returns the id it already has. Re-opening the same choice is deliberately free, so a node may call this after every action without churning ids the UI is holding.
+
+```csharp
+public int Sync(PendingChoice? pending)
+```
+
+Follows `CardRuntime.Pending`: opens a new request, keeps the current one, or closes it when the runtime has nothing to ask. Returns the current id, or 0.
+
+```csharp
+public ChoiceAnswer Validate(int requestId, IReadOnlyList<int>? entityIds)
+```
+
+Checks an answer from the UI against the question actually pending. It changes nothing: the caller passes the accepted ids to the runtime and then syncs, so a runtime that throws does not leave the bridge believing the choice is gone.
+
+---
+
+## ChoiceRejection
+
+```csharp
+public enum ChoiceRejection
+```
+
+Why an answer was not passed on to the runtime.
+
+| Member | |
+|---|---|
+| `None = 0` | *Undocumented.* |
+| `NothingPending = 1` | Nothing is waiting to be answered. |
+| `StaleRequest = 2` | The answer is to a question that has already been answered or cancelled. |
+| `UnknownOption = 3` | An entity that was not among the options. |
+| `DuplicateOption = 4` | The same option twice. |
+| `TooFew = 5` | Fewer options than the content asked for. |
+| `TooMany = 6` | More options than the content allows. |
+
+---
+
+## ContentPaths
+
+```csharp
+public static class ContentPaths
+```
+
+The path rules the adapter needs on both sides of the engine boundary: which files are content, what order they load in, and whether a path is something the engine owns.
+
+This lives in `shared/` and names no engine type, so the rules can be tested without starting Godot. That matters more than it sounds: load order decides listener order, and a determinism bug that only reproduces inside the editor is a bad afternoon.
+
+### Fields and constants
+
+```csharp
+public const string Extension = ".cantrip"
+```
+
+The extension the importer claims, with its dot.
+
+```csharp
+public const string ResourceScheme = "res://"
+```
+
+Everything shipped with the game, read-only once exported.
+
+```csharp
+public const string UserScheme = "user://"
+```
+
+The writable per-user folder, which is where mods and generated content live.
+
+### Methods
+
+```csharp
+public static string Combine(string? folder, string? name)
+```
+
+Joins a folder and an entry without doubling or dropping the separator.
+
+```csharp
+public static int Compare(string? left, string? right)
+```
+
+Ordering for content loading: ordinal, because the engine's determinism rests on every machine loading the same files in the same order, and culture-aware comparison does not promise that.
+
+```csharp
+public static string ImportMarkerOf(string path)
+```
+
+The `.import` sidecar the editor writes next to an imported source file.
+
+```csharp
+public static bool IsContentFile(string? path)
+```
+
+True for a DSL source file, whatever the case of its extension.
+
+```csharp
+public static bool IsEnginePath(string? path)
+```
+
+True for a path the engine resolves itself. Anything else is an operating-system path, which an exported game cannot use to reach its own content.
+
+```csharp
+public static bool IsMarker(string? path)
+```
+
+True when the path is one of Godot's sidecars rather than a file to read.
+
+```csharp
+public static bool IsResourcePath(string? path)
+```
+
+*Undocumented.*
+
+```csharp
+public static bool IsUserPath(string? path)
+```
+
+*Undocumented.*
+
+```csharp
+public static bool Matches(string? path, string? filter)
+```
+
+One glob, with `*` and `?`, matched the way Godot's `matchn` does.
+
+```csharp
+public static bool MatchesFilters(string? path, string? filters)
+```
+
+Whether a path is covered by one of Godot's export filter lists, such as `"*.cantrip, data/*.json"`. The engine matches these against the path relative to `res://`, case-insensitively, with `*` spanning folder separators, so this does the same: a check that disagrees with the exporter would be worse than no check.
+
+```csharp
+public static IReadOnlyList<string> Ordered(IEnumerable<string>? paths)
+```
+
+The given paths, de-duplicated and sorted ordinally. Empty entries are dropped rather than reported: a manifest with a blank line is not worth an error.
+
+```csharp
+public static string StripMarker(string? path)
+```
+
+Strips a single `.import` or `.remap` suffix. An exported project lists `cards.cantrip.remap` where the editor lists `cards.cantrip`, and both mean the same resource.
+
+```csharp
+public static string WithoutScheme(string? path)
+```
+
+The path with its engine scheme removed, which is what export filters match.
+
+---
+
+## DescriptionView
+
+```csharp
+public sealed class DescriptionView
+```
+
+A description ready for a label: the plain text, the same text as BBCode, the segments behind it, and the keywords it relies on.
+
+The BBCode is generated here, in the engine-free layer, because it is only string building and this is where it can be tested. A game that wants its own colours reads `DescriptionView.Segments` instead and renders them itself.
+
+### Fields and constants
+
+```csharp
+public const string BuffedColour = "#6fcf6f"
+```
+
+Green for better than printed, red for worse: the usual card-game convention.
+
+```csharp
+public const string DebuffedColour = "#e06c6c"
+```
+
+*Undocumented.*
+
+### Properties
+
+```csharp
+public string Against { get; }
+```
+
+Who this is aimed at, by name: the member an enemy is telegraphing against. Empty for everything that has no target of its own, which is every description but a rolled intent.
+
+```csharp
+public string BBCode { get; }
+```
+
+The text with changed values struck through and coloured, for a RichTextLabel.
+
+```csharp
+public SegmentView? Cost { get; }
+```
+
+The card's cost as a live value, or null when the entity has no cost.
+
+```csharp
+public string Flavour { get; }
+```
+
+The flavour line, never mixed into the rules text. Empty when there is none.
+
+```csharp
+public bool IsEmpty { get; }
+```
+
+True when there is nothing to show, as for an intent before it has been rolled.
+
+```csharp
+public string Level { get; }
+```
+
+"auto", "custom" or "override": where the words came from.
+
+```csharp
+public string Line { get; }
+```
+
+The whole thing on one line, as an intent panel shows it: "Cutthroat → Vestal: Deal 8 damage and apply 2 Bleeding." For a card it is its name and its text.
+
+```csharp
+public string Name { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string Plain { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public IReadOnlyList<SegmentView> Segments { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public IReadOnlyList<TooltipView> Tooltips { get; }
+```
+
+*Undocumented.*
+
+### Methods
+
+```csharp
+public static DescriptionView Of(Description description, bool forOpponent = false)
+```
+
+*Undocumented.*
+
+**Parameters.**
+
+- `forOpponent` — True for an effect the other side owns, such as an enemy's intent: the buffed and debuffed senses are inverted, because a bigger number coming at you is not an improvement.
+
+```csharp
+public override string ToString()
+```
+
+*Undocumented.*
+
+---
+
+## EntityDetail
+
+```csharp
+public sealed class EntityDetail
+```
+
+Everything about one live entity: what it is, what it is worth now against what it started with, and every rule currently attached to it.
+
+The point of showing base beside current is that a modifier is invisible in a single number. An enemy with 6 attack tells a designer nothing; 4 becoming 6, next to the `modify` line doing it and the file it lives in, answers the question they actually had.
+
+### Properties
+
+```csharp
+public bool Active { get; }
+```
+
+Whether its rules are live. An inactive entity keeps its listeners in content but hears nothing: a card in the draw pile, a status on a dead actor.
+
+```csharp
+public IReadOnlyDictionary<string, int> BaseStats { get; }
+```
+
+Stats before modifiers, against `EntityView.Stats` after them.
+
+```csharp
+public string Definition { get; }
+```
+
+The content it came from, as `card "Ember"`, or empty for the player.
+
+```csharp
+public EntityView Entity { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public IReadOnlyList<ListenerView> Listeners { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public IReadOnlyList<ModifierView> Modifiers { get; }
+```
+
+*Undocumented.*
+
+### Methods
+
+```csharp
+public static EntityDetail Of(Entity entity)
+```
+
+*Undocumented.*
+
+```csharp
+public override string ToString()
+```
+
+*Undocumented.*
+
+---
+
+## EntityView
+
+```csharp
+public sealed class EntityView
+```
+
+Everything a game shows about one entity, as plain data: no engine types, no live references, and every identity an `Int32`.
+
+This is where the boundary is drawn. Handing script a live `Entity` would let a UI mutate the rules state between two frames of an animation; handing it a number cannot. The mapping lives here rather than in the Godot layer so that it can be tested against a real game with no engine running, which is also why nothing in this file names the engine.
+
+Stats are read through the modifier pipeline, so they are what the rules would use now, not the printed values.
+
+### Properties
+
+```csharp
+public IReadOnlyList<int> Abilities { get; }
+```
+
+Ids of attached abilities, which a real-time game needs to fire them.
+
+```csharp
+public bool Acted { get; }
+```
+
+True when this combatant has already taken its step this round. False for anything that is not in the turn order, and for a view read without a live game beside it.
+
+```csharp
+public bool Alive { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public bool Dead { get; }
+```
+
+Dead but not yet gone. Both this and `EntityView.Alive` are carried because a corpse still on the board is neither alive nor absent, and a UI usually draws it differently.
+
+```csharp
+public int Id { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string Intent { get; }
+```
+
+The move this enemy will make next, or empty before intents are rolled.
+
+```csharp
+public string Kind { get; }
+```
+
+Lower-case `EntityKind`: actor, card, status, relic, ability, keyword, item, global.
+
+```csharp
+public int Lane { get; }
+```
+
+Slot across the board. Zero on a one-lane board, and for anything not on it.
+
+```csharp
+public string Name { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public int Owner { get; }
+```
+
+The entity this one belongs to: a card's actor, a status's host. Zero for none.
+
+```csharp
+public bool PartyMember { get; }
+```
+
+True for an actor the game is asked for input for: the leader and the heroes beside it. A summoned minion is an ally and not a member, which is what decides whether it takes a step of its own and whether the battle is lost when it falls.
+
+```csharp
+public int Position { get; }
+```
+
+What `EntityView.Rank` was called before a board had two axes. The same number.
+
+```csharp
+public int Rank { get; }
+```
+
+Slot along the facing axis, which together with `EntityView.Lane` is where this actor stands and what adjacency reads. Zero for anything not on the board.
+
+```csharp
+public bool Removed { get; }
+```
+
+Out of the game entirely. A view of a removed entity is still valid to read.
+
+```csharp
+public int Source { get; }
+```
+
+Whoever applied or created it, which is what `source:` filters compare. Zero for none.
+
+```csharp
+public IReadOnlyDictionary<string, int> Stats { get; }
+```
+
+Current stats, after modifiers, ordinally keyed.
+
+```csharp
+public IReadOnlyList<StatusView> Statuses { get; }
+```
+
+Attached statuses and keywords, in application order. Hidden ones are included and flagged.
+
+```csharp
+public IReadOnlyList<string> Tags { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string Team { get; }
+```
+
+Lower-case side: neutral, player or enemy.
+
+```csharp
+public string Zone { get; }
+```
+
+Where it lives: board, hand, draw, discard, exhaust, play, powers, relics, attached, dead, or empty.
+
+### Methods
+
+```csharp
+public static EntityView Of(Entity entity, IReadOnlyList<string>? stats = null, GameState? state = null)
+```
+
+Reads a live entity.
+
+**Parameters.**
+
+- `stats` — Which stats to read, or null for every stat the entity has. A game that shows three bars per actor passes those three: each stat read runs the modifier pipeline.
+- `state` — The live game, for the one fact an entity does not carry on its own: whether it has taken its step this round. Null leaves `EntityView.Acted` false.
+
+```csharp
+public override string ToString()
+```
+
+*Undocumented.*
+
+---
+
+## EventBuffer
+
+```csharp
+public sealed class EventBuffer
+```
+
+Holds the events of one action until it has finished resolving.
+
+The core calls `IEffectHost.OnEvent` from inside `Raise`, with the interpreter half way through an action. Emitting a signal there would let a handler play another card and re-enter an interpreter that is not re-entrant. So the host only appends here, and the runtime node drains to signals after the top-level call has returned.
+
+Rolled-back attempts need no filtering: the core buffers host notifications for an attempt of its own accord and drops them if the action is abandoned, so nothing that did not happen ever reaches `EventBuffer.Add(GameEvent, GameState, IReadOnlyList<string>)`. `EventBuffer.Discard` is for the adapter's own error paths.
+
+### Fields and constants
+
+```csharp
+public static readonly IReadOnlyList<string> DefaultTrackedStats
+```
+
+What a card game shows next to every actor, and so what is worth snapshotting.
+
+### Properties
+
+```csharp
+public int Capacity { get; set; }
+```
+
+How many records may wait at once, or 0 for no limit. A game that never drains would otherwise grow without bound.
+
+```csharp
+public int Count { get; }
+```
+
+Records waiting to be drained.
+
+```csharp
+public bool Draining { get; private set; }
+```
+
+True while `EventBuffer.Drain(Action<EventRecord>)` is delivering, which is when a sink must not re-enter.
+
+```csharp
+public long Dropped { get; private set; }
+```
+
+Records lost to `EventBuffer.Capacity`. Presentation this far behind can never catch up, so the oldest go first and the game keeps animating towards the state it is actually in.
+
+```csharp
+public long LastSequence { get; }
+```
+
+The sequence number of the last recorded event; 0 before the first.
+
+```csharp
+public IReadOnlyCollection<string> Masked { get; }
+```
+
+Names never recorded, whatever the watch list says.
+
+```csharp
+public IReadOnlyCollection<string> Watched { get; }
+```
+
+Names the game presents. Empty means every name that is not masked.
+
+### Methods
+
+```csharp
+public void Add(GameEvent gameEvent, GameState state, IReadOnlyList<string>? trackedStats = null)
+```
+
+Records one resolved event, snapshotting the tracked stats of everyone it involved.
+
+**Parameters.**
+
+- `trackedStats` — Null for `EventBuffer.DefaultTrackedStats`.
+
+Reading a stat here runs the modifier pipeline, which is a pure evaluation the interpreter itself performs constantly during resolution. Nothing in this method queues work, raises an event or calls back into the runtime, which is the one rule the host side of the adapter has to keep.
+
+```csharp
+public void ClearFilters()
+```
+
+Back to recording everything.
+
+```csharp
+public void Discard()
+```
+
+Throws away everything waiting. For the adapter's own error paths, where an action failed and its half-told story must not be animated.
+
+```csharp
+public void Drain(Action<EventRecord> sink)
+```
+
+Hands every waiting record to `sink`, oldest first, and empties the buffer. Anything recorded while it runs waits for the next drain, so a sink that causes more events cannot spin here for ever.
+
+```csharp
+public bool IsRecorded(string? name)
+```
+
+Whether an event of this name would be kept.
+
+```csharp
+public void Mask(params string[] names)
+```
+
+Never record these event names, however noisy the content that raises them.
+
+```csharp
+public void Reset()
+```
+
+Forgets the dropped count as well as the records, for a fresh game.
+
+```csharp
+public void Unmask(params string[] names)
+```
+
+*Undocumented.*
+
+```csharp
+public void Unwatch(params string[] names)
+```
+
+*Undocumented.*
+
+```csharp
+public void Watch(params string[] names)
+```
+
+Records only these event names from now on. A real-time game raising events every tick wants this: a snapshot it never presents is pure allocation.
+
+---
+
+## EventRecord
+
+```csharp
+public sealed class EventRecord
+```
+
+One resolved event, as the game will present it: what happened, to whom, and what the numbers were at that instant.
+
+The stat snapshot is why this type exists at all. `IEffectHost.OnEvent` fires in the middle of resolution, but an animation plays long after the whole action has finished, by which time the live entities show only its end state. A card that hits twice would otherwise play two hits against the same final hp.
+
+Identities are kept as ids and numbers are copied. An entity's id never changes, so it can be resolved safely whenever the animation gets round to it; its stats change with every line of content that runs, so they are taken now or not at all.
+
+### Constructors
+
+```csharp
+public EventRecord(long sequence, string name, EventPhase phase, long time, int source, int target, int card, Num amount, bool replaced = false, IReadOnlyList<string>? tags = null, IReadOnlyDictionary<string, Value>? values = null, IReadOnlyDictionary<int, IReadOnlyDictionary<string, int>>? after = null)
+```
+
+*Undocumented.*
+
+### Properties
+
+```csharp
+public IReadOnlyDictionary<int, IReadOnlyDictionary<string, int>> After { get; }
+```
+
+Tracked stats of the event's participants as they stood when it fired, keyed by entity id then stat name.
+
+```csharp
+public Num Amount { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public int AmountInt { get; }
+```
+
+The amount rounded, which is what damage numbers and counters show.
+
+```csharp
+public double AmountRaw { get; }
+```
+
+The unrounded amount, for anything that scales an animation by it.
+
+```csharp
+public int Card { get; }
+```
+
+Entity id of the card involved, or 0.
+
+```csharp
+public string Name { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public EventPhase Phase { get; }
+```
+
+Always `EventPhase.After` for a buffered event: the host is notified once an event has fully resolved. It is carried explicitly rather than read back off the event, because `GameEvent.Phase` is only written while listeners are being dispatched and so still reads "before" for any event nobody listened to.
+
+```csharp
+public string PhaseName { get; }
+```
+
+Lower-case phase name, for the dictionary that crosses into GDScript.
+
+```csharp
+public bool Replaced { get; }
+```
+
+True when an `instead` listener ran in place of the default action.
+
+```csharp
+public long Sequence { get; }
+```
+
+Position in the run of events, rising by one per recorded event. Never reused.
+
+```csharp
+public int Source { get; }
+```
+
+Entity id of whoever caused it, or 0.
+
+```csharp
+public IReadOnlyList<string> Tags { get; }
+```
+
+The event's type tags, ordinal-sorted so two runs of the same game agree.
+
+```csharp
+public int Target { get; }
+```
+
+Entity id of whoever it happened to, or 0.
+
+```csharp
+public long Time { get; }
+```
+
+The clock when the event resolved: turns for a turn game, ticks for a real-time one.
+
+```csharp
+public IReadOnlyDictionary<string, Value> Values { get; }
+```
+
+Whatever the verb exposed as `event.<name>`, copied at the time.
+
+### Methods
+
+```csharp
+public int StatOf(int entityId, string stat, int fallback = 0)
+```
+
+The snapshotted stat, or `fallback` when it was not tracked.
+
+```csharp
+public IReadOnlyDictionary<string, int> StatsOf(int entityId)
+```
+
+The snapshot for one entity, or an empty map when it took no part in the event.
+
+```csharp
+public override string ToString()
+```
+
+*Undocumented.*
+
+```csharp
+public bool TryGetStat(int entityId, string stat, out int value)
+```
+
+*Undocumented.*
+
+---
+
 ## GodotContentLoader
 
 ```csharp
@@ -1062,6 +2696,578 @@ A rules value as a Variant, for handing to a game Callable.
 
 ---
 
+## ListenerView
+
+```csharp
+public sealed class ListenerView
+```
+
+One registered `on ...:` block, as an inspector shows it.
+
+### Properties
+
+```csharp
+public int Column { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string Event { get; }
+```
+
+The event it hears, without its phase or scope: `damaged`.
+
+```csharp
+public string File { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public int Id { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string Limit { get; }
+```
+
+none, turn, battle, run or chain.
+
+```csharp
+public int Line { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string Phase { get; }
+```
+
+before, instead or after.
+
+```csharp
+public int Priority { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string Scope { get; }
+```
+
+The dotted prefix, as in `owner` of `owner.damaged`. Empty when unscoped.
+
+```csharp
+public string Text { get; }
+```
+
+How it reads in content, filter and all: `on owner.damaged(tag:fire)`.
+
+### Methods
+
+```csharp
+public static ListenerView Of(Listener listener)
+```
+
+*Undocumented.*
+
+```csharp
+public override string ToString()
+```
+
+*Undocumented.*
+
+---
+
+## ModifierView
+
+```csharp
+public sealed class ModifierView
+```
+
+One active `modify` line, as an inspector shows it.
+
+### Properties
+
+```csharp
+public string Amount { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string Channel { get; }
+```
+
+damage, damage_taken, block, cost, or any stat.
+
+```csharp
+public int Column { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string File { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public int Id { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string Layer { get; }
+```
+
+add, multiply, clamp or override: which pass of the pipeline it belongs to.
+
+```csharp
+public int Line { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string Scope { get; }
+```
+
+What it applies to, when the line says `of ...`. Empty for the default scope.
+
+```csharp
+public string Text { get; }
+```
+
+How it reads in content: `modify damage where tag:fire: x1.5`.
+
+### Methods
+
+```csharp
+public static ModifierView Of(Modifier modifier)
+```
+
+*Undocumented.*
+
+```csharp
+public override string ToString()
+```
+
+*Undocumented.*
+
+---
+
+## SaveCheck
+
+```csharp
+public sealed class SaveCheck
+```
+
+The verdict on one save file.
+
+### Properties
+
+```csharp
+public bool Accepted { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string Message { get; }
+```
+
+Why it was refused, ready to show. Empty when accepted.
+
+```csharp
+public SaveRejection Reason { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string ReasonName { get; }
+```
+
+The rejection as a snake_case word, for the dictionary that crosses into script.
+
+### Methods
+
+```csharp
+public static string NameOf(SaveRejection reason)
+```
+
+The word script is given for each rejection, written out for the same reason as `ChoiceAnswer.NameOf(ChoiceRejection)`: renaming a member must not quietly change one.
+
+```csharp
+public override string ToString()
+```
+
+*Undocumented.*
+
+---
+
+## SaveEnvelope
+
+```csharp
+public sealed class SaveEnvelope
+```
+
+What a save file carries besides the snapshot itself: which addon wrote it, and which content it was taken against.
+
+The fingerprint covers the kinds and names of every definition, content verb and resource, and nothing else, so rebalancing a card leaves it as it was, while adding, renaming or deleting a definition changes it. Comparing it with `ContentLibrary.Fingerprint` says "this save is from before a patch" before the snapshot is even read.
+
+A mismatch is not a verdict on the save. A patch that only adds a card changes the fingerprint, and the save still has everything it needs. `CardRuntime.Restore` looks up what the snapshot needs, the definitions it names and any `next turn:` or `in N turns:` block waiting in it, and refuses by throwing, before it changes anything, when one has gone. So the node lets a mismatched save through to the restore, and reports the restore's refusal as `SaveRejection.ContentChanged`; only a wrong format and a missing payload are refused here.
+
+### Constructors
+
+```csharp
+public SaveEnvelope(int format, string? fingerprint, string? payload)
+```
+
+*Undocumented.*
+
+### Fields and constants
+
+```csharp
+public static readonly int CurrentFormat
+```
+
+The envelope's own version, separate from the core's snapshot format. Like that one it only ever increases, and this addon reads every envelope up to its own: an older one is brought forward by `SaveEnvelope.Upgraded`, and only one from a newer addon, whose shape this addon cannot know, is refused.
+
+`static readonly` rather than `const` for the reason `GameSnapshot.CurrentFormat` gives: a `const` is baked into whatever reads it, and this addon's whole distribution model is a dll swapped into someone's project.
+
+### Properties
+
+```csharp
+public string Fingerprint { get; }
+```
+
+The `ContentLibrary.Fingerprint` the snapshot was taken against.
+
+```csharp
+public int Format { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string Payload { get; }
+```
+
+The serialized `GameSnapshot`. Opaque here: this layer never parses it.
+
+### Methods
+
+```csharp
+public SaveCheck Check(string? libraryFingerprint)
+```
+
+Whether this save was taken against content whose fingerprint is `libraryFingerprint`, in a format this addon reads and with a game in it. It decides nothing by itself: a mismatched fingerprint is a reason to let the restore check the save, which the node does, and the caller gets the core's own error if a definition the snapshot needs has really gone.
+
+```csharp
+public override string ToString()
+```
+
+*Undocumented.*
+
+```csharp
+public SaveEnvelope Upgraded()
+```
+
+This envelope in the format this addon writes, so that the rest of the load path only ever sees the current shape. It is itself when it is already current.
+
+Nothing moves here yet: format 1 is the only format there has been. The step exists because it is what keeps "a save made by any 1.x release loads in every later 1.x" true at the moment the number first changes. Refusing anything that is not exactly current keeps that promise only by never changing the number, and the number then stops describing the file. Each future format gets one step here, oldest first.
+
+```csharp
+public static SaveEnvelope Wrap(string fingerprint, string payload)
+```
+
+Seals a snapshot for saving.
+
+---
+
+## SaveRejection
+
+```csharp
+public enum SaveRejection
+```
+
+Why a save file was not restored.
+
+| Member | |
+|---|---|
+| `None = 0` | *Undocumented.* |
+| `WrongFormat = 1` | Written by a newer version of the addon than this one, which cannot know what is in it. An older version's save is not this: it is read, through `SaveEnvelope.Upgraded`. |
+| `NoPayload = 2` | The envelope carries no snapshot. |
+| `ContentChanged = 3` | The content loaded now is not the content the save was taken against. From `CantripRuntime.LoadSave`, it means the rules refused the save: something it needs has gone. |
+| `Resolving = 4` | Effects are still resolving, so a snapshot would hold half an action. Only `CantripRuntime.Save` answers with this; nothing loads a save in that moment. |
+| `ReloadPending = 5` | A `next turn:` or `in N turns:` block whose statements a reload has changed is still waiting to run, and a save can only name statements the loaded content still has. It passes once that block has run. Only `CantripRuntime.Save` answers with this. |
+| `ClockChanged = 6` | The save was written by a game whose clock ran at another rate than this one's, so every cooldown and every duration in it would mean a different length of time. It is not the content that changed: it is `CantripRuntime.TicksPerSecond`, or a turn-based game being handed a real-time save. Only `CantripRuntime.LoadSave` answers with this. |
+
+---
+
+## SegmentView
+
+```csharp
+public sealed class SegmentView
+```
+
+One run of a description: either words, or a number the rules produced.
+
+The printed value and the current one are both kept, which is the whole reason descriptions are segmented rather than rendered to a string. A card that reads "deal 6" while a relic makes it deal 9 has to show the 9, and a player who cannot see that something changed it will think the relic does nothing.
+
+### Properties
+
+```csharp
+public double Base { get; }
+```
+
+The printed value, before any modifier.
+
+```csharp
+public string BaseText { get; }
+```
+
+The printed value formatted, for a "~~6~~ 9" display.
+
+```csharp
+public bool Changed { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public double Current { get; }
+```
+
+The value the rules would use now.
+
+```csharp
+public bool HasNumber { get; }
+```
+
+False for symbolic values such as `X`, which have only their text.
+
+```csharp
+public string Kind { get; }
+```
+
+"text" or "value".
+
+```csharp
+public bool LowerIsBetter { get; }
+```
+
+True for costs, where a smaller number is the good direction.
+
+```csharp
+public string Placeholder { get; }
+```
+
+The effect value this is linked to (`damage`, `cost`...), or empty.
+
+```csharp
+public string Text { get; }
+```
+
+What to show: the words, or the current value already formatted.
+
+```csharp
+public string Trend { get; }
+```
+
+"unchanged", "buffed" or "debuffed", from the player's point of view.
+
+### Methods
+
+```csharp
+public static SegmentView Of(DescriptionSegment segment, bool forOpponent = false)
+```
+
+*Undocumented.*
+
+**Parameters.**
+
+- `forOpponent` — True when the effect belongs to the other side, as an enemy's intent does. The rules compute a trend for whoever owns the effect, so an enemy hitting harder is "buffed" to the enemy; a player reading their intent panel needs to see that as worse for them.
+
+```csharp
+public override string ToString()
+```
+
+*Undocumented.*
+
+---
+
+## StatusView
+
+```csharp
+public sealed class StatusView
+```
+
+One status or keyword on an entity, as a status bar shows it.
+
+Both counters are carried because they answer different questions and a UI needs the right one. `StatusView.Stacks` is the intensity: five stacks of Poison deal five damage. `StatusView.Counter` is the number the status is named by and removed at, which for a duration status is its remaining turns and for an intensity status is its stacks again. A bar that always showed stacks would print "1" on a Vulnerable that has two turns to run.
+
+### Properties
+
+```csharp
+public int Counter { get; }
+```
+
+The number the content means by the status's own name, and the one it is removed at: `StatusView.Duration` for duration and refresh stacking, `StatusView.Stacks` otherwise. Summed over instances this is `Entity.CounterOf`.
+
+```csharp
+public int Duration { get; }
+```
+
+Remaining duration; zero for a status that has no timer.
+
+```csharp
+public bool Hidden { get; }
+```
+
+True for `flags hidden`: rules the game runs but does not advertise, such as a tutorial marker. A status bar leaves these out; a debug view still wants them.
+
+```csharp
+public int Id { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string Name { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public int Stacks { get; }
+```
+
+Intensity, as `Entity.StacksOf` sums it. One for most duration statuses.
+
+```csharp
+public IReadOnlyList<string> Tags { get; }
+```
+
+The status's tags, ordinally sorted so two runs agree.
+
+### Methods
+
+```csharp
+public static StatusView Of(Entity status)
+```
+
+Reads one live status entity. Values go through the modifier pipeline.
+
+```csharp
+public override string ToString()
+```
+
+*Undocumented.*
+
+---
+
+## TickAccumulator
+
+```csharp
+public sealed class TickAccumulator
+```
+
+Turns physics frames into whole simulation ticks.
+
+The core's `TickClock` only ever advances in whole units, and the engine's physics step is fixed, so the conversion is an integer ratio: each frame adds `TickAccumulator.TicksPerSecond` to a counter and a tick comes out every `TickAccumulator.FramesPerSecond`. Fifty ticks a second on a sixty hertz step is then exactly fifty ticks every sixty frames, for ever, with no floating-point remainder to drift.
+
+The frame's delta is deliberately ignored. A fixed step is fixed by definition, and using the measured delta instead would make the simulation depend on how long the last frame happened to take, which is the one thing a deterministic engine must not do.
+
+### Constructors
+
+```csharp
+public TickAccumulator(int ticksPerSecond = 60, int framesPerSecond = 60, int maxCatchUp = 8)
+```
+
+*Undocumented.*
+
+### Fields and constants
+
+```csharp
+public const int DefaultMaxCatchUp = 8
+```
+
+Ticks a single frame may run at most. Beyond this the simulation skips time.
+
+### Properties
+
+```csharp
+public long Dropped { get; private set; }
+```
+
+Ticks skipped by `TickAccumulator.MaxCatchUp`, which is how much time the game lost.
+
+```csharp
+public int FramesPerSecond { get; private set; }
+```
+
+*Undocumented.*
+
+```csharp
+public int MaxCatchUp { get; set; }
+```
+
+The most ticks one `TickAccumulator.Advance` may return, or 0 for no cap. After a stall the ticks beyond it are abandoned rather than owed: a game that tried to repay them would spend every later frame further behind.
+
+```csharp
+public int Remainder { get; }
+```
+
+The part of a tick carried to the next frame, in frame units.
+
+```csharp
+public int TicksPerSecond { get; private set; }
+```
+
+*Undocumented.*
+
+```csharp
+public long TotalTicks { get; private set; }
+```
+
+Ticks this accumulator has handed out.
+
+### Methods
+
+```csharp
+public int Advance()
+```
+
+Whole ticks owed for one physics frame.
+
+```csharp
+public int Advance(int frames)
+```
+
+Whole ticks owed for `frames` physics frames.
+
+```csharp
+public void Configure(int ticksPerSecond, int framesPerSecond)
+```
+
+Changes the ratio, as when the engine's physics rate changes. The same values are a no-op, so this is safe to call every frame; a real change clears the remainder, which measured the old ratio and means nothing in the new one.
+
+```csharp
+public void Reset()
+```
+
+Clears the remainder and the counters, for a new game or a restored save.
+
+---
+
 ## TickDriver
 
 ```csharp
@@ -1153,6 +3359,202 @@ public delegate TickDriver.TickedEventHandler : MulticastDelegate
 ```
 
 Whole ticks were run this frame.
+
+---
+
+## TooltipView
+
+```csharp
+public sealed class TooltipView
+```
+
+A keyword the text leans on, explained in its own right.
+
+### Properties
+
+```csharp
+public string BBCode { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string Name { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string Plain { get; }
+```
+
+*Undocumented.*
+
+### Methods
+
+```csharp
+public static TooltipView Of(KeywordTooltip tooltip)
+```
+
+*Undocumented.*
+
+```csharp
+public override string ToString()
+```
+
+*Undocumented.*
+
+---
+
+## TraceBatch
+
+```csharp
+public sealed class TraceBatch
+```
+
+A slice of the trace: what happened after the cursor the editor last saw, how much was dropped before it got there, and whether there is more waiting.
+
+### Fields and constants
+
+```csharp
+public const int DefaultMax = 200
+```
+
+Kept well inside the channel's queue limit, so one fetch cannot flood it.
+
+### Properties
+
+```csharp
+public long Dropped { get; }
+```
+
+How many entries the ring buffer discarded in total. A panel says "412 dropped" rather than showing a gap and implying the game did nothing.
+
+```csharp
+public IReadOnlyList<TraceDto> Entries { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public bool More { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public long NextId { get; }
+```
+
+The cursor to send with the next fetch.
+
+### Methods
+
+```csharp
+public static TraceBatch From(TraceLog log, long sinceId = 0, int max = 200)
+```
+
+Everything recorded after `sinceId`, up to `max`. Entries are handed out in the order they were recorded, and ids only ever rise, so the cursor is enough to resume — even across a buffer that trimmed itself in between.
+
+```csharp
+public override string ToString()
+```
+
+*Undocumented.*
+
+---
+
+## TraceDto
+
+```csharp
+public sealed class TraceDto
+```
+
+One recorded step, flattened for the wire.
+
+Everything a panel needs to draw a row and open the line behind it. Values arrive as text because `TraceEntry.Values` is a bag of objects: converting here, once, keeps the engine boundary from meeting a type it has no rule for while someone is mid-debug.
+
+### Properties
+
+```csharp
+public int Column { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string File { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public long Id { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string Kind { get; }
+```
+
+action, event, listener, verb, modifier, warning...
+
+```csharp
+public int Line { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string Listener { get; }
+```
+
+The listener that ran, when this step is a trigger.
+
+```csharp
+public long Parent { get; }
+```
+
+The step this one happened because of, or 0 for a root action.
+
+```csharp
+public string Source { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public string Text { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public long Time { get; }
+```
+
+*Undocumented.*
+
+```csharp
+public IReadOnlyDictionary<string, string> Values { get; }
+```
+
+*Undocumented.*
+
+### Methods
+
+```csharp
+public static TraceDto Of(TraceEntry entry)
+```
+
+*Undocumented.*
+
+```csharp
+public override string ToString()
+```
+
+*Undocumented.*
 
 ---
 
@@ -1341,4 +3743,66 @@ public Variant ToVariant(Value value)
 ```
 
 A rules value as a Variant. Entities become ids, so nothing a script receives holds an engine object.
+
+---
+
+## Words
+
+```csharp
+public static class Words
+```
+
+The word script is given for each member of a core enum.
+
+Written out rather than made by lower-casing the member's name, for the same reason as `ChoiceAnswer.NameOf(ChoiceRejection)` and `SaveCheck.NameOf(SaveRejection)`: a game's script compares against these words, so renaming a C# member must not quietly change one, and a member of two words must not arrive run together. Every table refuses a member it has no word for, because at 1.0 a wrong word is worse than a loud failure: a new member added later is a decision about the published surface, not something a fallback should make.
+
+### Methods
+
+```csharp
+public static string ActionName(ActionResult result)
+```
+
+How an action ended, as `Play`, `PlayNamed`, `UseAbility` and `AnswerChoice` answer. "pending" for `ActionResult.ChoicePending`, because what a game does with it is wait for the question, not read the member's name.
+
+```csharp
+public static string KindName(EntityKind kind)
+```
+
+What an entity is. Not the same vocabulary as a definition's kind; see docs/godot.md.
+
+```csharp
+public static string LayerName(ModifierLayer layer)
+```
+
+Which pass of the modifier pipeline a `modify` line belongs to.
+
+```csharp
+public static string LevelName(DescriptionLevel level)
+```
+
+Where a description's words came from.
+
+```csharp
+public static string LimitName(LimitScope limit)
+```
+
+How often a `once per` listener may fire.
+
+```csharp
+public static string PhaseName(EventPhase phase)
+```
+
+When a listener ran relative to the thing it heard.
+
+```csharp
+public static string SeverityName(DiagnosticSeverity severity)
+```
+
+How bad a diagnostic is, as `dotnet cantrip lint` also prints it.
+
+```csharp
+public static string TeamName(Team team)
+```
+
+Which side an entity is on.
 

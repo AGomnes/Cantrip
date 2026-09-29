@@ -1433,19 +1433,21 @@ Restoring a snapshot into a runtime with the same content and then feeding it th
 ### Fields and constants
 
 ```csharp
-public const int CurrentFormat = 3
+public static readonly int CurrentFormat
 ```
 
 The save format this build writes. It only ever increases, and a build reads every format up to its own: a save made by an earlier release loads here, brought forward by `GameSnapshot.Upgrade(GameSnapshot)`, and only a save that needs a reader this build is not is refused.
 
+`static readonly` rather than `const`, and deliberately: C# bakes a `const` into the assembly that reads it, so a game compiled against one release and given a newer Cantrip.Core — which is exactly what swapping the addon's dll does — would go on comparing saves against the number it was built with. The same goes for `GameSnapshot.CurrentMinimumReader` and `GameSnapshot.CurrentRng`.
+
 ```csharp
-public const int CurrentMinimumReader = 3
+public static readonly int CurrentMinimumReader
 ```
 
 The oldest reader a save this build writes can be given to, which a reader compares against its own `GameSnapshot.CurrentFormat`. It moves only when a change would make an older reader get the game wrong rather than merely miss something it never knew about, so that adding an optional field can bump `GameSnapshot.CurrentFormat` — saying honestly that the shape changed — without locking every earlier build out of the save.
 
 ```csharp
-public const string CurrentRng = "xoshiro256**"
+public static readonly string CurrentRng
 ```
 
 The generator behind `GameSnapshot.Rng` in a save this build writes. A save that names another one is refused rather than read as four meaningless numbers; an empty name is this one, which is what a save made before the name was recorded carries.
@@ -1504,7 +1506,15 @@ The board this battle is being fought on, by name. Empty in a save from before b
 public long ClockNow { get; set; }
 ```
 
-The clock's time in its own units. On a tick clock the rate is *not* saved, so a restore into a clock at another rate reinterprets every duration in the game.
+The clock's time in its own units, as `GameSnapshot.ClockUnitsPerSecond` measures them.
+
+```csharp
+public int ClockUnitsPerSecond { get; set; }
+```
+
+The rate `GameSnapshot.ClockNow` is counted at: `IGameClock.UnitsPerSecond` as it stood when the save was written. Zero for a turn clock, which has no rate, and in a save written before the rate was recorded.
+
+A restore refuses a save whose recorded rate is not the live clock's, because a tick is only a length of time while something says how many of them a second is: at half the rate every cooldown, every `for 3s` and every `on every 2s` in the restored game would run for twice as long, with nothing to show for it but a game that feels wrong. Zero is read as "not recorded" and checked against nothing, which is what keeps every save written before this field loading.
 
 ```csharp
 public List<EntitySnapshot> Entities { get; set; }
@@ -2023,6 +2033,14 @@ long Now { get; }
 
 The current time in this clock's own whole units: turns elapsed, or ticks elapsed. It starts at 0 and only ever goes up, so a duration is stored as the absolute time it ends at.
 
+```csharp
+virtual int UnitsPerSecond { get; }
+```
+
+How many of this clock's units make one second of game time, or 0 for a clock whose unit is not a length of real time at all — which is every turn clock, and the default here.
+
+It is what turns `3s` in content into a number of units, so it is saved with the game: `GameSnapshot.ClockUnitsPerSecond` records it and a restore refuses a save written at another rate, rather than silently reinterpreting every cooldown, every `for 3s` and every `on every 2s` in it. A clock that answers 0 both writes and accepts 0, so nothing changes for a turn-based game.
+
 ### Methods
 
 ```csharp
@@ -2324,12 +2342,18 @@ Who the enemy's telegraphed move is aimed at *now*: the target it rolled while t
 Recomputed on every ask rather than stored, so a taunt, a death or a swap changes the displayed target with no event for a UI to miss. The move's own re-check when it runs agrees with this by construction: both ask the same question of the same rule.
 
 ```csharp
-public bool IsTargetable(Entity candidate, Entity? source, Entity? card)
+public bool IsTargetable(Entity candidate, Entity? source, Entity? action)
 ```
 
 Whether one entity may be aimed at, over a base of 1: zero or less means "not this one". A card's target asks this, and so do an enemy's move and the `attack` verb, so that a taunt or a stealth means one thing wherever something is pointed at somebody.
 
-Area and random effects still resolve through the interpreter's own selectors, and do not ask: a taunt constrains what something may be pointed at, not what a blast reaches. The query carries the card when there is one, so a `where` on the group must say `it.` to mean the candidate; a bare `tag:` tests the card.
+**Parameters.**
+
+- `candidate` — Who is being pointed at.
+- `source` — Who is pointing, or null.
+- `action` — The card or ability being aimed, or null. Not `card`: an ability is aimed through here too, which is why `CardRuntime.LegalTargets(Entity)` is named as it is.
+
+Area and random effects still resolve through the interpreter's own selectors, and do not ask: a taunt constrains what something may be pointed at, not what a blast reaches. The query carries the action when there is one, so a `where` on the group must say `it.` to mean the candidate; a bare `tag:` tests the action.
 
 ```csharp
 public bool IsTrue(Value value, EvalContext context)
@@ -2450,10 +2474,16 @@ public void RollIntent(Entity enemy)
 Picks an enemy's next move from its pattern, so the UI can show intents in advance.
 
 ```csharp
-public IReadOnlyList<Entity> Targetable(IReadOnlyList<Entity> candidates, Entity? source, Entity? card)
+public IReadOnlyList<Entity> Targetable(IReadOnlyList<Entity> candidates, Entity? source, Entity? action)
 ```
 
 Those of a group that may be aimed at, in the group's own order.
+
+**Parameters.**
+
+- `candidates` — Who is being pointed at.
+- `source` — Who is pointing, or null.
+- `action` — The card or ability being aimed, or null; see `Interpreter.IsTargetable(Entity, Entity, Entity)`.
 
 ```csharp
 public void Transform(Entity entity, EntityDefinition definition, EvalContext context, SourceSpan span = default(SourceSpan))
@@ -3647,7 +3677,7 @@ A tick clock at a fixed rate. The rate is what turns `3s` in content into a numb
 
 **Parameters.**
 
-- `ticksPerSecond` — Ticks in one second of game time. It cannot be changed afterwards, and it is not part of a save: restoring into a clock running at another rate reinterprets every cooldown and every timed status in it.
+- `ticksPerSecond` — Ticks in one second of game time. It cannot be changed afterwards, and it is written into a save as `GameSnapshot.ClockUnitsPerSecond`: a restore into a clock running at another rate is refused rather than reinterpreting every cooldown and every timed status in it.
 
 **Throws.**
 
@@ -3666,6 +3696,12 @@ public int TicksPerSecond { get; }
 ```
 
 How many ticks a second is. A UI dividing `ready_at - Now` by this gets seconds, which is the one conversion the core cannot do for it.
+
+```csharp
+public int UnitsPerSecond { get; }
+```
+
+`TickClock.TicksPerSecond`, under the name a save and a restore compare it by. See `IGameClock.UnitsPerSecond`.
 
 ### Methods
 

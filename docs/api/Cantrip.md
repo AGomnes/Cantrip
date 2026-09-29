@@ -13,7 +13,6 @@ Part of [the API reference](README.md). The guides are [docs/csharp.md](../cshar
 | [`CardRuntime.ReloadReport`](#cardruntimereloadreport) | What `CardRuntime.ApplyContentChanges` did, for tools and logs. |
 | [`EntityKind`](#entitykind) | What an entity is. Everything in the game is an entity; this only affects defaults. |
 | [`EventPhase`](#eventphase) | The three phases every verb emits: before, instead and after. |
-| [`ExecutionMode`](#executionmode) | Pacing of the action queue — a setting the engine carries and does not act on. |
 | [`ModifierLayer`](#modifierlayer) | Fixed layers of the modifier pipeline. Values pass through them in the order the ruleset declares (add, multiply, clamp, override by default), which is what keeps a stack of modifiers from depending on the order they happened to be applied in. |
 | [`Num`](#num) | Fixed-point number used for every value the rules engine computes. |
 | [`Rng`](#rng) | Deterministic random number generator (xoshiro256** seeded through splitmix64). |
@@ -95,12 +94,6 @@ public ContentLibrary Content { get; }
 ```
 
 The library this runtime plays. It is the object that was handed in, not a copy, so loading further files into it and then calling `CardRuntime.ApplyContentChanges` is how hot reload works.
-
-```csharp
-public ExecutionMode Execution { get; set; }
-```
-
-The pacing this runtime was built with, settable at any time. **Nothing in the engine reads it.** Only the tree-walking interpreter exists and it always drains the queue, so a game that wants an animation between actions paces its own presentation; see `ExecutionMode`.
 
 ```csharp
 public IReadOnlyList<Entity> Fallen { get; }
@@ -293,16 +286,24 @@ public Num ChangeStat(Entity entity, string stat, long by)
 Adds to a stat, or takes away with a negative amount: content's `gain 2 gold` and `lose 3 gold`, from C#, with the same bounds, events and consequences.
 
 ```csharp
-public int CostOf(Entity card)
+public int CostOf(Entity action)
 ```
 
-The card's current cost after modifiers. An X cost spends everything the payer has of the resource the card is priced in.
+The action's current cost after modifiers. An X cost spends everything the payer has of the resource it is priced in.
+
+**Parameters.**
+
+- `action` — The card or ability; see `CardRuntime.IsXCost(Entity)` on the name.
 
 ```csharp
-public string CostResourceOf(Entity card)
+public string CostResourceOf(Entity action)
 ```
 
-The resource a card's cost is paid in: `energy`, or whatever its `cost` names.
+The resource an action's cost is paid in: `energy`, or whatever its `cost` names.
+
+**Parameters.**
+
+- `action` — The card or ability; see `CardRuntime.IsXCost(Entity)` on the name.
 
 ```csharp
 public Entity CreatePlayer(string name = "Player", int hp = 80, int maxEnergy = 3)
@@ -385,10 +386,14 @@ Whether an ability's cooldown has run out. True both when it has come back and w
 It answers the cooldown and nothing else. An ability whose actor is dead, or which has nothing legal to aim at, is still ready by this; `CardRuntime.CanUse(Entity)` is the question that takes those in too.
 
 ```csharp
-public bool IsXCost(Entity card)
+public bool IsXCost(Entity action)
 ```
 
-Whether this card's cost is `X`: it spends everything the actor has rather than a fixed amount. A UI has to ask, because such a card shows no number and is never refused for cost.
+Whether this action's cost is `X`: it spends everything the actor has rather than a fixed amount. A UI has to ask, because such a card shows no number and is never refused for cost.
+
+**Parameters.**
+
+- `action` — The card or ability. It is not called `card` because only a card has a cost today and this is the surface an ability's cost would arrive on, as `CardRuntime.LegalTargets(Entity)` is named for the same reason.
 
 ```csharp
 public IReadOnlyList<Entity> LegalTargets(Entity action)
@@ -639,23 +644,6 @@ The three phases every verb emits: before, instead and after.
 
 ---
 
-## ExecutionMode
-
-```csharp
-public enum ExecutionMode
-```
-
-Pacing of the action queue — a setting the engine carries and does not act on.
-
-Only the tree-walking interpreter exists in 1.0, and it always drains the queue. The value is kept on `RuntimeOptions.Execution` and `CardRuntime.Execution` so a game can record what it meant and a later release can honour it without a breaking change, but today the two modes run identically. A game that wants an animation between actions paces its own presentation from the events it hears.
-
-| Member | |
-|---|---|
-| `Headless = 0` | Drain the queue as fast as possible. What simulations and tests want, and what every runtime does. |
-| `Live = 1` | Yield between actions so presentation can keep up. Recorded, not yet honoured. |
-
----
-
 ## ModifierLayer
 
 ```csharp
@@ -869,7 +857,13 @@ The value in invariant culture, with trailing zeros trimmed, so `1.5` prints as 
 public string ToString(string? format, IFormatProvider? formatProvider)
 ```
 
-The `IFormattable` form, which **ignores `format`**: there is one representation of a `Num` and this is it, so `$"{damage:F2}"` gives the same text as `$"{damage}"`. A caller that wants a fixed number of decimals formats `Num.ToDouble` instead, having read what that costs.
+The `IFormattable` form. With no format, or `"G"`, it is the invariant, trailing-zero-trimmed text `Num.ToString` writes and `Num.Parse(string)` reads back. Any other standard or custom numeric format string is honoured, so `$"{damage:F2}"` gives `5.00` and `$"{chance:P0}"` gives a percentage.
+
+**Throws.**
+
+- `FormatException` — `format` is not a valid numeric format string.
+
+A format is applied to the exact value as a `Decimal`, never through `Num.ToDouble`: six decimal places in 64 bits fit a decimal exactly, so the text is the number rather than a rounding of it, and it is the same text on every machine. This is presentation only — nothing in the rules formats a number — so it is outside the determinism promise's reach either way.
 
 ```csharp
 public static bool TryParse(string text, out Num value)
@@ -990,10 +984,10 @@ How many words `Rng.GetState` gives and `Rng.SetState(ulong[])` wants.
 ### Properties
 
 ```csharp
-public ulong Seed { get; private set; }
+public ulong? Seed { get; private set; }
 ```
 
-The seed this generator was last started from — a label, not its position. It does not move as numbers are drawn and `Rng.SetState(ulong[])` does not change it, so `new Rng(saved.Seed)` rewinds to the beginning of the run rather than restoring where that generator had got to. `Rng.GetState` is what restores a generator.
+The seed this generator was started from, or `null` when it has none to name: after `Rng.SetState(ulong[])`, and in a generator built from four state words. It is a label rather than a position — it does not move as numbers are drawn — so `new Rng(rng.Seed.Value)` starts that stream again rather than continuing it. `Rng.GetState` is what saves a generator. It is nullable because a restored generator that still named its old seed offered a host a label that looks like a save and rewinds the run to its beginning when it is used as one.
 
 ### Methods
 
@@ -1061,7 +1055,7 @@ Throws away the current position and starts the stream this seed names, as the c
 public void SetState(ulong[] state)
 ```
 
-Restores what `Rng.GetState` gave. Anything but four words is refused.
+Restores what `Rng.GetState` gave, and clears `Rng.Seed`, which named a place this generator is no longer at. Anything but four words is refused.
 
 ```csharp
 public void Shuffle<T>(IList<T> items)
@@ -1094,12 +1088,6 @@ public IGameClock? Clock { get; set; }
 ```
 
 Defaults to a `TurnClock`. Pass a `TickClock` for real-time games.
-
-```csharp
-public ExecutionMode Execution { get; set; }
-```
-
-The pacing this runtime records. It is carried through to `CardRuntime.Execution` and nothing reads it yet; see `ExecutionMode`.
 
 ```csharp
 public IEffectHost? Host { get; set; }

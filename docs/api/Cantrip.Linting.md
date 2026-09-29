@@ -272,6 +272,14 @@ public const string UnknownTag = "CT303"
 Warning: a `tag:` test for a tag no definition has, so it never matches.
 
 ```csharp
+public const string UnknownTargetMode = "CT340"
+```
+
+Error: a `target` line naming a word that is not one of `enemy`, `ally`, `self`, `any` or `none`.
+
+The set is closed — nothing a game registers adds to it — and the engine falls through to "nobody" for anything else, quietly. So `target freind` loaded, linted and tested clean, and the card it was written on stopped asking for a target and stopped checking the one it was handed: it would deal its damage to the party's own leader, or to anything else a caller passed, for the whole life of the game. It is an error rather than a warning for the same reason CT326 is: the alternative is a silent wrong answer.
+
+```csharp
 public const string UnknownVerb = "CT301"
 ```
 

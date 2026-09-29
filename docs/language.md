@@ -155,7 +155,7 @@ card "Whirlwind"
 
 Everything that is pointed at somebody settles who that is the same way: a card, an [ability](#abilities-and-real-time), an enemy's move, and the [`attack`](#built-in-verbs) verb. A candidate has to pass all four of these, in this order:
 
-1. **Side, and alive.** What the `target` word names: `enemy`, `ally`, `self` or `any`.
+1. **Side, and alive.** What the `target` word names: `enemy`, `ally`, `self` or `any` — or `none`, for an action that is pointed at nobody. Those five are the whole list and nothing a game registers adds to it, so any other word is error **CT340**: outside the list the engine finds no side, asks for no target, and checks nothing against the one it is handed.
 2. **Reach.** The action's `range`, through the `range` modifier channel, measured against the [distance](#boards) between whoever is using it and the candidate. An action that prints no `range`, in a game with nothing on the channel, asks nothing and reaches everybody.
 3. **The action's own `where` filter**, if it has one.
 4. **The [`targetable`](#modifiers) channel**, which is how content adds rules from somewhere other than the action itself: a taunt, a stealth.
@@ -1624,6 +1624,7 @@ Codes with four digits come from reading and loading the files. An error among t
 | CT337 | error | Machinery a turn drives, in a game that says `clock ticks`: a `move`, a `pattern`, a `phase`, a `stacking duration`, a `decay ... on turn_end`, an `until turn_end:`, a `next turn:`, an `once per turn`, a `reset_on turn_start`, or a `turn_start` or `turn_end` listener. A real-time game takes no turns, so none of it ever runs. See [Rulesets](#rulesets) for the table of what to write instead. | Write the real-time shape of the same idea, which each message names — usually `on every <n>s:`, a filter on a second listener, or a `for <n>s` where a status is applied. Or say `clock turns` if this game does take turns. |
 | CT338 | error | A `scenario` in a game that says `clock ticks`. A bot plays a scenario by taking turns, so nothing would ever advance the clock: every listener would stay silent, every ability used once would never come back, and no battle could end. `cantrip sim` refuses such a folder for the same reason. | Cover a real-time game with `test` blocks, which have `realtime <rate>` and `tick <n>`. Or say `clock turns` if this game does take turns. |
 | CT339 | error | `cost` on an `ability`. An ability is paid for in the seconds it makes you wait; nothing spends the resource a `cost` line names, so the number reads like a rule and is not one. | Write the price as a `cooldown`, or put the effect on a card, which does pay. |
+| CT340 | error | A `target` line naming a word that is not `enemy`, `ally`, `self`, `any` or `none`. The five are a closed set, and outside it the action asks for no target and validates none — `target freind` will deal its damage to whoever the game hands it, the party's own leader included, while everything loads, lints and tests clean. | Spell one of the five. A filter goes after the word: `target enemy where it.hp <= 5`. |
 
 **Descriptions**
 
@@ -1639,5 +1640,5 @@ Codes with four digits come from reading and loading the files. An error among t
 - **Spatial selectors** with a unit (`within(x, 5m)`) parse, and their meaning comes from the host. With a plain number they count slots on the board and the engine answers them.
 - **`deal 2 to adjacent(target)`** uses the board: actors on the same side one step apart.
 - **Pending choices** are answered by an `IChoiceProvider`. A UI that cannot answer on the spot uses `DeferredChooser`: the action rolls back to a snapshot, reports the choice, and replays deterministically once answered, so a saved game is never mid-choice.
-- **Backends.** Only the tree-walking interpreter exists; `ExecutionMode` is recorded but does not change pacing yet.
+- **Backends.** Only the tree-walking interpreter exists, and it always drains the action queue. There is no pacing setting: a game that wants an animation between actions paces its own presentation from the events it hears.
 - **Descriptions** come at three levels, automatic, custom and override (see [Descriptions](#descriptions)). Automatic text is serviceable English, meant as a starting point that designers override with `text:`.

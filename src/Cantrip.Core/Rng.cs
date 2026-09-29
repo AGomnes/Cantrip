@@ -30,12 +30,15 @@ namespace Cantrip
         }
 
         /// <summary>
-        /// The seed this generator was last started from — a label, not its position. It does not move
-        /// as numbers are drawn and <see cref="SetState"/> does not change it, so
-        /// <c>new Rng(saved.Seed)</c> rewinds to the beginning of the run rather than restoring where
-        /// that generator had got to. <see cref="GetState"/> is what restores a generator.
+        /// The seed this generator was started from, or <c>null</c> when it has none to name: after
+        /// <see cref="SetState"/>, and in a generator built from four state words. It is a label
+        /// rather than a position — it does not move as numbers are drawn — so
+        /// <c>new Rng(rng.Seed.Value)</c> starts that stream again rather than continuing it.
+        /// <see cref="GetState"/> is what saves a generator. It is nullable because a restored
+        /// generator that still named its old seed offered a host a label that looks like a save
+        /// and rewinds the run to its beginning when it is used as one.
         /// </summary>
-        public ulong Seed { get; private set; }
+        public ulong? Seed { get; private set; }
 
         /// <summary>
         /// Throws away the current position and starts the stream this seed names, as the constructor
@@ -63,7 +66,10 @@ namespace Cantrip
         /// </remarks>
         public ulong[] GetState() => new[] { _s0, _s1, _s2, _s3 };
 
-        /// <summary>Restores what <see cref="GetState"/> gave. Anything but four words is refused.</summary>
+        /// <summary>
+        /// Restores what <see cref="GetState"/> gave, and clears <see cref="Seed"/>, which named a
+        /// place this generator is no longer at. Anything but four words is refused.
+        /// </summary>
         public void SetState(ulong[] state)
         {
             if (state == null) throw new ArgumentNullException(nameof(state));
@@ -71,6 +77,10 @@ namespace Cantrip
                 throw new ArgumentException($"This generator's state is {StateWords} words, not {state.Length}.", nameof(state));
 
             _s0 = state[0]; _s1 = state[1]; _s2 = state[2]; _s3 = state[3];
+
+            // The seed named where this generator began, and it is no longer there. Keeping it
+            // would leave behind a label that looks like a save and rewinds a run when used as one.
+            Seed = null;
         }
 
         /// <summary>How many words <see cref="GetState"/> gives and <see cref="SetState"/> wants.</summary>

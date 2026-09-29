@@ -602,8 +602,9 @@ changed; see [Saving](#saving)). `save` is `""` when it was refused.
 
 **A load**, from `LoadSave`: `accepted`, `reason` and `message`. `reason` is `"none"`,
 `"wrong_format"` (not a save, a damaged one, or one from a version of the addon or of Cantrip.Core
-that writes saves differently), `"no_payload"` or `"content_changed"` (the content has changed in a
-way the save cannot survive; see [Saving](#saving)).
+that writes saves differently), `"no_payload"`, `"content_changed"` (the content has changed in a
+way the save cannot survive; see [Saving](#saving)) or `"clock_changed"` (the save was written with
+`Ticks Per Second` set to another value; see [Saving](#saving)).
 
 **An event** is under [Events](#events).
 
@@ -970,6 +971,13 @@ A save is refused, with the `reason` `"content_changed"`, when:
   changed that block's statements. The message names the definition the block belongs to. A save
   made by 0.1.0-preview.2 or earlier finds such a block by its place alone instead: it runs whatever
   block is in that place now, and is refused only if there is none.
+
+A save is refused, with the `reason` `"clock_changed"`, when it was written by a real-time game
+whose clock ran at another rate — a different `Ticks Per Second` on the node, or a turn-based game
+handed a real-time save. A tick is a length of time only while something says how many of them a
+second is, so restoring across a change of rate would re-time every cooldown, every `for 3s` and
+every `on every 2s` in the save. Put the rate back to what the save names, which the message
+gives, or start a new game.
 
 A refused save leaves the game as it was, a choice it is waiting on included. What a patch does to
 the stats and listeners of a save that loads is under

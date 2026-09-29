@@ -496,6 +496,15 @@ namespace Cantrip.GodotAdapter.Demo
                 !newer["accepted"].AsBool() && newer["reason"].AsString() == "wrong_format", newer["reason"] + ": " + newer["message"]);
             Check("and changes nothing either", rules.StateHash() == untouched);
 
+            // A save from a real-time game, offered to this turn-based one. The content is fine and
+            // the clock is not, and "content_changed" would send a player looking in the wrong
+            // place; the rate is what re-times every cooldown and every duration in the save.
+            Godot.Collections.Dictionary otherClock = LoadOrThrown(rules,
+                "{\"format\":1,\"fingerprint\":\"" + rules.Content.Fingerprint + "\",\"snapshot\":\"{\\\"FormatVersion\\\":3,\\\"ClockUnitsPerSecond\\\":60}\"}");
+            Check("a save from a clock at another rate is clock_changed, not content_changed",
+                !otherClock["accepted"].AsBool() && otherClock["reason"].AsString() == "clock_changed", otherClock["reason"] + ": " + otherClock["message"]);
+            Check("and changes nothing at all", rules.StateHash() == untouched);
+
             rules.QueueFree();
         }
 
