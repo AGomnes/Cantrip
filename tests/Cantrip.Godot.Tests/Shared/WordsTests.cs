@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Cantrip.Descriptions;
 using Cantrip.Diagnostics;
+using Cantrip.Runtime;
 using Cantrip.Syntax;
 using Xunit;
 
@@ -132,8 +133,10 @@ namespace Cantrip.GodotAdapter.Tests.Shared
                     [ActionResult.NotACard] = "not_a_card",
                     [ActionResult.NotInHand] = "not_in_hand",
                     [ActionResult.Unplayable] = "unplayable",
-                    [ActionResult.NotEnoughEnergy] = "not_enough_energy",
+                    [ActionResult.CannotAfford] = "cannot_afford",
                     [ActionResult.InvalidTarget] = "invalid_target",
+                    [ActionResult.OutOfRange] = "out_of_range",
+                    [ActionResult.NoTarget] = "no_target",
                     [ActionResult.Cancelled] = "cancelled",
                     [ActionResult.NotReady] = "not_ready",
                 },
@@ -162,6 +165,39 @@ namespace Cantrip.GodotAdapter.Tests.Shared
 
             List<string> wrong = words.FindAll(word => !System.Text.RegularExpressions.Regex.IsMatch(word, "^[a-z][a-z0-9_]*$"));
             Assert.True(wrong.Count == 0, "not snake_case: " + string.Join(", ", wrong));
+        }
+
+        /// <summary>
+        /// The word a game shows a player when a play is refused must not name a resource the card is
+        /// not priced in. It was <c>"not_enough_energy"</c> until 1.0 and came back for a card priced
+        /// <c>cost 2 bones</c>, and this word is frozen script surface: a GDScript
+        /// <c>match</c> arm goes on compiling however wrong the word is.
+        /// </summary>
+        [Fact]
+        [Trait("Regression", "not-enough-energy-named-the-wrong-resource")]
+        public void The_word_for_a_refused_play_never_names_energy_for_another_resource()
+        {
+            CardRuntime runtime = CardRuntime.FromText(@"resource ""bones""
+  min 0
+
+card ""Bone Bargain""
+  cost 2 bones
+  effect:
+    gain 1 gold
+
+enemy ""Dummy""
+  hp 10
+");
+            Entity player = runtime.CreatePlayer();
+            runtime.SpawnEnemy("Dummy");
+            Entity card = runtime.AddCard("Bone Bargain", Zones.Hand);
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+            player.SetBase("bones", 1);
+
+            string word = Words.ActionName(runtime.Play(card));
+
+            Assert.DoesNotContain("energy", word, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal("cannot_afford", word);
         }
 
         [Fact]

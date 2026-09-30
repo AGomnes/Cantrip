@@ -129,7 +129,7 @@ namespace Cantrip.Runtime
             var values = new Dictionary<string, object>();
             if (gameEvent.Source != null) values["source"] = gameEvent.Source.ToString();
             if (gameEvent.Target != null) values["target"] = gameEvent.Target.ToString();
-            if (gameEvent.Card != null) values["card"] = gameEvent.Card.ToString();
+            if (gameEvent.Action != null) values["card"] = gameEvent.Action.ToString();
             if (!gameEvent.Amount.IsZero) values["amount"] = gameEvent.Amount.ToString();
             if (gameEvent.Tags.Count > 0) values["tags"] = string.Join(",", gameEvent.Tags.OrderBy(t => t, StringComparer.Ordinal));
             return values;
@@ -275,7 +275,7 @@ namespace Cantrip.Runtime
         {
             if (gameEvent.Target != null) yield return gameEvent.Target;
             if (gameEvent.Source != null) yield return gameEvent.Source;
-            if (gameEvent.Card != null) yield return gameEvent.Card;
+            if (gameEvent.Action != null) yield return gameEvent.Action;
             foreach (Value data in gameEvent.Data.Values)
             {
                 if (data.Kind == ValueKind.Entity) yield return data.Entity!;

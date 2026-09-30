@@ -264,7 +264,7 @@ The same seed plays the same battle, so yours reads the same. What the script re
   then draws the opening hand.
 - **The player's hand is `GetZone(PlayerId(), "hand")`.** There is no `GetHand`: a zone belongs to
   whoever owns it, and a game with more than one hero has more than one hand.
-- **`Play` answers with a word**: `played`, or why not (`not_enough_energy`, `invalid_target` and
+- **`Play` answers with a word**: `played`, or why not (`cannot_afford`, `out_of_range` and
   the others under [The node](#the-node)). `pending` means the card stopped for a choice. The
   `ChoiceRequested` signal has fired before `Play` returns, and because this stand-in answers at
   once, Sift has been played by then; a real game opens a picker and answers later.
@@ -364,15 +364,25 @@ that is the value to pass if you have no other in mind.
 | `Pass(actor_id: int) -> void` | One member is done for this turn. When the last one that could act has passed, the enemies take theirs — so for a party of one this is `EndTurn`. Does nothing for an id that names nobody, or somebody who is not a party member. |
 | `Revive(actor_id: int, hp: int) -> bool` | Brings a fallen actor back, and says whether it rose. False for an unknown id, for somebody already alive, and when content cancelled the `revived` event. `heal` refuses a corpse and always will, which is why this is its own call. Default: `1`. |
 | `Tick(count: int) -> void` | Advances a real-time clock by `count` ticks. Default: `1`. In a turn game it fails with an error saying the runtime uses turns. |
-| `UseAbility(ability_id: int, target_id: int) -> String` | Uses an ability, answering with the same words `Play` does. An ability with a `target` line settles its own target from 0, the way a card does, and answers `invalid_target` when there is nobody legal to aim it at. Default target: `0`. |
+| `UseAbility(ability_id: int, target_id: int) -> String` | Uses an ability, answering with the same words `Play` does. An ability with a `target` line settles its own target from 0, the way a card does, and answers `no_target`, `out_of_range` or `invalid_target` when it cannot be aimed. Default target: `0`. |
 | `Execute(statements: String, self_id: int, target_id: int) -> void` | Runs statements as content would, for a console, a cheat key or a heal between battles. `self_id` 0 runs them as the player; `target_id` 0 means nobody. Defaults: `0, 0`. |
 
 `Play`, `PlayNamed` and `UseAbility` answer `played`, `pending`
 (see [Choices](#choices-the-player-makes)), `not_a_card`, `not_in_hand`, `unplayable`,
-`not_enough_energy`, `invalid_target`, `cancelled` or `not_ready`. For an ability, `not_a_card`
-means the id is not an ability that can be used — gone, or on a dead owner — and `not_ready` means
-it is still on cooldown. `not_ready` never comes back from `Play`, and `not_in_hand` never from
-`UseAbility`; the one table is shared so that one ending always has one word.
+`cannot_afford`, `invalid_target`, `out_of_range`, `no_target`, `cancelled` or `not_ready`. For an
+ability, `not_a_card` means the id is not an ability that can be used — gone, or on a dead owner —
+and `not_ready` means it is still on cooldown. `not_ready` never comes back from `Play`, and
+`not_in_hand` never from `UseAbility`; the one table is shared so that one ending always has one
+word.
+
+`cannot_afford` says the payer is short of whatever the card is priced in, which is why it does not
+name a resource: `CostOf` and the card's own `cost` segment say how much of what. The three
+targeting words split what one word used to say, and they are worth telling apart because a game
+says something different about each: `out_of_range` is the one a player can act on, `no_target`
+means the side it asks for is empty — usually a bug in the game's own loop rather than something to
+show — and `invalid_target` means the one it was handed is somebody the action will not take, which
+is where a taunt and the action's own `where` filter come out. `GetLegalTargets` is still the list
+to highlight from.
 
 **Reading the game**
 

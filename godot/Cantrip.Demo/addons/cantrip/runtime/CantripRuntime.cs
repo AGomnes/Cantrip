@@ -492,8 +492,9 @@ namespace Cantrip.GodotAdapter
 
         /// <summary>
         /// Plays a card. The answer is one of "played", "pending", "not_a_card", "not_in_hand",
-        /// "unplayable", "not_enough_energy", "invalid_target" or "cancelled"; "pending" means the
-        /// rules need a decision and a <c>choice_requested</c> signal is on its way.
+        /// "unplayable", "cannot_afford", "invalid_target", "out_of_range", "no_target" or
+        /// "cancelled"; "pending" means the rules need a decision and a <c>choice_requested</c>
+        /// signal is on its way.
         /// </summary>
         public string Play(int card_id, int target_id = 0) => PlayBy(card_id, target_id, VariantMap.NoEntity);
 
@@ -581,9 +582,9 @@ namespace Cantrip.GodotAdapter
 
         /// <summary>
         /// Uses an ability, answering with a word from the same table <see cref="Play"/> answers
-        /// from: "played", "pending", "not_ready" for a cooldown, "not_enough_energy",
-        /// "invalid_target", "cancelled", or "not_a_card" for an id that is not an ability that can
-        /// be used at all.
+        /// from: "played", "pending", "not_ready" for a cooldown, "invalid_target", "out_of_range",
+        /// "no_target", "cancelled", or "not_a_card" for an id that is not an ability that can be
+        /// used at all. Never "cannot_afford": an ability has no cost.
         /// </summary>
         /// <remarks>
         /// It used to answer a bool, so a cooldown, a question the rules stopped to ask, and an id

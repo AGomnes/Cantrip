@@ -68,13 +68,15 @@ Cantrip.Runtime.IChoiceProvider.ChooseDefinition(Cantrip.Runtime.DefinitionChoic
 *REMOVED*Cantrip.PlayResult.Played = 0 -> Cantrip.PlayResult
 *REMOVED*Cantrip.PlayResult.Unplayable = 3 -> Cantrip.PlayResult
 Cantrip.ActionResult
-Cantrip.ActionResult.Cancelled = 6 -> Cantrip.ActionResult
-Cantrip.ActionResult.ChoicePending = 7 -> Cantrip.ActionResult
+Cantrip.ActionResult.Cancelled = 8 -> Cantrip.ActionResult
+Cantrip.ActionResult.ChoicePending = 9 -> Cantrip.ActionResult
 Cantrip.ActionResult.InvalidTarget = 5 -> Cantrip.ActionResult
 Cantrip.ActionResult.NotACard = 1 -> Cantrip.ActionResult
-Cantrip.ActionResult.NotEnoughEnergy = 4 -> Cantrip.ActionResult
+Cantrip.ActionResult.CannotAfford = 4 -> Cantrip.ActionResult
+Cantrip.ActionResult.NoTarget = 7 -> Cantrip.ActionResult
+Cantrip.ActionResult.OutOfRange = 6 -> Cantrip.ActionResult
 Cantrip.ActionResult.NotInHand = 2 -> Cantrip.ActionResult
-Cantrip.ActionResult.NotReady = 8 -> Cantrip.ActionResult
+Cantrip.ActionResult.NotReady = 10 -> Cantrip.ActionResult
 Cantrip.ActionResult.Played = 0 -> Cantrip.ActionResult
 Cantrip.ActionResult.Unplayable = 3 -> Cantrip.ActionResult
 Cantrip.CardRuntime.Answer(Cantrip.Content.EntityDefinition! chosen) -> Cantrip.ActionResult
@@ -320,3 +322,19 @@ Cantrip.CardRuntime.CostOf(Cantrip.Runtime.Entity! action) -> int
 Cantrip.CardRuntime.CostResourceOf(Cantrip.Runtime.Entity! action) -> string!
 Cantrip.CardRuntime.IsXCost(Cantrip.Runtime.Entity! action) -> bool
 const Cantrip.Linting.Linter.UnknownTargetMode = "CT340" -> string!
+*REMOVED*Cantrip.Runtime.IModifierEvaluator
+*REMOVED*Cantrip.Runtime.IModifierEvaluator.Amount(Cantrip.Runtime.Modifier! modifier, Cantrip.Runtime.ModifierQuery! query) -> Cantrip.Runtime.Value
+*REMOVED*Cantrip.Runtime.IModifierEvaluator.Applies(Cantrip.Runtime.Modifier! modifier, Cantrip.Runtime.ModifierQuery! query) -> bool
+*REMOVED*Cantrip.Runtime.ModifierPipeline.Evaluator.get -> Cantrip.Runtime.IModifierEvaluator?
+*REMOVED*Cantrip.Runtime.EvalContext.Card.get -> Cantrip.Runtime.Entity?
+*REMOVED*Cantrip.Runtime.EvalContext.Card.set -> void
+*REMOVED*Cantrip.Runtime.GameEvent.Card.get -> Cantrip.Runtime.Entity?
+*REMOVED*Cantrip.Runtime.GameEvent.Card.set -> void
+*REMOVED*Cantrip.Runtime.ModifierQuery.Card.get -> Cantrip.Runtime.Entity?
+*REMOVED*Cantrip.Runtime.ModifierQuery.Card.set -> void
+Cantrip.Runtime.EvalContext.Action.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.EvalContext.Action.set -> void
+Cantrip.Runtime.GameEvent.Action.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.GameEvent.Action.set -> void
+Cantrip.Runtime.ModifierQuery.Action.get -> Cantrip.Runtime.Entity?
+Cantrip.Runtime.ModifierQuery.Action.set -> void

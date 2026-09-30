@@ -282,9 +282,9 @@ namespace Cantrip.GodotAdapter.Tests.Shared
             EventRecord played = AdapterTestKit.DrainAll(buffer).First(r => r.Name == "card_played");
 
             // The card is named by the event, but a card has no hp, block or energy to show.
-            Assert.NotEqual(0, played.Card);
-            Assert.False(played.After.ContainsKey(played.Card));
-            Assert.Empty(played.StatsOf(played.Card));
+            Assert.NotEqual(0, played.Action);
+            Assert.False(played.After.ContainsKey(played.Action));
+            Assert.Empty(played.StatsOf(played.Action));
         }
 
         // What a record carries ------------------------------------------------------------------
@@ -303,7 +303,7 @@ namespace Cantrip.GodotAdapter.Tests.Shared
 
             Assert.Equal(player.Id, played.Source);
             Assert.Equal(enemy.Id, played.Target);
-            Assert.NotEqual(0, played.Card);
+            Assert.NotEqual(0, played.Action);
             Assert.Equal(0, played.AmountInt);      // Twin costs nothing
 
             EventRecord hit = records.First(r => r.Name == "damaged");

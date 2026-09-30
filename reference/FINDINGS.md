@@ -447,7 +447,7 @@ side may stand, which a summon changes mid-fight. The workaround stays, arithmet
 
 **Written down in packaging.** The lint note is still not written, so this is still a detour
 waiting to happen — but it is a detour with a map now.
-[troubleshooting.md](../docs/troubleshooting.md#invalidtarget-is-one-word-for-four-different-refusals)
+[troubleshooting.md](../docs/troubleshooting.md#which-refusal-was-it)
 gives the cross-side arithmetic (`a.rank + b.rank + 1`), says outright that `range 1..2` on a board
 two ranks deep can be unable to reach half the enemies for ever with nothing warning, and
 [The fight never ends](../docs/troubleshooting.md#the-fight-never-ends) lists it first among the
@@ -478,6 +478,14 @@ reaches a reader through the generated [API reference](../docs/api/Cantrip.md#ac
 through [troubleshooting.md](../docs/troubleshooting.md#a-card-or-ability-will-not-play), which
 turns "call `GetLegalTargets`" into four cases and what each one means. The hour this cost is the
 hour a reader now does not spend; the word is still one word.
+
+**Reopened and done at 1.0.** The freeze audit called it now-or-never rather than deferrable:
+adding these later would *narrow* what `InvalidTarget` means, so a game that wrote
+`if (result == InvalidTarget) ShowOutOfRangeHint()` would have gone on compiling and quietly
+stopped firing. `ActionResult` has `OutOfRange` and `NoTarget` now — reach, and a side with nobody
+on it — and `InvalidTarget` is left meaning "somebody the action will not take", which is a taunt
+or the action's own `where`. Telling *those two* apart is still `LegalTargets`, and a
+`WhyNotTargetable` would be additive, so it can arrive in a 1.x release.
 
 ---
 

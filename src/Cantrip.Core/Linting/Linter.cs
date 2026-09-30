@@ -1567,86 +1567,156 @@ namespace Cantrip.Linting
         {
             if (!_hasParty) return;
 
-            string? place = PartyBody(body);
-            if (place == null) return;
+            if (!(PartyBody(body) is (string place, string fix))) return;
 
             foreach (NameExpr name in body.Facts.Names)
             {
                 if (!string.Equals(name.Name, "player", StringComparison.OrdinalIgnoreCase)) continue;
                 if (body.Facts.Locals.Contains(name.Name)) continue;
 
-                // A status and a relic are carried, so the word that means "whoever this is on" is
-                // `owner`, and `target` names nothing at all inside `on every 2s:`. The message
-                // also states the exception, because a rule is easier to keep than to look up.
-                bool carried = place == "a status's listener" || place == "a relic's listener";
+                // Which word does what was meant depends on what the declaration is, and the message
+                // says it rather than listing all three: `owner` for something carried, `self` for a
+                // declaration that is itself the member, `target` for one that acts on somebody else.
+                // A carried listener is told the exception in the same breath, because a rule is
+                // easier to keep than to look up.
+                string wrong = fix switch
+                {
+                    "owner" => "not whoever is carrying it",
+                    "self" => "not this one",
+                    _ => "not the member being acted on",
+                };
+                string advice = fix switch
+                {
+                    "owner" => "Write `owner` for whoever is carrying it, `leader` if the run's own actor really is meant, or `party` for all of them. " +
+                               "`player` stays right in a listener about its own owner, such as `on owner.turn_start:`.",
+                    "self" => "Write `self` for this one, `target` for whoever the line is aimed at, `leader` if the run's own actor really is meant, " +
+                              "or `party` for all of them.",
+                    _ => "Write `target` for whoever this is aimed at, `leader` if the run's own actor really is meant, or `party` for all of them.",
+                };
 
                 Error(
                     PlayerWhereAMemberIsMeant,
-                    $"`player` in {place} means the party's leader, " +
-                    (carried ? "not whoever is carrying it" : "not the member being acted on") +
-                    ", and this content has a party. " +
-                    (carried
-                        ? "Write `owner` for whoever is carrying it, `leader` if the run's own actor really is meant, or `party` for all of them. " +
-                          "`player` stays right in a listener about its own owner, such as `on owner.turn_start:`."
-                        : "Write `target` for whoever this is aimed at, `leader` if the run's own actor really is meant, or `party` for all of them."),
+                    $"`player` in {place} means the party's leader, {wrong}, and this content has a party. {advice}",
                     name.Span,
-                    carried ? "owner" : "target");
+                    fix);
             }
         }
 
         /// <summary>
-        /// Which body CT326 is about this is, in words for the message, or null when it is none of
-        /// them: the places where a line acts on somebody and the somebody is settled by the rules,
-        /// not by the word.
+        /// Where the body is, in words for the message, and which word does what was meant there.
+        /// Null when <c>player</c> is not refused: a body no declaration owns, or a carried listener
+        /// about its own holder.
         /// </summary>
         /// <remarks>
         /// <para>
-        /// An enemy's <c>move</c>, a card's <c>effect</c> and an ability's <c>effect</c> were the
-        /// first three, and they are the whole of a turn game's enemy behaviour. They are not the
-        /// whole of a real-time game's: a real-time enemy has no <c>move</c> at all, because a move
-        /// runs on a turn (CT337) — its entire behaviour is <c>on every &lt;n&gt;s:</c> listeners,
-        /// which is the one place this check did not look. So the party guarantee 1.0 makes was
-        /// absent from the whole surface a real-time party game lives on, and
-        /// <c>on every 2s: deal 5 to player</c> on an enemy linted with zero errors.
+        /// This is the rule, rather than a list: <b>every body on every declaration</b>. It was a
+        /// list until 1.0 — an enemy's <c>move</c>, a card's and an ability's <c>effect</c>, and
+        /// listeners on <c>enemy</c>, <c>card</c>, <c>ability</c>, <c>status</c> and <c>relic</c> —
+        /// and a list has holes. The one that mattered: a listener on a <c>hero</c>.
+        /// <c>hero "Cleric" / on damaged: block 2 to player</c> blocked the <em>leader</em> whenever
+        /// the Cleric was damaged, quietly, which is the exact shape CT326 was made an error to
+        /// prevent, in the declaration a party game has most of. A listener on an <c>actor</c> or a
+        /// <c>keyword</c>, a <c>modify</c> line and a <c>target … where</c> filter were out too.
         /// </para>
         /// <para>
-        /// A listener on a status, a relic, a card or an ability counts for the same reason: it
-        /// fires for whoever is carrying it, and <c>player</c> names the leader whoever that is.
-        /// A status's listener was the last hole and the widest one, because a status is how
-        /// damage over time is spelled: <c>on every 2s: deal 5 to player</c> on a Burn burns the
-        /// leader rather than the member the Burn is on, in every fight, in silence.
+        /// There is nothing to carve out for a <c>hero</c> or an <c>actor</c>, which is what makes
+        /// the rule affordable: <c>CreatePlayer</c> spawns an actor with no definition behind it, so
+        /// the leader is never made from a declaration and <c>player</c> inside one always names
+        /// somebody other than the declaration itself. The word there is <c>self</c>.
         /// </para>
         /// <para>
-        /// A status's and a relic's listener carry one exception, which is what lets the whole
-        /// rule be a sentence rather than a list of five places: <c>player</c> stays legal where
-        /// the listener is about its own owner. <see cref="AboutItsOwner"/> says exactly what that
-        /// means, and why those are the two shapes in which no member can be meant.
+        /// The kinds an actor <em>carries</em> — <see cref="IsCarried"/> — keep the one exception,
+        /// which is what lets the whole rule be a sentence rather than a list of places:
+        /// <c>player</c> stays legal where the listener is about its own owner.
+        /// <see cref="AboutItsOwner"/> says exactly what that means, and why those are the two shapes
+        /// in which no member can be meant.
+        /// </para>
+        /// <para>
+        /// A content <c>verb</c> is deliberately <b>not</b> here, and neither is a <c>test</c> or a
+        /// <c>scenario</c>. A verb has no owner, so neither <c>self</c> nor <c>owner</c> exists inside
+        /// one and its <c>target</c> is whatever its caller bound: there is no word this diagnostic
+        /// could name, and CT326 is an error rather than a warning precisely because it can always
+        /// name one. <c>player</c> in a verb is also often right — <c>verb score(c): gain c.chips
+        /// chips to player</c> means the run's own pool — and the caller's own body is checked, which
+        /// is where the leader-or-member decision is actually written. Severity may rise in a 1.x
+        /// release, so a verb can still be warned about later; naming the wrong word now could not be
+        /// taken back.
         /// </para>
         /// </remarks>
-        private static string? PartyBody(Body body)
+        private static (string Place, string Fix)? PartyBody(Body body)
         {
+            // No owner: a content `verb`, a `test` or a `scenario`. See the remarks above on why a
+            // verb is left out rather than warned about.
             if (body.Owner == null) return null;
-            string kind = body.Owner.KindName.ToLowerInvariant();
 
-            if (body.Kind == BodyKind.Listener)
+            string? what = BodyWords(body);
+            if (what == null) return null;
+
+            string kind = body.Owner.KindName.ToLowerInvariant();
+            string place = $"{(Vowel(kind) ? "an" : "a")} {kind}'s {what}";
+
+            // Carried: a status, a relic, a keyword and an item all fire for whoever is holding them,
+            // so the word that means that is `owner`, and `target` names nothing inside
+            // `on every 2s:`. A listener about the holder alone is the exception.
+            if (IsCarried(kind))
             {
-                switch (kind)
-                {
-                    case "enemy": return "an enemy's listener";
-                    case "card": return "a card's listener";
-                    case "ability": return "an ability's listener";
-                    case "status": return AboutItsOwner(body.Listener) ? null : "a status's listener";
-                    case "relic": return AboutItsOwner(body.Listener) ? null : "a relic's listener";
-                    default: return null;
-                }
+                return body.Kind == BodyKind.Listener && AboutItsOwner(body.Listener) ? null : (place, "owner");
             }
 
-            if (body.Kind != BodyKind.Effect || !(body.Anchor is BlockMemberNode block)) return null;
+            // A `hero` or an `actor` declaration *is* a member, so `self` is the word. There is
+            // nothing to carve out for either: `CreatePlayer` spawns an actor with no definition
+            // behind it, so the leader is never made from one of these declarations and `player`
+            // inside one is always somebody else.
+            if (kind == "hero" || kind == "actor") return (place, "self");
 
-            if (kind == "enemy" && block.Name == "move") return "an enemy's move";
-            if (block.Name != "effect") return null;
-            return kind == "card" ? "a card's effect" : kind == "ability" ? "an ability's effect" : null;
+            // An enemy, a card and an ability act on somebody the rules settled on: `target`.
+            return (place, "target");
         }
+
+        /// <summary>
+        /// The bodies <c>player</c> is refused in, which is every body a declaration can carry: an
+        /// <c>effect</c>, a <c>move</c>, a listener, a <c>modify</c> line and a <c>target … where</c>
+        /// filter. Null for nothing else, which is how a body with no statements of its own is
+        /// skipped.
+        /// </summary>
+        private static string? BodyWords(Body body)
+        {
+            switch (body.Kind)
+            {
+                case BodyKind.Listener:
+                    return "listener";
+
+                case BodyKind.Effect:
+                    if (!(body.Anchor is BlockMemberNode block)) return null;
+                    if (string.Equals(block.Name, "effect", StringComparison.OrdinalIgnoreCase)) return "effect";
+                    if (string.Equals(block.Name, "move", StringComparison.OrdinalIgnoreCase)) return "move";
+                    return $"`{block.Name}:` block";
+
+                // A `modify` line's scope, filter and amount, and the predicate of a
+                // `target … where`. Both are expressions the rules evaluate about somebody, so
+                // `player` in one is the same wrong answer as `player` in a statement.
+                case BodyKind.Modifier:
+                    return body.Anchor is PropertyNode ? "`target` filter" : "`modify` line";
+
+                default:
+                    return null;
+            }
+        }
+
+        /// <summary>
+        /// The declaration kinds something is <em>carried</em> by an actor as: they fire and apply for
+        /// whoever is holding them, so <c>owner</c> is the word, and the owner exception is theirs.
+        /// </summary>
+        /// <remarks>
+        /// <c>item</c> is here beside <c>status</c>, <c>relic</c> and <c>keyword</c> because the
+        /// engine already treats it as a relic by another name — <c>InDefaultScope</c> anchors both to
+        /// the holder's controller — so leaving it out would refuse <c>player</c> in an item's
+        /// own-owner listener where a relic's is allowed.
+        /// </remarks>
+        private static bool IsCarried(string kind) =>
+            kind == "status" || kind == "relic" || kind == "keyword" || kind == "item";
+
+        private static bool Vowel(string word) => "aeiou".IndexOf(word[0]) >= 0;
 
         /// <summary>
         /// The events that put no actor in view but the leader, so that a <c>player</c> in a
@@ -1664,9 +1734,9 @@ namespace Cantrip.Linting
         };
 
         /// <summary>
-        /// Whether a <c>status</c>'s or <c>relic</c>'s listener is <em>about its own owner</em>:
-        /// the one shape in which <c>player</c> is refused nowhere, because no member is in view
-        /// to have been meant instead.
+        /// Whether a carried declaration's listener — a <c>status</c>, a <c>relic</c>, a
+        /// <c>keyword</c> or an <c>item</c> — is <em>about its own owner</em>: the one shape in which
+        /// <c>player</c> is refused nowhere, because no member is in view to have been meant instead.
         /// </summary>
         /// <remarks>
         /// <para>

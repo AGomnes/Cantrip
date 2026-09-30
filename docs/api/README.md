@@ -17,7 +17,7 @@ Nothing here is written by hand. `tools/api-docs.sh` regenerates it and CI runs 
 | [`Cantrip.Descriptions`](Cantrip.Descriptions.md) | 9 | 100.0% | Rules text: what a card says, worked out from what it does, through a phrase table a game can translate. |
 | [`Cantrip.Diagnostics`](Cantrip.Diagnostics.md) | 5 | 100.0% | What a tool says about content it has not run: a code, a place and a fix. |
 | [`Cantrip.Linting`](Cantrip.Linting.md) | 2 | 100.0% | The linter, and every diagnostic code it can report, each as a named constant. |
-| [`Cantrip.Runtime`](Cantrip.Runtime.md) | 64 | 100.0% | The rules themselves: entities, the board, events, modifiers, the clock, the interpreter and the snapshot. |
+| [`Cantrip.Runtime`](Cantrip.Runtime.md) | 63 | 100.0% | The rules themselves: entities, the board, events, modifiers, the clock, the interpreter and the snapshot. |
 | [`Cantrip.Syntax`](Cantrip.Syntax.md) | 49 | 21.2% | The syntax tree the parser builds. A game never touches it; a tool that reads content lives in it. |
 | [`Cantrip.Testing`](Cantrip.Testing.md) | 2 | 100.0% | Running the `test` blocks written in content. |
 | [`Cantrip.GodotAdapter`](Cantrip.GodotAdapter.md) | 46 | 77.7% | The Godot addon's script surface: the `CantripRuntime` node a scene holds, and everything it publishes to GDScript. |
@@ -28,7 +28,7 @@ A member counts as documented when it has a `<summary>`. These numbers are the s
 
 | | Documented | Total | |
 |---|---:|---:|---:|
-| Types | 182 | 203 | 89.6% |
-| Members | 1438 | 1750 | 82.1% |
-| **All** | **1620** | **1953** | **82.9%** |
+| Types | 181 | 202 | 89.6% |
+| Members | 1437 | 1749 | 82.1% |
+| **All** | **1618** | **1951** | **82.9%** |
 

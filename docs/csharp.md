@@ -33,7 +33,7 @@ runtime.AddRelic("Kindling");
 Entity worm = runtime.SpawnEnemy("Jaw Worm");
 
 runtime.StartBattle();
-ActionResult result = runtime.Play("Fireball", worm);   // Played, NotEnoughEnergy, InvalidTarget...
+ActionResult result = runtime.Play("Fireball", worm);   // Played, CannotAfford, OutOfRange...
 runtime.EndTurn();
 ```
 
@@ -199,7 +199,7 @@ sealed class BattleScreen
                 gameEvent.Data.TryGetValue("blocked", out Value blocked);
                 return ShowHit(gameEvent.Target!, gameEvent.Amount.ToInt(), blocked.Number.ToInt());
             case "card_played":
-                return ShowCardLanded(gameEvent.Card!);   // into the pile it went to: Card.Zone
+                return ShowCardLanded(gameEvent.Action!);   // into the pile it went to: Action.Zone
             default:
                 return 0;
         }
@@ -270,7 +270,7 @@ switch (runtime.UseAbility(ability, target))
 }
 ```
 
-An ability settles its own target from its `target` and `range` lines when none is given, so `InvalidTarget` is a real answer: it means there was nobody in reach. An ability has no cost and never will have one -- its price is the seconds it makes you wait, and a `cost` line on an `ability` declaration is refused at lint as CT339 -- so it never answers `NotEnoughEnergy`, which is in the type only because one enum serves cards as well.
+An ability settles its own target from its `target` and `range` lines when none is given, so the three targeting refusals are all real answers: `NoTarget` when there is nobody on the side it asks for, `OutOfRange` when it cannot reach from where its owner stands, and `InvalidTarget` when the one it was handed is somebody it will not take. An ability has no cost and never will have one -- its price is the seconds it makes you wait, and a `cost` line on an `ability` declaration is refused at lint as CT339 -- so it never answers `CannotAfford`, which is in the type only because one enum serves cards as well.
 
 `AddRelic`, `ApplyStatus` and `Tick` never stop: a choice they raise takes the first option.
 
@@ -482,7 +482,7 @@ foreach (Entity ability in runtime.AbilitiesOf(member))
 | `ReadyIn(ability)` | how much longer it has to wait, **in clock units** — ticks here, turns on a turn clock. 0 when it is ready |
 | `CanUse(ability)` | ready, its owner alive, and somebody in reach if it needs one: what a button is greyed out on |
 | `LegalTargets(ability)`, `TargetMode(ability)` | answer for an ability exactly as for a card, so one targeting UI serves both |
-| `UseAbility(ability, target = null)` | with no target it settles its own from the ability's `target` and `range`, and answers `InvalidTarget` when nobody is in reach |
+| `UseAbility(ability, target = null)` | with no target it settles its own from the ability's `target` and `range`, and answers `NoTarget`, `OutOfRange` or `InvalidTarget` when it cannot be aimed |
 | `clock.Now` | what time it is, in ticks. Divide by `TicksPerSecond` for a read-out |
 
 Content can ask the first two of those itself, which is how a test says what a keeper may *not* do yet: `leader.is_ready(Bulwark)` is whether the cooldown has run out, and `leader.can_use(Bulwark)` also asks whether anything is in reach.

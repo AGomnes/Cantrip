@@ -212,7 +212,7 @@ namespace Cantrip.GodotAdapter
             GameState? state = State
                 ?? gameEvent.Target?.State
                 ?? gameEvent.Source?.State
-                ?? gameEvent.Card?.State;
+                ?? gameEvent.Action?.State;
             if (state == null) return;
 
             Buffer.Add(gameEvent, state, TrackedStats);
@@ -289,7 +289,7 @@ namespace Cantrip.GodotAdapter
             map["self"] = context?.Self?.Id ?? 0;
             map["source"] = context?.Source?.Id ?? 0;
             map["target"] = context?.Target?.Id ?? 0;
-            map["card"] = context?.Card?.Id ?? 0;
+            map["card"] = context?.Action?.Id ?? 0;
             map["event"] = context?.Event?.Name ?? string.Empty;
             return map;
         }

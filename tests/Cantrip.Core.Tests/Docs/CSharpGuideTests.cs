@@ -159,7 +159,7 @@ namespace Cantrip.Tests.Docs
             public List<Seen> Events { get; } = new List<Seen>();
 
             public override void OnEvent(GameEvent gameEvent) =>
-                Events.Add(new Seen(gameEvent, gameEvent.Name, gameEvent.Source, gameEvent.Target, gameEvent.Card?.Zone));
+                Events.Add(new Seen(gameEvent, gameEvent.Name, gameEvent.Source, gameEvent.Target, gameEvent.Action?.Zone));
 
             public List<string> Names() => Events.Select(e => e.Name).ToList();
         }
@@ -203,7 +203,7 @@ namespace Cantrip.Tests.Docs
 
             // While its own events resolve, the card is in the play zone.
             Seen played = host.Events.Last();
-            Assert.Same(card, played.Event.Card);
+            Assert.Same(card, played.Event.Action);
             Assert.Equal(Zones.Play, played.CardZone);
             Assert.Equal(1, played.Event.Amount.ToInt());   // the energy paid, which raises nothing of its own
 

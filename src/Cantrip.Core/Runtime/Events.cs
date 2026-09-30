@@ -38,8 +38,18 @@ namespace Cantrip.Runtime
         /// <summary>Who or what it happened to.</summary>
         public Entity? Target { get; set; }
 
-        /// <summary>The card involved, for card flow events and damage dealt by cards.</summary>
-        public Entity? Card { get; set; }
+        /// <summary>
+        /// The action involved: the card for card flow events and for damage dealt by a card, and
+        /// whatever else an effect was running as. Content reads it as <c>event.card</c>, which keeps
+        /// its word.
+        /// </summary>
+        /// <remarks>
+        /// Named <c>Card</c> until 1.0, beside an <see cref="EvalContext"/> and a
+        /// <see cref="ModifierQuery"/> whose same-named member already carried abilities. One word
+        /// across the three is worth more than three spellings of it, and <c>Action</c> is the word an
+        /// ability needs here.
+        /// </remarks>
+        public Entity? Action { get; set; }
 
         /// <summary>The quantity involved. Before-phase listeners may change it.</summary>
         public Num Amount { get; set; }

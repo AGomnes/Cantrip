@@ -100,7 +100,7 @@ namespace Cantrip
 
         /// <summary>
         /// Something an actor uses directly rather than playing from hand: the real-time verb. It has a
-        /// cooldown instead of a cost, which is why <c>ActionResult.NotEnoughEnergy</c> never comes back
+        /// cooldown instead of a cost, which is why <c>ActionResult.CannotAfford</c> never comes back
         /// from using one.
         /// </summary>
         Ability = 4,

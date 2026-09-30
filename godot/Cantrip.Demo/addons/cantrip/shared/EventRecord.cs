@@ -39,7 +39,7 @@ namespace Cantrip.GodotAdapter
             long time,
             int source,
             int target,
-            int card,
+            int action,
             Num amount,
             bool replaced = false,
             IReadOnlyList<string>? tags = null,
@@ -52,7 +52,7 @@ namespace Cantrip.GodotAdapter
             Time = time;
             Source = source;
             Target = target;
-            Card = card;
+            Action = action;
             Amount = amount;
             Replaced = replaced;
             Tags = tags ?? NoTags;
@@ -85,8 +85,17 @@ namespace Cantrip.GodotAdapter
         /// <summary>Entity id of whoever it happened to, or 0.</summary>
         public int Target { get; }
 
-        /// <summary>Entity id of the card involved, or 0.</summary>
-        public int Card { get; }
+        /// <summary>
+        /// Entity id of the action involved — the card played, or whatever else the effect was
+        /// running as — or 0. It crosses into script as <c>["card"]</c>, which keeps its key.
+        /// </summary>
+        /// <remarks>
+        /// Named <c>Card</c> until 1.0, with <c>GameEvent.Card</c>, which is <c>GameEvent.Action</c>
+        /// now. The dictionary key does not move with it: a key is invisible to GDScript until the
+        /// line runs, so it is frozen as firmly as a method signature, and every game that reads
+        /// <c>event["card"]</c> goes on reading it.
+        /// </remarks>
+        public int Action { get; }
 
         public Num Amount { get; }
 

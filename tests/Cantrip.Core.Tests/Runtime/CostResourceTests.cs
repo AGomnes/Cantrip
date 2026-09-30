@@ -1,3 +1,4 @@
+using System;
 using Cantrip.Runtime;
 using Xunit;
 using static Cantrip.Tests.Runtime.RuntimeTestKit;
@@ -67,11 +68,35 @@ namespace Cantrip.Tests.Runtime
             CardRuntime runtime = Ready();
             runtime.Player!.SetBase("bones", 1);
 
-            Assert.Equal(ActionResult.NotEnoughEnergy, runtime.Play(runtime.AddCard("Bone Bargain", Zones.Hand), null));
+            Assert.Equal(ActionResult.CannotAfford, runtime.Play(runtime.AddCard("Bone Bargain", Zones.Hand), null));
 
             // Refused, not merely ineffective: nothing was spent and nothing happened.
             Assert.Equal(1, runtime.Player.GetInt("bones"));
             Assert.Equal(0, runtime.Player.GetInt("gold"));
+        }
+
+        /// <summary>
+        /// The refusal must not name a resource the card is not priced in. It was
+        /// <c>NotEnoughEnergy</c> until 1.0, and <c>"not_enough_energy"</c> in Godot, so a card priced
+        /// <c>cost 2 bones</c> refused with the word <c>energy</c> — a lie today, in every game with a
+        /// second resource, and unfixable once the enum and the word are a promise.
+        /// </summary>
+        [Fact]
+        [Trait("Regression", "not-enough-energy-named-the-wrong-resource")]
+        public void The_refusal_never_names_energy_for_a_card_priced_in_something_else()
+        {
+            CardRuntime runtime = Ready();
+            Entity card = runtime.AddCard("Bone Bargain", Zones.Hand);
+            runtime.Player!.SetBase("bones", 1);
+
+            ActionResult refused = runtime.Play(card, null);
+
+            Assert.Equal(ActionResult.CannotAfford, refused);
+            Assert.DoesNotContain("energy", refused.ToString(), StringComparison.OrdinalIgnoreCase);
+
+            // What a message to the player is built from instead, and it says bones.
+            Assert.Equal("bones", runtime.CostResourceOf(card));
+            Assert.Equal(2, runtime.CostOf(card));
         }
 
         [Fact]
@@ -93,7 +118,7 @@ namespace Cantrip.Tests.Runtime
             runtime.Player!.SetBase("bones", 2);
 
             // Tax makes it cost three, so two bones is no longer enough.
-            Assert.Equal(ActionResult.NotEnoughEnergy, runtime.Play(runtime.AddCard("Bone Bargain", Zones.Hand), null));
+            Assert.Equal(ActionResult.CannotAfford, runtime.Play(runtime.AddCard("Bone Bargain", Zones.Hand), null));
 
             runtime.Player.SetBase("bones", 3);
             Assert.Equal(ActionResult.Played, runtime.Play(runtime.AddCard("Bone Bargain", Zones.Hand), null));

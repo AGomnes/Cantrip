@@ -23,7 +23,7 @@ namespace Cantrip.GodotAdapter.Tests.Shared
 
         public override void OnEvent(GameEvent gameEvent)
         {
-            GameState? state = State ?? gameEvent.Target?.State ?? gameEvent.Source?.State ?? gameEvent.Card?.State;
+            GameState? state = State ?? gameEvent.Target?.State ?? gameEvent.Source?.State ?? gameEvent.Action?.State;
             if (state == null) return;
 
             Buffer.Add(gameEvent, state, TrackedStats);

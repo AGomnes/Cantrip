@@ -51,8 +51,8 @@ namespace Cantrip.Runtime
 
         /// <summary>
         /// A question for the pipeline. Set <see cref="Subject"/> at least; for an action channel set
-        /// <see cref="Source"/>, <see cref="Card"/> and <see cref="Tags"/> too, or filters that look at
-        /// them will not match.
+        /// <see cref="Source"/>, <see cref="Action"/> and <see cref="Tags"/> too, or filters that look
+        /// at them will not match.
         /// </summary>
         public ModifierQuery(string channel) => Channel = channel;
 
@@ -65,8 +65,18 @@ namespace Cantrip.Runtime
         /// <summary>Who is acting: the attacker for <c>damage</c>, the healer for <c>heal</c>.</summary>
         public Entity? Source { get; set; }
 
-        /// <summary>The card the action came from, when there is one, so a <c>card:</c> filter has something to read.</summary>
-        public Entity? Card { get; set; }
+        /// <summary>
+        /// The action this value came from, when there is one: the card being played, or the ability
+        /// being used. It is what the <c>card:</c> qualifier reads.
+        /// </summary>
+        /// <remarks>
+        /// It was called <c>Card</c> until 1.0 and held an ability all along — the <c>targetable</c>
+        /// channel sets it from whatever is being aimed, and <c>cost</c> and <c>cooldown</c> from
+        /// whatever is priced — so the name was wrong on the day it was written and would have been
+        /// frozen wrong. The DSL's <c>card:</c> filter keeps its word, because that is frozen content
+        /// vocabulary and reads correctly in the case content overwhelmingly writes.
+        /// </remarks>
+        public Entity? Action { get; set; }
 
         /// <summary>
         /// The action's own tags — <c>fire</c> on fire damage — which a <c>tag:</c> filter tests. Empty
@@ -150,8 +160,21 @@ namespace Cantrip.Runtime
         }
     }
 
-    /// <summary>Evaluates a modifier's scope, filter and amount. Implemented by the interpreter.</summary>
-    public interface IModifierEvaluator
+    /// <summary>
+    /// Evaluates a modifier's scope, filter and amount. Implemented by the interpreter, and by
+    /// nothing else.
+    /// </summary>
+    /// <remarks>
+    /// Internal because it is unimplementable from outside and always was. <c>Interpreter</c> is
+    /// the only implementer, implements both members explicitly, and is handed to the pipeline by
+    /// the runtime that builds it — the setter of <see cref="ModifierPipeline.Evaluator"/> has been
+    /// internal since a null there was found to stop every modifier applying in silence. So nothing
+    /// outside the library could ever supply one, and the pipeline is not one of the four seams
+    /// <c>docs/stability.md</c> promises may grow a member with a default. Left public it would
+    /// have carried an interface's whole freeze cost — a member added in 1.x breaking every
+    /// implementation of it — and none of the escape hatch, for a surface nobody can implement.
+    /// </remarks>
+    internal interface IModifierEvaluator
     {
         /// <summary>Whether this modifier's scope and filter match the value being computed.</summary>
         bool Applies(Modifier modifier, ModifierQuery query);
@@ -183,10 +206,11 @@ namespace Cantrip.Runtime
         internal ModifierPipeline(GameState state) => _state = state;
 
         /// <summary>
-        /// The interpreter, set when it is built. Settable only inside the library: a null here
-        /// stops every modifier applying, silently, and the pipeline is not a seam a game replaces.
+        /// The interpreter, set when it is built. Internal both ways, because
+        /// <see cref="IModifierEvaluator"/> is: a null here stops every modifier applying, silently,
+        /// and the pipeline is not a seam a game replaces.
         /// </summary>
-        public IModifierEvaluator? Evaluator { get; internal set; }
+        internal IModifierEvaluator? Evaluator { get; set; }
 
         /// <summary>How many modifiers are registered, across every channel and owner.</summary>
         public int Count { get; private set; }

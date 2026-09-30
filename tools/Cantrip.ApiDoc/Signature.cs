@@ -85,6 +85,12 @@ public static class Signature
 
             foreach (INamedTypeSymbol contract in type.Interfaces.OrderBy(i => i.Name, StringComparer.Ordinal))
             {
+                // An interface a reader cannot see is not part of the surface this page describes,
+                // and naming one would send them looking for a type that is not in it:
+                // `Interpreter : IModifierEvaluator` for an interface that is internal. An error
+                // type is kept, because that is the unresolved-base case the comment above covers.
+                if (contract.TypeKind != TypeKind.Error && contract.DeclaredAccessibility != Accessibility.Public) continue;
+
                 bases.Add(contract.ToDisplayString(TypeReferenceFormat));
             }
 

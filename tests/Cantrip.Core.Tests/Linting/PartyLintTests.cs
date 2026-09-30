@@ -92,6 +92,103 @@ namespace Cantrip.Tests.Linting
         }
 
         /// <summary>
+        /// The hole the list left, and the worst one: a listener on a <c>hero</c>.
+        /// <c>hero "Cleric" / on damaged: block 2 to player</c> blocked the <em>leader</em> whenever
+        /// the Cleric was damaged, quietly, in the one declaration a party game has most of. The rule
+        /// is every body on every declaration now, so an <c>actor</c> and a <c>keyword</c> are in too,
+        /// and so are a <c>modify</c> line and a <c>target … where</c> filter.
+        /// </summary>
+        [Theory]
+        [Trait("Regression", "ct326-was-a-list-of-places-with-holes")]
+        [InlineData("""
+            hero "Cleric"
+              hp 24
+              on damaged:
+                block 2 to player
+            """, "a hero's listener", "self")]
+        [InlineData("""
+            hero "Cleric"
+              hp 24
+              effect:
+                block 2 to player
+            """, "a hero's effect", "self")]
+        [InlineData("""
+            actor "Squire"
+              hp 12
+              on turn_start:
+                heal 1 to player
+            """, "an actor's listener", "self")]
+        [InlineData("""
+            keyword "Thorned"
+              on damaged:
+                deal 1 to player
+            """, "a keyword's listener", "owner")]
+        [InlineData("""
+            card "Ward"
+              cost 1
+              modify block of player: +2
+            """, "a card's `modify` line", "target")]
+        [InlineData("""
+            card "Snipe"
+              cost 1
+              target enemy where it != player
+              effect:
+                deal 3 to target
+            """, "a card's `target` filter", "target")]
+        public void Every_body_on_every_declaration_is_checked(string body, string place, string fix)
+        {
+            Diagnostic error = Assert.Single(Coded(Party + body, Linter.PlayerWhereAMemberIsMeant));
+
+            Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+            Assert.Contains(place, error.Message);
+            Assert.Contains("`leader`", error.Message);
+            Assert.Contains("`party`", error.Message);
+            Assert.Equal(fix, error.Suggestion);
+        }
+
+        /// <summary>
+        /// A <c>keyword</c> is carried, so it keeps the owner exception a <c>status</c> and a
+        /// <c>relic</c> have: there is no member in view in a listener about the holder alone.
+        /// </summary>
+        [Fact]
+        public void A_carried_listener_about_its_own_owner_keeps_player_whatever_carries_it()
+        {
+            Assert.Empty(Coded(Party + """
+                keyword "Blessed"
+                  on owner.turn_start:
+                    block 1 to player
+
+                item "Flask"
+                  on battle_start:
+                    heal 2 to player
+                """, Linter.PlayerWhereAMemberIsMeant));
+        }
+
+        /// <summary>
+        /// A content <c>verb</c> is deliberately left out, and this pins that decision rather than
+        /// leaving it to omission. A verb has no owner, so neither <c>self</c> nor <c>owner</c> exists
+        /// inside one and its <c>target</c> is whatever its caller bound: there is no word CT326 could
+        /// name, and it is an error rather than a warning precisely because it can always name one.
+        /// <c>player</c> in a verb is often right, too — a run's own pool — and the body that calls it
+        /// is checked, which is where the leader-or-member decision is actually written. Severity may
+        /// rise in a 1.x release, so a verb can still be warned about later; naming the wrong word now
+        /// could not be taken back.
+        /// </summary>
+        [Fact]
+        public void A_verb_may_still_say_player_and_that_is_on_purpose()
+        {
+            Assert.Empty(Coded(Party + """
+                verb score(c):
+                  gain 1 gold to player
+
+                card "Cash In"
+                  cost 0
+                  effect:
+                    score self
+                """, Linter.PlayerWhereAMemberIsMeant));
+        }
+
+        /// <summary>
         /// The whole reason it can be an error rather than a warning: it only ever applies to
         /// content that opted into a party, and nobody has shipped one.
         /// </summary>
@@ -117,7 +214,7 @@ namespace Cantrip.Tests.Linting
         /// itself is meant: relics, gold, anything the party as a whole owns.
         /// </summary>
         [Fact]
-        public void Player_is_still_right_outside_the_three_bodies_that_act_on_somebody()
+        public void Player_is_still_right_wherever_the_run_itself_is_meant()
         {
             Assert.Empty(Coded(Party + """
                 relic "Purse"

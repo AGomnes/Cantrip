@@ -41,25 +41,55 @@ namespace Cantrip
         Unplayable,
 
         /// <summary>
-        /// The card costs more of its resource than the actor has. An ability has no cost, so
-        /// <see cref="CardRuntime.UseAbility"/> never answers this; see <see cref="NotReady"/>.
+        /// The card costs more of its resource than the payer has — <em>whichever</em> resource that
+        /// is. A card priced <c>cost 2 bones</c> is refused with this, so the word cannot say
+        /// <c>energy</c>: it said so until 1.0, and it was a lie in every game with a second
+        /// resource. <see cref="CardRuntime.CostResourceOf"/> names the resource and
+        /// <see cref="CardRuntime.CostOf"/> the price, which is what a message to the player needs.
+        /// An ability has no cost, so <see cref="CardRuntime.UseAbility"/> never answers this; see
+        /// <see cref="NotReady"/>.
         /// </summary>
-        NotEnoughEnergy,
+        CannotAfford,
 
         /// <summary>
-        /// Nothing legal to aim at. It is one answer for four different refusals, and telling them
-        /// apart means asking <see cref="CardRuntime.LegalTargets"/> what was left: the target
-        /// given is not among them; the card's own <c>target ... where</c> excluded everything; a
-        /// taunt drew targeting elsewhere; or the side it asks for has nobody alive on it. On a
-        /// board it is most often <c>range</c>: the card cannot reach from where its side stands.
+        /// Somebody was named, or settled on, that the action will not take: the wrong side, not an
+        /// actor, not alive, excluded by the action's own <c>target … where</c>, or drawn away by a
+        /// taunt or hidden by a stealth on the <c>targetable</c> channel. It is about <em>who</em>,
+        /// and it is the answer to ask <see cref="CardRuntime.LegalTargets"/> about, because the
+        /// list is the filter's own answer.
         /// </summary>
         /// <remarks>
-        /// It stays one word because the enum is frozen for the 1.x line and the four are not
-        /// equally worth telling apart; <c>reference/FINDINGS.md</c> #9 is the case for splitting
-        /// it, left on record. <c>docs/troubleshooting.md</c> has how to find out which of the four
-        /// it was.
+        /// Reach and an empty table used to come back as this too. They are
+        /// <see cref="OutOfRange"/> and <see cref="NoTarget"/> now, which narrows what this word
+        /// means — and narrowing it is why both had to exist before 1.0 rather than after it: a game
+        /// that wrote <c>if (result == InvalidTarget) ShowOutOfRangeHint()</c> would have gone on
+        /// compiling and quietly stopped firing.
         /// </remarks>
         InvalidTarget,
+
+        /// <summary>
+        /// Everyone the action could have aimed at is too far away, or the one named is. Reach is
+        /// the action's printed <c>range</c> after the <c>range</c> channel has had it, so a status
+        /// that shortens reach answers this as much as a card that printed a short one.
+        /// </summary>
+        /// <remarks>
+        /// It is the refusal a player can do something about — move, or pick a nearer target — which
+        /// is the whole reason it is worth a word of its own. On a <c>facing</c> board the distance
+        /// across the sides is <c>a.rank + b.rank + 1</c>, so a back rank facing a back rank on a
+        /// 2×2 board is three steps; <c>docs/troubleshooting.md</c> has the arithmetic.
+        /// </remarks>
+        OutOfRange,
+
+        /// <summary>
+        /// There is nobody on the side the action asks for: <c>target enemy</c> with no enemy alive.
+        /// Nothing was filtered out and nothing was too far away — the table is empty.
+        /// </summary>
+        /// <remarks>
+        /// In a turn game this usually means the battle should already have ended, and it is worth
+        /// treating as a bug in the game's own loop rather than as something to tell the player. In
+        /// a real-time game between waves it is ordinary.
+        /// </remarks>
+        NoTarget,
 
         /// <summary>
         /// A <c>choose</c> or <c>discover</c> was answered with nothing, or the game called
@@ -1195,7 +1225,7 @@ namespace Cantrip
             if (IsXCost(action)) return action.Controller.GetInt(CostResourceOf(action));
 
             // From the base cost: action.Get("cost") would already have run the cost channel once.
-            var query = new ModifierQuery("cost") { Subject = action, Source = action.Controller, Card = action, Tags = action.Tags.ToArray() };
+            var query = new ModifierQuery("cost") { Subject = action, Source = action.Controller, Action = action, Tags = action.Tags.ToArray() };
             Num cost = State.Modifiers.Compute(query, action.GetBase("cost"));
             return Math.Max(0, cost.Floor().ToInt());
         }
@@ -1257,16 +1287,17 @@ namespace Cantrip
             Entity payer = card.Controller;
             Entity player = performer != null && performer.Kind == EntityKind.Actor && performer.IsAlive ? performer : payer;
             int cost = CostOf(card);
-            // A card priced in something else is refused the same way, so NotEnoughEnergy now means
-            // "not enough of whatever this costs".
+            // A card priced in something else is refused the same way, which is why the word is
+            // CannotAfford: it means "not enough of whatever this costs", and `energy` in its name
+            // was a lie the day the first `cost 2 bones` card was written.
             string resource = CostResourceOf(card);
-            if (!free && !IsXCost(card) && payer.GetInt(resource) < cost) return ActionResult.NotEnoughEnergy;
+            if (!free && !IsXCost(card) && payer.GetInt(resource) < cost) return ActionResult.CannotAfford;
 
-            if (!TryResolveTarget(card, ref target, automatic: from == null, user: player)) return ActionResult.InvalidTarget;
+            if (TryResolveTarget(card, ref target, automatic: from == null, user: player) is ActionResult refused) return refused;
 
             if (_runDepth == 0) Interpreter.ResetSteps();
             string startedIn = card.Zone;
-            var context = new EvalContext(card) { Source = player, Target = target, Card = card, Chain = chain ?? Interpreter.NewChain() };
+            var context = new EvalContext(card) { Source = player, Target = target, Action = card, Chain = chain ?? Interpreter.NewChain() };
 
             // `, free` changes what is paid, never what the card sees: an X card played free still
             // spends nothing but still knows how much the payer had, or it would do nothing at all.
@@ -1274,7 +1305,7 @@ namespace Cantrip
             int paid = free ? 0 : cost;
 
             // What was actually paid, so "gain 1 hp per energy spent" stays honest about a free play.
-            var gameEvent = new GameEvent("card_played") { Source = player, Target = target, Card = card, Amount = paid };
+            var gameEvent = new GameEvent("card_played") { Source = player, Target = target, Action = card, Amount = paid };
             foreach (string tag in card.Tags) gameEvent.Tags.Add(tag);
 
             _runDepth++;
@@ -1417,7 +1448,12 @@ namespace Cantrip
         /// through a <see cref="DeferredChooser"/> is answer number one and replays in the same
         /// place as any other choice the action goes on to make.
         /// </remarks>
-        private bool TryResolveTarget(Entity action, ref Entity? target, bool automatic = false, Entity? user = null)
+        /// <returns>
+        /// Null when a target is settled, and otherwise the refusal: <see cref="ActionResult.OutOfRange"/>,
+        /// <see cref="ActionResult.NoTarget"/> or <see cref="ActionResult.InvalidTarget"/>. It used to
+        /// answer a bool and leave the caller to say <c>InvalidTarget</c> for all three.
+        /// </returns>
+        private ActionResult? TryResolveTarget(Entity action, ref Entity? target, bool automatic = false, Entity? user = null)
         {
             user ??= action.Controller;
             TargetRule rule = TargetRule.Of(action.Definition);
@@ -1427,30 +1463,61 @@ namespace Cantrip
                 case "enemy":
                 case "ally":
                 {
-                    if (target != null) return Interpreter.IsLegalTarget(rule, user, action, target);
+                    if (target != null) return RefuseNamed(Interpreter.Verdict(rule, user, action, target));
 
                     IReadOnlyList<Entity> candidates = Interpreter.LegalTargets(rule, user, action);
-                    if (candidates.Count == 0) return false;
+                    if (candidates.Count == 0) return RefuseNobody(Interpreter.WhyNobody(rule, user, action));
 
                     // One candidate is not a choice, so nobody is asked and nothing is rolled — which
                     // is also why a party of one behaves exactly as it always has.
                     target = candidates.Count == 1 ? candidates[0]
                         : automatic ? candidates[State.Rng.NextInt(0, candidates.Count - 1)]
                         : Chooser.Choose(new ChoiceRequest("choose a target", candidates, 1, 1, user, action.Definition!.Syntax.Span), State)?.FirstOrDefault(candidates.Contains) ?? candidates[0];
-                    return true;
+                    return null;
                 }
 
                 case "self":
                     target = user;
-                    return true;
+                    return null;
 
                 case "any":
-                    return target == null || Interpreter.IsLegalTarget(rule, user, action, target);
+                    return target == null ? null : RefuseNamed(Interpreter.Verdict(rule, user, action, target));
 
                 default:
-                    return true;
+                    return null;
             }
         }
+
+        /// <summary>
+        /// The refusal for somebody the caller named. Reach is the one worth telling apart, because
+        /// it is the one the player can do something about; everything else — the wrong side, a
+        /// corpse, an entity that is not an actor, the action's own filter, a taunt — is
+        /// <see cref="ActionResult.InvalidTarget"/>, which is exactly what that word now means.
+        /// </summary>
+        /// <remarks>
+        /// Naming a corpse is deliberately not <see cref="ActionResult.NoTarget"/>: there may be
+        /// three enemies standing, and "nobody to aim at" would be false.
+        /// </remarks>
+        private static ActionResult? RefuseNamed(TargetVerdict verdict) => verdict switch
+        {
+            TargetVerdict.Legal => null,
+            TargetVerdict.OutOfReach => ActionResult.OutOfRange,
+            _ => ActionResult.InvalidTarget,
+        };
+
+        /// <summary>
+        /// The refusal for an action that had to settle its own target and found nobody. An empty
+        /// side is <see cref="ActionResult.NoTarget"/>, reach alone is
+        /// <see cref="ActionResult.OutOfRange"/>, and anything a filter or a taunt had a hand in is
+        /// <see cref="ActionResult.InvalidTarget"/>.
+        /// </summary>
+        private static ActionResult? RefuseNobody(TargetVerdict verdict) => verdict switch
+        {
+            TargetVerdict.Legal => null,
+            TargetVerdict.NotSomebody => ActionResult.NoTarget,
+            TargetVerdict.OutOfReach => ActionResult.OutOfRange,
+            _ => ActionResult.InvalidTarget,
+        };
 
         // Target validity ----------------------------------------------------------------------
         //
@@ -1693,15 +1760,19 @@ namespace Cantrip
         /// <returns>
         /// <see cref="ActionResult.Played"/> when it ran, <see cref="ActionResult.NotReady"/> while it
         /// is still on cooldown, <see cref="ActionResult.NotACard"/> when the ability has been removed
-        /// or its owner is gone or dead, and <see cref="ActionResult.ChoicePending"/> when it stopped
-        /// to ask the player something.
+        /// or its owner is gone or dead, one of <see cref="ActionResult.NoTarget"/>,
+        /// <see cref="ActionResult.OutOfRange"/> and <see cref="ActionResult.InvalidTarget"/> when it
+        /// cannot be aimed, and <see cref="ActionResult.ChoicePending"/> when it stopped to ask the
+        /// player something.
         /// </returns>
         /// <remarks>
-        /// An ability reads its own <c>target</c> line exactly as a card does, so
-        /// <see cref="ActionResult.InvalidTarget"/> means the same here as there: an ability that
-        /// asks for an enemy and has none left is refused rather than run at nobody. An ability has
-        /// no cost, so it still never answers <see cref="ActionResult.NotEnoughEnergy"/>; that one is
-        /// here for the day it does, so adding it is not a change to this signature.
+        /// An ability reads its own <c>target</c> line exactly as a card does, so the three
+        /// targeting refusals mean the same here as there: <see cref="ActionResult.NoTarget"/> for an
+        /// ability that asks for an enemy and has none left, <see cref="ActionResult.OutOfRange"/>
+        /// for one that cannot reach from where its owner stands, and
+        /// <see cref="ActionResult.InvalidTarget"/> for somebody it will not take. An ability has no
+        /// cost, so it still never answers <see cref="ActionResult.CannotAfford"/>; that one is here
+        /// for the day it does, so adding it is not a change to this signature.
         /// </remarks>
         public ActionResult UseAbility(Entity ability, Entity? target = null)
         {
@@ -1722,7 +1793,7 @@ namespace Cantrip
             // An ability aims the way a card does: the chooser is offered only legal candidates, a
             // taunt narrows them, and nothing to aim at refuses the cast rather than running it at
             // nobody. Before this, `target` on an ability was read by nothing at all.
-            if (!TryResolveTarget(ability, ref target)) return ActionResult.InvalidTarget;
+            if (TryResolveTarget(ability, ref target) is ActionResult refused) return refused;
 
             Entity owner = ability.Owner;
             bool used = false;
@@ -2366,7 +2437,7 @@ namespace Cantrip
 
                 EvalContext replay = call.Context.Derive();
                 replay.Self = card ?? call.Context.Self;
-                replay.Card = card ?? call.Context.Card;
+                replay.Action = card ?? call.Context.Action;
                 replay.Target = target;
                 Interpreter.Execute(definition.Effect, replay);
             });

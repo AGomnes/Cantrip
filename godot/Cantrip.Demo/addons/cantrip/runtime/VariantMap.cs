@@ -54,7 +54,7 @@ namespace Cantrip.GodotAdapter
                 ["time"] = record.Time,
                 ["source"] = record.Source,
                 ["target"] = record.Target,
-                ["card"] = record.Card,
+                ["card"] = record.Action,
                 ["amount"] = record.AmountInt,
                 ["amount_raw"] = record.AmountRaw,
                 ["replaced"] = record.Replaced,

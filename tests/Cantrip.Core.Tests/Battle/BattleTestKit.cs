@@ -121,7 +121,7 @@ namespace Cantrip.Tests.Battle
             Name = gameEvent.Name;
             Source = gameEvent.Source;
             Target = gameEvent.Target;
-            Card = gameEvent.Card;
+            Card = gameEvent.Action;
             Amount = gameEvent.Amount.ToInt();
             Replaced = gameEvent.Replaced;
             Tags = gameEvent.Tags.OrderBy(t => t, StringComparer.Ordinal).ToArray();

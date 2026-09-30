@@ -165,8 +165,12 @@ func _use(ability: int, target: int) -> void:
 		_say("%s." % rules.GetEntity(ability)["name"])
 	elif answer == "not_ready":
 		_say("[color=#886]%s is still cooling.[/color]" % rules.GetEntity(ability)["name"])
+	elif answer == "no_target":
+		_say("[color=#886]%s has nothing to aim at.[/color]" % rules.GetEntity(ability)["name"])
+	elif answer == "out_of_range":
+		_say("[color=#886]%s cannot reach that far.[/color]" % rules.GetEntity(ability)["name"])
 	elif answer == "invalid_target":
-		_say("[color=#886]%s has nothing in reach.[/color]" % rules.GetEntity(ability)["name"])
+		_say("[color=#886]%s will not take that one.[/color]" % rules.GetEntity(ability)["name"])
 	aiming = 0
 	_refresh()
 

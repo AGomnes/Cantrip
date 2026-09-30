@@ -209,6 +209,71 @@ namespace Cantrip.Tests.Runtime
         }
 
         /// <summary>
+        /// Reach has its own refusal. Until 1.0, a card that could not reach was
+        /// <c>InvalidTarget</c> — the same word as a taunt, the card's own filter and an empty side —
+        /// and reach is the one of the four a player can do something about. Splitting it later would
+        /// have <em>narrowed</em> <c>InvalidTarget</c>, so a game that wrote
+        /// <c>if (result == InvalidTarget) ShowOutOfRangeHint()</c> would have kept compiling and
+        /// quietly stopped firing.
+        /// </summary>
+        [Fact]
+        [Trait("Regression", "invalid-target-was-five-refusals-in-one-word")]
+        public void A_card_that_cannot_reach_is_refused_as_out_of_range()
+        {
+            CardRuntime runtime = Board();
+            Entity front = Goon(runtime, 0, 0);
+            Entity behind = Goon(runtime, 0, 1);
+            Entity lunge = Card(runtime, "Lunge");
+
+            // Named: the Goon behind is two away and the lunge reaches one.
+            Assert.Equal(ActionResult.OutOfRange, runtime.Play(lunge, behind));
+            Assert.Equal(30, Hp(behind));
+            Assert.Equal(Zones.Hand, lunge.Zone);
+
+            // Settled: with the front Goon gone, reach is the whole of what is left in the way.
+            runtime.Execute("kill target", target: front);
+            Assert.Equal(ActionResult.OutOfRange, runtime.Play(lunge));
+            Assert.Equal(30, Hp(behind));
+        }
+
+        /// <summary>
+        /// A span refuses point blank as out of range too, because the near end of a reach is reach.
+        /// </summary>
+        [Fact]
+        public void A_span_that_cannot_shoot_point_blank_says_out_of_range()
+        {
+            CardRuntime runtime = Board();
+            Entity front = Goon(runtime, 0, 0);
+
+            Assert.Equal(ActionResult.OutOfRange, runtime.Play(Card(runtime, "Longbow"), front));
+        }
+
+        /// <summary>
+        /// Out of range only when reach is unanimous. One enemy too far and another behind a stealth
+        /// is <c>InvalidTarget</c>: "move closer" would send the player at somebody they still could
+        /// not hit.
+        /// </summary>
+        [Fact]
+        public void Out_of_range_is_only_said_when_reach_is_the_whole_of_the_problem()
+        {
+            CardRuntime runtime = Create(Line + """
+
+                status "Hidden"
+                  stacking none
+                  modify targetable: set 0
+                """);
+            Start(runtime);
+
+            Entity front = Goon(runtime, 0, 0);
+            Goon(runtime, 0, 1);
+            runtime.Interpreter.ApplyStatus(runtime.Content.Find("Hidden", "status")!, front, Num.One, null, new EvalContext(front));
+
+            // The one in reach is hidden and the one that is not is too far.
+            Assert.Empty(runtime.LegalTargets(Card(runtime, "Lunge")));
+            Assert.Equal(ActionResult.InvalidTarget, runtime.Play(Card(runtime, "Lunge")));
+        }
+
+        /// <summary>
         /// The printed range is the base of the `range` channel, so a status shortens a longbow into
         /// a melee weapon rather than into something that can no longer reach anything at all.
         /// </summary>

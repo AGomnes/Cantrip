@@ -31,7 +31,6 @@ Part of [the API reference](README.md). The guides are [docs/csharp.md](../cshar
 | [`IChoiceProvider`](#ichoiceprovider) | Pluggable decision maker: UI, AI, random or scripted. Answers must be a subset of `ChoiceRequest.Options`; anything else is ignored. |
 | [`IEffectHost`](#ieffecthost) | The game's side of the integration. Everything is optional: a host only implements the parts the library cannot know, such as spatial queries or presentation. |
 | [`IGameClock`](#igameclock) | Abstract game time. The core only ever sees whole units: a `TurnClock` advances one unit per turn and a `TickClock` one unit per fixed-timestep tick, so durations, cooldowns and `every` triggers share one code path. |
-| [`IModifierEvaluator`](#imodifierevaluator) | Evaluates a modifier's scope, filter and amount. Implemented by the interpreter. |
 | [`Interpreter`](#interpreter) | The tree-walking interpreter. It evaluates expressions, executes statements, dispatches events and resolves the trigger queue. All randomness goes through `GameState.Rng` and all arithmetic through `Num`, so a run is fully determined by its seed and its inputs. |
 | [`Listener`](#listener) | A registered `on ...:` block, bound to the entity that declared it. |
 | [`ListenerDueSnapshot`](#listenerduesnapshot) | When an `on every ...:` listener of one entity is next due to fire. |
@@ -1155,10 +1154,12 @@ A root context for running content outside a listener. It starts a fresh chain, 
 ### Properties
 
 ```csharp
-public Entity? Card { get; set; }
+public Entity? Action { get; set; }
 ```
 
-The card being played, if any. Its tags become the tags of the damage it deals.
+The action being run, if any: the card being played, or — through a modifier's query — the ability being aimed or priced. Its tags become the tags of the damage it deals, and content reads it as `card`, which keeps its word.
+
+It was `Card` until 1.0. `ModifierQuery.Action` is copied straight into it when a modifier's filter or amount is evaluated, and that one has always been able to hold an ability, so the old name was already wrong here.
 
 ```csharp
 public Chain Chain { get; set; }
@@ -1345,6 +1346,14 @@ An event a verb or a game is about to raise. Building one does nothing; the inte
 ### Properties
 
 ```csharp
+public Entity? Action { get; set; }
+```
+
+The action involved: the card for card flow events and for damage dealt by a card, and whatever else an effect was running as. Content reads it as `event.card`, which keeps its word.
+
+Named `Card` until 1.0, beside an `EvalContext` and a `ModifierQuery` whose same-named member already carried abilities. One word across the three is worth more than three spellings of it, and `Action` is the word an ability needs here.
+
+```csharp
 public Num Amount { get; set; }
 ```
 
@@ -1355,12 +1364,6 @@ public bool Cancelled { get; set; }
 ```
 
 Set by `cancel` in a before listener. The action and its after phase are skipped.
-
-```csharp
-public Entity? Card { get; set; }
-```
-
-The card involved, for card flow events and damage dealt by cards.
 
 ```csharp
 public Dictionary<string, Value> Data { get; }
@@ -2067,34 +2070,10 @@ Raised once per unit after the clock has moved, carrying the new `IGameClock.Now
 
 ---
 
-## IModifierEvaluator
-
-```csharp
-public interface IModifierEvaluator
-```
-
-Evaluates a modifier's scope, filter and amount. Implemented by the interpreter.
-
-### Methods
-
-```csharp
-Value Amount(Modifier modifier, ModifierQuery query)
-```
-
-What the modifier's right-hand side evaluates to for this query. It is evaluated per query, not once, because an amount may read the owner's stats.
-
-```csharp
-bool Applies(Modifier modifier, ModifierQuery query)
-```
-
-Whether this modifier's scope and filter match the value being computed.
-
----
-
 ## Interpreter
 
 ```csharp
-public sealed class Interpreter : IModifierEvaluator
+public sealed class Interpreter
 ```
 
 The tree-walking interpreter. It evaluates expressions, executes statements, dispatches events and resolves the trigger queue. All randomness goes through `GameState.Rng` and all arithmetic through `Num`, so a run is fully determined by its seed and its inputs.
@@ -2776,12 +2755,6 @@ public int Count { get; private set; }
 
 How many modifiers are registered, across every channel and owner.
 
-```csharp
-public IModifierEvaluator? Evaluator { get; internal set; }
-```
-
-The interpreter, set when it is built. Settable only inside the library: a null here stops every modifier applying, silently, and the pipeline is not a seam a game replaces.
-
 ### Methods
 
 ```csharp
@@ -2836,15 +2809,17 @@ What a value is being computed for. Stats use only `ModifierQuery.Subject`; acti
 public ModifierQuery(string channel)
 ```
 
-A question for the pipeline. Set `ModifierQuery.Subject` at least; for an action channel set `ModifierQuery.Source`, `ModifierQuery.Card` and `ModifierQuery.Tags` too, or filters that look at them will not match.
+A question for the pipeline. Set `ModifierQuery.Subject` at least; for an action channel set `ModifierQuery.Source`, `ModifierQuery.Action` and `ModifierQuery.Tags` too, or filters that look at them will not match.
 
 ### Properties
 
 ```csharp
-public Entity? Card { get; set; }
+public Entity? Action { get; set; }
 ```
 
-The card the action came from, when there is one, so a `card:` filter has something to read.
+The action this value came from, when there is one: the card being played, or the ability being used. It is what the `card:` qualifier reads.
+
+It was called `Card` until 1.0 and held an ability all along — the `targetable` channel sets it from whatever is being aimed, and `cost` and `cooldown` from whatever is priced — so the name was wrong on the day it was written and would have been frozen wrong. The DSL's `card:` filter keeps its word, because that is frozen content vocabulary and reads correctly in the case content overwhelmingly writes.
 
 ```csharp
 public string Channel { get; }

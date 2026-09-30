@@ -136,18 +136,18 @@ namespace Cantrip.Tests.Battle
         }
 
         [Fact]
-        public void NotEnoughEnergy_when_the_cost_exceeds_energy()
+        public void CannotAfford_when_the_cost_exceeds_energy()
         {
             var (runtime, player, enemy) = Setup();
             Entity heavy = runtime.AddCard("Heavy", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(ActionResult.NotEnoughEnergy, runtime.Play(heavy, enemy));
+            Assert.Equal(ActionResult.CannotAfford, runtime.Play(heavy, enemy));
             AssertNothingHappened(runtime, player, enemy, heavy);
         }
 
         [Fact]
-        public void NotEnoughEnergy_once_energy_has_been_spent()
+        public void CannotAfford_once_energy_has_been_spent()
         {
             var (runtime, player, enemy) = Setup();
             for (int i = 0; i < 4; i++) runtime.AddCard("Strike", Zones.Hand);
@@ -155,7 +155,7 @@ namespace Cantrip.Tests.Battle
 
             for (int i = 0; i < 3; i++) Assert.Equal(ActionResult.Played, runtime.Play("Strike", enemy));
 
-            Assert.Equal(ActionResult.NotEnoughEnergy, runtime.Play("Strike", enemy));
+            Assert.Equal(ActionResult.CannotAfford, runtime.Play("Strike", enemy));
             Assert.Equal(0, player.GetInt("energy"));
             Assert.Equal(12, enemy.GetInt("hp"));
             Assert.Single(BattleKit.Zone(runtime, Zones.Hand));
@@ -195,16 +195,39 @@ namespace Cantrip.Tests.Battle
             Assert.Equal(30, second.GetInt("hp"));
         }
 
+        /// <summary>
+        /// An empty side is <see cref="ActionResult.NoTarget"/> rather than
+        /// <see cref="ActionResult.InvalidTarget"/>: nothing was filtered out and nothing was too far
+        /// away, there is simply nobody there. It used to be the same word as a taunt and a filter,
+        /// and the two mean opposite things to a game — one is usually a bug in its own loop.
+        /// </summary>
         [Fact]
-        public void InvalidTarget_when_no_enemy_is_left_to_target()
+        public void NoTarget_when_no_enemy_is_left_to_target()
         {
             CardRuntime runtime = BattleKit.Create(Content);
             Entity player = runtime.CreatePlayer();
             Entity strike = runtime.AddCard("Strike", Zones.Hand);
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
 
-            Assert.Equal(ActionResult.InvalidTarget, runtime.Play(strike));
+            Assert.Equal(ActionResult.NoTarget, runtime.Play(strike));
             Assert.Equal(3, player.GetInt("energy"));
+        }
+
+        /// <summary>
+        /// Naming somebody who has fallen is still <see cref="ActionResult.InvalidTarget"/> and not
+        /// <see cref="ActionResult.NoTarget"/>, because there is another enemy standing: "nobody to
+        /// aim at" would be false.
+        /// </summary>
+        [Fact]
+        public void A_corpse_named_is_an_invalid_target_while_somebody_else_stands()
+        {
+            var (runtime, _, first) = Setup();
+            runtime.SpawnEnemy("Dummy");
+            Entity strike = runtime.AddCard("Strike", Zones.Hand);
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+            runtime.Execute("deal 100 to target", target: first);
+
+            Assert.Equal(ActionResult.InvalidTarget, runtime.Play(strike, first));
         }
 
         [Fact]

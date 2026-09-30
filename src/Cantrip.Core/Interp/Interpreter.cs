@@ -276,7 +276,7 @@ namespace Cantrip.Runtime
             {
                 Subject = candidate,
                 Source = source,
-                Card = action,
+                Action = action,
                 Tags = action == null ? Array.Empty<string>() : action.Tags.ToArray(),
             };
             return State.Modifiers.Compute(query, Num.One) > Num.Zero;
@@ -610,7 +610,7 @@ namespace Cantrip.Runtime
             action.Bindings["self"] = Value.FromEntity(context.Self);
             action.Bindings["source"] = Value.FromEntity(context.Source);
             action.Bindings["target"] = Value.FromEntity(context.Target);
-            action.Bindings["card"] = Value.FromEntity(context.Card);
+            action.Bindings["card"] = Value.FromEntity(context.Action);
         }
 
         /// <summary>Runs a scheduled block with the actors it captured when it was scheduled.</summary>
@@ -622,7 +622,7 @@ namespace Cantrip.Runtime
             {
                 Source = action.Bindings["source"].Entity,
                 Target = action.Bindings["target"].Entity,
-                Card = action.Bindings["card"].Entity,
+                Action = action.Bindings["card"].Entity,
                 Chain = NewChain(),
             };
 
@@ -734,7 +734,7 @@ namespace Cantrip.Runtime
             {
                 Source = query.Source,
                 Target = query.Subject,
-                Card = query.Card,
+                Action = query.Action,
                 It = query.Subject,
                 Focus = query,
             };
@@ -762,7 +762,7 @@ namespace Cantrip.Runtime
                 case "block":
                 case "heal":
                 case "draw":
-                    if (anchor.Kind == EntityKind.Card) return query.Card == anchor;
+                    if (anchor.Kind == EntityKind.Card) return query.Action == anchor;
                     return query.Source != null && query.Source.Controller == anchor.Controller;
 
                 case "damage_taken":

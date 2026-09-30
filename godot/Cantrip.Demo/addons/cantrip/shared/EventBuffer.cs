@@ -140,7 +140,7 @@ namespace Cantrip.GodotAdapter
                 state.Clock.Now,
                 gameEvent.Source?.Id ?? 0,
                 gameEvent.Target?.Id ?? 0,
-                gameEvent.Card?.Id ?? 0,
+                gameEvent.Action?.Id ?? 0,
                 gameEvent.Amount,
                 gameEvent.Replaced,
                 CopyTags(gameEvent),
@@ -179,7 +179,7 @@ namespace Cantrip.GodotAdapter
             Dictionary<int, IReadOnlyDictionary<string, int>>? stats = null;
             Capture(gameEvent.Target, trackedStats, ref stats);
             Capture(gameEvent.Source, trackedStats, ref stats);
-            Capture(gameEvent.Card, trackedStats, ref stats);
+            Capture(gameEvent.Action, trackedStats, ref stats);
             return stats ?? EventRecord.NoStats;
         }
 

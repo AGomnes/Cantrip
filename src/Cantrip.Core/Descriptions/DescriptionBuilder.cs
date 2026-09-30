@@ -1175,7 +1175,7 @@ namespace Cantrip.Descriptions
                 {
                     Source = entity.Kind == EntityKind.Card ? entity.Controller : entity,
                     Target = _live.Target ?? (IsStatus ? entity.Owner : null),
-                    Card = entity.Kind == EntityKind.Card ? entity : null,
+                    Action = entity.Kind == EntityKind.Card ? entity : null,
                 };
 
                 try
@@ -1210,22 +1210,22 @@ namespace Cantrip.Descriptions
                         if (command?.Clause("as") is ExprNode type && FirstWord(type) is string typeTag) tags.Add(typeTag);
                         string[] tagArray = tags.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
-                        Num value = state.Modifiers.Compute(new ModifierQuery("damage") { Source = source, Subject = _live.Target, Card = card, Tags = tagArray }, amount);
+                        Num value = state.Modifiers.Compute(new ModifierQuery("damage") { Source = source, Subject = _live.Target, Action = card, Tags = tagArray }, amount);
                         if (_live.Target != null)
-                            value = state.Modifiers.Compute(new ModifierQuery("damage_taken") { Source = source, Subject = _live.Target, Card = card, Tags = tagArray }, value);
+                            value = state.Modifiers.Compute(new ModifierQuery("damage_taken") { Source = source, Subject = _live.Target, Action = card, Tags = tagArray }, value);
                         return Num.Max(Num.Zero, value.Floor());
                     }
 
                     case "block":
                     case "heal":
                     {
-                        Num value = state.Modifiers.Compute(new ModifierQuery(channel) { Source = source, Subject = controller, Card = card }, amount);
-                        value = state.Modifiers.Compute(new ModifierQuery(channel + "_taken") { Source = source, Subject = controller, Card = card }, value);
+                        Num value = state.Modifiers.Compute(new ModifierQuery(channel) { Source = source, Subject = controller, Action = card }, amount);
+                        value = state.Modifiers.Compute(new ModifierQuery(channel + "_taken") { Source = source, Subject = controller, Action = card }, value);
                         return Num.Max(Num.Zero, value.Floor());
                     }
 
                     case "draw":
-                        return Num.Max(Num.Zero, state.Modifiers.Compute(new ModifierQuery("draw") { Source = controller, Subject = controller, Card = card }, amount).Floor());
+                        return Num.Max(Num.Zero, state.Modifiers.Compute(new ModifierQuery("draw") { Source = controller, Subject = controller, Action = card }, amount).Floor());
 
                     default:
                         return amount;

@@ -36,11 +36,13 @@ What a top-level action did. Every call that can stop for a choice reports it he
 | `NotACard = 1` | There is nothing to act on: the entity is not a card, or not an ability, or it has been removed, or the actor it belongs to is dead. |
 | `NotInHand = 2` | The card is not where it would have to be to be played: not in hand, or not in the pile a `from` named. It is also what `CardRuntime.Play(string, Entity, Entity)` answers when nothing in hand is called that. |
 | `Unplayable = 3` | The card is tagged `unplayable` — a curse, a wound, a status card — so no hand it is in ever offers it. Never being playable is the whole of what it is, which is why `cantrip sim` leaves one out of its "held but never playable" finding. |
-| `NotEnoughEnergy = 4` | The card costs more of its resource than the actor has. An ability has no cost, so `CardRuntime.UseAbility(Entity, Entity)` never answers this; see `ActionResult.NotReady`. |
-| `InvalidTarget = 5` | Nothing legal to aim at. It is one answer for four different refusals, and telling them apart means asking `CardRuntime.LegalTargets(Entity)` what was left: the target given is not among them; the card's own `target ... where` excluded everything; a taunt drew targeting elsewhere; or the side it asks for has nobody alive on it. On a board it is most often `range`: the card cannot reach from where its side stands. |
-| `Cancelled = 6` | A `choose` or `discover` was answered with nothing, or the game called `CardRuntime.CancelPending`. The action was rolled back, so nothing it had already done stands. |
-| `ChoicePending = 7` | The action needs a decision from the player. The game has been rolled back to where it was; see `CardRuntime.Pending` and answer with `CardRuntime.Answer(int[])`. |
-| `NotReady = 8` | An ability that is still on cooldown. See `CardRuntime.IsReady(Entity)`. |
+| `CannotAfford = 4` | The card costs more of its resource than the payer has — *whichever* resource that is. A card priced `cost 2 bones` is refused with this, so the word cannot say `energy`: it said so until 1.0, and it was a lie in every game with a second resource. `CardRuntime.CostResourceOf(Entity)` names the resource and `CardRuntime.CostOf(Entity)` the price, which is what a message to the player needs. An ability has no cost, so `CardRuntime.UseAbility(Entity, Entity)` never answers this; see `ActionResult.NotReady`. |
+| `InvalidTarget = 5` | Somebody was named, or settled on, that the action will not take: the wrong side, not an actor, not alive, excluded by the action's own `target … where`, or drawn away by a taunt or hidden by a stealth on the `targetable` channel. It is about *who*, and it is the answer to ask `CardRuntime.LegalTargets(Entity)` about, because the list is the filter's own answer. |
+| `OutOfRange = 6` | Everyone the action could have aimed at is too far away, or the one named is. Reach is the action's printed `range` after the `range` channel has had it, so a status that shortens reach answers this as much as a card that printed a short one. |
+| `NoTarget = 7` | There is nobody on the side the action asks for: `target enemy` with no enemy alive. Nothing was filtered out and nothing was too far away — the table is empty. |
+| `Cancelled = 8` | A `choose` or `discover` was answered with nothing, or the game called `CardRuntime.CancelPending`. The action was rolled back, so nothing it had already done stands. |
+| `ChoicePending = 9` | The action needs a decision from the player. The game has been rolled back to where it was; see `CardRuntime.Pending` and answer with `CardRuntime.Answer(int[])`. |
+| `NotReady = 10` | An ability that is still on cooldown. See `CardRuntime.IsReady(Entity)`. |
 
 ---
 
@@ -555,9 +557,9 @@ public ActionResult UseAbility(Entity ability, Entity? target = null)
 
 Uses an ability if it is off cooldown.
 
-**Returns.** `ActionResult.Played` when it ran, `ActionResult.NotReady` while it is still on cooldown, `ActionResult.NotACard` when the ability has been removed or its owner is gone or dead, and `ActionResult.ChoicePending` when it stopped to ask the player something.
+**Returns.** `ActionResult.Played` when it ran, `ActionResult.NotReady` while it is still on cooldown, `ActionResult.NotACard` when the ability has been removed or its owner is gone or dead, one of `ActionResult.NoTarget`, `ActionResult.OutOfRange` and `ActionResult.InvalidTarget` when it cannot be aimed, and `ActionResult.ChoicePending` when it stopped to ask the player something.
 
-An ability reads its own `target` line exactly as a card does, so `ActionResult.InvalidTarget` means the same here as there: an ability that asks for an enemy and has none left is refused rather than run at nobody. An ability has no cost, so it still never answers `ActionResult.NotEnoughEnergy`; that one is here for the day it does, so adding it is not a change to this signature.
+An ability reads its own `target` line exactly as a card does, so the three targeting refusals mean the same here as there: `ActionResult.NoTarget` for an ability that asks for an enemy and has none left, `ActionResult.OutOfRange` for one that cannot reach from where its owner stands, and `ActionResult.InvalidTarget` for somebody it will not take. An ability has no cost, so it still never answers `ActionResult.CannotAfford`; that one is here for the day it does, so adding it is not a change to this signature.
 
 ### Other
 
@@ -621,7 +623,7 @@ What an entity is. Everything in the game is an entity; this only affects defaul
 | `Card = 1` | Something played from a hand and paid for. The only kind `CardRuntime.Play(Entity, Entity, Entity)` accepts. |
 | `Status = 2` | A timed or stacking effect attached to an actor. Its count is the `stacks` stat, not a separate number. |
 | `Relic = 3` | A permanent held by an actor, live from the moment it is obtained until the run ends. |
-| `Ability = 4` | Something an actor uses directly rather than playing from hand: the real-time verb. It has a cooldown instead of a cost, which is why `ActionResult.NotEnoughEnergy` never comes back from using one. |
+| `Ability = 4` | Something an actor uses directly rather than playing from hand: the real-time verb. It has a cooldown instead of a cost, which is why `ActionResult.CannotAfford` never comes back from using one. |
 | `Keyword = 5` | A named rule with a tooltip, attached like a status but with no stacks or duration of its own. |
 | `Item = 6` | A consumable. It behaves as a relic does in every way the engine cares about; the distinction is the game's. |
 | `Global = 7` | Anything else, and what an unrecognised declaration becomes rather than failing to load. A definition that ended up here when it should not have is usually a misspelled kind word. |

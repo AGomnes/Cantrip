@@ -163,7 +163,7 @@ while (runtime.Won == null)
 Console.WriteLine(runtime.Won == true ? "The Ghoul falls." : "You fall.");
 ```
 
-Run it with `dotnet run`. Each line shows a card's cost and its rules text with live numbers, and an `x` marks a card you cannot play right now. Above the hand, the Ghoul shows its intent: the move it will make when you end your turn, described the same way, with live numbers. `Play` answers with what happened: `Played`, `NotEnoughEnergy`, `InvalidTarget` and so on.
+Run it with `dotnet run`. Each line shows a card's cost and its rules text with live numbers, and an `x` marks a card you cannot play right now. Above the hand, the Ghoul shows its intent: the move it will make when you end your turn, described the same way, with live numbers. `Play` answers with what happened: `Played`, `CannotAfford`, `OutOfRange` and so on.
 
 The whole rules engine is behind those few calls. Nothing in `Program.cs` knows what Hex does or how the Ghoul chooses its move; change `content/game.cantrip`, run again, and the game changes with it.
 

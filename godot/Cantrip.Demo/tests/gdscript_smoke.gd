@@ -67,8 +67,20 @@ func _run() -> void:
 	_check_answers(rules)
 	_check_between_battles(rules)
 	_check_party(rules)
+	_check_empty_board(rules)
 
 	_finish()
+
+# Nobody left to aim at is `no_target` and not `invalid_target`: nothing was filtered out and
+# nothing was too far away, the table is simply empty, and a game usually wants to say something
+# different about that. Until 1.0 the two were one word. Last, because it clears the board.
+func _check_empty_board(rules: CantripRuntime) -> void:
+	for enemy_id in rules.GetEnemies():
+		rules.Execute("kill target", 0, enemy_id)
+	_check("the board is clear", rules.GetEnemies().is_empty(), str(rules.GetEnemies()))
+
+	var nobody: String = rules.Play(rules.AddCard("Ember", "hand"), 0)
+	_check("a card with nobody to aim at answers no_target", nobody == "no_target", nobody)
 
 # What the node does and does not publish. GDScript compiles nothing until the line runs, so a
 # method that went away at 1.0 must be gone from has_method too, and a method that was never meant
@@ -113,6 +125,20 @@ func _check_refusals(rules: CantripRuntime, player: int, slime: int) -> void:
 	_check("and a segment for a card that has one", ability.has("cost") and ability["cost"] != null, str(ability.get("cost")))
 
 	_check("UseAbility answers a word, not a bool", rules.UseAbility(999999, 0) == "not_a_card", str(rules.UseAbility(999999, 0)))
+
+	# The refusal words, which are the frozen strings a game's `match` arms are written against.
+	# `cannot_afford` was `not_enough_energy` until 1.0 and came back for a card priced in anything
+	# at all, so a game with bones, rage or charges showed the player the wrong noun -- and a
+	# GDScript arm goes on compiling however wrong the word is.
+	var ember: int = rules.AddCard("Ember", "hand")
+	var energy: int = rules.GetStat(player, "energy")
+	rules.SetStat(player, "energy", 0)
+	var broke: String = rules.Play(ember, slime)
+	_check("a card that cannot be paid for answers cannot_afford", broke == "cannot_afford", broke)
+	_check("and the word names no resource, because a card may be priced in any",
+		not broke.contains("energy"), broke)
+	rules.SetStat(player, "energy", energy)
+	_check("and it was refused rather than half played", rules.GetZone(player, "hand").has(ember))
 
 # Save answers the same dictionary LoadSave does, so a save button can say why it did nothing.
 func _check_saving(rules: CantripRuntime) -> void:

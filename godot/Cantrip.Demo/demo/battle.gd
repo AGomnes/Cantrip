@@ -97,10 +97,14 @@ func _play(card_id: int, target_id: int) -> void:
 	match result:
 		"played", "pending":
 			pass
-		"not_enough_energy":
-			_say("Not enough energy.")
+		"cannot_afford":
+			_say("Cannot afford that.")
+		"no_target":
+			_say("Nothing to aim that at.")
+		"out_of_range":
+			_say("That is out of reach.")
 		"invalid_target":
-			_say("That card needs a target.")
+			_say("That card will not take that one.")
 		_:
 			_say("Could not play that: %s" % result)
 	_refresh()

@@ -452,7 +452,7 @@ namespace Cantrip.Runtime
             {
                 Source = call.Context.Source,
                 Target = call.Node.Clause("to") != null ? call.Clause("to").Entity ?? call.Clause("to").AsEntities().FirstOrDefault() : call.Context.Target,
-                Card = call.Context.Card,
+                Action = call.Context.Action,
                 Amount = call.Amount(1, Num.Zero),
             };
             if (call.Context.Self != null) foreach (string tag in call.Context.Self.Tags) gameEvent.Tags.Add(tag);
@@ -536,7 +536,7 @@ namespace Cantrip.Runtime
             // runs: a taunt, a stealth or a reach limit means one thing everywhere. Everything named
             // being untouchable is a rules outcome, not a mistake, so the swing lands nowhere and
             // `into` binds nothing.
-            targets = LegalTargets(TargetRule.Any, attacker, call.Context.Card, targets);
+            targets = LegalTargets(TargetRule.Any, attacker, call.Context.Action, targets);
             if (targets.Count == 0)
             {
                 BindResult(call, Num.Zero);
@@ -636,7 +636,7 @@ namespace Cantrip.Runtime
             if (first.Kind == ValueKind.Number)
             {
                 Entity actor = call.Context.Controller ?? throw call.Error("nobody to choose for.");
-                IReadOnlyList<Entity> hand = State.ZoneOf(actor, Zones.Hand).Where(c => c != call.Context.Card).ToList();
+                IReadOnlyList<Entity> hand = State.ZoneOf(actor, Zones.Hand).Where(c => c != call.Context.Action).ToList();
                 int count = Math.Min(first.Number.ToInt(), hand.Count);
                 cards = Choose($"{call.Verb} {count}", hand, count, count, actor, call);
             }

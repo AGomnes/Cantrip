@@ -113,6 +113,32 @@ namespace Cantrip.Runtime
             move?.Range == null ? Any : new TargetRule("any", NoFilters, move.Range);
     }
 
+    /// <summary>
+    /// Which of the four targeting filters turned a candidate away, in the order they are asked.
+    /// Internal: what a <em>refused action</em> answers is <c>ActionResult</c>, and this is how the
+    /// runtime decides which one.
+    /// </summary>
+    internal enum TargetVerdict
+    {
+        /// <summary>Through all four. This one may be aimed at.</summary>
+        Legal,
+
+        /// <summary>Not an actor, or not alive: a card, a status, a corpse, or nobody at all.</summary>
+        NotSomebody,
+
+        /// <summary>Alive, and on the side the <c>target</c> line did not ask for.</summary>
+        WrongSide,
+
+        /// <summary>Too far: filter 2, the action's <c>range</c> after the <c>range</c> channel.</summary>
+        OutOfReach,
+
+        /// <summary>Excluded by filter 3, the action's own <c>target … where</c>.</summary>
+        Filtered,
+
+        /// <summary>Refused by filter 4, the <c>targetable</c> channel: a taunt, or a stealth.</summary>
+        Untargetable,
+    }
+
     public sealed partial class Interpreter
     {
         // Targeting ---------------------------------------------------------------------------
@@ -163,21 +189,65 @@ namespace Cantrip.Runtime
         }
 
         /// <summary>Whether one candidate passes all four filters. The whole of the rule, in order.</summary>
-        internal bool IsLegalTarget(TargetRule rule, Entity user, Entity? action, Entity? candidate)
+        internal bool IsLegalTarget(TargetRule rule, Entity user, Entity? action, Entity? candidate) =>
+            Verdict(rule, user, action, candidate) == TargetVerdict.Legal;
+
+        /// <summary>
+        /// The same four filters, in the same order, saying <em>which</em> one turned a candidate
+        /// away. <see cref="IsLegalTarget"/> is this with the answer thrown away.
+        /// </summary>
+        /// <remarks>
+        /// It exists so that a refused action can name its refusal: reach is
+        /// <c>ActionResult.OutOfRange</c> and an empty table is <c>ActionResult.NoTarget</c>, while
+        /// the filter and the channel are the two that leave <c>ActionResult.InvalidTarget</c>
+        /// meaning "somebody the action will not take". The order is the rule's, so a candidate that
+        /// is both out of reach and taunted away is reported as out of reach — the cheaper question
+        /// is asked first and nothing looks past the first no.
+        /// </remarks>
+        internal TargetVerdict Verdict(TargetRule rule, Entity user, Entity? action, Entity? candidate)
         {
             // 1. Side, and alive. Only actors are ever aimed at; a card is not somebody.
-            if (candidate == null || candidate.Kind != EntityKind.Actor || !candidate.IsAlive) return false;
-            if (!OnSide(rule.Mode, user, candidate)) return false;
-            if (rule.Mode == "self") return true;
+            if (candidate == null || candidate.Kind != EntityKind.Actor || !candidate.IsAlive) return TargetVerdict.NotSomebody;
+            if (!OnSide(rule.Mode, user, candidate)) return TargetVerdict.WrongSide;
+            if (rule.Mode == "self") return TargetVerdict.Legal;
 
             // 2. Reach.
-            if (!InReach(rule, user, action, candidate)) return false;
+            if (!InReach(rule, user, action, candidate)) return TargetVerdict.OutOfReach;
 
             // 3. The action's own `target … where`.
-            if (!MatchesFilter(rule, user, action, candidate)) return false;
+            if (!MatchesFilter(rule, user, action, candidate)) return TargetVerdict.Filtered;
 
             // 4. The `targetable` channel.
-            return IsTargetable(candidate, user, action);
+            return IsTargetable(candidate, user, action) ? TargetVerdict.Legal : TargetVerdict.Untargetable;
+        }
+
+        /// <summary>
+        /// Why an action that settles its own target has nothing to settle on:
+        /// <see cref="TargetVerdict.NotSomebody"/> when the side it asks for is empty,
+        /// <see cref="TargetVerdict.OutOfReach"/> when reach is the whole of the problem, and
+        /// <see cref="TargetVerdict.Filtered"/> when at least one living candidate was turned away
+        /// by the action's own filter or by the <c>targetable</c> channel.
+        /// </summary>
+        /// <remarks>
+        /// Only asked once <see cref="LegalTargets(TargetRule, Entity, Entity)"/> has come back
+        /// empty, so <see cref="TargetVerdict.Legal"/> here would mean the two disagreed. Reach only
+        /// wins when it is unanimous: on a board where one enemy is out of reach and another is
+        /// behind a taunt, "out of range" would send the player walking towards somebody they still
+        /// could not hit.
+        /// </remarks>
+        internal TargetVerdict WhyNobody(TargetRule rule, Entity user, Entity? action)
+        {
+            IReadOnlyList<Entity> candidates = Candidates(rule.Mode, user);
+            if (candidates.Count == 0) return TargetVerdict.NotSomebody;
+
+            bool reachAlone = true;
+            foreach (Entity candidate in candidates)
+            {
+                TargetVerdict verdict = Verdict(rule, user, action, candidate);
+                if (verdict == TargetVerdict.Legal) return TargetVerdict.Legal;
+                if (verdict != TargetVerdict.OutOfReach) reachAlone = false;
+            }
+            return reachAlone ? TargetVerdict.OutOfReach : TargetVerdict.Filtered;
         }
 
         /// <summary>Everyone the <c>target</c> line's side word puts on the table, before any filter.</summary>
@@ -266,7 +336,7 @@ namespace Cantrip.Runtime
             {
                 Subject = action ?? user,
                 Source = user,
-                Card = action != null && action.Kind == EntityKind.Card ? action : null,
+                Action = action != null && action.Kind == EntityKind.Card ? action : null,
                 Tags = action != null ? action.Tags.ToArray() : user.Tags.ToArray(),
             };
 
@@ -297,7 +367,7 @@ namespace Cantrip.Runtime
             var context = new EvalContext(action ?? user)
             {
                 Source = user,
-                Card = action != null && action.Kind == EntityKind.Card ? action : null,
+                Action = action != null && action.Kind == EntityKind.Card ? action : null,
                 It = candidate,
                 ItIsFocus = true,
             };

@@ -15,13 +15,85 @@ namespace Cantrip.Tests.Foundation
     {
         // The modifier pipeline ------------------------------------------------------------------
 
+        /// <summary>
+        /// <c>IModifierEvaluator</c> is internal, and so is the property that holds one. It was public
+        /// and unimplementable: <c>Interpreter</c> is the only implementer, implements both members
+        /// explicitly, and the setter had already been made internal because a null there stopped
+        /// every modifier applying in silence. Left public at 1.0 it would have carried an interface's
+        /// whole freeze cost — a member added in 1.x breaks every implementation — for a surface
+        /// nobody outside the library can implement, and it is not one of the four seams
+        /// <c>docs/stability.md</c> promises may grow a member with a default.
+        /// </summary>
         [Fact]
-        public void The_modifier_evaluator_cannot_be_unset_from_outside()
+        public void The_modifier_evaluator_is_not_a_surface_a_game_can_see()
         {
-            PropertyInfo evaluator = typeof(ModifierPipeline).GetProperty("Evaluator")!;
+            Assembly core = typeof(ModifierPipeline).Assembly;
+            Type? evaluator = core.GetType("Cantrip.Runtime.IModifierEvaluator");
 
-            Assert.True(evaluator.GetMethod!.IsPublic);
-            Assert.False(evaluator.SetMethod!.IsPublic, "setting Evaluator to null stops every modifier applying.");
+            Assert.NotNull(evaluator);
+            Assert.False(evaluator!.IsPublic, "IModifierEvaluator is unimplementable from outside, so it is internal.");
+            Assert.DoesNotContain(core.GetExportedTypes(), t => t == evaluator);
+
+            Assert.Null(typeof(ModifierPipeline).GetProperty("Evaluator", BindingFlags.Public | BindingFlags.Instance));
+            Assert.NotNull(typeof(ModifierPipeline).GetProperty("Evaluator", BindingFlags.NonPublic | BindingFlags.Instance));
+        }
+
+        /// <summary>
+        /// One word for the action a value came from, on all three of the types that carry one, and it
+        /// is <c>Action</c> rather than <c>Card</c> because two of them have always been able to hold
+        /// an ability: the <c>targetable</c> channel sets the query's from whatever is being aimed, and
+        /// <c>ModifierContext</c> copies that straight into the context it evaluates in. The word
+        /// <c>Action</c> is also the one an ability needs in these three places, and a name cannot be
+        /// taken back once the surface is a promise.
+        /// </summary>
+        [Theory]
+        [InlineData(typeof(ModifierQuery))]
+        [InlineData(typeof(EvalContext))]
+        [InlineData(typeof(GameEvent))]
+        public void The_action_a_value_came_from_is_called_Action(Type carrier)
+        {
+            Assert.Null(carrier.GetProperty("Card"));
+
+            PropertyInfo? action = carrier.GetProperty("Action");
+            Assert.NotNull(action);
+            Assert.Equal(typeof(Entity), action!.PropertyType);
+            Assert.True(action.GetMethod!.IsPublic && action.SetMethod!.IsPublic);
+        }
+
+        /// <summary>
+        /// And the reason it had to move: a <c>targetable</c> rule written with <c>card:</c> matches an
+        /// <em>ability</em> being aimed, because the query carries whichever of the two is in hand.
+        /// The DSL word stays <c>card:</c> — frozen content vocabulary, and right in the case content
+        /// overwhelmingly writes — while the C# member says what it really holds.
+        /// </summary>
+        [Fact]
+        public void The_query_carries_an_ability_which_is_why_the_member_is_not_called_Card()
+        {
+            CardRuntime runtime = CardRuntime.FromText("""
+                ability "Smite"
+                  target enemy
+                  effect:
+                    deal 5 to target
+
+                status "Warded"
+                  stacking none
+                  modify targetable where card:Smite: set 0
+
+                enemy "Dummy"
+                  hp 40
+                """);
+            Entity player = runtime.CreatePlayer();
+            Entity enemy = runtime.SpawnEnemy("Dummy");
+            Entity smite = runtime.GrantAbility("Smite", player);
+            runtime.StartBattle(shuffle: false, drawOpeningHand: false);
+
+            Assert.Equal(new[] { enemy }, runtime.LegalTargets(smite));
+
+            runtime.ApplyStatus("Warded", enemy);
+
+            // `card:Smite` matched an ability, so the query's member was never only a card.
+            Assert.Empty(runtime.LegalTargets(smite));
+            Assert.Equal(ActionResult.InvalidTarget, runtime.UseAbility(smite));
         }
 
         [Theory]

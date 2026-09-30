@@ -335,14 +335,14 @@ namespace Cantrip.Sim
         /// </summary>
         private void Played(GameEvent gameEvent)
         {
-            Add(_cards, Who(gameEvent.Card), gameEvent.Amount.ToInt());
-            if (Card(gameEvent.Card) is Entity card) CardInHand?.Invoke(card, true);
+            Add(_cards, Who(gameEvent.Action), gameEvent.Amount.ToInt());
+            if (Card(gameEvent.Action) is Entity card) CardInHand?.Invoke(card, true);
         }
 
         /// <summary>A card drawn, created or moved. It counts only if it ended up in a hand.</summary>
         private void Reached(GameEvent gameEvent)
         {
-            if (Card(gameEvent.Card ?? gameEvent.Target) is Entity card && card.Zone == Zones.Hand)
+            if (Card(gameEvent.Action ?? gameEvent.Target) is Entity card && card.Zone == Zones.Hand)
                 CardInHand?.Invoke(card, false);
         }
 
@@ -361,11 +361,11 @@ namespace Cantrip.Sim
         /// <summary>
         /// What the report calls the thing that dealt a hit: the card where a card was played, and
         /// otherwise whatever was running — the status whose listener ticked, or the enemy that
-        /// swung. <c>damaged.Source</c> is the actor a hit belongs to and <c>damaged.Card</c> the
+        /// swung. <c>damaged.Source</c> is the actor a hit belongs to and <c>damaged.Action</c> the
         /// card that caused it, and inside a status's listener the source is the status itself.
         /// </summary>
         private static string Dealer(GameEvent gameEvent) =>
-            gameEvent.Card != null ? gameEvent.Card.Name : Who(gameEvent.Source);
+            gameEvent.Action != null ? gameEvent.Action.Name : Who(gameEvent.Source);
 
         private static string Who(Entity? entity) => entity?.Name ?? "(nothing)";
 

@@ -1299,7 +1299,7 @@ Where somebody stands is a rule, and content writes it as `target.rank = 0`. Thi
 public string Play(int card_id, int target_id = 0)
 ```
 
-Plays a card. The answer is one of "played", "pending", "not_a_card", "not_in_hand", "unplayable", "not_enough_energy", "invalid_target" or "cancelled"; "pending" means the rules need a decision and a `choice_requested` signal is on its way.
+Plays a card. The answer is one of "played", "pending", "not_a_card", "not_in_hand", "unplayable", "cannot_afford", "invalid_target", "out_of_range", "no_target" or "cancelled"; "pending" means the rules need a decision and a `choice_requested` signal is on its way.
 
 ```csharp
 public string PlayBy(int card_id, int target_id, int by_id)
@@ -1417,7 +1417,7 @@ Advances a real-time game by whole ticks. Call it from the physics step, or let 
 public string UseAbility(int ability_id, int target_id = 0)
 ```
 
-Uses an ability, answering with a word from the same table `CantripRuntime.Play(int, int)` answers from: "played", "pending", "not_ready" for a cooldown, "not_enough_energy", "invalid_target", "cancelled", or "not_a_card" for an id that is not an ability that can be used at all.
+Uses an ability, answering with a word from the same table `CantripRuntime.Play(int, int)` answers from: "played", "pending", "not_ready" for a cooldown, "invalid_target", "out_of_range", "no_target", "cancelled", or "not_a_card" for an id that is not an ability that can be used at all. Never "cannot_afford": an ability has no cost.
 
 It used to answer a bool, so a cooldown, a question the rules stopped to ask, and an id naming nothing were all one `false`, and a real-time game could not tell the player why the ability did not fire.
 
@@ -2337,12 +2337,20 @@ Identities are kept as ids and numbers are copied. An entity's id never changes,
 ### Constructors
 
 ```csharp
-public EventRecord(long sequence, string name, EventPhase phase, long time, int source, int target, int card, Num amount, bool replaced = false, IReadOnlyList<string>? tags = null, IReadOnlyDictionary<string, Value>? values = null, IReadOnlyDictionary<int, IReadOnlyDictionary<string, int>>? after = null)
+public EventRecord(long sequence, string name, EventPhase phase, long time, int source, int target, int action, Num amount, bool replaced = false, IReadOnlyList<string>? tags = null, IReadOnlyDictionary<string, Value>? values = null, IReadOnlyDictionary<int, IReadOnlyDictionary<string, int>>? after = null)
 ```
 
 *Undocumented.*
 
 ### Properties
+
+```csharp
+public int Action { get; }
+```
+
+Entity id of the action involved — the card played, or whatever else the effect was running as — or 0. It crosses into script as `["card"]`, which keeps its key.
+
+Named `Card` until 1.0, with `GameEvent.Card`, which is `GameEvent.Action` now. The dictionary key does not move with it: a key is invisible to GDScript until the line runs, so it is frozen as firmly as a method signature, and every game that reads `event["card"]` goes on reading it.
 
 ```csharp
 public IReadOnlyDictionary<int, IReadOnlyDictionary<string, int>> After { get; }
@@ -2367,12 +2375,6 @@ public double AmountRaw { get; }
 ```
 
 The unrounded amount, for anything that scales an animation by it.
-
-```csharp
-public int Card { get; }
-```
-
-Entity id of the card involved, or 0.
 
 ```csharp
 public string Name { get; }

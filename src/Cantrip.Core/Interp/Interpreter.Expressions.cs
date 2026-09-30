@@ -144,7 +144,7 @@ namespace Cantrip.Runtime
                 case "source": return Value.FromEntity(context.Source);
                 case "target": return Value.FromEntity(context.Target);
                 case "it": return context.ItDefinition != null ? Value.FromDefinition(context.ItDefinition) : Value.FromEntity(context.It);
-                case "card": return Value.FromEntity(context.Card ?? (context.Self?.Kind == EntityKind.Card ? context.Self : null));
+                case "card": return Value.FromEntity(context.Action ?? (context.Self?.Kind == EntityKind.Card ? context.Self : null));
                 // `player` and `leader` are one entity and the same one: whoever CreatePlayer made,
                 // who holds the run's relics and gold. In a game with a party, `leader` is the word
                 // that says so; CT326 is what stops `player` being written where a member is meant.
@@ -431,7 +431,7 @@ namespace Cantrip.Runtime
             {
                 case "source": return Value.FromEntity(gameEvent.Source);
                 case "target": return Value.FromEntity(gameEvent.Target);
-                case "card": return Value.FromEntity(gameEvent.Card);
+                case "card": return Value.FromEntity(gameEvent.Action);
                 case "amount": return Value.FromNumber(gameEvent.Amount);
                 case "name": return Value.FromText(gameEvent.Name);
                 case "cancelled": return Value.FromBool(gameEvent.Cancelled);
@@ -980,7 +980,7 @@ namespace Cantrip.Runtime
                 case "name":
                 case "card":
                 {
-                    Entity? subject = q.Qualifier == "card" ? (context.Focus?.Card ?? context.Event?.Card ?? context.It) : FocusSubject(context);
+                    Entity? subject = q.Qualifier == "card" ? (context.Focus?.Action ?? context.Event?.Action ?? context.It) : FocusSubject(context);
                     return subject != null && string.Equals(subject.Name, q.Name, StringComparison.OrdinalIgnoreCase);
                 }
 
@@ -1060,8 +1060,8 @@ namespace Cantrip.Runtime
             if (context.Focus != null)
             {
                 foreach (string tag in context.Focus.Tags) yield return tag;
-                if (context.Focus.Card != null) foreach (string tag in context.Focus.Card.Tags) yield return tag;
-                if (context.Focus.Tags.Count == 0 && context.Focus.Card == null && context.Focus.Subject != null)
+                if (context.Focus.Action != null) foreach (string tag in context.Focus.Action.Tags) yield return tag;
+                if (context.Focus.Tags.Count == 0 && context.Focus.Action == null && context.Focus.Subject != null)
                     foreach (string tag in context.Focus.Subject.Tags) yield return tag;
                 yield break;
             }
@@ -1069,7 +1069,7 @@ namespace Cantrip.Runtime
             if (context.Event != null)
             {
                 foreach (string tag in context.Event.Tags) yield return tag;
-                if (context.Event.Card != null) foreach (string tag in context.Event.Card.Tags) yield return tag;
+                if (context.Event.Action != null) foreach (string tag in context.Event.Action.Tags) yield return tag;
                 yield break;
             }
 

@@ -151,14 +151,18 @@ run's relics and gold. It is never "whoever is acting" and never "all of you". I
 somebody else.
 
 Content that declares a `hero` is refused at lint for exactly that: **CT326**, an error, wherever a
-member could be meant — an enemy's move, a card's or an ability's effect, and a listener on any of
-those, on a status or on a relic. Write `target` for whoever the line is aimed at, `owner` for
-whoever is carrying a status or relic, `leader` when the run's own actor really is meant, or
-`party` for all of them. See [The party](language.md#the-party).
+member could be meant, which is **every body on every declaration** — an `effect`, a `move`, a
+listener, a `modify` line and a `target … where` filter. A hero's own listener is the one that
+catches people: `hero "Cleric" / on damaged: block 2 to player` blocks the *leader*, not the
+Cleric. The message names the word that does what was meant: `owner` for something carried, `self`
+in a `hero` or an `actor`, `target` for a card, an ability or an enemy. `leader` says the run's own
+actor where that really is meant, and `party` says all of them. See
+[The party](language.md#the-party).
 
-`player` stays legal, and stays right, in a status's or relic's listener that is **about its own
-owner** — `on owner.turn_start:`, or a run-level event such as `on battle_start:` — and in tests,
-scenarios, and your game's own C#.
+`player` stays legal, and stays right, in a carried declaration's listener that is **about its own
+owner** — `on owner.turn_start:`, or a run-level event such as `on battle_start:` — and in a
+`verb`, which has no owner for the diagnostic to name a word from, and in tests, scenarios, and
+your game's own C#.
 
 ### `source` is not `event.source`
 
@@ -228,33 +232,49 @@ assuming:
 |---|---|
 | `NotInHand` | Not in hand, or not in the pile a `from` named. |
 | `Unplayable` | Tagged `unplayable`: a curse or a wound. It is never offered, on purpose. |
-| `NotEnoughEnergy` | The actor cannot pay. An ability has no cost and never answers this. |
+| `CannotAfford` | The payer is short of whatever the card is priced in — not always energy, which is why the word does not say so. `CostResourceOf(card)` names it and `CostOf(card)` gives the price. An ability has no cost and never answers this. |
 | `NotReady` | An ability still on cooldown. `IsReady(ability)` asks in advance. |
 | `ChoicePending` | The action stopped for a decision and **rolled the game back**. Read `Pending`, then call `Answer(...)`. |
 | `Cancelled` | A choice was answered with nothing, or `CancelPending()` was called. Nothing stands. |
-| `InvalidTarget` | Nothing legal to aim at — see below. |
+| `OutOfRange` | Too far. The action's `range` after the `range` channel cannot reach — see below. |
+| `NoTarget` | Nobody on the side it asks for. Nothing was filtered out and nothing was too far away: the table is empty. |
+| `InvalidTarget` | Somebody the action will not take — see below. |
 
-### `InvalidTarget` is one word for four different refusals
+### Which refusal was it?
 
-It is the one that costs people an hour, because it does not say which. Call
-`LegalTargets(card)` and look at what came back:
+Three words share the work that `InvalidTarget` used to do alone, and they are worth
+reading rather than lumping together, because a game says something different about each:
 
-1. **The list is empty and the side is alive.** The card's own `target ... where` excluded
-   everybody, or a taunt drew targeting elsewhere. Read the `where` clause against the actual
-   board.
-2. **The list is empty and the side is dead.** Nobody to aim at. This is usually a game-logic bug:
-   the battle should have ended.
-3. **The list is not empty and does not hold the target you passed.** You aimed at somebody the
-   card will not accept. In a party game, check you are not passing the leader out of habit.
-4. **The list is not empty and holds fewer actors than you expected.** On a board this is almost
-   always `range`.
+| Answer | What happened | What to tell the player |
+|---|---|---|
+| `OutOfRange` | The one you named is too far, or every candidate is. Reach is the action's `range` after the `range` channel has had it. | "Out of reach." It is the only one of the three a player can act on. |
+| `NoTarget` | There is nobody on the side it asks for. | Usually nothing: it is a bug in your own loop. The battle should have ended, or the wave should not have let you act. |
+| `InvalidTarget` | Somebody the action will not take: the wrong side, not alive, excluded by its own `target … where`, or drawn away by a taunt or hidden by a stealth on the `targetable` channel. | "Not that one." |
 
-**Range is the one that surprises people.** On a `facing` board the distance across the sides is
-`a.rank + b.rank + 1`, so on a 2×2 board your back rank to their back rank is **three** steps and
+`OutOfRange` is only said when reach is the **whole** of the problem. With one enemy too far and
+another behind a taunt, the answer is `InvalidTarget`, because "move closer" would send the player
+at somebody they still could not hit.
+
+To tell the last two of `InvalidTarget`'s cases apart — the action's own filter against a taunt —
+call `LegalTargets(action)` and read the list:
+
+1. **The list is empty.** The action's own `target … where` excluded everybody, or a taunt drew
+   targeting elsewhere. Read the `where` clause against the actual board.
+2. **The list does not hold the target you passed.** You aimed at somebody the action will not
+   accept. In a party game, check you are not passing the leader out of habit.
+3. **The list holds fewer actors than you expected, and nothing is out of range.** A `targetable`
+   rule somewhere is speaking for them.
+
+The engine does not name which of those two it was; `WhyNotTargetable` is not a thing yet, and
+adding it later is additive, so it can arrive in a 1.x release.
+
+**Range is still the one that surprises people.** On a `facing` board the distance across the sides
+is `a.rank + b.rank + 1`, so on a 2×2 board your back rank to their back rank is **three** steps and
 `range 1..2` cannot make it. A card printed `range 1..2` on a board two ranks deep can be unable to
 reach half the enemies, for ever, and nothing warns: lint knows the board's depth but does not yet
 check that a `range` can span it (`reference/FINDINGS.md` #8). Do the arithmetic once, write it in
-a comment, and pin both ends with a test.
+a comment, and pin both ends with a test. `OutOfRange` now says when it has happened, which is the
+difference between an hour and a minute.
 
 A `test` block cannot assert a refusal — `play` fails the test when a card cannot be played — so
 the way to test an exclusion today is to play the card with no target and check which one it

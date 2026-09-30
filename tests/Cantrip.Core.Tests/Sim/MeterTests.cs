@@ -434,7 +434,7 @@ enemy Dummy
             public Seen(GameEvent gameEvent)
             {
                 Name = gameEvent.Name;
-                Dealer = gameEvent.Card?.Name ?? gameEvent.Source?.Name ?? "(nothing)";
+                Dealer = gameEvent.Action?.Name ?? gameEvent.Source?.Name ?? "(nothing)";
                 TargetTeam = gameEvent.Target?.Team ?? Team.Neutral;
                 Amount = gameEvent.Amount.ToInt();
             }

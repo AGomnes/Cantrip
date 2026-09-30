@@ -501,12 +501,12 @@ namespace Cantrip.Runtime
             if (!target.IsAlive) return Num.Zero;
 
             var tagList = tags.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-            var query = new ModifierQuery("damage") { Source = source, Subject = target, Card = context.Card, Tags = tagList };
+            var query = new ModifierQuery("damage") { Source = source, Subject = target, Action = context.Action, Tags = tagList };
             Num modified = State.Modifiers.Compute(query, amount);
-            modified = State.Modifiers.Compute(new ModifierQuery("damage_taken") { Source = source, Subject = target, Card = context.Card, Tags = tagList }, modified);
+            modified = State.Modifiers.Compute(new ModifierQuery("damage_taken") { Source = source, Subject = target, Action = context.Action, Tags = tagList }, modified);
             modified = Num.Max(Num.Zero, modified.Floor());
 
-            var gameEvent = new GameEvent("damaged") { Source = source, Target = target, Card = context.Card, Amount = modified };
+            var gameEvent = new GameEvent("damaged") { Source = source, Target = target, Action = context.Action, Amount = modified };
             foreach (string tag in tagList) gameEvent.Tags.Add(tag);
             gameEvent.Data["base"] = Value.FromNumber(amount);
 
@@ -540,12 +540,12 @@ namespace Cantrip.Runtime
             });
 
             if (blocked > Num.Zero)
-                Raise(new GameEvent("blocked") { Source = source, Target = target, Card = context.Card, Amount = blocked }, context);
+                Raise(new GameEvent("blocked") { Source = source, Target = target, Action = context.Action, Amount = blocked }, context);
 
             if (target.IsAlive && target.GetBase("hp") <= Num.Zero && target.Kind == EntityKind.Actor)
             {
                 if (Kill(target, source, context) && overkill > Num.Zero)
-                    Raise(new GameEvent("overkill") { Source = source, Target = target, Card = context.Card, Amount = overkill }, context);
+                    Raise(new GameEvent("overkill") { Source = source, Target = target, Action = context.Action, Amount = overkill }, context);
             }
             else if (lost > Num.Zero)
             {
@@ -563,7 +563,7 @@ namespace Cantrip.Runtime
         {
             if (!target.IsAlive) return target.IsDead;
 
-            var died = new GameEvent("died") { Source = source, Target = target, Card = context.Card };
+            var died = new GameEvent("died") { Source = source, Target = target, Action = context.Action };
             Raise(died, context, () =>
             {
                 State.MarkDead(target);
@@ -572,7 +572,7 @@ namespace Cantrip.Runtime
 
             if (!target.IsDead) return false;
 
-            Raise(new GameEvent("killed") { Source = source, Target = target, Card = context.Card }, context);
+            Raise(new GameEvent("killed") { Source = source, Target = target, Action = context.Action }, context);
 
             // Only now does the actor leave the board. Its own `on died` and `on killed` listeners,
             // and those of its statuses, were queued while it was still listening.
@@ -598,11 +598,11 @@ namespace Cantrip.Runtime
         {
             if (!target.IsAlive) return Num.Zero;
 
-            Num modified = State.Modifiers.Compute(new ModifierQuery("heal") { Source = source, Subject = target, Card = context.Card }, amount);
-            modified = State.Modifiers.Compute(new ModifierQuery("heal_taken") { Source = source, Subject = target, Card = context.Card }, modified);
+            Num modified = State.Modifiers.Compute(new ModifierQuery("heal") { Source = source, Subject = target, Action = context.Action }, amount);
+            modified = State.Modifiers.Compute(new ModifierQuery("heal_taken") { Source = source, Subject = target, Action = context.Action }, modified);
             modified = Num.Max(Num.Zero, modified.Floor());
 
-            var gameEvent = new GameEvent("healed") { Source = source, Target = target, Card = context.Card, Amount = modified };
+            var gameEvent = new GameEvent("healed") { Source = source, Target = target, Action = context.Action, Amount = modified };
             Num healed = Num.Zero;
             Raise(gameEvent, context, () =>
             {
@@ -630,11 +630,11 @@ namespace Cantrip.Runtime
         {
             if (!target.IsAlive) return Num.Zero;
 
-            Num modified = State.Modifiers.Compute(new ModifierQuery("block") { Source = source, Subject = target, Card = context.Card }, amount);
-            modified = State.Modifiers.Compute(new ModifierQuery("block_taken") { Source = source, Subject = target, Card = context.Card }, modified);
+            Num modified = State.Modifiers.Compute(new ModifierQuery("block") { Source = source, Subject = target, Action = context.Action }, amount);
+            modified = State.Modifiers.Compute(new ModifierQuery("block_taken") { Source = source, Subject = target, Action = context.Action }, modified);
             modified = Num.Max(Num.Zero, modified.Floor());
 
-            var gameEvent = new GameEvent("gained_block") { Source = source, Target = target, Card = context.Card, Amount = modified };
+            var gameEvent = new GameEvent("gained_block") { Source = source, Target = target, Action = context.Action, Amount = modified };
             Num gained = Num.Zero;
             Raise(gameEvent, context, () =>
             {
@@ -656,7 +656,7 @@ namespace Cantrip.Runtime
         /// </summary>
         public IReadOnlyList<Entity> Draw(Entity actor, int count, EvalContext context)
         {
-            var query = new ModifierQuery("draw") { Source = actor, Subject = actor, Card = context.Card };
+            var query = new ModifierQuery("draw") { Source = actor, Subject = actor, Action = context.Action };
             count = Math.Max(0, State.Modifiers.Compute(query, Num.FromInt(count)).Floor().ToInt());
 
             var drawn = new List<Entity>();
@@ -678,7 +678,7 @@ namespace Cantrip.Runtime
                     continue;
                 }
 
-                var gameEvent = new GameEvent("drawn") { Source = actor, Target = card, Card = card };
+                var gameEvent = new GameEvent("drawn") { Source = actor, Target = card, Action = card };
                 foreach (string tag in card.Tags) gameEvent.Tags.Add(tag);
 
                 bool ran = Raise(gameEvent, context, () =>
@@ -713,7 +713,7 @@ namespace Cantrip.Runtime
         {
             if (card.IsRemoved) return false;
 
-            var gameEvent = new GameEvent(eventName) { Source = context.Source?.Controller, Target = card, Card = card };
+            var gameEvent = new GameEvent(eventName) { Source = context.Source?.Controller, Target = card, Action = card };
             foreach (string tag in card.Tags) gameEvent.Tags.Add(tag);
             gameEvent.Data["kind"] = Value.FromText("card");
             gameEvent.Data["from"] = Value.FromText(card.Zone);
@@ -974,7 +974,7 @@ namespace Cantrip.Runtime
                         break;
                 }
                 gameEvent.Target = made;
-                if (made.Kind == EntityKind.Card) gameEvent.Card = made;
+                if (made.Kind == EntityKind.Card) gameEvent.Action = made;
             });
 
             if (noRoom) return null;
@@ -1077,7 +1077,7 @@ namespace Cantrip.Runtime
             {
                 Source = context.Source,
                 Target = entity,
-                Card = entity.Kind == EntityKind.Card ? entity : null,
+                Action = entity.Kind == EntityKind.Card ? entity : null,
             };
             // The tags it had before, so `on transformed(tag:big)` hears what was transformed rather
             // than what it became, which the event already names as `into`.
@@ -1112,7 +1112,7 @@ namespace Cantrip.Runtime
                 return;
             }
 
-            var gameEvent = new GameEvent("destroyed") { Source = context.Source, Target = entity, Card = entity.Kind == EntityKind.Card ? entity : null };
+            var gameEvent = new GameEvent("destroyed") { Source = context.Source, Target = entity, Action = entity.Kind == EntityKind.Card ? entity : null };
             foreach (string tag in entity.Tags) gameEvent.Tags.Add(tag);
             Raise(gameEvent, context, () => State.Remove(entity));
         }

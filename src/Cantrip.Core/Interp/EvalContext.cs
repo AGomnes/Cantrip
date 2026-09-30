@@ -92,7 +92,7 @@ namespace Cantrip.Runtime
             Self = parent.Self;
             Source = parent.Source;
             Target = parent.Target;
-            Card = parent.Card;
+            Action = parent.Action;
             Event = parent.Event;
             It = parent.It;
             ItDefinition = parent.ItDefinition;
@@ -114,8 +114,17 @@ namespace Cantrip.Runtime
         /// </summary>
         public Entity? Target { get; set; }
 
-        /// <summary>The card being played, if any. Its tags become the tags of the damage it deals.</summary>
-        public Entity? Card { get; set; }
+        /// <summary>
+        /// The action being run, if any: the card being played, or — through a modifier's query — the
+        /// ability being aimed or priced. Its tags become the tags of the damage it deals, and content
+        /// reads it as <c>card</c>, which keeps its word.
+        /// </summary>
+        /// <remarks>
+        /// It was <c>Card</c> until 1.0. <see cref="ModifierQuery.Action"/> is copied straight into it
+        /// when a modifier's filter or amount is evaluated, and that one has always been able to hold
+        /// an ability, so the old name was already wrong here.
+        /// </remarks>
+        public Entity? Action { get; set; }
 
         /// <summary>The triggering event, inside a listener.</summary>
         public GameEvent? Event { get; set; }

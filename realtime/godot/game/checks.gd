@@ -81,6 +81,15 @@ func _static_checks() -> void:
 	_check("Ember Bolt reaches the back rank", rules.GetLegalTargets(bolt).has(hollow))
 	_check("Backdraft does not", not rules.GetLegalTargets(backdraft).has(hollow),
 		str(rules.GetLegalTargets(backdraft)))
+	# And the refusal says which of the five it was. Until 1.0 reach came back as invalid_target,
+	# the same word as a taunt, the ability's own filter and an empty board -- and reach is the one
+	# a player can do something about.
+	var reached: String = rules.UseAbility(backdraft, hollow)
+	_check("using an ability at what it cannot reach answers out_of_range", reached == "out_of_range", reached)
+	# CooldownLeft rather than CanUse: CanUse is also false for "nothing to aim at", which is the
+	# whole reason Backdraft was refused, so it would have passed however the cooldown behaved.
+	_check("and a refused cast started no cooldown", rules.CooldownLeft(backdraft) == 0.0,
+		str(rules.CooldownLeft(backdraft)))
 
 	_check("using it answers played", rules.UseAbility(bolt, hollow) == "played")
 	_check("and the hollow felt it", rules.GetStat(hollow, "hp") == 11,
