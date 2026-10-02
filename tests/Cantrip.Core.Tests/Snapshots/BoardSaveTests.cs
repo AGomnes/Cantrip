@@ -87,7 +87,7 @@ namespace Cantrip.Tests.Snapshots
             runtime.State.Assign(grunt, 2, 2);
             GameSnapshot save = Roundtrip(runtime.Capture());
 
-            CardRuntime patched = Fresh(Shapes.Replace("board Floor\n  lanes 3\n  ranks 3", "board Floor\n  lanes 4\n  ranks 6"));
+            CardRuntime patched = Fresh(Reshaped("board Floor\n  lanes 4\n  ranks 6"));
             patched.Restore(save);
 
             Assert.Equal(4, patched.State.Board.Lanes);
@@ -108,7 +108,7 @@ namespace Cantrip.Tests.Snapshots
             runtime.State.Assign(grunt, 2, 2);
             GameSnapshot save = Roundtrip(runtime.Capture());
 
-            CardRuntime patched = Fresh(Shapes.Replace("board Floor\n  lanes 3\n  ranks 3", "board Floor\n  lanes 3\n  ranks 2"));
+            CardRuntime patched = Fresh(Reshaped("board Floor\n  lanes 3\n  ranks 2"));
             InvalidOperationException refused = Assert.Throws<InvalidOperationException>(() => patched.Restore(save));
 
             Assert.Contains("board \"Floor\"", refused.Message);
@@ -128,7 +128,7 @@ namespace Cantrip.Tests.Snapshots
             runtime.State.Assign(grunt, 2, 2);
             GameSnapshot save = Roundtrip(runtime.Capture());
 
-            CardRuntime patched = Fresh(Shapes.Replace("board Floor\n  lanes 3\n  ranks 3", "board Floor\n  lanes 3\n  ranks 2"));
+            CardRuntime patched = Fresh(Reshaped("board Floor\n  lanes 3\n  ranks 2"));
             patched.StartBattle(shuffle: false, drawOpeningHand: false, board: "Floor");
             Entity standing = patched.SpawnEnemy("Grunt");
             ulong before = patched.State.ComputeHash();
@@ -151,7 +151,7 @@ namespace Cantrip.Tests.Snapshots
             runtime.SpawnEnemy("Grunt");   // enemy side, lane 0 rank 0; the player is there too
             GameSnapshot save = Roundtrip(runtime.Capture());
 
-            CardRuntime patched = Fresh(Shapes.Replace("board Floor\n  lanes 3\n  ranks 3", "board Floor\n  lanes 3\n  ranks 3\n  shared"));
+            CardRuntime patched = Fresh(Reshaped("board Floor\n  lanes 3\n  ranks 3\n  shared"));
             InvalidOperationException refused = Assert.Throws<InvalidOperationException>(() => patched.Restore(save));
             Assert.Contains("is also standing on the new board", refused.Message);
         }
@@ -246,6 +246,21 @@ namespace Cantrip.Tests.Snapshots
             CardRuntime runtime = CardRuntime.FromText(content, new RuntimeOptions { Seed = 7 });
             runtime.CreatePlayer();
             return runtime;
+        }
+
+        /// <summary>
+        /// Reshapes the Floor board, and insists that it happened. A plain <c>Replace</c> here is a
+        /// trap: a raw string literal keeps the line endings the source file was checked out with,
+        /// so a pattern written with <c>\n</c> misses entirely on a CRLF checkout — and the test then
+        /// goes on with the board unpatched, which is a different game rather than a failure. That
+        /// cost one red CI run on Windows where Linux and the author's own machine were green.
+        /// </summary>
+        private static string Reshaped(string floor)
+        {
+            string lf = Shapes.Replace("\r\n", "\n");
+            const string from = "board Floor\n  lanes 3\n  ranks 3";
+            Assert.Contains(from, lf);
+            return lf.Replace(from, floor.Replace("\r\n", "\n"));
         }
 
         private static GameSnapshot Roundtrip(GameSnapshot save) =>
