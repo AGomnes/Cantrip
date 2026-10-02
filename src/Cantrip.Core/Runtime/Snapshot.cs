@@ -27,7 +27,7 @@ namespace Cantrip.Runtime
         /// <remarks>
         /// <c>static readonly</c> rather than <c>const</c>, and deliberately: C# bakes a
         /// <c>const</c> into the assembly that reads it, so a game compiled against one release and
-        /// given a newer Cantrip.Core — which is exactly what swapping the addon's dll does — would
+        /// given a newer Cantrip.Core (which is exactly what swapping the addon's dll does) would
         /// go on comparing saves against the number it was built with. The same goes for
         /// <see cref="CurrentMinimumReader"/> and <see cref="CurrentRng"/>.
         /// </remarks>
@@ -37,8 +37,8 @@ namespace Cantrip.Runtime
         /// The oldest reader a save this build writes can be given to, which a reader compares
         /// against its own <see cref="CurrentFormat"/>. It moves only when a change would make an
         /// older reader get the game wrong rather than merely miss something it never knew about,
-        /// so that adding an optional field can bump <see cref="CurrentFormat"/> — saying honestly
-        /// that the shape changed — without locking every earlier build out of the save.
+        /// so that adding an optional field can bump <see cref="CurrentFormat"/> (saying honestly
+        /// that the shape changed) without locking every earlier build out of the save.
         /// </summary>
         public static readonly int CurrentMinimumReader = 3;
 
@@ -91,22 +91,22 @@ namespace Cantrip.Runtime
         public int PlayerId { get; set; }
 
         /// <summary>
-        /// The party: every actor the game asks for input, leader first. A save that lists none —
-        /// which is every save a game with no <c>hero</c> writes, and every save written before a
-        /// party existed — restores as a party of one, <see cref="PlayerId"/> alone.
+        /// The party: every actor the game asks for input, leader first. A save that lists none
+        /// (which is every save a game with no <c>hero</c> writes, and every save written before a
+        /// party existed) restores as a party of one, <see cref="PlayerId"/> alone.
         /// </summary>
         public List<int> PartyIds { get; set; } = new List<int>();
 
         /// <summary>
         /// Whose step it was when this was written, or zero when none of the party's was. It is
-        /// written for a reader — a save browser, a bug report — and never read back: the restore
+        /// written for a reader (a save browser, a bug report) and never read back: the restore
         /// works it out again from <see cref="ActedIds"/> and the party, so a save that carries a
         /// stale one cannot contradict the game it restores.
         /// </summary>
         public int ActiveMemberId { get; set; }
 
         /// <summary>
-        /// Everyone who has already taken their step this round — the party under
+        /// Everyone who has already taken their step this round: the party under
         /// <c>turns: sides</c>, both sides under <c>turns: initiative</c>. Ids rather than slots, so
         /// a member that moves, dies or is revived mid-round keeps having acted.
         /// </summary>
@@ -166,8 +166,8 @@ namespace Cantrip.Runtime
 
         /// <summary>
         /// The board's shape as it stood when the save was written. It is here so that a save is
-        /// self-describing — a game whose content no longer declares that board still loads and
-        /// plays on the board it was saved on — and so that a restore can say exactly what changed
+        /// self-describing (a game whose content no longer declares that board still loads and
+        /// plays on the board it was saved on) and so that a restore can say exactly what changed
         /// when content has reshaped it underneath.
         /// </summary>
         public BoardSnapshot? Board { get; set; }
@@ -176,7 +176,7 @@ namespace Cantrip.Runtime
         public List<EntitySnapshot> Entities { get; set; } = new List<EntitySnapshot>();
 
         /// <summary>
-        /// Where everything is, in order — and the order matters: a draw pile's is the sequence the
+        /// Where everything is, in order. The order matters: a draw pile's is the sequence the
         /// player will see. A restore refuses a save whose zones and entities disagree.
         /// </summary>
         public List<ZoneSnapshot> Zones { get; set; } = new List<ZoneSnapshot>();
@@ -217,10 +217,10 @@ namespace Cantrip.Runtime
         /// Nothing moves here yet. Format 1 became format 2 by renaming two fields of
         /// <see cref="ScheduledSnapshot"/>, which that type reads under both names as it is
         /// deserialized, and by recording who wrote the save, its minimum reader and the name of
-        /// its generator — three things a format 1 save cannot know, and whose absence means
-        /// exactly what it should: an unknown earlier writer, a reader as old as the format, and
-        /// the generator of the day. So that step is a no-op with a place to put the next one, and
-        /// the tests that pin a format 1 save's restore are what prove that no-op is the truth.
+        /// its generator. Those are three things a format 1 save cannot know, and their absence
+        /// means exactly what it should: an unknown earlier writer, a reader as old as the format,
+        /// and the generator of the day. So that step is a no-op with a place to put the next one,
+        /// and the tests that pin a format 1 save's restore are what prove that no-op is the truth.
         /// <para>
         /// Format 2 became format 3 when a board grew a second axis. A format 2 save was played on
         /// one lane with no floor, which is exactly <see cref="BoardShape.Default"/>, and every
@@ -230,7 +230,7 @@ namespace Cantrip.Runtime
         /// <para>
         /// Format 3 also carries the party. It is not a fourth format, because format 3 has not
         /// been published: a save from any earlier format, and any format 3 save a game with no
-        /// <c>hero</c> wrote, lists no party and restores as a party of one — which is what it was.
+        /// <c>hero</c> wrote, lists no party and restores as a party of one, which is what it was.
         /// </para>
         /// </remarks>
         internal static void Upgrade(GameSnapshot snapshot)
@@ -303,7 +303,7 @@ namespace Cantrip.Runtime
         /// </summary>
         public string? DefinitionName { get; set; }
 
-        /// <summary>Whose this is — whose hand the card is in, whose relic it is — or 0 for something nobody owns.</summary>
+        /// <summary>Whose this is (whose hand the card is in, whose relic it is), or 0 for something nobody owns.</summary>
         public int OwnerId { get; set; }
 
         /// <summary>Who put it here: the applier of a status, so that a <c>source:</c> filter still reads right after a restore. 0 when nobody did.</summary>
@@ -338,7 +338,7 @@ namespace Cantrip.Runtime
         /// </summary>
         public bool IsRemoved { get; set; }
 
-        /// <summary>When it came into play, which is what the "play order" listener tie-break compares — so restoring it is what keeps listener order stable across a save.</summary>
+        /// <summary>When it came into play, which is what the "play order" listener tie-break compares. Restoring it is what keeps listener order stable across a save.</summary>
         public long Sequence { get; set; }
 
         /// <summary>How far through its move pattern this enemy was, so a restored fight carries on rather than starting the cycle again.</summary>
@@ -366,7 +366,7 @@ namespace Cantrip.Runtime
         /// <summary>Base stats, as raw <see cref="Num"/> values.</summary>
         public Dictionary<string, long> Stats { get; set; } = new Dictionary<string, long>();
 
-        /// <summary>Its tags as they stood, which includes any an effect added — not only the definition's.</summary>
+        /// <summary>Its tags as they stood, which includes any an effect added, not only the definition's.</summary>
         public List<string> Tags { get; set; } = new List<string>();
 
         /// <summary>Attached statuses and keywords, in attachment order.</summary>
@@ -412,7 +412,7 @@ namespace Cantrip.Runtime
     /// <remarks>
     /// This is where a card is. <see cref="EntitySnapshot.Zone"/> says the same thing from the
     /// entity's side, and a capture always writes the two consistently, but only this one carries
-    /// the order — which for the draw pile is the next card the player will see. A restore checks
+    /// the order, which for the draw pile is the next card the player will see. A restore checks
     /// that every entity naming a zone is in that zone's list and in no other, and that every
     /// entity naming none is in no list at all, and refuses the save before it touches the game
     /// when they disagree, so that a future change cannot quietly let the two drift apart in a
@@ -451,8 +451,8 @@ namespace Cantrip.Runtime
         /// or within <see cref="Statements"/> when those are set, such as <c>execute/0.body</c>.
         /// </summary>
         /// <remarks>
-        /// It was called <c>Block</c> through format 1, which reads as a `block` — the stat, the
-        /// verb and the modifier channel — everywhere else in this language. Saves in format 1
+        /// It was called <c>Block</c> through format 1, which reads as a `block` (the stat, the
+        /// verb and the modifier channel) everywhere else in this language. Saves in format 1
         /// still carry that name, and <see cref="Block"/> takes it.
         /// </remarks>
         public string? BlockAddress { get; set; }
@@ -511,7 +511,7 @@ namespace Cantrip.Runtime
         }
 
         /// <summary>
-        /// The names the block captured when it was scheduled — <c>target</c>, <c>source</c> — so that
+        /// The names the block captured when it was scheduled (<c>target</c>, <c>source</c>), so that
         /// the block still means what it meant, whatever has happened since.
         /// </summary>
         public Dictionary<string, ValueSnapshot> Bindings { get; set; } = new Dictionary<string, ValueSnapshot>();
@@ -558,7 +558,7 @@ namespace Cantrip.Runtime
     }
 
     /// <summary>
-    /// One reversible change an <c>until</c> block made, as plain data — the saved form of
+    /// One reversible change an <c>until</c> block made, as plain data: the saved form of
     /// <see cref="TemporaryChange"/>.
     /// </summary>
     public sealed class UndoSnapshot
@@ -825,8 +825,8 @@ namespace Cantrip.Runtime
                 Require(record.OwnerId);
                 foreach (UndoSnapshot change in record.Undo) Require(change.EntityId);
             }
-            // The generator names itself, so that a release that changes it — which
-            // docs/stability.md allows — turns a save it cannot continue away instead of feeding
+            // The generator names itself, so that a release that changes it (which
+            // docs/stability.md allows) turns a save it cannot continue away instead of feeding
             // another generator four numbers that mean nothing to it. An empty name is this
             // generator: that is what a save written before the name was recorded carries.
             string generator = snapshot.RngGenerator ?? string.Empty;
@@ -868,7 +868,7 @@ namespace Cantrip.Runtime
                 Entity entity;
 
                 // Id and kind identify it, and nothing else may: a name is not fixed for the life of
-                // an entity — `transform` changes it — and matching on one would quietly abandon the
+                // an entity (`transform` changes it) and matching on one would quietly abandon the
                 // instance the game is holding for a new object with the saved name. That breaks the
                 // promise three lines above every time an effect transforms something and then asks
                 // the player a question, because a deferred choice restores the snapshot to roll back.
@@ -995,7 +995,7 @@ namespace Cantrip.Runtime
 
         /// <summary>
         /// The board a save is continued on. Content decides, because a patch that reshapes a board
-        /// means the reshaped board — but only where everyone in the save still fits on it. An actor
+        /// means the reshaped board, but only where everyone in the save still fits on it. An actor
         /// standing outside the new bounds is a refusal naming the board, the way a missing
         /// definition is a refusal naming the definition; growing a board loads fine, because
         /// everybody who fitted still does. A board the content no longer declares at all falls back

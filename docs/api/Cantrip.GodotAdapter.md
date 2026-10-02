@@ -20,11 +20,11 @@ Part of [the API reference](README.md). The guides are [docs/csharp.md](../cshar
 | [`CantripProtocol`](#cantripprotocol) | The names on the wire between the editor and a running game, and the shapes that travel on it. Engine-free on purpose: the interesting part is the batching, and that is worth testing without launching Godot. |
 | [`CantripReloadResult`](#cantripreloadresult) | What came of reloading content into a running game. |
 | [`CantripRuntime`](#cantripruntime) | The node a game drops into a scene, and the only surface script touches. It owns the rules engine, loads content the way an exported game must, and turns everything crossing the boundary into ids and dictionaries. |
-| [`CantripRuntime.BattleEndedEventHandler`](#cantripruntimebattleendedeventhandler) | The battle is over, and the action that ended it has finished. It is safe to act from here — hand out a reward, start the next battle — and the next battle will announce its own end when it comes. |
+| [`CantripRuntime.BattleEndedEventHandler`](#cantripruntimebattleendedeventhandler) | The battle is over, and the action that ended it has finished. It is safe to act from here (hand out a reward, start the next battle), and the next battle will announce its own end when it comes. |
 | [`CantripRuntime.BattleStartedEventHandler`](#cantripruntimebattlestartedeventhandler) | A battle has begun. It is emitted only if the battle is still running once `battle_start` has resolved. |
 | [`CantripRuntime.ChoiceRequestedEventHandler`](#cantripruntimechoicerequestedeventhandler) | The rules stopped to ask the player something. The game has been rolled back to before the action, so nothing has happened yet; answer with `Answer` and the action replays. |
 | [`CantripRuntime.ContentReloadedEventHandler`](#cantripruntimecontentreloadedeventhandler) | Carries the whole report `CantripRuntime.ReloadContent(Nullable<Array>)` returns, not only its problems. |
-| [`CantripRuntime.EffectEventEventHandler`](#cantripruntimeeffecteventeventhandler) | One resolved event, as a dictionary with snake_case keys. It arrives *after* the whole action has finished, never during it, so a handler may call back into the node — and `after` carries the stats as they were at that event, which is what an animation should show rather than the live values. |
+| [`CantripRuntime.EffectEventEventHandler`](#cantripruntimeeffecteventeventhandler) | One resolved event, as a dictionary with snake_case keys. It arrives *after* the whole action has finished, never during it, so a handler may call back into the node. The dictionary's `after` carries the stats as they were at that event, which is what an animation should show rather than the live values. |
 | [`CantripStepState`](#cantripstepstate) | Where a game stands for a debugger: what is being held, and what would run next. |
 | [`ChoiceAnswer`](#choiceanswer) | The verdict on one answer from the UI, and the ids to pass on when it is good. |
 | [`ChoiceBridge`](#choicebridge) | Gives the core's `PendingChoice` an identity, so a late answer cannot be applied to the wrong question. |
@@ -99,7 +99,7 @@ public static Godot.Collections.Dictionary DefaultFormat(EventRecord record)
 
 The dictionary shape of an event, per the addon's contract.
 
-One line, because it used to be all thirteen keys written out a second time. The runtime node always installs `VariantMap.Event(EventRecord)` as the `BattlePresenter.Formatter`, so the copy only ran for a presenter used on its own — exactly where a key that had drifted apart from the real one would go unnoticed.
+One line, because it used to be all thirteen keys written out a second time. The runtime node always installs `VariantMap.Event(EventRecord)` as the `BattlePresenter.Formatter`, so the copy only ran for a presenter used on its own: exactly where a key that had drifted apart from the real one would go unnoticed.
 
 ```csharp
 public void Done()
@@ -663,7 +663,7 @@ public static class CantripProtocol
 
 The names on the wire between the editor and a running game, and the shapes that travel on it. Engine-free on purpose: the interesting part is the batching, and that is worth testing without launching Godot.
 
-Godot's debugger channel is capped — a live 4.6.1 run reports 2048 queued messages and 32768 characters a second — so nothing here streams per event. The game keeps a ring buffer and the editor pulls batches with a cursor, which also means a slow editor cannot back the game up.
+Godot's debugger channel is capped (a live 4.6.1 run reports 2048 queued messages and 32768 characters a second), so nothing here streams per event. The game keeps a ring buffer and the editor pulls batches with a cursor, which also means a slow editor cannot back the game up.
 
 ### Fields and constants
 
@@ -911,7 +911,7 @@ The loaded content, for a game written in C#. It is replaced by a load, so hold 
 public string ContentFolder { get; set; }
 ```
 
-Where `.cantrip` files are discovered, as a `res://` path. Left empty, which is the default, the project setting `cantrip/content/folder` is read, and `res://content` when that is not set either — so the editor dock and the running game read one folder rather than two that can disagree without either saying so.
+Where `.cantrip` files are discovered, as a `res://` path. Left empty, which is the default, the project setting `cantrip/content/folder` is read, and `res://content` when that is not set either. The editor dock and the running game then read one folder rather than two that can disagree without either saying so.
 
 ```csharp
 public CardRuntime Core { get; }
@@ -971,7 +971,7 @@ public int ActiveMemberId()
 
 The member whose step it is, or 0 when none of the party's is: outside a battle, on the enemies' turn, and once every member has acted.
 
-Under `turns: initiative` it is binding and a game drives its turn off it. Under `turns: sides` the party shares one turn and may act in any order, so this is the one the engine would offer next — a suggestion for a UI to highlight. The rule is `CantripRuntime.CanAct(int)`, which is true of every waiting member there.
+Under `turns: initiative` it is binding and a game drives its turn off it. Under `turns: sides` the party shares one turn and may act in any order, so this is the one the engine would offer next, a suggestion for a UI to highlight. The rule is `CantripRuntime.CanAct(int)`, which is true of every waiting member there.
 
 ```csharp
 public int AddCard(string name, string zone = null)
@@ -993,7 +993,7 @@ Adds a party member from a `hero` declaration, with the abilities its `abilities
 
 **Parameters.**
 
-- `hp` — Overrides the health its content declares when positive; 0 takes the content's own, as it does nowhere else on this node, because a hero with no health is not a thing a party can be asked for and there is no negative convention to preserve here.
+- `hp`: Overrides the health its content declares when positive; 0 takes the content's own, as it does nowhere else on this node, because a hero with no health is not a thing a party can be asked for and there is no negative convention to preserve here.
 
 The leader `CantripRuntime.CreatePlayer(string, int, int)` made is already a member, so a party of four is one `CreatePlayer` and three of these.
 
@@ -1015,7 +1015,7 @@ public int ApplyStatus(string status, int target_id, int stacks = 1)
 
 Applies a status to an entity, as the player. Returns the status's id, or 0 when the target is unknown or no status of that name is loaded.
 
-Both failures answer 0. They used to differ — an unknown target gave 0 and an unknown name threw, which from GDScript is null — so a caller checking for 0, as this method's own documentation says to, was right only half the time.
+Both failures answer 0. They used to differ: an unknown target gave 0 and an unknown name threw, which from GDScript is null. A caller checking for 0, as this method's own documentation says to, was right only half the time.
 
 ```csharp
 public bool CanAct(int actor_id)
@@ -1063,7 +1063,7 @@ Seconds until an ability comes back, for a cooldown sweep: 0 when it is ready no
 public int CostOf(int card_id)
 ```
 
-What this card costs to play right now, after modifiers — not its printed number. 0 for an id that names nothing, and 0 for a card that really is free, which is the same answer for two different things.
+What this card costs to play right now, after modifiers, not its printed number. 0 for an id that names nothing, and 0 for a card that really is free, which is the same answer for two different things.
 
 ```csharp
 public int CounterOf(int entity_id, string status)
@@ -1071,7 +1071,7 @@ public int CounterOf(int entity_id, string status)
 
 How many of a status somebody is holding: stacks for a stacking status, and 1 or 0 for one that does not stack. 0 for an id that names nobody, and for somebody without it.
 
-Content reads this as `Warden.Fervour` and C# as `entity.CounterOf("Fervour")`. There was no third spelling, so a status bar walked the whole `GetEntity(id)["statuses"]` dictionary — every stat, every tag and every status built to answer one number — once per member per frame, and `GetStat(warden, "Fervour")`, which is what the DSL's own vocabulary suggests, answered 0 without saying why.
+Content reads this as `Warden.Fervour` and C# as `entity.CounterOf("Fervour")`. There was no third spelling, so a status bar walked the whole `GetEntity(id)["statuses"]` dictionary (every stat, every tag and every status built to answer one number) once per member per frame, and `GetStat(warden, "Fervour")`, which is what the DSL's own vocabulary suggests, answered 0 without saying why.
 
 ```csharp
 public int CreatePlayer(string name = "Player", int hp = 80, int max_energy = 3)
@@ -1079,7 +1079,7 @@ public int CreatePlayer(string name = "Player", int hp = 80, int max_energy = 3)
 
 Makes the run's leader and returns its id. Every game calls it once, before anything else.
 
-The defaults are C# defaults, and GDScript does not see them: a script has to pass all three. A leader that needs a stat of its own, such as `speed` under `order: speed`, gets it afterwards from `SetStat` — there is no fourth argument and no declaration this reads.
+The defaults are C# defaults, and GDScript does not see them: a script has to pass all three. A leader that needs a stat of its own, such as `speed` under `order: speed`, gets it afterwards from `SetStat`. There is no fourth argument and no declaration this reads.
 
 ```csharp
 public Godot.Collections.Dictionary Describe(int entity_id, int target_id = 0)
@@ -1093,7 +1093,7 @@ public Godot.Collections.Dictionary DescribeDefinition(string name, string kind 
 
 The rules text of a definition that need not be in play, such as a reward, a shop's stock or a page of a card library, with its printed values: the same dictionary as `CantripRuntime.Describe(int, int)`. An empty `kind` takes the first definition of that name. Empty when nothing of that name is loaded. Name and kind are matched without regard to case, as `CantripRuntime.GetDefinitions(string, string)` matches the kind.
 
-The kind here is the keyword that declares the definition in content — "card", "relic", "enemy" — and not the `kind` an entity's dictionary carries, which says what it is in the rules: the Slime spawned from `enemy Slime` reads back as an "actor". It reads the content alone, so it does not bring the rules into being.
+The kind here is the keyword that declares the definition in content ("card", "relic", "enemy"), and not the `kind` an entity's dictionary carries, which says what it is in the rules: the Slime spawned from `enemy Slime` reads back as an "actor". It reads the content alone, so it does not bring the rules into being.
 
 ```csharp
 public Godot.Collections.Dictionary DescribeIntent(int enemy_id)
@@ -1135,7 +1135,7 @@ Every living actor on the board, both sides, as ids.
 public Godot.Collections.Array GetAllies()
 ```
 
-Everyone on the player's side, as ids — which includes summoned minions that take no step. `GetParty` is the narrower list of who the game asks for input.
+Everyone on the player's side, as ids, including summoned minions that take no step. `GetParty` is the narrower list of who the game asks for input.
 
 ```csharp
 public Godot.Collections.Array GetDefinitions(string kind, string tag = "")
@@ -1161,7 +1161,7 @@ Everything a UI shows about one entity. Empty when the id is unknown.
 public Godot.Collections.Array GetFallen()
 ```
 
-The party's dead, in the order they fell — what `CantripRuntime.GetParty` and `CantripRuntime.GetAllies` leave out, and what content calls `fallen`. Pair it with `CantripRuntime.Revive(int, int)` for the shrine that offers to raise one.
+The party's dead, in the order they fell. These are what `CantripRuntime.GetParty` and `CantripRuntime.GetAllies` leave out, and what content calls `fallen`. Pair it with `CantripRuntime.Revive(int, int)` for the shrine that offers to raise one.
 
 A fallen member used to be in none of these lists, so a run that wanted to offer a raise had to keep its own list of ids from the moment it created them, save it and keep it in step with the snapshot. It was always in the save; only the way to ask was missing.
 
@@ -1169,7 +1169,7 @@ A fallen member used to be in none of these lists, so a run that wanted to offer
 public Godot.Collections.Array GetLegalTargets(int card_id)
 ```
 
-The entities that card or ability may be aimed at, after its own `target … where` filter and content's `targetable` rules, so a UI highlights exactly what `Play` and `UseAbility` accept.
+The entities that card or ability may be aimed at, after its own `target ... where` filter and content's `targetable` rules, so a UI highlights exactly what `Play` and `UseAbility` accept.
 
 ```csharp
 public Godot.Collections.Array GetParty()
@@ -1177,7 +1177,7 @@ public Godot.Collections.Array GetParty()
 
 The living party, in the order the engine offers its members: the actors this game asks for input. A game that declares no `hero` gets one id, `CantripRuntime.PlayerId`.
 
-Not the same as `CantripRuntime.GetAllies`, which is everyone on the side — a summoned minion is an ally and takes no step.
+Not the same as `CantripRuntime.GetAllies`, which is everyone on the side: a summoned minion is an ally and takes no step.
 
 ```csharp
 public Godot.Collections.Dictionary GetPendingChoice()
@@ -1215,7 +1215,7 @@ This is the game's own clock and not the driver's count, which is what `TickDriv
 public int GetTurn()
 ```
 
-The turn within the current battle, counting from 1. It is 0 between battles — and 0 for the whole of a real-time battle, which has no turns at all.
+The turn within the current battle, counting from 1. It is 0 between battles, and 0 for the whole of a real-time battle, which has no turns at all.
 
 ```csharp
 public Variant GetWon()
@@ -1307,7 +1307,7 @@ public string PlayBy(int card_id, int target_id, int by_id)
 
 The same play, made by a named party member: the one whose `source` the card's effect reads, whose damage it is and whose statuses apply to it. The cost still comes out of the card owner's pool, because those are the owner's cards. A `by_id` of 0 is `CantripRuntime.Play(int, int)`, and for a party of one the two are the same actor.
 
-A method of its own rather than a third parameter on `CantripRuntime.Play(int, int)`, for the reason `docs/godot.md` states at the top: a C# default argument is not a default in GDScript, so every parameter has to be passed. Adding one to `CantripRuntime.Play(int, int)` would have broken every `rules.Play(card, target)` written against a preview — and `CantripRuntime.Play(int, int)` is not ambiguous for a party the way `GetHand` was, because a card played with nobody named is played by whoever owns it, which is a definite answer. It is the same reasoning that gave `CantripRuntime.Pass(int)` its own name beside `CantripRuntime.EndTurn`.
+A method of its own rather than a third parameter on `CantripRuntime.Play(int, int)`, for the reason `docs/godot.md` states at the top: a C# default argument is not a default in GDScript, so every parameter has to be passed. Adding one to `CantripRuntime.Play(int, int)` would have broken every `rules.Play(card, target)` written against a preview. `CantripRuntime.Play(int, int)` is also not ambiguous for a party the way `GetHand` was, because a card played with nobody named is played by whoever owns it, which is a definite answer. It is the same reasoning that gave `CantripRuntime.Pass(int)` its own name beside `CantripRuntime.EndTurn`.
 
 ```csharp
 public string PlayNamed(string card_name, int target_id = 0)
@@ -1375,7 +1375,7 @@ public int SetStat(int entity_id, string stat, int value)
 
 Writes a stat: the same thing content's `speed = 6` does, with the resource's bounds, the `<stat>_changed` event and death when hp reaches zero. Returns the change actually applied, which a bound or a listener may have cut short.
 
-This is how a leader gets a `speed` under `order: speed`, where an actor with none reads 0 and takes its step last — and the leader's step is when the party's hand is drawn. Before it, the only way was to build a statement and call `Execute`.
+This is how a leader gets a `speed` under `order: speed`, where an actor with none reads 0 and takes its step last, and the leader's step is when the party's hand is drawn. Before it, the only way was to build a statement and call `Execute`.
 
 ```csharp
 public int SpawnEnemy(string name, int hp = -1)
@@ -1437,7 +1437,7 @@ Releases the Callables the game registered, on predelete rather than on leaving 
 public override void _Ready()
 ```
 
-Puts a `CantripRuntime.Driver` on this node's tick rate and, when `CantripRuntime.AutoLoad` is on, loads the content — reporting any problems to the Output panel, since nothing receives what an automatic load returns.
+Puts a `CantripRuntime.Driver` on this node's tick rate and, when `CantripRuntime.AutoLoad` is on, loads the content, reporting any problems to the Output panel, since nothing receives what an automatic load returns.
 
 ### Other
 
@@ -1445,7 +1445,7 @@ Puts a `CantripRuntime.Driver` on this node's tick rate and, when `CantripRuntim
 public CantripRuntime.BattleEndedEventHandler
 ```
 
-The battle is over, and the action that ended it has finished. It is safe to act from here — hand out a reward, start the next battle — and the next battle will announce its own end when it comes.
+The battle is over, and the action that ended it has finished. It is safe to act from here (hand out a reward, start the next battle), and the next battle will announce its own end when it comes.
 
 ```csharp
 public CantripRuntime.BattleStartedEventHandler
@@ -1469,7 +1469,7 @@ Carries the whole report `CantripRuntime.ReloadContent(Nullable<Array>)` returns
 public CantripRuntime.EffectEventEventHandler
 ```
 
-One resolved event, as a dictionary with snake_case keys. It arrives *after* the whole action has finished, never during it, so a handler may call back into the node — and `after` carries the stats as they were at that event, which is what an animation should show rather than the live values.
+One resolved event, as a dictionary with snake_case keys. It arrives *after* the whole action has finished, never during it, so a handler may call back into the node. The dictionary's `after` carries the stats as they were at that event, which is what an animation should show rather than the live values.
 
 ---
 
@@ -1479,7 +1479,7 @@ One resolved event, as a dictionary with snake_case keys. It arrives *after* the
 public delegate CantripRuntime.BattleEndedEventHandler : MulticastDelegate
 ```
 
-The battle is over, and the action that ended it has finished. It is safe to act from here — hand out a reward, start the next battle — and the next battle will announce its own end when it comes.
+The battle is over, and the action that ended it has finished. It is safe to act from here (hand out a reward, start the next battle), and the next battle will announce its own end when it comes.
 
 ---
 
@@ -1519,7 +1519,7 @@ Carries the whole report `CantripRuntime.ReloadContent(Nullable<Array>)` returns
 public delegate CantripRuntime.EffectEventEventHandler : MulticastDelegate
 ```
 
-One resolved event, as a dictionary with snake_case keys. It arrives *after* the whole action has finished, never during it, so a handler may call back into the node — and `after` carries the stats as they were at that event, which is what an animation should show rather than the live values.
+One resolved event, as a dictionary with snake_case keys. It arrives *after* the whole action has finished, never during it, so a handler may call back into the node. The dictionary's `after` carries the stats as they were at that event, which is what an animation should show rather than the live values.
 
 ---
 
@@ -1959,7 +1959,7 @@ public static DescriptionView Of(Description description, bool forOpponent = fal
 
 **Parameters.**
 
-- `forOpponent` — True for an effect the other side owns, such as an enemy's intent: the buffed and debuffed senses are inverted, because a bigger number coming at you is not an improvement.
+- `forOpponent`: True for an effect the other side owns, such as an enemy's intent: the buffed and debuffed senses are inverted, because a bigger number coming at you is not an improvement.
 
 ```csharp
 public override string ToString()
@@ -2177,8 +2177,8 @@ Reads a live entity.
 
 **Parameters.**
 
-- `stats` — Which stats to read, or null for every stat the entity has. A game that shows three bars per actor passes those three: each stat read runs the modifier pipeline.
-- `state` — The live game, for the one fact an entity does not carry on its own: whether it has taken its step this round. Null leaves `EntityView.Acted` false.
+- `stats`: Which stats to read, or null for every stat the entity has. A game that shows three bars per actor passes those three: each stat read runs the modifier pipeline.
+- `state`: The live game, for the one fact an entity does not carry on its own: whether it has taken its step this round. Null leaves `EntityView.Acted` false.
 
 ```csharp
 public override string ToString()
@@ -2262,7 +2262,7 @@ Records one resolved event, snapshotting the tracked stats of everyone it involv
 
 **Parameters.**
 
-- `trackedStats` — Null for `EventBuffer.DefaultTrackedStats`.
+- `trackedStats`: Null for `EventBuffer.DefaultTrackedStats`.
 
 Reading a stat here runs the modifier pipeline, which is a pure evaluation the interpreter itself performs constantly during resolution. Nothing in this method queues work, raises an event or calls back into the runtime, which is the one rule the host side of the adapter has to keep.
 
@@ -2348,7 +2348,7 @@ public EventRecord(long sequence, string name, EventPhase phase, long time, int 
 public int Action { get; }
 ```
 
-Entity id of the action involved — the card played, or whatever else the effect was running as — or 0. It crosses into script as `["card"]`, which keeps its key.
+Entity id of the action involved (the card played, or whatever else the effect was running as), or 0. It crosses into script as `["card"]`, which keeps its key.
 
 Named `Card` until 1.0, with `GameEvent.Card`, which is `GameEvent.Action` now. The dictionary key does not move with it: a key is invisible to GDScript until the line runs, so it is frozen as firmly as a method signature, and every game that reads `event["card"]` goes on reading it.
 
@@ -2564,7 +2564,7 @@ The host the runtime node installs. A game rarely builds one: the node owns its 
 
 **Parameters.**
 
-- `buffer` — Where resolved events wait. Null makes one, which is what a host of its own wants.
+- `buffer`: Where resolved events wait. Null makes one, which is what a host of its own wants.
 
 ### Fields and constants
 
@@ -3096,7 +3096,7 @@ public static SegmentView Of(DescriptionSegment segment, bool forOpponent = fals
 
 **Parameters.**
 
-- `forOpponent` — True when the effect belongs to the other side, as an enemy's intent does. The rules compute a trend for whoever owns the effect, so an enemy hitting harder is "buffed" to the enemy; a player reading their intent panel needs to see that as worse for them.
+- `forOpponent`: True when the effect belongs to the other side, as an enemy's intent does. The rules compute a trend for whoever owns the effect, so an enemy hitting harder is "buffed" to the enemy; a player reading their intent panel needs to see that as worse for them.
 
 ```csharp
 public override string ToString()
@@ -3456,7 +3456,7 @@ The cursor to send with the next fetch.
 public static TraceBatch From(TraceLog log, long sinceId = 0, int max = 200)
 ```
 
-Everything recorded after `sinceId`, up to `max`. Entries are handed out in the order they were recorded, and ids only ever rise, so the cursor is enough to resume — even across a buffer that trimmed itself in between.
+Everything recorded after `sinceId`, up to `max`. Entries are handed out in the order they were recorded, and ids only ever rise, so the cursor is enough to resume, even across a buffer that trimmed itself in between.
 
 ```csharp
 public override string ToString()
@@ -3586,7 +3586,7 @@ public static Godot.Collections.Dictionary Choice(int requestId, PendingChoice c
 
 A decision the rules are waiting on. The options are entity ids and views both: a UI needs the names to show, and the ids to answer with. An offer of content that does not exist yet, as `discover` makes, has `mode` "offer": its `option_ids` are the numbers 1, 2, 3... and each option is the candidate's name, kind, tags and rules text, which `describe` supplies.
 
-The request says `mode` rather than `kind` because `kind` already means three other things inside this one dictionary — what an entity is, what keyword declared an offered definition, and whether a segment is text or a value — and the vocabulary of `options[i]["kind"]` changes with it.
+The request says `mode` rather than `kind` because `kind` already means three other things inside this one dictionary (what an entity is, what keyword declared an offered definition, and whether a segment is text or a value), and the vocabulary of `options[i]["kind"]` changes with it.
 
 ```csharp
 public static Godot.Collections.Dictionary ContentReport(IEnumerable<Diagnostic> diagnostics)
@@ -3604,7 +3604,7 @@ Rules text as a dictionary, with the values kept apart from the words so a UI ca
 
 **Parameters.**
 
-- `targetId` — Who the description is aimed at, for an intent. `VariantMap.NoEntity` everywhere else, so every description dictionary has the same keys whatever made it.
+- `targetId`: Who the description is aimed at, for an intent. `VariantMap.NoEntity` everywhere else, so every description dictionary has the same keys whatever made it.
 
 ```csharp
 public static Godot.Collections.Dictionary Diagnostic(Diagnostic diagnostic)
@@ -3622,7 +3622,7 @@ Every diagnostic as a dictionary with its code, severity, message and place, in 
 public static Godot.Collections.Dictionary Entity(EntityView view)
 ```
 
-One entity as a dictionary: id, name, kind, team, zone, place, its tracked stats, its statuses and its ability ids. The keys are a contract — a game reads them by name — so they do not change within 1.x.
+One entity as a dictionary: id, name, kind, team, zone, place, its tracked stats, its statuses and its ability ids. The keys are a contract (a game reads them by name), so they do not change within 1.x.
 
 ```csharp
 public static Godot.Collections.Dictionary Event(EventRecord record)
@@ -3652,7 +3652,7 @@ The shape every refusal crosses in: `accepted` false, a snake_case `reason` and 
 public static Godot.Collections.Dictionary Segment(SegmentView view)
 ```
 
-One run of a description: its text, whether it is a value, and — when it is — the printed number beside the current one, so "~~6~~ 9" can be drawn.
+One run of a description: its text, whether it is a value, and, for a value, the printed number beside the current one, so "~~6~~ 9" can be drawn.
 
 ```csharp
 public static Godot.Collections.Dictionary Status(StatusView view)
@@ -3696,7 +3696,7 @@ public static void WarnUnknownZone(string zone, string calledFrom)
 
 Says so in the Output panel when a zone is not one the rules know.
 
-A warning and not a refusal: the core lets a game invent zones of its own, and that is deliberate. But nothing catches a typo either — `AddCard("Guard", "hnd")` makes a real card in a pile nothing will ever draw from — and a warning is the only thing that tells the two apart without taking the ability away.
+A warning and not a refusal: the core lets a game invent zones of its own, and that is deliberate. But nothing catches a typo either (`AddCard("Guard", "hnd")` makes a real card in a pile nothing will ever draw from), and a warning is the only thing that tells the two apart without taking the ability away.
 
 ### Other
 

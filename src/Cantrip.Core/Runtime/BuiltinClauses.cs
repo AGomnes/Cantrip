@@ -13,8 +13,8 @@ namespace Cantrip.Runtime
     /// </summary>
     /// <remarks>
     /// Only built-in verbs are listed. A verb a game registers in C#, or one content declares, may
-    /// read any clause it likes — which is the whole reason the grammar knows words no built-in verb
-    /// reads — so the check that uses this table skips them. A flag after a comma
+    /// read any clause it likes, which is the whole reason the grammar knows words no built-in verb
+    /// reads, so the check that uses this table skips them. A flag after a comma
     /// (<c>, ignore block</c>) is a different thing and is not a clause at all.
     /// </remarks>
     public static class BuiltinClauses

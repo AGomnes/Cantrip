@@ -70,16 +70,16 @@ namespace Cantrip.Runtime
         /// being used. It is what the <c>card:</c> qualifier reads.
         /// </summary>
         /// <remarks>
-        /// It was called <c>Card</c> until 1.0 and held an ability all along — the <c>targetable</c>
+        /// It was called <c>Card</c> until 1.0 and held an ability all along. The <c>targetable</c>
         /// channel sets it from whatever is being aimed, and <c>cost</c> and <c>cooldown</c> from
-        /// whatever is priced — so the name was wrong on the day it was written and would have been
+        /// whatever is priced, so the name was wrong on the day it was written and would have been
         /// frozen wrong. The DSL's <c>card:</c> filter keeps its word, because that is frozen content
         /// vocabulary and reads correctly in the case content overwhelmingly writes.
         /// </remarks>
         public Entity? Action { get; set; }
 
         /// <summary>
-        /// The action's own tags — <c>fire</c> on fire damage — which a <c>tag:</c> filter tests. Empty
+        /// The action's own tags (<c>fire</c> on fire damage), which a <c>tag:</c> filter tests. Empty
         /// rather than null by default, so a filter never has to guard.
         /// </summary>
         public IReadOnlyCollection<string> Tags { get; set; } = NoTags;
@@ -167,12 +167,12 @@ namespace Cantrip.Runtime
     /// <remarks>
     /// Internal because it is unimplementable from outside and always was. <c>Interpreter</c> is
     /// the only implementer, implements both members explicitly, and is handed to the pipeline by
-    /// the runtime that builds it — the setter of <see cref="ModifierPipeline.Evaluator"/> has been
+    /// the runtime that builds it. The setter of <see cref="ModifierPipeline.Evaluator"/> has been
     /// internal since a null there was found to stop every modifier applying in silence. So nothing
     /// outside the library could ever supply one, and the pipeline is not one of the four seams
     /// <c>docs/stability.md</c> promises may grow a member with a default. Left public it would
-    /// have carried an interface's whole freeze cost — a member added in 1.x breaking every
-    /// implementation of it — and none of the escape hatch, for a surface nobody can implement.
+    /// have carried an interface's whole freeze cost (a member added in 1.x breaking every
+    /// implementation of it) and none of the escape hatch, for a surface nobody can implement.
     /// </remarks>
     internal interface IModifierEvaluator
     {
@@ -262,8 +262,8 @@ namespace Cantrip.Runtime
             _byOwner.TryGetValue(owner.Id, out List<Modifier>? owned) ? owned : (IReadOnlyList<Modifier>)Array.Empty<Modifier>();
 
         /// <summary>
-        /// Every modifier registered on a channel, in registration order — not the order they are
-        /// applied in, which the layers decide. Empty for a channel nothing modifies.
+        /// Every modifier registered on a channel, in registration order rather than the order they
+        /// are applied in, which the layers decide. Empty for a channel nothing modifies.
         /// </summary>
         public IReadOnlyList<Modifier> OnChannel(string channel) =>
             _byChannel.TryGetValue(channel, out List<Modifier>? list) ? list : (IReadOnlyList<Modifier>)Array.Empty<Modifier>();

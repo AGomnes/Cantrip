@@ -150,8 +150,8 @@ namespace Cantrip.Sim
         /// <remarks>
         /// A party of one is not passed at all: the runner's <c>EndTurn</c> ends its turn, exactly
         /// as it did before a party existed, so every call the engine sees on a one-hero game is
-        /// the call it saw before. With more than one member, passing is how the turn moves on —
-        /// under <c>turns: initiative</c> it is the only way the next member ever comes up.
+        /// the call it saw before. With more than one member, passing is how the turn moves on.
+        /// Under <c>turns: initiative</c> it is the only way the next member ever comes up.
         /// </remarks>
         public static void EachMember(CardRuntime runtime, Action<Entity> play)
         {
@@ -162,7 +162,7 @@ namespace Cantrip.Sim
             }
 
             // The turn this is playing. Passing the last member ends it, and the next round's
-            // members are immediately waiting again — so without this the loop would play a whole
+            // members are immediately waiting again, so without this the loop would play a whole
             // battle inside one turn, and the runner would count it as one.
             int round = runtime.State.Turn;
 
@@ -202,7 +202,7 @@ namespace Cantrip.Sim
         public bool Ability { get; }
 
         /// <summary>
-        /// The member performing it, or 0 for the card's own controller — which is what a party of
+        /// The member performing it, or 0 for the card's own controller, which is what a party of
         /// one always is, and why nothing about a one-hero game reads differently here.
         /// </summary>
         public int By { get; }

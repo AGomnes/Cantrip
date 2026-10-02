@@ -9,7 +9,7 @@ namespace Cantrip.Runtime
     /// <summary>
     /// What one action asks to be aimed at, read from its <c>target</c> line:
     /// <c>target enemy</c>, <c>target ally where it.position &lt;= 1</c>, and so on. Cards, abilities
-    /// and the things with no <c>target</c> line at all — an enemy move, the <c>attack</c> verb —
+    /// and the things with no <c>target</c> line at all (an enemy move, the <c>attack</c> verb)
     /// all describe themselves with one of these, so that every site that points at somebody asks
     /// <see cref="Interpreter.LegalTargets(TargetRule, Entity, Entity, System.Collections.Generic.IReadOnlyList{Entity})"/>
     /// the same question.
@@ -52,7 +52,7 @@ namespace Cantrip.Runtime
             mode != null && Array.IndexOf(Modes, mode.ToLowerInvariant()) >= 0;
 
         /// <summary>
-        /// The predicates of <c>target enemy where …</c>, with <c>it</c> the candidate. Empty when
+        /// The predicates of <c>target enemy where ...</c>, with <c>it</c> the candidate. Empty when
         /// the <c>target</c> line names a side and nothing more, which is the usual case.
         /// </summary>
         internal IReadOnlyList<ExprNode> Filters { get; }
@@ -75,7 +75,7 @@ namespace Cantrip.Runtime
         /// Reads an action's <c>target</c> line. <c>target enemy</c> is a bare word;
         /// <c>target enemy where it.position &lt;= 1</c> parses as that word wrapped in a
         /// <see cref="WhereExpr"/>, which is why the word alone cannot be read with
-        /// <c>Word("target")</c> any more — it would answer <c>none</c> and the card would quietly
+        /// <c>Word("target")</c> any more: it would answer <c>none</c> and the card would quietly
         /// stop asking for a target at all.
         /// </summary>
         internal static TargetRule Of(EntityDefinition? definition)
@@ -105,8 +105,8 @@ namespace Cantrip.Runtime
 
         /// <summary>
         /// What an enemy move points at: anybody living, with the move's own <c>range</c>. A move
-        /// has no <c>target</c> line — the enemy is handed somebody and the rule only decides
-        /// whether that somebody is still legal — so this differs from <see cref="Any"/> in reach
+        /// has no <c>target</c> line (the enemy is handed somebody and the rule only decides
+        /// whether that somebody is still legal), so this differs from <see cref="Any"/> in reach
         /// and nothing else.
         /// </summary>
         internal static TargetRule OfMove(MoveDefinition? move) =>
@@ -132,7 +132,7 @@ namespace Cantrip.Runtime
         /// <summary>Too far: filter 2, the action's <c>range</c> after the <c>range</c> channel.</summary>
         OutOfReach,
 
-        /// <summary>Excluded by filter 3, the action's own <c>target … where</c>.</summary>
+        /// <summary>Excluded by filter 3, the action's own <c>target ... where</c>.</summary>
         Filtered,
 
         /// <summary>Refused by filter 4, the <c>targetable</c> channel: a taunt, or a stealth.</summary>
@@ -149,8 +149,8 @@ namespace Cantrip.Runtime
         // candidate must pass all of them:
         //
         //   1. the side the `target` line names, and being alive
-        //   2. reach — the seam `range` plugs into; see InReach, which is empty on purpose
-        //   3. the action's own `target … where` filter, with `it` bound to the candidate
+        //   2. reach: the seam `range` plugs into; see InReach, which is empty on purpose
+        //   3. the action's own `target ... where` filter, with `it` bound to the candidate
         //   4. the `targetable` channel, where a taunt and a stealth live
         //
         // Area and random effects are deliberately not here. `deal 3 to enemies` resolves through
@@ -165,7 +165,7 @@ namespace Cantrip.Runtime
         {
             if (user == null) throw new ArgumentNullException(nameof(user));
 
-            // `target self` is not a choice, so nothing is asked of it — not the channel, and not
+            // `target self` is not a choice, so nothing is asked of it: not the channel, and not
             // the card's own filter. It is who the card is for, not who it is pointed at.
             if (rule.Mode == "self") return new[] { user };
 
@@ -201,7 +201,7 @@ namespace Cantrip.Runtime
         /// <c>ActionResult.OutOfRange</c> and an empty table is <c>ActionResult.NoTarget</c>, while
         /// the filter and the channel are the two that leave <c>ActionResult.InvalidTarget</c>
         /// meaning "somebody the action will not take". The order is the rule's, so a candidate that
-        /// is both out of reach and taunted away is reported as out of reach — the cheaper question
+        /// is both out of reach and taunted away is reported as out of reach: the cheaper question
         /// is asked first and nothing looks past the first no.
         /// </remarks>
         internal TargetVerdict Verdict(TargetRule rule, Entity user, Entity? action, Entity? candidate)
@@ -214,7 +214,7 @@ namespace Cantrip.Runtime
             // 2. Reach.
             if (!InReach(rule, user, action, candidate)) return TargetVerdict.OutOfReach;
 
-            // 3. The action's own `target … where`.
+            // 3. The action's own `target ... where`.
             if (!MatchesFilter(rule, user, action, candidate)) return TargetVerdict.Filtered;
 
             // 4. The `targetable` channel.
@@ -278,7 +278,7 @@ namespace Cantrip.Runtime
         /// <summary>The side an actor is against. There are two sides, so this is the other one.</summary>
         internal static Team Opposing(Entity actor) => actor.Team == Team.Enemy ? Team.Player : Team.Enemy;
 
-        // Reach — the seam where `range` plugs in ------------------------------------------------
+        // Reach: the seam where `range` plugs in -------------------------------------------------
 
         /// <summary>
         /// Filter 2 of 4: whether <paramref name="candidate"/> is near enough for
@@ -294,7 +294,7 @@ namespace Cantrip.Runtime
         /// </para>
         /// <para>
         /// An action that prints no range, in a game with nothing on the <c>range</c> channel, asks
-        /// nothing and reaches everybody — which is what every game did before this existed, and is
+        /// nothing and reaches everybody, which is what every game did before this existed, and is
         /// why adding reach moved no sample's numbers.
         /// </para>
         /// <para>
@@ -312,7 +312,7 @@ namespace Cantrip.Runtime
 
             int distance = State.Distance(user, candidate);
 
-            // Either of them is off the board — a summon that has not landed, an actor a game keeps
+            // Either of them is off the board: a summon that has not landed, an actor a game keeps
             // outside the rules. There is no place to measure between, so reach says nothing.
             return distance == int.MaxValue || reach.Reaches(distance);
         }
@@ -356,7 +356,7 @@ namespace Cantrip.Runtime
         /// </summary>
         /// <remarks>
         /// This is an ordinary <c>where</c>, so a bare qualifier such as <c>tag:undead</c> tests the
-        /// candidate, the way it does in <c>enemies where tag:undead</c> — and unlike the same words
+        /// candidate, the way it does in <c>enemies where tag:undead</c>, and unlike the same words
         /// inside a <c>targetable</c> modifier, where a bare qualifier tests the card being played.
         /// <c>self</c> is the action, <c>source</c> is whoever is using it.
         /// </remarks>

@@ -35,11 +35,11 @@ What a top-level action did. Every call that can stop for a choice reports it he
 | `Played = 0` | The action ran to the end. For `CardRuntime.Play(Entity, Entity, Entity)`, the card was played. |
 | `NotACard = 1` | There is nothing to act on: the entity is not a card, or not an ability, or it has been removed, or the actor it belongs to is dead. |
 | `NotInHand = 2` | The card is not where it would have to be to be played: not in hand, or not in the pile a `from` named. It is also what `CardRuntime.Play(string, Entity, Entity)` answers when nothing in hand is called that. |
-| `Unplayable = 3` | The card is tagged `unplayable` — a curse, a wound, a status card — so no hand it is in ever offers it. Never being playable is the whole of what it is, which is why `cantrip sim` leaves one out of its "held but never playable" finding. |
-| `CannotAfford = 4` | The card costs more of its resource than the payer has — *whichever* resource that is. A card priced `cost 2 bones` is refused with this, so the word cannot say `energy`: it said so until 1.0, and it was a lie in every game with a second resource. `CardRuntime.CostResourceOf(Entity)` names the resource and `CardRuntime.CostOf(Entity)` the price, which is what a message to the player needs. An ability has no cost, so `CardRuntime.UseAbility(Entity, Entity)` never answers this; see `ActionResult.NotReady`. |
-| `InvalidTarget = 5` | Somebody was named, or settled on, that the action will not take: the wrong side, not an actor, not alive, excluded by the action's own `target … where`, or drawn away by a taunt or hidden by a stealth on the `targetable` channel. It is about *who*, and it is the answer to ask `CardRuntime.LegalTargets(Entity)` about, because the list is the filter's own answer. |
+| `Unplayable = 3` | The card is tagged `unplayable` (a curse, a wound, a status card), so no hand it is in ever offers it. Never being playable is the whole of what it is, which is why `cantrip sim` leaves one out of its "held but never playable" finding. |
+| `CannotAfford = 4` | The card costs more of its resource than the payer has, *whichever* resource that is. A card priced `cost 2 bones` is refused with this, so the word cannot say `energy`: it said so until 1.0, and it was a lie in every game with a second resource. `CardRuntime.CostResourceOf(Entity)` names the resource and `CardRuntime.CostOf(Entity)` the price, which is what a message to the player needs. An ability has no cost, so `CardRuntime.UseAbility(Entity, Entity)` never answers this; see `ActionResult.NotReady`. |
+| `InvalidTarget = 5` | Somebody was named, or settled on, that the action will not take: the wrong side, not an actor, not alive, excluded by the action's own `target ... where`, or drawn away by a taunt or hidden by a stealth on the `targetable` channel. It is about *who*, and it is the answer to ask `CardRuntime.LegalTargets(Entity)` about, because the list is the filter's own answer. |
 | `OutOfRange = 6` | Everyone the action could have aimed at is too far away, or the one named is. Reach is the action's printed `range` after the `range` channel has had it, so a status that shortens reach answers this as much as a card that printed a short one. |
-| `NoTarget = 7` | There is nobody on the side the action asks for: `target enemy` with no enemy alive. Nothing was filtered out and nothing was too far away — the table is empty. |
+| `NoTarget = 7` | There is nobody on the side the action asks for: `target enemy` with no enemy alive. Nothing was filtered out and nothing was too far away: the table is empty. |
 | `Cancelled = 8` | A `choose` or `discover` was answered with nothing, or the game called `CardRuntime.CancelPending`. The action was rolled back, so nothing it had already done stands. |
 | `ChoicePending = 9` | The action needs a decision from the player. The game has been rolled back to where it was; see `CardRuntime.Pending` and answer with `CardRuntime.Answer(int[])`. |
 | `NotReady = 10` | An ability that is still on cooldown. See `CardRuntime.IsReady(Entity)`. |
@@ -64,12 +64,12 @@ Builds a runtime over already-loaded content. Nothing is running yet: call `Card
 
 **Parameters.**
 
-- `content` — The library to play. It is not re-checked here, so load it through `ContentLibrary.FromText(string, string)` or `CardRuntime.FromText(string, RuntimeOptions)` and look at its diagnostics first — content with errors in it builds a runtime that fails one battle in.
-- `options` — Null takes the defaults, which is the run the content describes.
+- `content`: The library to play. It is not re-checked here, so load it through `ContentLibrary.FromText(string, string)` or `CardRuntime.FromText(string, RuntimeOptions)` and look at its diagnostics first: content with errors in it builds a runtime that fails one battle in.
+- `options`: Null takes the defaults, which is the run the content describes.
 
 **Throws.**
 
-- `InvalidOperationException` — The content says `clock turns` and `RuntimeOptions.Clock` is a `TickClock`, or the other way round. It is caught here rather than at the line that would have gone wrong, which would have been an `on every 1s:` listener quietly registering nothing.
+- `InvalidOperationException`: The content says `clock turns` and `RuntimeOptions.Clock` is a `TickClock`, or the other way round. It is caught here rather than at the line that would have gone wrong, which would have been an `on every 1s:` listener quietly registering nothing.
 
 ### Properties
 
@@ -101,7 +101,7 @@ The library this runtime plays. It is the object that was handed in, not a copy,
 public IReadOnlyList<Entity> Fallen { get; }
 ```
 
-The party's dead, in the order they fell — what `CardRuntime.Party` and `State.Actors` leave out, and what content calls `fallen`.
+The party's dead, in the order they fell: what `CardRuntime.Party` and `State.Actors` leave out, and what content calls `fallen`.
 
 A run that offers to raise a fallen member used to have to keep its own list of member ids from the moment it created them, save it, version it and keep it in step with the snapshot, because a corpse was in none of `Party`, `State.Actors` or the content groups. It is in the snapshot like everyone else; only the way to ask was missing.
 
@@ -137,9 +137,9 @@ The party's leader: the actor `CardRuntime.CreatePlayer(string, int, int)` made,
 
 **Throws.**
 
-- `InvalidOperationException` — Before `CardRuntime.CreatePlayer(string, int, int)`. Every other call that needs a player needs it too, so the window in which this is empty is the few lines between building a runtime and setting the game up — and a game that asks in that window has its order wrong rather than a player that might not be there.
+- `InvalidOperationException`: Before `CardRuntime.CreatePlayer(string, int, int)`. Every other call that needs a player needs it too, so the window in which this is empty is the few lines between building a runtime and setting the game up. A game that asks in that window has its order wrong rather than a player that might not be there.
 
-Not nullable, deliberately. It used to be, and a host with `<Nullable>enable</Nullable>` — which this repository's own `Directory.Build.props` sets, with `WarningsAsErrors=nullable` — could not write `runtime.Player.GetInt("hp")`, the line the guide gives, without a `!` the guide never mentions. `CardRuntime.HasPlayer` is the question worth asking, and it is asked once, at setup.
+Not nullable, deliberately. It used to be, and a host with `<Nullable>enable</Nullable>` (which this repository's own `Directory.Build.props` sets, with `WarningsAsErrors=nullable`) could not write `runtime.Player.GetInt("hp")`, the line the guide gives, without a `!` the guide never mentions. `CardRuntime.HasPlayer` is the question worth asking, and it is asked once, at setup.
 
 ```csharp
 public GameState State { get; }
@@ -171,19 +171,19 @@ Puts one copy of a `card` declaration into a pile. This is the run's deck being 
 
 **Parameters.**
 
-- `name` — A `card` declared in content.
-- `zone` — Which pile, from `Zones`. The default is the draw pile, which is where deck building puts things; `Zones.Hand` is what a test usually wants.
-- `owner` — Whose card it is. Null means the leader, which is right for a party sharing one deck and wrong for a game where each member draws from its own.
+- `name`: A `card` declared in content.
+- `zone`: Which pile, from `Zones`. The default is the draw pile, which is where deck building puts things; `Zones.Hand` is what a test usually wants.
+- `owner`: Whose card it is. Null means the leader, which is right for a party sharing one deck and wrong for a game where each member draws from its own.
 
 **Throws.**
 
-- `ArgumentException` — No `card` of that name is loaded. The message suggests the closest name that is.
+- `ArgumentException`: No `card` of that name is loaded. The message suggests the closest name that is.
 
 ```csharp
 public IReadOnlyList<Entity> AddDeck(params string[] names)
 ```
 
-`CardRuntime.AddCard(string, string, Entity)` for a whole list, into the leader's draw pile, in the order given — which is the order they are drawn in if the battle starts without a shuffle. Repeating a name is how a deck holds five Strikes.
+`CardRuntime.AddCard(string, string, Entity)` for a whole list, into the leader's draw pile, in the order given, which is the order they are drawn in if the battle starts without a shuffle. Repeating a name is how a deck holds five Strikes.
 
 ```csharp
 public Entity AddHero(string name, int? hp = null)
@@ -193,8 +193,8 @@ Adds a party member from a `hero` definition: an actor on the player's side that
 
 **Parameters.**
 
-- `name` — A `hero` declared in content.
-- `hp` — Overrides the printed hp, as `CardRuntime.SpawnEnemy(string, Nullable<int>)` does.
+- `name`: A `hero` declared in content.
+- `hp`: Overrides the printed hp, as `CardRuntime.SpawnEnemy(string, Nullable<int>)` does.
 
 The leader `CardRuntime.CreatePlayer(string, int, int)` made is already a member, so a party of four is one `CreatePlayer` and three `AddHero`. Content adds one with `create Vestal`, which is the same arrival by a different door: a mid-run recruit, or a summon that acts.
 
@@ -202,12 +202,12 @@ The leader `CardRuntime.CreatePlayer(string, int, int)` made is already a member
 public Entity AddRelic(string name, Entity? owner = null)
 ```
 
-Gives an actor a relic and announces it with `obtained` — unlike `CardRuntime.AddCard(string, string, Entity)`, which is silent. A relic whose whole effect is an `on obtained:` block therefore fires here, during setup, before any battle has started.
+Gives an actor a relic and announces it with `obtained`, unlike `CardRuntime.AddCard(string, string, Entity)`, which is silent. A relic whose whole effect is an `on obtained:` block therefore fires here, during setup, before any battle has started.
 
 **Parameters.**
 
-- `name` — A `relic` declaration, or an `item` if no relic has that name.
-- `owner` — Who holds it. Null means the leader, which is where a run's relics live.
+- `name`: A `relic` declaration, or an `item` if no relic has that name.
+- `owner`: Who holds it. Null means the leader, which is where a run's relics live.
 
 ```csharp
 public ActionResult Answer(EntityDefinition chosen)
@@ -219,7 +219,7 @@ Answers a pending offer of content, as `discover` makes, with the candidate the 
 public ActionResult Answer(IEnumerable<Entity> entities)
 ```
 
-`CardRuntime.Answer(int[])` for a caller holding the entities rather than their ids — a UI that kept what the player clicked. Null counts as an empty selection, which cancels.
+`CardRuntime.Answer(int[])` for a caller holding the entities rather than their ids: a UI that kept what the player clicked. Null counts as an empty selection, which cancels.
 
 ```csharp
 public ActionResult Answer(IEnumerable<int> entityIds)
@@ -229,7 +229,7 @@ public ActionResult Answer(IEnumerable<int> entityIds)
 
 **Throws.**
 
-- `InvalidOperationException` — Nothing is pending, or what is pending is an offer of content rather than a choice between entities — answer that one with `CardRuntime.Answer(EntityDefinition)`.
+- `InvalidOperationException`: Nothing is pending, or what is pending is an offer of content rather than a choice between entities. Answer that one with `CardRuntime.Answer(EntityDefinition)`.
 
 ```csharp
 public ActionResult Answer(params int[] entityIds)
@@ -295,7 +295,7 @@ The action's current cost after modifiers. An X cost spends everything the payer
 
 **Parameters.**
 
-- `action` — The card or ability; see `CardRuntime.IsXCost(Entity)` on the name.
+- `action`: The card or ability; see `CardRuntime.IsXCost(Entity)` on the name.
 
 ```csharp
 public string CostResourceOf(Entity action)
@@ -305,7 +305,7 @@ The resource an action's cost is paid in: `energy`, or whatever its `cost` names
 
 **Parameters.**
 
-- `action` — The card or ability; see `CardRuntime.IsXCost(Entity)` on the name.
+- `action`: The card or ability; see `CardRuntime.IsXCost(Entity)` on the name.
 
 ```csharp
 public Entity CreatePlayer(string name = "Player", int hp = 80, int maxEnergy = 3)
@@ -315,13 +315,13 @@ Makes the run's leader: the actor that holds the deck, the relics and the gold, 
 
 **Parameters.**
 
-- `name` — What the leader is called. It is not looked up in content — the leader is built from these three numbers rather than from a declaration, which is why a game that wants the leader to have a stat of its own, such as `speed`, sets it afterwards with `CardRuntime.SetStat(Entity, string, long)`.
-- `hp` — Starting and maximum hp.
-- `maxEnergy` — Energy the leader refills to each turn. A real-time game pays for nothing, so it is unused there.
+- `name`: What the leader is called. It is not looked up in content: the leader is built from these three numbers rather than from a declaration, which is why a game that wants the leader to have a stat of its own, such as `speed`, sets it afterwards with `CardRuntime.SetStat(Entity, string, long)`.
+- `hp`: Starting and maximum hp.
+- `maxEnergy`: Energy the leader refills to each turn. A real-time game pays for nothing, so it is unused there.
 
 **Throws.**
 
-- `InvalidOperationException` — A player already exists. There is one per runtime; further party members are `CardRuntime.AddHero(string, Nullable<int>)`.
+- `InvalidOperationException`: A player already exists. There is one per runtime; further party members are `CardRuntime.AddHero(string, Nullable<int>)`.
 
 ```csharp
 public void Dispose()
@@ -329,7 +329,7 @@ public void Dispose()
 
 Lets go of the clock. A runtime listens to `IGameClock.Advanced` from the moment it is built, which is how scheduled work, periodic triggers and timed statuses run; until it lets go, the clock holds it alive and keeps driving it.
 
-It only matters when a game passes its own clock in `RuntimeOptions.Clock` and outlives a runtime that used it — two runtimes sharing one clock both keep running, and the one nobody uses any more goes on resolving effects on a game that has been replaced. A runtime that made its own clock is collected with it, so nothing is leaked by not calling this. Nothing else is torn down: the state, the content and the entities are ordinary objects, and calling any other member afterwards still works, minus the clock. Calling it twice does nothing the second time.
+It only matters when a game passes its own clock in `RuntimeOptions.Clock` and outlives a runtime that used it: two runtimes sharing one clock both keep running, and the one nobody uses any more goes on resolving effects on a game that has been replaced. A runtime that made its own clock is collected with it, so nothing is leaked by not calling this. Nothing else is torn down: the state, the content and the entities are ordinary objects, and calling any other member afterwards still works, minus the clock. Calling it twice does nothing the second time.
 
 ```csharp
 public ActionResult EndBattle(bool won)
@@ -339,7 +339,7 @@ Ends the running battle, won or lost, as though the last enemy had just fallen: 
 
 **Returns.** `ActionResult.Played`, `ActionResult.Unplayable` when no battle is running, or `ActionResult.ChoicePending` when a `battle_end` effect stops to ask the player something.
 
-The companion of `ends: called`: a game that has turned the automatic ending off needs a way to say the fight is over, and a wave game's ending is a rule of the game above the fight — a timer ran out, a boss arrived, the gate held. It works under `BattleEnd.LastEnemy` too, for a retreat or a surrender.
+The companion of `ends: called`: a game that has turned the automatic ending off needs a way to say the fight is over, and a wave game's ending is a rule of the game above the fight (a timer ran out, a boss arrived, the gate held). It works under `BattleEnd.LastEnemy` too, for a retreat or a surrender.
 
 ```csharp
 public ActionResult EndTurn()
@@ -351,7 +351,7 @@ Ends the player's turn, runs the enemies' turn, and starts the next player turn.
 
 **Throws.**
 
-- `InvalidOperationException` — This runtime uses a `TickClock`, so it has no turns to end.
+- `InvalidOperationException`: This runtime uses a `TickClock`, so it has no turns to end.
 
 ```csharp
 public ActionResult Execute(string statements, Entity? self = null, Entity? target = null)
@@ -395,17 +395,17 @@ Whether this action's cost is `X`: it spends everything the actor has rather tha
 
 **Parameters.**
 
-- `action` — The card or ability. It is not called `card` because only a card has a cost today and this is the surface an ability's cost would arrive on, as `CardRuntime.LegalTargets(Entity)` is named for the same reason.
+- `action`: The card or ability. It is not called `card` because only a card has a cost today and this is the surface an ability's cost would arrive on, as `CardRuntime.LegalTargets(Entity)` is named for the same reason.
 
 ```csharp
 public IReadOnlyList<Entity> LegalTargets(Entity action)
 ```
 
-The entities this action may be pointed at right now, in board order, after its own `target … where` filter and content's `targetable` rules: exactly what `CardRuntime.Play(Entity, Entity, Entity)` and `CardRuntime.UseAbility(Entity, Entity)` accept. Empty for one that takes no target. A `target any` action may also be played at nothing, which this list cannot say, so a UI that wants to offer that asks `CardRuntime.TargetMode(Entity)`.
+The entities this action may be pointed at right now, in board order, after its own `target ... where` filter and content's `targetable` rules: exactly what `CardRuntime.Play(Entity, Entity, Entity)` and `CardRuntime.UseAbility(Entity, Entity)` accept. Empty for one that takes no target. A `target any` action may also be played at nothing, which this list cannot say, so a UI that wants to offer that asks `CardRuntime.TargetMode(Entity)`.
 
 **Parameters.**
 
-- `action` — A card or an ability.
+- `action`: A card or an ability.
 
 ```csharp
 public static BlockNode ParseStatements(string statements, string file = "<execute>")
@@ -417,7 +417,7 @@ Parses free-standing statements by wrapping them in a synthetic block.
 public ActionResult Pass(Entity member)
 ```
 
-That member is done for this turn. When the last one that could act has passed, the party's turn ends and the enemies take theirs — so for a party of one this is `CardRuntime.EndTurn`, to the byte.
+That member is done for this turn. When the last one that could act has passed, the party's turn ends and the enemies take theirs. For a party of one this is therefore `CardRuntime.EndTurn`, to the byte.
 
 **Returns.** `ActionResult.Played`, or `ActionResult.ChoicePending` when the turn it ended stopped to ask the player something.
 
@@ -431,7 +431,7 @@ Stands an actor at `lane`, `rank`, raising `moved` so content hears it and `befo
 
 **Returns.** True when the actor stands there afterwards; false when a `before_moved` listener refused the move.
 
-Where somebody stands is a rule and not a view, so the Godot node has nothing that does this — but a rule still has to be reachable from the game that owns the fight above it. A host with waves to place had to execute a string of content for every spawn, which turned a typo in a lane number from a compile error into a `DslException` on a hot path. A slot off the board is refused here with the board's own name and shape, rather than clamped: a wave walking in at a rank that does not exist is a bug in the schedule, and quietly standing it somewhere else would hide it.
+Where somebody stands is a rule and not a view, so the Godot node has nothing that does this. Even so, a rule still has to be reachable from the game that owns the fight above it. A host with waves to place had to execute a string of content for every spawn, which turned a typo in a lane number from a compile error into a `DslException` on a hot path. A slot off the board is refused here with the board's own name and shape, rather than clamped: a wave walking in at a rank that does not exist is a bug in the schedule, and quietly standing it somewhere else would hide it.
 
 ```csharp
 public ActionResult Play(Entity card, Entity? target = null, Entity? performer = null)
@@ -441,11 +441,11 @@ Plays a card from hand: checks energy and target, pays, resolves, and drains tri
 
 **Parameters.**
 
-- `card` — The card to play, from whichever member's hand it is in.
-- `target` — Who it is aimed at, or null to settle from the card's `target` line.
-- `performer` — The member doing it, or null for the card's own controller — which is what every game before a party existed means, and what a party of one always has.
+- `card`: The card to play, from whichever member's hand it is in.
+- `target`: Who it is aimed at, or null to settle from the card's `target` line.
+- `performer`: The member doing it, or null for the card's own controller, which is what every game before a party existed means, and what a party of one always has.
 
-The cost is paid by the card's controller, because that is whose pool the card is in. Everything else is the performer's: `card_played.source` is the performer, the damage comes from the performer, `source:` filters match the performer, and the performer's own statuses and modifiers apply. A card that draws draws into the performer's pile, so a member with no pile of its own draws nothing — which is the same sentence as the rule that gave it the party's hand to play from.
+The cost is paid by the card's controller, because that is whose pool the card is in. Everything else is the performer's: `card_played.source` is the performer, the damage comes from the performer, `source:` filters match the performer, and the performer's own statuses and modifiers apply. A card that draws draws into the performer's pile, so a member with no pile of its own draws nothing, which is the same sentence as the rule that gave it the party's hand to play from.
 
 ```csharp
 public ActionResult Play(string cardName, Entity? target = null, Entity? performer = null)
@@ -455,9 +455,9 @@ Plays the first card of that name in hand, for a game that thinks in names.
 
 **Parameters.**
 
-- `cardName` — The card to look for, matched without regard to case.
-- `target` — What to aim it at, or null for one that needs no target.
-- `performer` — The member making the play, or null for the card's controller. The card is looked for in that member's own hand first and then in the party's, which is the leader's — the same two shapes a party can take, told apart by whether the member has a hand at all.
+- `cardName`: The card to look for, matched without regard to case.
+- `target`: What to aim it at, or null for one that needs no target.
+- `performer`: The member making the play, or null for the card's controller. The card is looked for in that member's own hand first and then in the party's, which is the leader's. Those are the same two shapes a party can take, told apart by whether the member has a hand at all.
 
 ```csharp
 public long ReadyIn(Entity ability)
@@ -483,7 +483,7 @@ Takes a card out of the game for good, as `destroy` does in content: the way to 
 
 **Returns.** Whether the card is gone. False, having changed nothing, for anything that is not a card still in the game.
 
-The Godot node has had this since the addon shipped, with a worked `upgrade_card` recipe beside it, while C# was told to write `Execute("destroy target", target: card)` — the same operation as a typed call on one side of the engine and a parsed string on the other.
+The Godot node has had this since the addon shipped, with a worked `upgrade_card` recipe beside it, while C# was told to write `Execute("destroy target", target: card)`: one operation, a typed call on one side of the engine and a parsed string on the other.
 
 ```csharp
 public void Restore(GameSnapshot snapshot)
@@ -515,7 +515,7 @@ public Num SetStat(Entity entity, string stat, long value)
 
 Sets a stat on an actor, or on a card: the same thing content's `speed = 6` does, with the resource's own bounds, the `<stat>_changed` event, and death when hp reaches zero. Returns the change that was actually applied, which a bound or a listener may have cut short.
 
-There was no typed way to write a number onto an entity at all, so a game that finished creating its leader — a `speed` for `order: speed`, a starting shard count — or spent gold in a shop had to build a statement and call `Execute`: `runtime.Execute($"lose {amount} gold")`, a string-interpolated statement, unchecked until it runs, for subtracting an integer.
+There was no typed way to write a number onto an entity at all, so a game that finished creating its leader (a `speed` for `order: speed`, a starting shard count) or spent gold in a shop had to build a statement and call `Execute`: `runtime.Execute($"lose {amount} gold")`, a string-interpolated statement, unchecked until it runs, for subtracting an integer.
 
 ```csharp
 public Entity SpawnEnemy(string name, int? hp = null)
@@ -523,7 +523,7 @@ public Entity SpawnEnemy(string name, int? hp = null)
 
 Puts an enemy on the board and announces it with `created`, the same event content's own `create` raises.
 
-The event is an announcement rather than a gate: the enemy is already in the game when it is raised, so a `before created:` listener cannot stop a spawn the host has decided on. What it buys is the thing a wave game needs and had no way to write — an arrival effect, a self-placement, a relic that hears anything entering the fight: `on created(target:self): self.rank = 3` on the enemy's own declaration. In a turn game a spawn happens once, before the battle, so this never came up; in a real-time game it is the most frequent event there is.
+The event is an announcement rather than a gate: the enemy is already in the game when it is raised, so a `before created:` listener cannot stop a spawn the host has decided on. What it buys is the thing a wave game needs and had no way to write (an arrival effect, a self-placement, a relic that hears anything entering the fight): `on created(target:self): self.rank = 3` on the enemy's own declaration. In a turn game a spawn happens once, before the battle, so this never came up; in a real-time game it is the most frequent event there is.
 
 ```csharp
 public ActionResult StartBattle(bool shuffle = true, bool drawOpeningHand = true, string? board = null)
@@ -533,9 +533,9 @@ Opens a battle against whatever enemies are already on the board, raising `battl
 
 **Parameters.**
 
-- `shuffle` — Shuffle the draw pile first. Tests turn this off to control draw order.
-- `drawOpeningHand` — Draw the first hand. Tests turn this off to set the hand explicitly.
-- `board` — The board to fight this battle on, by name, or null to keep the one in play — which before the first battle is `ContentLibrary.DefaultBoard`. Content owns the shapes: a name no `board` declaration matches is refused rather than invented, because the linter has to know how deep a board is to check what reaches across it.
+- `shuffle`: Shuffle the draw pile first. Tests turn this off to control draw order.
+- `drawOpeningHand`: Draw the first hand. Tests turn this off to set the hand explicitly.
+- `board`: The board to fight this battle on, by name, or null to keep the one in play, which before the first battle is `ContentLibrary.DefaultBoard`. Content owns the shapes: a name no `board` declaration matches is refused rather than invented, because the linter has to know how deep a board is to check what reaches across it.
 
 **Returns.** `ActionResult.Played`, or `ActionResult.ChoicePending` when a `battle_start` effect asks the player something: the whole call is rolled back and runs again from `CardRuntime.Answer(int[])`.
 
@@ -619,7 +619,7 @@ What an entity is. Everything in the game is an entity; this only affects defaul
 
 | Member | |
 |---|---|
-| `Actor = 0` | Something that takes part in the fight and has hp: the leader, a `hero`, an `enemy`, a summon. Both `hero` and `enemy` declarations land here — the side is `Team`, not the kind. |
+| `Actor = 0` | Something that takes part in the fight and has hp: the leader, a `hero`, an `enemy`, a summon. Both `hero` and `enemy` declarations land here: the side is `Team`, not the kind. |
 | `Card = 1` | Something played from a hand and paid for. The only kind `CardRuntime.Play(Entity, Entity, Entity)` accepts. |
 | `Status = 2` | A timed or stacking effect attached to an actor. Its count is the `stacks` stat, not a separate number. |
 | `Relic = 3` | A permanent held by an actor, live from the moment it is obtained until the run ends. |
@@ -658,7 +658,7 @@ Fixed layers of the modifier pipeline. Values pass through them in the order the
 |---|---|
 | `Add = 0` | Flat addition: `+2`. Everything on this layer sums, in no particular order. |
 | `Multiply = 1` | Scaling: `x150%`. Applied to whatever the add layer left, so a flat bonus is scaled too. |
-| `Clamp = 2` | A floor or a ceiling. It runs after the arithmetic, so it is the last word on the number — unless something overrides it. |
+| `Clamp = 2` | A floor or a ceiling. It runs after the arithmetic, so it is the last word on the number, unless something overrides it. |
 | `Override = 3` | A fixed result that replaces everything before it, clamp included. Last in the default order and therefore the strongest thing a modifier can say; two overrides on one value is a content bug the linter cannot see, and the later one wins. |
 
 ---
@@ -681,7 +681,7 @@ Values are stored as a `Int64` scaled by `Num.Scale` (one millionth), which make
 public static readonly Num MaxValue
 ```
 
-The largest value this type carries — half of what its `Int64` could hold, so that adding or subtracting any two values in range cannot overflow the underlying integer.
+The largest value this type carries: half of what its `Int64` could hold, so that adding or subtracting any two values in range cannot overflow the underlying integer.
 
 It is not a limit game numbers meet: this is roughly 4.6 trillion, and damage is a two-digit number. It is the headroom that lets `+` and `-` stay unchecked, which is what keeps arithmetic identical on every platform rather than throwing on one and not another.
 
@@ -781,7 +781,7 @@ A whole number as a `Num`. The parameter is a `Int64` for the convenience of cal
 
 **Throws.**
 
-- `ArgumentOutOfRangeException` — `value` is outside the range a `Num` can hold, which every `Int32` is inside.
+- `ArgumentOutOfRangeException`: `value` is outside the range a `Num` can hold, which every `Int32` is inside.
 
 ```csharp
 public static Num FromRaw(long raw)
@@ -815,7 +815,7 @@ public static Num Parse(string text)
 
 **Throws.**
 
-- `FormatException` — The text is not a number this type can hold.
+- `FormatException`: The text is not a number this type can hold.
 
 ```csharp
 public static Num Percent(Num percent)
@@ -863,15 +863,15 @@ The `IFormattable` form. With no format, or `"G"`, it is the invariant, trailing
 
 **Throws.**
 
-- `FormatException` — `format` is not a valid numeric format string.
+- `FormatException`: `format` is not a valid numeric format string.
 
-A format is applied to the exact value as a `Decimal`, never through `Num.ToDouble`: six decimal places in 64 bits fit a decimal exactly, so the text is the number rather than a rounding of it, and it is the same text on every machine. This is presentation only — nothing in the rules formats a number — so it is outside the determinism promise's reach either way.
+A format is applied to the exact value as a `Decimal`, never through `Num.ToDouble`: six decimal places in 64 bits fit a decimal exactly, so the text is the number rather than a rounding of it, and it is the same text on every machine. This is presentation only (nothing in the rules formats a number), so it is outside the determinism promise's reach either way.
 
 ```csharp
 public static bool TryParse(string text, out Num value)
 ```
 
-Reads the form `Num.ToString` writes, plus a leading sign and `_` as a digit separator. False for anything else, with `value` left at `Num.Zero` — including for a number too large to scale, which is refused rather than wrapped round to a negative one nobody would think to look for.
+Reads the form `Num.ToString` writes, plus a leading sign and `_` as a digit separator. False for anything else, with `value` left at `Num.Zero`, including for a number too large to scale, which is refused rather than wrapped round to a negative one nobody would think to look for.
 
 Decimal digits past the sixth are dropped, not rounded and not rejected, because `Num.Scale` cannot hold them: `0.1234567` parses, as `0.123456`.
 
@@ -989,7 +989,7 @@ How many words `Rng.GetState` gives and `Rng.SetState(ulong[])` wants.
 public ulong? Seed { get; private set; }
 ```
 
-The seed this generator was started from, or `null` when it has none to name: after `Rng.SetState(ulong[])`, and in a generator built from four state words. It is a label rather than a position — it does not move as numbers are drawn — so `new Rng(rng.Seed.Value)` starts that stream again rather than continuing it. `Rng.GetState` is what saves a generator. It is nullable because a restored generator that still named its old seed offered a host a label that looks like a save and rewinds the run to its beginning when it is used as one.
+The seed this generator was started from, or `null` when it has none to name: after `Rng.SetState(ulong[])`, and in a generator built from four state words. It is a label rather than a position (it does not move as numbers are drawn), so `new Rng(rng.Seed.Value)` starts that stream again rather than continuing it. `Rng.GetState` is what saves a generator. It is nullable because a restored generator that still named its old seed offered a host a label that looks like a save and rewinds the run to its beginning when it is used as one.
 
 ### Methods
 
@@ -1029,7 +1029,7 @@ Uniform value in `[min, max]`, inclusive of both ends.
 public ulong NextUInt64()
 ```
 
-The raw draw every other method is built on. Calling it advances the same stream the game's shuffles and rolls come out of, so a host that borrows a number here changes every later shuffle — `Rng.Fork(ulong)` is the way to take numbers without disturbing the game.
+The raw draw every other method is built on. Calling it advances the same stream the game's shuffles and rolls come out of, so a host that borrows a number here changes every later shuffle. `Rng.Fork(ulong)` is the way to take numbers without disturbing the game.
 
 ```csharp
 public T Pick<T>(IReadOnlyList<T> items)
@@ -1039,7 +1039,7 @@ One item, uniformly. An empty list throws rather than answering `default`, becau
 
 **Throws.**
 
-- `ArgumentException` — `items` is null or empty.
+- `ArgumentException`: `items` is null or empty.
 
 ```csharp
 public int PickWeighted(IReadOnlyList<Num> weights)
@@ -1075,7 +1075,7 @@ public sealed class RuntimeOptions
 
 Everything about a runtime that is decided before it is built, and cannot be changed afterwards: the seed, the clock, the host, the chooser and the ruleset. A game that passes none of it gets the run described by its content.
 
-The two worth setting deliberately are `RuntimeOptions.Seed`, which is the whole of what makes a run reproducible, and `RuntimeOptions.Clock`, which decides whether this is a turn-based or a real-time game — and which the content's own `clock` setting has to agree with, or the constructor refuses the pair.
+The two worth setting deliberately are `RuntimeOptions.Seed`, which is the whole of what makes a run reproducible, and `RuntimeOptions.Clock`, which decides whether this is a turn-based or a real-time game. The content's own `clock` setting has to agree with `RuntimeOptions.Clock`, or the constructor refuses the pair.
 
 ### Properties
 
@@ -1083,7 +1083,7 @@ The two worth setting deliberately are `RuntimeOptions.Seed`, which is the whole
 public IChoiceProvider? Chooser { get; set; }
 ```
 
-Who answers a `choose` or a `discover`. Null installs a `FirstOptionChooser`, which always takes the first option — fine for a headless run and wrong for a game, which wants `CardRuntime.Pending` and `CardRuntime.Answer(int[])` instead.
+Who answers a `choose` or a `discover`. Null installs a `FirstOptionChooser`, which always takes the first option: fine for a headless run, and wrong for a game, which wants `CardRuntime.Pending` and `CardRuntime.Answer(int[])` instead.
 
 ```csharp
 public IGameClock? Clock { get; set; }

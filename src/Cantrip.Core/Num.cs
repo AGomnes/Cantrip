@@ -47,7 +47,7 @@ namespace Cantrip
         public static readonly Num MinValue = new Num(long.MinValue / 2);
 
         /// <summary>
-        /// The largest value this type carries — half of what its <see cref="long"/> could hold, so that
+        /// The largest value this type carries: half of what its <see cref="long"/> could hold, so that
         /// adding or subtracting any two values in range cannot overflow the underlying integer.
         /// </summary>
         /// <remarks>
@@ -267,7 +267,7 @@ namespace Cantrip
         /// <summary>
         /// Reads the form <see cref="ToString()"/> writes, plus a leading sign and <c>_</c> as a digit
         /// separator. False for anything else, with <paramref name="value"/> left at
-        /// <see cref="Zero"/> — including for a number too large to scale, which is refused rather than
+        /// <see cref="Zero"/>, including for a number too large to scale, which is refused rather than
         /// wrapped round to a negative one nobody would think to look for.
         /// </summary>
         /// <remarks>
@@ -364,7 +364,7 @@ namespace Cantrip
         /// A format is applied to the exact value as a <see cref="decimal"/>, never through
         /// <see cref="ToDouble"/>: six decimal places in 64 bits fit a decimal exactly, so the text
         /// is the number rather than a rounding of it, and it is the same text on every machine.
-        /// This is presentation only — nothing in the rules formats a number — so it is outside the
+        /// This is presentation only (nothing in the rules formats a number), so it is outside the
         /// determinism promise's reach either way.
         /// </remarks>
         /// <exception cref="FormatException"><paramref name="format"/> is not a valid numeric format string.</exception>

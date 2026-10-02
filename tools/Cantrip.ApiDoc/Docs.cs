@@ -173,7 +173,7 @@ public static class Docs
             XElement? description = item.Element("description");
 
             var body = new StringBuilder();
-            if (term != null) body.Append("**").Append(Inline(term)).Append("** — ");
+            if (term != null) body.Append("**").Append(Inline(term)).Append(":** ");
             if (description != null) body.Append(Inline(description));
             else if (term == null) body.Append(Inline(item));
 

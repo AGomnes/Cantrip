@@ -108,7 +108,7 @@ namespace Cantrip.Runtime
         public int Id { get; }
 
         /// <summary>
-        /// The entity whose declaration this came from — the relic, the status, the card. Inside the
+        /// The entity whose declaration this came from: the relic, the status, the card. Inside the
         /// listener's body, that is what <c>self</c> and a bare <c>source</c> mean;
         /// <c>event.source</c> is who caused the event, which is the other thing entirely.
         /// </summary>

@@ -12,8 +12,8 @@ namespace Cantrip.Runtime
     /// body for it, and a member added in a later release will have one too. <see cref="Now"/>,
     /// <see cref="Advanced"/> and <see cref="Restore"/> deliberately have none: a default for them
     /// could only be a clock stuck at zero, an event that never fires, and a restore that quietly
-    /// keeps the wrong time — the kind of silent wrong answer an interface should not offer. See
-    /// <see href="https://github.com/AGomnes/Cantrip/blob/main/docs/stability.md">Stability</see>.
+    /// keeps the wrong time, which is the kind of silent wrong answer an interface should not offer.
+    /// See <see href="https://github.com/AGomnes/Cantrip/blob/main/docs/stability.md">Stability</see>.
     /// </remarks>
     public interface IGameClock
     {
@@ -25,8 +25,9 @@ namespace Cantrip.Runtime
 
         /// <summary>
         /// Raised once per unit after the clock has moved, carrying the new <see cref="Now"/>. A runtime
-        /// subscribes from the moment it is built — that is what runs scheduled work, periodic triggers
-        /// and timed statuses — so a game that shares one clock between two runtimes drives both.
+        /// subscribes from the moment it is built, and that subscription is what runs scheduled work,
+        /// periodic triggers and timed statuses. Every runtime subscribes, so a game that shares one
+        /// clock between two runtimes drives both.
         /// <see cref="Restore"/> deliberately does not raise it.
         /// </summary>
         event Action<long>? Advanced;
@@ -56,7 +57,7 @@ namespace Cantrip.Runtime
 
         /// <summary>
         /// How many of this clock's units make one second of game time, or 0 for a clock whose unit
-        /// is not a length of real time at all — which is every turn clock, and the default here.
+        /// is not a length of real time at all (every turn clock, and the default here).
         /// </summary>
         /// <remarks>
         /// It is what turns <c>3s</c> in content into a number of units, so it is saved with the
@@ -150,14 +151,14 @@ namespace Cantrip.Runtime
         public long Now { get; private set; }
 
         /// <summary>
-        /// Raised once per tick, after <see cref="Now"/> has moved — so a <see cref="Tick"/> of four
+        /// Raised once per tick, after <see cref="Now"/> has moved, so a <see cref="Tick"/> of four
         /// raises it four times, and nothing that was due in between is skipped.
         /// <see cref="Restore"/> does not raise it.
         /// </summary>
         public event Action<long>? Advanced;
 
         /// <summary>
-        /// Moves time on, raising <see cref="Advanced"/> once per tick rather than once per call — so a
+        /// Moves time on, raising <see cref="Advanced"/> once per tick rather than once per call, so a
         /// game that catches up four ticks at once resolves each of them in order, and nothing that was
         /// due in between is skipped.
         /// </summary>

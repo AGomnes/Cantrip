@@ -167,7 +167,7 @@ namespace Cantrip.Cli
 
         /// <summary>
         /// The meter: what the engine raised while the game was really being played. It is the one
-        /// block here that is not a judgement about play, which is why it says so at the top — and
+        /// block here that is not a judgement about play, which is why it says so at the top, and
         /// why it sits inside the bot's block all the same. Every amount in it is the engine's own,
         /// and the plays those amounts came from are the bot's.
         /// </summary>

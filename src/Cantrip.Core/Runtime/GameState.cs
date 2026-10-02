@@ -175,7 +175,7 @@ namespace Cantrip.Runtime
         public Dictionary<string, Value> Bindings { get; }
 
         /// <summary>
-        /// What to put back when the deadline fires, in the order it was done — it is reverted from the
+        /// What to put back when the deadline fires, in the order it was done. It is reverted from the
         /// end. Empty for a plain <c>next turn:</c> block, which changes nothing that has to be undone.
         /// </summary>
         public List<TemporaryChange> Undo { get; } = new List<TemporaryChange>();
@@ -204,7 +204,7 @@ namespace Cantrip.Runtime
         /// <summary>
         /// Who stands where. One actor per slot, and the only account of it: <see cref="Entity.Lane"/>
         /// and <see cref="Entity.Rank"/> are what this index is keyed by, so the two cannot drift
-        /// apart. An actor is in here exactly while it is in the <c>board</c> zone, alive or not — a
+        /// apart. An actor is in here exactly while it is in the <c>board</c> zone, alive or not: a
         /// corpse that has not been buried yet is still standing in its slot.
         /// </summary>
         private readonly Dictionary<(int Side, int Lane, int Rank), Entity> _slots =
@@ -281,7 +281,7 @@ namespace Cantrip.Runtime
 
         /// <summary>
         /// The turn number within the current battle, counting from 1, and 0 before the first one. A
-        /// real-time game has no turns, so it stays at 0 for the whole fight — which is a battle in
+        /// real-time game has no turns, so it stays at 0 for the whole fight, which is a battle in
         /// progress, not one that has not started.
         /// </summary>
         public int Turn
@@ -394,7 +394,7 @@ namespace Cantrip.Runtime
         /// Under <c>turns: initiative</c> it is binding: that member and no other may act, and the
         /// round does not move on until it passes. Under <c>turns: sides</c> the whole party shares
         /// one turn and a game may act with its members in any order it likes, so this is the one
-        /// the engine <em>would</em> offer next — the first that has not acted — and a suggestion
+        /// the engine <em>would</em> offer next (the first that has not acted) and a suggestion
         /// rather than a rule. A game that wants the rule asks <see cref="CardRuntime.CanAct"/>.
         /// It used to be null in <c>sides</c>, which meant a host polling it got nothing to show.
         /// </remarks>
@@ -549,8 +549,8 @@ namespace Cantrip.Runtime
         /// <remarks>
         /// The side and the owner are the caller's to decide, because a copy takes them from the
         /// original rather than from whoever made it: copying an enemy's minion must not hand it to
-        /// the player. Statuses come across as a snapshot of a state — no <c>status_applied</c> is
-        /// raised and <c>immune</c> is not consulted — so <c>stacks</c>, <c>duration</c> and
+        /// the player. Statuses come across as a snapshot of a state (no <c>status_applied</c> is
+        /// raised and <c>immune</c> is not consulted), so <c>stacks</c>, <c>duration</c> and
         /// <c>expires_at</c> arrive exactly as they stand, because all three are ordinary stats.
         /// </remarks>
         public Entity Duplicate(Entity original, Entity? owner = null, Team team = Team.Neutral, string zone = Zones.None)
@@ -633,8 +633,8 @@ namespace Cantrip.Runtime
         /// <remarks>
         /// Everything the old definition brought goes, and goes silently. Statuses and keywords leave
         /// through <see cref="Remove"/> rather than raising <c>status_removed</c>, because one verb
-        /// raising a variable number of cancellable events — each able to destroy the host half way
-        /// through — is not something content could reason about. <c>destroy</c> already takes its
+        /// raising a variable number of cancellable events (each able to destroy the host half way
+        /// through) is not something content could reason about. <c>destroy</c> already takes its
         /// attachments the same way. The one event is <c>transformed</c>, which the interpreter
         /// raises around this call.
         /// </remarks>
@@ -766,7 +766,7 @@ namespace Cantrip.Runtime
         /// The one place an entity is put anywhere. For an actor going onto the board that means a
         /// slot search: the lowest free rank, in <paramref name="preferredLane"/> when one is named
         /// and across the lanes in order when none is. It throws when there is no room, which the
-        /// callers that can meet a full board — <c>create</c> and <c>copy</c> — ask about first.
+        /// callers that can meet a full board (<c>create</c> and <c>copy</c>) ask about first.
         /// </summary>
         private void Place(Entity entity, string zone, bool toTop, int? preferredLane)
         {
@@ -822,7 +822,7 @@ namespace Cantrip.Runtime
             entity.Kind == EntityKind.Actor ? null : entity.Owner?.Controller;
 
         /// <summary>
-        /// Live actors on the board, optionally for one side, ordered by <c>(lane, rank)</c> — which
+        /// Live actors on the board, optionally for one side, ordered by <c>(lane, rank)</c>, which
         /// is where they stand, and so the order a party takes its steps in and the order an area
         /// effect reaches them in.
         /// </summary>
@@ -905,7 +905,7 @@ namespace Cantrip.Runtime
             _slots.TryGetValue(Key(team, lane, rank), out Entity? standing) ? standing : null;
 
         /// <summary>
-        /// The lowest free rank in <paramref name="lane"/>, or — when no lane is named — the lowest
+        /// The lowest free rank in <paramref name="lane"/>, or, when no lane is named, the lowest
         /// free rank in the first lane that has one. Null when there is no room at all.
         /// </summary>
         private (int Lane, int Rank)? FreeSlot(Team team, int? lane)
@@ -1039,7 +1039,7 @@ namespace Cantrip.Runtime
         /// On a <c>facing</c> board the two sides are mirrored, so a rank means a different place on
         /// each: across the sides the rank term is <c>a.rank + b.rank + 1</c>, which makes two
         /// front-rank actors one step apart however deep the board is. Within one side, and on a
-        /// <c>shared</c> board — where a rank is the same place for everyone — it is the plain
+        /// <c>shared</c> board (where a rank is the same place for everyone), it is the plain
         /// metric over <c>(lane, rank)</c>. Anything not standing on the board has no distance to
         /// anything, and gets <see cref="int.MaxValue"/>.
         /// </remarks>

@@ -37,7 +37,7 @@ namespace Cantrip.Runtime
     /// </remarks>
     public static class BuiltinEvents
     {
-        /// <summary>A hit landed. <c>target</c> took it, <c>source</c> dealt it, and <c>amount</c> is hp actually lost <em>after</em> block — not what the card said.</summary>
+        /// <summary>A hit landed. <c>target</c> took it, <c>source</c> dealt it, and <c>amount</c> is hp actually lost <em>after</em> block, not what the card said.</summary>
         public const string Damaged = "damaged";
 
         /// <summary>Block absorbed part of a hit. <c>amount</c> is how much was blocked, not what got through.</summary>
@@ -67,7 +67,7 @@ namespace Cantrip.Runtime
         /// <summary>A discard pile went back into the draw pile. It fires on the automatic reshuffle mid-draw as well as on a written <c>shuffle</c>.</summary>
         public const string Shuffled = "shuffled";
 
-        /// <summary>A card went to the discard pile — including one drawn into a hand that was already full.</summary>
+        /// <summary>A card went to the discard pile, including one drawn into a hand that was already full.</summary>
         public const string Discarded = "discarded";
 
         /// <summary>A card left the battle for good. A shuffle will not bring it back.</summary>
@@ -82,8 +82,8 @@ namespace Cantrip.Runtime
 
         /// <summary>
         /// Something arrived: <c>create</c>, <c>copy</c>, or a spawn the host made. It is an
-        /// announcement and not a gate — the thing is already in the game — which is what an enemy's own
-        /// arrival effect is written on.
+        /// announcement and not a gate (the thing is already in the game), and it is what an enemy's
+        /// own arrival effect is written on.
         /// </summary>
         public const string Created = "created";
 
@@ -92,7 +92,7 @@ namespace Cantrip.Runtime
 
         /// <summary>
         /// Something became something else and kept its id, owner, side and place. Raised once, and the
-        /// statuses it sheds raise nothing — which is why <c>until</c> refuses to hold a transform.
+        /// statuses it sheds raise nothing, which is why <c>until</c> refuses to hold a transform.
         /// </summary>
         public const string Transformed = "transformed";
 
@@ -126,7 +126,7 @@ namespace Cantrip.Runtime
         /// <summary>The battle ended. <c>target</c> is the player and <c>data.won</c> says which way it went.</summary>
         public const string BattleEnd = "battle_end";
 
-        /// <summary>An enemy is performing a named move. <c>data.move</c> is which — not to be confused with <see cref="Moved"/>, which is about position.</summary>
+        /// <summary>An enemy is performing a named move. <c>data.move</c> is which one. Not to be confused with <see cref="Moved"/>, which is about position.</summary>
         public const string Move = "move";
 
         /// <summary>An ability was used. <c>data.ability</c> is which one; this is the real-time counterpart of <see cref="CardPlayed"/>.</summary>

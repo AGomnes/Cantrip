@@ -120,15 +120,15 @@ namespace Cantrip.Runtime
         /// <remarks>
         /// <para>
         /// Pausing does not interrupt anything: whatever is running finishes, and what it queued
-        /// waits. That is the only granularity the interpreter can offer honestly — a queue entry is
+        /// waits. That is the only granularity the interpreter can offer honestly: a queue entry is
         /// a self-contained closure, while a before or instead listener runs inline on the raising
         /// thread's stack, nested arbitrarily deep, and cannot be suspended without turning the
         /// whole interpreter into a state machine.
         /// </para>
         /// <para>
         /// A paused game is deliberately not a saveable one: <see cref="HasPendingWork"/> stays
-        /// true, so capture and restore keep refusing, which is right — the queue holds live
-        /// closures over listeners, events and chains that no snapshot can represent.
+        /// true, so capture and restore keep refusing, which is right. The queue holds live closures
+        /// over listeners, events and chains that no snapshot can represent.
         /// </para>
         /// </remarks>
         public void Pause() => _paused = true;
@@ -150,7 +150,7 @@ namespace Cantrip.Runtime
         /// <para>
         /// Each step resets the sandbox step budget, because a paused drain is spread across host
         /// frames and cannot share a budget with the action that queued it. A stepped game is
-        /// therefore not protected from an unbounded loop by the budget — but every step is a
+        /// therefore not protected from an unbounded loop by the budget, but every step is a
         /// deliberate request from a debugger, so there is nothing running away.
         /// </para>
         /// <para>

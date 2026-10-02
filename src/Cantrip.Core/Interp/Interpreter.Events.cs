@@ -168,7 +168,7 @@ namespace Cantrip.Runtime
 
                 // A listener that came into play during this event hears it or does not, as the
                 // ruleset says. The default is that it does, which is what content written before
-                // the setting existed expects — and what makes "whenever you summon a minion" have
+                // the setting existed expects, and what makes "whenever you summon a minion" have
                 // to leave its own summon out.
                 if (Rules.NewListeners == NewListeners.MissTheEvent && listener.Order >= gameEvent.ListenersAtRaise)
                 {
@@ -373,7 +373,7 @@ namespace Cantrip.Runtime
         /// run all of them, and only the one whose interval has elapsed should fire.
         /// </para>
         /// <para>
-        /// One that has fallen behind — a big tick jump, or a game paused at a breakpoint — fires once
+        /// One that has fallen behind (a big tick jump, or a game paused at a breakpoint) fires once
         /// and resyncs from now, instead of owing the clock one firing per interval it missed.
         /// </para>
         /// </remarks>

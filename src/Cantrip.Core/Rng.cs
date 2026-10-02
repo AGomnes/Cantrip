@@ -32,7 +32,7 @@ namespace Cantrip
         /// <summary>
         /// The seed this generator was started from, or <c>null</c> when it has none to name: after
         /// <see cref="SetState"/>, and in a generator built from four state words. It is a label
-        /// rather than a position — it does not move as numbers are drawn — so
+        /// rather than a position (it does not move as numbers are drawn), so
         /// <c>new Rng(rng.Seed.Value)</c> starts that stream again rather than continuing it.
         /// <see cref="GetState"/> is what saves a generator. It is nullable because a restored
         /// generator that still named its old seed offered a host a label that looks like a save
@@ -95,7 +95,7 @@ namespace Cantrip
         /// <summary>
         /// The raw draw every other method is built on. Calling it advances the same stream the game's
         /// shuffles and rolls come out of, so a host that borrows a number here changes every later
-        /// shuffle — <see cref="Fork"/> is the way to take numbers without disturbing the game.
+        /// shuffle. <see cref="Fork"/> is the way to take numbers without disturbing the game.
         /// </summary>
         public ulong NextUInt64()
         {

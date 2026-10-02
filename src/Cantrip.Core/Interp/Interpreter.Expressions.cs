@@ -156,8 +156,8 @@ namespace Cantrip.Runtime
                 case "party": return Value.FromEntities(State.Party);
 
                 // The dead of this side, in the order they fell. `heal` refuses a corpse and always
-                // will, so bringing one back is its own verb — and until this word existed there was
-                // no way to name its argument. `party` and `allies` leave the dead out by design,
+                // will, so bringing one back is its own verb. Until this word existed there was no
+                // way to name its argument. `party` and `allies` leave the dead out by design,
                 // `target ally` and `target any` both want somebody living, and
                 // `everyone where zone:dead` binds nobody, because `everyone` is the living. An
                 // in-combat raise is what every party roguelite has, and it could not be spelt.
@@ -361,8 +361,8 @@ namespace Cantrip.Runtime
 
                 // One entity answers the group words as a group of one. `choose 1 from hand as
                 // picked` binds an entity where `choose 2` binds a list, so without this the line
-                // that reads `picked.first` fell through to "a stat nothing has" and got 0 — and it
-                // did so only on the one-card path, which is the path an author tries last.
+                // that reads `picked.first` fell through to "a stat nothing has" and got 0. It did
+                // so only on the one-card path, which is the path an author tries last.
                 case "count":
                 case "size":
                 case "length": return Value.FromNumber(Num.One);
@@ -394,7 +394,7 @@ namespace Cantrip.Runtime
                 case "empty": return Value.FromBool(list.Count == 0);
                 case "any": return Value.FromBool(list.Count > 0);
 
-                // Where a group stands is where the first of them stands, in board order — so a
+                // Where a group stands is where the first of them stands, in board order, so a
                 // group of one answers like the one it holds. Without this the place fell through
                 // to the stat table, where nothing has a `rank`, and `created.rank` read 0 while
                 // `created.first.rank` read 2: the same actor, two answers, no message.
@@ -462,8 +462,8 @@ namespace Cantrip.Runtime
                     // `leader.is_ready(Bulwark)` and `leader.can_use(Bulwark)`: the two questions a
                     // real-time game is made of, asked from content. A test could say what an
                     // ability does and never that it may not be used yet, because `cast` fails the
-                    // test when the ability is refused — so in a game whose design is entirely
-                    // about what you may not do yet, half the test surface had no words.
+                    // test when the ability is refused. In a game whose design is entirely about
+                    // what you may not do yet, half the test surface had no words.
                     case "is_ready":
                     case "can_use":
                     {
@@ -602,7 +602,7 @@ namespace Cantrip.Runtime
             if (name == "within")
             {
                 throw new RuntimeError(
-                    "`within` with a length — `within(target, 5m)` — is a question about the world, and needs a host that answers it " +
+                    "`within` with a length, such as `within(target, 5m)`, is a question about the world, and needs a host that answers it " +
                     "(IEffectHost.TryCall). `within(target, 2)`, with a plain number, counts slots on the board and is answered here.",
                     call.Span);
             }
@@ -615,9 +615,9 @@ namespace Cantrip.Runtime
 
         /// <summary>
         /// Whether a <c>within</c> is the board's question or the world's. A plain number counts
-        /// slots and the engine answers it; a length with a unit — <c>5m</c>, <c>250px</c> — is
-        /// about a space the engine knows nothing about and goes to the host, exactly as it always
-        /// has. That split is the whole of why both spellings can live under one word.
+        /// slots and the engine answers it; a length with a unit (<c>5m</c>, <c>250px</c>) is about
+        /// a space the engine knows nothing about and goes to the host, exactly as it always has.
+        /// That split is the whole of why both spellings can live under one word.
         /// </summary>
         private bool WithinIsInSlots(CallExpr call, EvalContext context, out Num slots)
         {

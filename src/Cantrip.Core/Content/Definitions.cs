@@ -101,7 +101,7 @@ namespace Cantrip.Content
 
     /// <summary>
     /// How far an action reaches, in slots on the board: <c>range 1</c> is everything up to one
-    /// step away — melee — and <c>range 2..3</c> is a bow that cannot shoot point blank.
+    /// step away (melee), and <c>range 2..3</c> is a bow that cannot shoot point blank.
     /// </summary>
     /// <remarks>
     /// A reach is measured with <see cref="Runtime.GameState.Distance"/> between whoever is using
@@ -189,7 +189,7 @@ namespace Cantrip.Content
         /// <summary>
         /// Who the move telegraphs against, from <c>move "Cutthroat" at lowest hp enemies:</c>.
         /// Null when the move says nothing, and the target is then a living party member drawn
-        /// uniformly — which for a party of one is that one member, with nothing rolled.
+        /// uniformly. For a party of one, that is the one member, with nothing rolled.
         /// </summary>
         public ExprNode? TargetSelector { get; internal set; }
     }
@@ -320,8 +320,8 @@ namespace Cantrip.Content
         public bool IsThing => KindName != "resource" && KindName != "board";
 
         /// <summary>
-        /// What the engine treats this as. Several keywords land on one kind — <c>enemy</c>,
-        /// <c>actor</c> and <c>hero</c> are all <see cref="EntityKind.Actor"/> — so
+        /// What the engine treats this as. Several keywords land on one kind (<c>enemy</c>,
+        /// <c>actor</c> and <c>hero</c> are all <see cref="EntityKind.Actor"/>), so
         /// <see cref="KindName"/> is what tells them apart.
         /// </summary>
         public EntityKind Kind { get; }
@@ -333,8 +333,8 @@ namespace Cantrip.Content
         public IReadOnlyList<string> Tags { get; }
 
         /// <summary>
-        /// Every <c>on ...:</c> block, in declaration order. A line that only looks like a listener —
-        /// <c>when card_played:</c> — is in <see cref="Blocks"/> instead and never runs, which is CT313.
+        /// Every <c>on ...:</c> block, in declaration order. A line that only looks like a listener
+        /// (<c>when card_played:</c>) is in <see cref="Blocks"/> instead and never runs, which is CT313.
         /// </summary>
         public IReadOnlyList<ListenerNode> Listeners { get; }
 
@@ -349,7 +349,7 @@ namespace Cantrip.Content
         /// </summary>
         public IReadOnlyDictionary<string, BlockMemberNode> Blocks { get; }
 
-        /// <summary>Every <c>move</c>, in declaration order — which is also the order a <c>cycle</c> pattern takes them in when no <c>pattern</c> line names them.</summary>
+        /// <summary>Every <c>move</c>, in declaration order. That is also the order a <c>cycle</c> pattern takes them in when no <c>pattern</c> line names them.</summary>
         public IReadOnlyList<MoveDefinition> Moves { get; }
 
         /// <summary>
@@ -370,7 +370,7 @@ namespace Cantrip.Content
         /// <summary>
         /// How far this reaches, from its <c>range</c> line, or null when it says nothing and
         /// reaches as far as the board is wide. Read by targeting through the <c>range</c> modifier
-        /// channel; a card's own <c>target … where</c> filter is a separate rule and is not a
+        /// channel; a card's own <c>target ... where</c> filter is a separate rule and is not a
         /// channel, because a card's printed reach is its own and not a stranger's to rewrite.
         /// </summary>
         public Reach? Range { get; private set; }
@@ -469,7 +469,7 @@ namespace Cantrip.Content
         }
 
         /// <summary>
-        /// A property's value when it was written as a quoted string, or null — which also covers a
+        /// A property's value when it was written as a quoted string, or null, which also covers a
         /// property that was written without quotes. Use <see cref="Word"/> for a bare word.
         /// </summary>
         public string? ReadString(string property)
@@ -505,7 +505,7 @@ namespace Cantrip.Content
             "weight" => true,
 
             // Reach is a rule about an action, not a number on the thing using it. Left out of the
-            // stat table so that `range` is read in exactly one place — Interpreter.InReach — and
+            // stat table so that `range` is read in exactly one place (Interpreter.InReach) and
             // cannot also arrive through the stat pipeline under the same name.
             "range" => true,
             _ => false,
@@ -689,7 +689,7 @@ namespace Cantrip.Content
                 return null;
             }
 
-            // `phase Broken when hp <= max_hp / 2, retelegraph` — a trailing word, so the condition
+            // `phase Broken when hp <= max_hp / 2, retelegraph`: a trailing word, so the condition
             // is still whatever sits in the third value.
             bool retelegraph = false;
             for (int i = 3; i < property.Values.Count; i++)

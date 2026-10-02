@@ -90,7 +90,7 @@ namespace Cantrip.Descriptions
             new DescriptionSegment(SegmentKind.Value, text ?? string.Empty, placeholder, false, Num.Zero, Num.Zero, null, false);
 
         /// <summary>
-        /// Whether this run is words or a value. Note that a value is not always a number — see
+        /// Whether this run is words or a value. Note that a value is not always a number: see
         /// <see cref="HasNumber"/>, which is false for symbolic ones such as <c>X</c>.
         /// </summary>
         public SegmentKind Kind { get; }
@@ -258,14 +258,14 @@ namespace Cantrip.Descriptions
         public DescriptionSegment? Cost { get; }
 
         /// <summary>
-        /// Just the values, in order — the numbers a tooltip or a comparison view wants without the
+        /// Just the values, in order: the numbers a tooltip or a comparison view wants without the
         /// prose. Evaluated on each enumeration.
         /// </summary>
         public IEnumerable<DescriptionSegment> Values => Segments.Where(s => s.Kind == SegmentKind.Value);
 
         /// <summary>
         /// Whether there is anything to show. True for a definition with no effect, no listeners and no
-        /// modifiers — a vanilla card — so a UI can leave the rules box out rather than draw an empty one.
+        /// modifiers (a vanilla card), so a UI can leave the rules box out rather than draw an empty one.
         /// </summary>
         public bool IsEmpty => Segments.All(s => s.Text.Length == 0);
 

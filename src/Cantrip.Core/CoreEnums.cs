@@ -28,7 +28,7 @@ namespace Cantrip
         /// <summary>Scaling: <c>x150%</c>. Applied to whatever the add layer left, so a flat bonus is scaled too.</summary>
         Multiply,
 
-        /// <summary>A floor or a ceiling. It runs after the arithmetic, so it is the last word on the number — unless something overrides it.</summary>
+        /// <summary>A floor or a ceiling. It runs after the arithmetic, so it is the last word on the number, unless something overrides it.</summary>
         Clamp,
 
         /// <summary>
@@ -84,7 +84,7 @@ namespace Cantrip
         // Saved games store these as numbers: never renumber or reuse one, only add.
         /// <summary>
         /// Something that takes part in the fight and has hp: the leader, a <c>hero</c>, an
-        /// <c>enemy</c>, a summon. Both <c>hero</c> and <c>enemy</c> declarations land here — the side
+        /// <c>enemy</c>, a summon. Both <c>hero</c> and <c>enemy</c> declarations land here: the side
         /// is <see cref="Team"/>, not the kind.
         /// </summary>
         Actor = 0,

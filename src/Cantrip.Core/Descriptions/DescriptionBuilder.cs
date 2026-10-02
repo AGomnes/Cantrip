@@ -485,8 +485,9 @@ namespace Cantrip.Descriptions
 
             /// <summary>
             /// The <c>range</c> line in words: "Melee." for one step, "Range 3." for a limit and
-            /// "Range 2–3." for a span. Null when the definition prints no range, which is most of
-            /// them and reads as no sentence at all rather than as "Range unlimited".
+            /// "Range 2-3." for a span. Null when the definition prints
+            /// no range, which is most of them and reads as no sentence at all rather than as
+            /// "Range unlimited".
             /// </summary>
             private List<DescriptionSegment>? Reach()
             {
@@ -507,7 +508,7 @@ namespace Cantrip.Descriptions
             /// <remarks>
             /// This used to be dropped in silence. Darkest Dungeon's Pike printed "Deal 5 damage"
             /// and said nothing at all about the half of the card that decides what it may be
-            /// pointed at — which is the rule a player most needs to read.
+            /// pointed at, which is the rule a player most needs to read.
             /// </remarks>
             private List<DescriptionSegment>? TargetFilter()
             {
@@ -538,8 +539,8 @@ namespace Cantrip.Descriptions
             }
 
             /// <summary>
-            /// One predicate of a <c>target … where</c> in words. A comparison against a place is
-            /// said as a place — "in the front 2 ranks" — because that is the rule the player is
+            /// One predicate of the <c>where</c> on a <c>target</c> line, in words. A comparison against a place is
+            /// said as a place ("in the front 2 ranks") because that is the rule the player is
             /// being told; anything else is printed as it was written, which is at least true.
             /// </summary>
             private string Reaches(ExprNode filter)
@@ -577,8 +578,8 @@ namespace Cantrip.Descriptions
                     }
 
                     // `it.lane == self.lane`: the same lane as whoever is using it, which is the one
-                    // comparison against something other than a number worth saying in words —
-                    // a whole genre of card is built on it.
+                    // comparison against something other than a number worth saying in words. A
+                    // whole genre of card is built on it.
                     if (comparison.Operator == BinaryOperator.Equal && IsAxis(comparison.Left, "lane") && IsAxis(comparison.Right, "lane"))
                         return Words(Word("target.same_lane") ?? "on this {lane_word}", ("lane_word", Board.LaneWord));
                 }
@@ -792,7 +793,7 @@ namespace Cantrip.Descriptions
                         ExprNode? zoneNode = command.Clause("into") ?? command.Clause("to") ?? command.Clause("onto");
 
                         // Without a zone the copy goes wherever a new one would, which depends on
-                        // what was copied — so the phrasing says "Make", not "Add ... to your hand".
+                        // what was copied, so the phrasing says "Make", not "Add ... to your hand".
                         if (zoneNode == null)
                             return Phrase(IsOne(count) ? "copy.one" : "copy.many",
                                 ("amount", Amount(count, "copy", "none", command)),
@@ -1260,7 +1261,7 @@ namespace Cantrip.Descriptions
                 NameExpr { Name: var name } when string.Equals(name, "x", StringComparison.OrdinalIgnoreCase)
                                               || string.Equals(name, "stacks", StringComparison.OrdinalIgnoreCase) => "X",
                 UnaryExpr { Operator: UnaryOperator.Negate, Operand: var inner } => "-" + SymbolFor(inner),
-                RangeExpr range => AstPrinter.Print(range.Low) + "–" + AstPrinter.Print(range.High),
+                RangeExpr range => AstPrinter.Print(range.Low) + "-" + AstPrinter.Print(range.High),
                 _ => AstPrinter.Print(expression),
             };
 
@@ -1287,8 +1288,8 @@ namespace Cantrip.Descriptions
                             // "to the target" is left off a move for the same reason it is left off
                             // a card: it says nothing a reader did not already know, and an enemy's
                             // move now names who it is aimed at beside the text rather than inside
-                            // it — "Cutthroat → Vestal: Deal 8 damage" instead of "Deal 8 damage to
-                            // the target". It is still written out where the word is not the
+                            // it ("Cutthroat → Vestal: Deal 8 damage" instead of "Deal 8 damage to
+                            // the target"). It is still written out where the word is not the
                             // subject of the sentence, such as "Pull the target to the front".
                             case "target": return implicitTarget && (IsCard || IsEnemy) ? string.Empty : Word("who.target") ?? "the target";
                             case "owner": return Word(IsStatus ? "who.holder" : "who.you") ?? name.Name;

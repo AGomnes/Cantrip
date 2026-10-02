@@ -86,8 +86,8 @@ namespace Cantrip.GodotAdapter
         public int Target { get; }
 
         /// <summary>
-        /// Entity id of the action involved — the card played, or whatever else the effect was
-        /// running as — or 0. It crosses into script as <c>["card"]</c>, which keeps its key.
+        /// Entity id of the action involved (the card played, or whatever else the effect was
+        /// running as), or 0. It crosses into script as <c>["card"]</c>, which keeps its key.
         /// </summary>
         /// <remarks>
         /// Named <c>Card</c> until 1.0, with <c>GameEvent.Card</c>, which is <c>GameEvent.Action</c>

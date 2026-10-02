@@ -12,7 +12,7 @@ namespace Cantrip.Runtime
     public enum ValueKind
     {
         // Saved games store these as numbers: never renumber or reuse one, only add.
-        /// <summary>Nothing at all — a name that resolved to no entity, a selector that matched none. It is what <c>default(Value)</c> is.</summary>
+        /// <summary>Nothing at all: a name that resolved to no entity, a selector that matched none. It is what <c>default(Value)</c> is.</summary>
         None = 0,
 
         /// <summary>A number, in <see cref="Cantrip.Num"/>, possibly with a unit such as <c>%</c> or <c>s</c>.</summary>
@@ -94,7 +94,7 @@ namespace Cantrip.Runtime
         /// <summary>A text value. Null becomes the empty string, which is falsey, rather than <see cref="None"/>.</summary>
         public static Value FromText(string text) => new Value(ValueKind.Text, Num.Zero, text ?? string.Empty);
 
-        /// <summary>One entity, or <see cref="None"/> when it is null — so a lookup that failed needs no separate branch.</summary>
+        /// <summary>One entity, or <see cref="None"/> when it is null, so a lookup that failed needs no separate branch.</summary>
         public static Value FromEntity(Entity? entity) => entity == null ? None : new Value(ValueKind.Entity, Num.Zero, entity);
 
         /// <summary>
@@ -125,7 +125,7 @@ namespace Cantrip.Runtime
         public string? Text => _ref as string;
 
         /// <summary>
-        /// The entity, or null — including for a <see cref="ValueKind.List"/> of exactly one, which is
+        /// The entity, or null. It is null for a <see cref="ValueKind.List"/> of exactly one too, which is
         /// what most selectors give. <c>AsEntities</c> covers both.
         /// </summary>
         public Entity? Entity => _ref as Entity;
@@ -208,7 +208,7 @@ namespace Cantrip.Runtime
             Name = name;
         }
 
-        /// <summary>The part before the colon — <c>tag</c>, <c>source</c>, <c>card</c> — which says what kind of test this is.</summary>
+        /// <summary>The part before the colon (<c>tag</c>, <c>source</c>, <c>card</c>), which says what kind of test this is.</summary>
         public string Qualifier { get; }
 
         /// <summary>The part after the colon: what the qualifier is being tested against.</summary>

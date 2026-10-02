@@ -119,7 +119,7 @@ public static class Render
         foreach ((string name, string text) in entries)
         {
             page.Append("- `").Append(name).Append('`');
-            if (text.Length > 0) page.Append(" — ").Append(OneLine(text));
+            if (text.Length > 0) page.Append(": ").Append(OneLine(text));
             page.Append('\n');
         }
 

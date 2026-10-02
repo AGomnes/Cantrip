@@ -17,7 +17,7 @@ Part of [the API reference](README.md). The guides are [docs/csharp.md](../cshar
 | [`MoveDefinition`](#movedefinition) | A named enemy move: `move "Chomp": deal 11 to player`. |
 | [`OnVacated`](#onvacated) | What happens to the actors behind a slot when its occupant leaves. |
 | [`PhaseDefinition`](#phasedefinition) | A behaviour phase: `phase Broken when hp <= max_hp / 2`. Moves tagged with the phase are available only while its condition holds. |
-| [`Reach`](#reach) | How far an action reaches, in slots on the board: `range 1` is everything up to one step away — melee — and `range 2..3` is a bow that cannot shoot point blank. |
+| [`Reach`](#reach) | How far an action reaches, in slots on the board: `range 1` is everything up to one step away (melee), and `range 2..3` is a bow that cannot shoot point blank. |
 | [`ResourceRule`](#resourcerule) | Bounds and reset behaviour for a stat treated as a resource. Resources are data, declared with `resource "energy"`; common ones are built in. |
 | [`ScenarioDefinition`](#scenariodefinition) | A `scenario` block together with the file it came from. |
 | [`StatusFlags`](#statusflags) | Status flags: what a status is (buff, debuff) and how it behaves (persistent, unique). |
@@ -61,18 +61,18 @@ A board shape built in C#, for a test or a tool. A game does not build one: shap
 
 **Parameters.**
 
-- `name` — What content calls this board. Names compare case-insensitively.
-- `lanes` — Slots across, at least one.
-- `ranks` — Slots deep, or `BoardShape.Unbounded` for a lane with no floor.
-- `sides` — Whether the two sides stand on mirrored grids or on one shared grid.
-- `metric` — How the distance between two slots is measured.
-- `onVacated` — What happens to the actors behind a slot when its occupant leaves.
-- `laneWord` — What rules text calls a lane. Null or blank keeps `lane`.
-- `rankWord` — What rules text calls a rank. Null or blank keeps `rank`.
+- `name`: What content calls this board. Names compare case-insensitively.
+- `lanes`: Slots across, at least one.
+- `ranks`: Slots deep, or `BoardShape.Unbounded` for a lane with no floor.
+- `sides`: Whether the two sides stand on mirrored grids or on one shared grid.
+- `metric`: How the distance between two slots is measured.
+- `onVacated`: What happens to the actors behind a slot when its occupant leaves.
+- `laneWord`: What rules text calls a lane. Null or blank keeps `lane`.
+- `rankWord`: What rules text calls a rank. Null or blank keeps `rank`.
 
 **Throws.**
 
-- `ArgumentOutOfRangeException` — Fewer than one lane, or a negative number of ranks.
+- `ArgumentOutOfRangeException`: Fewer than one lane, or a negative number of ranks.
 
 ### Fields and constants
 
@@ -144,7 +144,7 @@ What the board does with the hole an actor leaves behind. It is the difference b
 public bool RankHoldsOne { get; }
 ```
 
-Whether a rank on this board holds one actor at most, which is true of a board one lane wide — today's board, and so worth saying out loud when content writes `rank(who)` on it and gets a group of one.
+Whether a rank on this board holds one actor at most, which is true of a board one lane wide (today's board), and so worth saying out loud when content writes `rank(who)` on it and gets a group of one.
 
 ```csharp
 public string RankWord { get; }
@@ -239,7 +239,7 @@ Every definition loaded from DSL files. Parse errors are collected rather than t
 public ContentLibrary()
 ```
 
-An empty library with the built-in resources already in it — `hp`, `block`, `energy`, `stacks` and `gold` — which content may override with a `resource` block of its own. Load files into it with `ContentLibrary.LoadText(string, string)`, `ContentLibrary.LoadFile(string)` or `ContentLibrary.LoadFolder(string, string, bool)`.
+An empty library with the built-in resources already in it (`hp`, `block`, `energy`, `stacks` and `gold`), which content may override with a `resource` block of its own. Load files into it with `ContentLibrary.LoadText(string, string)`, `ContentLibrary.LoadFile(string)` or `ContentLibrary.LoadFolder(string, string, bool)`.
 
 ### Fields and constants
 
@@ -267,13 +267,13 @@ The boards content declares, in declaration order. Empty when it declares none.
 public BoardShape DefaultBoard { get; }
 ```
 
-The board a battle is fought on when nobody names one: the first board content declares, or `BoardShape.Default` when it declares none — today's board, spelled out, which is what keeps every game written before boards existed working unchanged.
+The board a battle is fought on when nobody names one: the first board content declares, or `BoardShape.Default` when it declares none. The default is today's board, spelled out, which is what keeps every game written before boards existed working unchanged.
 
 ```csharp
 public IEnumerable<EntityDefinition> Definitions { get; }
 ```
 
-Every definition loaded, of every kind, `resource` and `board` included — filter on `EntityDefinition.IsThing` for the ones a game can make one of.
+Every definition loaded, of every kind, `resource` and `board` included. Filter on `EntityDefinition.IsThing` for the ones a game can make one of.
 
 The order is a dictionary's, and a reload removes and re-adds entries, so it is not stable and must never reach the RNG. Anything that picks a definition at random reads `ContentLibrary.Pool(string)` instead, or the same seed would stop replaying.
 
@@ -323,7 +323,7 @@ Every `scenario` block, in load order. A real-time game should declare none: a b
 public IReadOnlyList<TestDefinition> Tests { get; }
 ```
 
-Every `test` block, in load order — which is the order `DslTestRunner.RunAll(string)` runs them in.
+Every `test` block, in load order, which is the order `DslTestRunner.RunAll(string)` runs them in.
 
 ```csharp
 public IEnumerable<VerbDefinition> Verbs { get; }
@@ -353,14 +353,14 @@ The definition of that name, or null. Names compare case-insensitively, as every
 
 **Parameters.**
 
-- `name` — A definition's name, as content wrote it.
-- `kind` — The declaring keyword — `card`, `status`, `enemy` — which is what makes the answer unambiguous. Null takes the first definition of that name whatever its kind, and "first" is not defined when two kinds share a name, so pass a kind whenever the caller knows one. `ContentLibrary.FindAny(string, string[])` is the way to ask for several in a stated order.
+- `name`: A definition's name, as content wrote it.
+- `kind`: The declaring keyword (`card`, `status`, `enemy`), which is what makes the answer unambiguous. Null takes the first definition of that name whatever its kind, and "first" is not defined when two kinds share a name, so pass a kind whenever the caller knows one. `ContentLibrary.FindAny(string, string[])` is the way to ask for several in a stated order.
 
 ```csharp
 public EntityDefinition? FindAny(string name, params string[] kinds)
 ```
 
-The first match among several kinds, in the order given — how a call that accepts either a `relic` or an `item` asks for both without guessing which came first.
+The first match among several kinds, in the order given. It is how a call that accepts either a `relic` or an `item` asks for both without guessing which came first.
 
 ```csharp
 public VerbDefinition? FindVerb(string name)
@@ -372,12 +372,12 @@ The verb content declares under that name, or null. A verb the game registered f
 public static ContentLibrary FromText(string text, string file = "<inline>")
 ```
 
-A library holding one piece of text, for a test or a snippet. It does **not** throw on errors — check `ContentLibrary.Diagnostics`, or use `CardRuntime.FromText(string, RuntimeOptions)`, which does.
+A library holding one piece of text, for a test or a snippet. It does **not** throw on errors. Check `ContentLibrary.Diagnostics`, or use `CardRuntime.FromText(string, RuntimeOptions)`, which does.
 
 **Parameters.**
 
-- `text` — The content, as it would be written in a `.cantrip` file.
-- `file` — The name diagnostics will point at. It does not have to exist.
+- `text`: The content, as it would be written in a `.cantrip` file.
+- `file`: The name diagnostics will point at. It does not have to exist.
 
 ```csharp
 public DiagnosticBag LoadFile(string path)
@@ -509,7 +509,7 @@ Whether this declares something the game can make one of, rather than a rule abo
 public EntityKind Kind { get; }
 ```
 
-What the engine treats this as. Several keywords land on one kind — `enemy`, `actor` and `hero` are all `EntityKind.Actor` — so `EntityDefinition.KindName` is what tells them apart.
+What the engine treats this as. Several keywords land on one kind (`enemy`, `actor` and `hero` are all `EntityKind.Actor`), so `EntityDefinition.KindName` is what tells them apart.
 
 ```csharp
 public string KindName { get; }
@@ -521,7 +521,7 @@ The keyword it was declared with: `card`, `status`, `relic`...
 public IReadOnlyList<ListenerNode> Listeners { get; }
 ```
 
-Every `on ...:` block, in declaration order. A line that only looks like a listener — `when card_played:` — is in `EntityDefinition.Blocks` instead and never runs, which is CT313.
+Every `on ...:` block, in declaration order. A line that only looks like a listener (`when card_played:`) is in `EntityDefinition.Blocks` instead and never runs, which is CT313.
 
 ```csharp
 public int? MaxStacks { get; private set; }
@@ -539,7 +539,7 @@ Every `modify` line, in declaration order. They are live while the entity is, an
 public IReadOnlyList<MoveDefinition> Moves { get; }
 ```
 
-Every `move`, in declaration order — which is also the order a `cycle` pattern takes them in when no `pattern` line names them.
+Every `move`, in declaration order. That is also the order a `cycle` pattern takes them in when no `pattern` line names them.
 
 ```csharp
 public string Name { get; }
@@ -575,7 +575,7 @@ Every property line as it was parsed, by name. It holds the configuration lines 
 public Reach? Range { get; private set; }
 ```
 
-How far this reaches, from its `range` line, or null when it says nothing and reaches as far as the board is wide. Read by targeting through the `range` modifier channel; a card's own `target … where` filter is a separate rule and is not a channel, because a card's printed reach is its own and not a stranger's to rewrite.
+How far this reaches, from its `range` line, or null when it says nothing and reaches as far as the board is wide. Read by targeting through the `range` modifier channel; a card's own `target ... where` filter is a separate rule and is not a channel, because a card's printed reach is its own and not a stranger's to rewrite.
 
 ```csharp
 public StackingMode Stacking { get; private set; }
@@ -631,7 +631,7 @@ One property line as it was parsed, or null when it was not written. The parsed 
 public string? ReadString(string property)
 ```
 
-A property's value when it was written as a quoted string, or null — which also covers a property that was written without quotes. Use `EntityDefinition.Word(string)` for a bare word.
+A property's value when it was written as a quoted string, or null, which also covers a property that was written without quotes. Use `EntityDefinition.Word(string)` for a bare word.
 
 ```csharp
 public IReadOnlyList<string> ReadWordList(string property)
@@ -671,10 +671,10 @@ A move built in C#, for a test or a tool. Content declares them with `move "Chom
 
 **Parameters.**
 
-- `name` — What the intent panel shows and what `use` names.
-- `body` — The statements the move runs.
-- `weight` — Its share of a `random` pattern. Ignored by a `cycle` pattern.
-- `phase` — The phase it belongs to, or null for a move available in every phase.
+- `name`: What the intent panel shows and what `use` names.
+- `body`: The statements the move runs.
+- `weight`: Its share of a `random` pattern. Ignored by a `cycle` pattern.
+- `phase`: The phase it belongs to, or null for a move available in every phase.
 
 ### Properties
 
@@ -706,7 +706,7 @@ How far this move reaches, from `move "Swing" range 1:`, or null when it says no
 public ExprNode? TargetSelector { get; internal set; }
 ```
 
-Who the move telegraphs against, from `move "Cutthroat" at lowest hp enemies:`. Null when the move says nothing, and the target is then a living party member drawn uniformly — which for a party of one is that one member, with nothing rolled.
+Who the move telegraphs against, from `move "Cutthroat" at lowest hp enemies:`. Null when the move says nothing, and the target is then a living party member drawn uniformly. For a party of one, that is the one member, with nothing rolled.
 
 ```csharp
 public Num Weight { get; }
@@ -749,10 +749,10 @@ A phase built in C#, for a test or a tool. Content declares them with `phase Bro
 
 **Parameters.**
 
-- `name` — What moves tag themselves with to belong to this phase.
-- `condition` — Evaluated against the enemy each time its intent is rolled.
-- `span` — Where it was written, for diagnostics.
-- `retelegraph` — Whether entering the phase re-rolls the intent there and then.
+- `name`: What moves tag themselves with to belong to this phase.
+- `condition`: Evaluated against the enemy each time its intent is rolled.
+- `span`: Where it was written, for diagnostics.
+- `retelegraph`: Whether entering the phase re-rolls the intent there and then.
 
 ### Properties
 
@@ -798,7 +798,7 @@ The phase's name.
 public struct Reach : IEquatable<Reach>
 ```
 
-How far an action reaches, in slots on the board: `range 1` is everything up to one step away — melee — and `range 2..3` is a bow that cannot shoot point blank.
+How far an action reaches, in slots on the board: `range 1` is everything up to one step away (melee), and `range 2..3` is a bow that cannot shoot point blank.
 
 A reach is measured with `GameState.Distance(Entity, Entity)` between whoever is using the action and the candidate, and it is the only thing the `range` modifier channel changes: the channel computes `Reach.Max` and `Reach.Min` follows it down, so `modify range: set 1` makes a longbow melee rather than leaving it unable to reach anything at all.
 
@@ -812,8 +812,8 @@ A reach from two step counts. A negative `min` is clamped to 0 rather than refus
 
 **Parameters.**
 
-- `min` — The nearest slot reached. 0 means "from where I stand outwards".
-- `max` — The furthest slot reached.
+- `min`: The nearest slot reached. 0 means "from where I stand outwards".
+- `max`: The furthest slot reached.
 
 ### Properties
 
@@ -977,7 +977,7 @@ A `test` block together with the file it came from.
 public string File { get; }
 ```
 
-The file this was loaded from, as it was named to the loader — a real path for `ContentLibrary.LoadFile(string)`, and whatever a host passed to `ContentLibrary.LoadText(string, string)` otherwise.
+The file this was loaded from, as it was named to the loader: a real path for `ContentLibrary.LoadFile(string)`, and whatever a host passed to `ContentLibrary.LoadText(string, string)` otherwise.
 
 ```csharp
 public string Name { get; }

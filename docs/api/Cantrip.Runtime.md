@@ -35,7 +35,7 @@ Part of [the API reference](README.md). The guides are [docs/csharp.md](../cshar
 | [`Listener`](#listener) | A registered `on ...:` block, bound to the entity that declared it. |
 | [`ListenerDueSnapshot`](#listenerduesnapshot) | When an `on every ...:` listener of one entity is next due to fire. |
 | [`ListenerLimitSnapshot`](#listenerlimitsnapshot) | A `once per ...` window already used by one listener of one entity. |
-| [`ListenerOrdering`](#listenerordering) | One tie-break in the order listeners run. The ruleset lists several, applied in turn, and an id comparison settles whatever is left — so the order never depends on a dictionary and a replay always agrees. |
+| [`ListenerOrdering`](#listenerordering) | One tie-break in the order listeners run. The ruleset lists several, applied in turn, and an id comparison settles whatever is left: the order never depends on a dictionary and a replay always agrees. |
 | [`LoopProtection`](#loopprotection) | What stops a chain of reactions from running for ever. It is a ruleset setting because the two answers suit different games, not because one is a bug. |
 | [`Modifier`](#modifier) | An active `modify` line, bound to the entity that declared it. |
 | [`ModifierPipeline`](#modifierpipeline) | The modifier pipeline. Values pass through fixed layers in ruleset order (add, multiply, clamp, override by default). Stat reads are cached and the cache is dropped whenever `GameState.Version` moves, which covers every mutation that could change a modifier's scope, filter or amount. |
@@ -63,7 +63,7 @@ Part of [the API reference](README.md). The guides are [docs/csharp.md](../cshar
 | [`TriggerResolution`](#triggerresolution) | When an after-phase listener runs: at the end of the action that set it off, or in the middle of it. It changes the order everything happens in, so it is not a setting to change mid-project. |
 | [`TurnClock`](#turnclock) | One unit per turn. The default for turn-based games. |
 | [`TurnMode`](#turnmode) | Whether the party takes one turn between them or every combatant takes its own step in one interleaved order. |
-| [`UndoSnapshot`](#undosnapshot) | One reversible change an `until` block made, as plain data — the saved form of `TemporaryChange`. |
+| [`UndoSnapshot`](#undosnapshot) | One reversible change an `until` block made, as plain data: the saved form of `TemporaryChange`. |
 | [`Value`](#value) | The dynamically typed value the interpreter passes around. Numbers are always `Num` so that evaluation stays deterministic. |
 | [`ValueKind`](#valuekind) | What a `Value` is holding. Worth branching on rather than guessing: several kinds carry a number and only `ValueKind.Number` is one. |
 | [`ValueSnapshot`](#valuesnapshot) | One `Value` as plain data. Entities are stored as ids, definitions as kind and name, and numbers as raw `Num` longs, so nothing in here is a live object. |
@@ -82,7 +82,7 @@ public enum BattleEnd
 
 What ends a battle that the party is still standing in.
 
-A battle has always ended the instant the board was empty, which is right for a fight the engine lays out once and wrong for every fight that arrives in waves. In a wave game the board is empty every few seconds by design — the keepers clear one wave and the next is two seconds away — so the first run of a survival mode ends at two seconds, having been won. The only way to keep such a fight open was an enemy that is always there and can never be pointed at, propping the battle open while every count and every `deal to enemies` in the game had to remember it was there.
+A battle has always ended the instant the board was empty, which is right for a fight the engine lays out once and wrong for every fight that arrives in waves. In a wave game the board is empty every few seconds by design: the keepers clear one wave and the next is two seconds away. So the first run of a survival mode ends at two seconds, having been won. The only way to keep such a fight open was an enemy that is always there and can never be pointed at, propping the battle open while every count and every `deal to enemies` in the game had to remember it was there.
 
 | Member | |
 |---|---|
@@ -141,7 +141,7 @@ public static class BuiltinClauses
 
 Which named clauses each built-in verb reads. The parser knows the clause words but attaches no meaning to any of them, so before this table a clause a verb did not read was simply dropped: `block 8 for 2 turns` gave ordinary block, `apply Poison 3 at target` ignored the `at`, and `deal 5 against enemy2` hit the card's own target.
 
-Only built-in verbs are listed. A verb a game registers in C#, or one content declares, may read any clause it likes — which is the whole reason the grammar knows words no built-in verb reads — so the check that uses this table skips them. A flag after a comma (`, ignore block`) is a different thing and is not a clause at all.
+Only built-in verbs are listed. A verb a game registers in C#, or one content declares, may read any clause it likes, which is the whole reason the grammar knows words no built-in verb reads, so the check that uses this table skips them. A flag after a comma (`, ignore block`) is a different thing and is not a clause at all.
 
 ### Properties
 
@@ -259,13 +259,13 @@ A card was played. `source` is the member who performed it, which in a party is 
 public const string Created = "created"
 ```
 
-Something arrived: `create`, `copy`, or a spawn the host made. It is an announcement and not a gate — the thing is already in the game — which is what an enemy's own arrival effect is written on.
+Something arrived: `create`, `copy`, or a spawn the host made. It is an announcement and not a gate (the thing is already in the game), and it is what an enemy's own arrival effect is written on.
 
 ```csharp
 public const string Damaged = "damaged"
 ```
 
-A hit landed. `target` took it, `source` dealt it, and `amount` is hp actually lost *after* block — not what the card said.
+A hit landed. `target` took it, `source` dealt it, and `amount` is hp actually lost *after* block, not what the card said.
 
 ```csharp
 public const string Destroyed = "destroyed"
@@ -283,7 +283,7 @@ An actor is dying, and can still be saved: `instead_of_died` prevents it. The dy
 public const string Discarded = "discarded"
 ```
 
-A card went to the discard pile — including one drawn into a hand that was already full.
+A card went to the discard pile, including one drawn into a hand that was already full.
 
 ```csharp
 public const string Drawn = "drawn"
@@ -325,7 +325,7 @@ An actor died and it is settled. `source` is the killer; `BuiltinEvents.Died` is
 public const string Move = "move"
 ```
 
-An enemy is performing a named move. `data.move` is which — not to be confused with `BuiltinEvents.Moved`, which is about position.
+An enemy is performing a named move. `data.move` is which one. Not to be confused with `BuiltinEvents.Moved`, which is about position.
 
 ```csharp
 public const string Moved = "moved"
@@ -385,7 +385,7 @@ A status did not land because the target was immune. Nothing was applied, so no 
 public const string Transformed = "transformed"
 ```
 
-Something became something else and kept its id, owner, side and place. Raised once, and the statuses it sheds raise nothing — which is why `until` refuses to hold a transform.
+Something became something else and kept its id, owner, side and place. Raised once, and the statuses it sheds raise nothing, which is why `until` refuses to hold a transform.
 
 ```csharp
 public const string TurnEnd = "turn_end"
@@ -507,13 +507,13 @@ Identifies the whole chain, for `once per chain` limits.
 public bool Contains(int listenerId)
 ```
 
-Whether a listener is already somewhere up this chain — the check that keeps a listener from re-triggering itself through its own effect. A listener id of 0 is the root and is never contained.
+Whether a listener is already somewhere up this chain. This is the check that keeps a listener from re-triggering itself through its own effect. A listener id of 0 is the root and is never contained.
 
 ```csharp
 public Chain Extend(int listenerId)
 ```
 
-A new link for a listener about to run, one deeper and keeping the same `Chain.RootId` — so everything set off by one action shares a root, which is what `once per chain` counts.
+A new link for a listener about to run, one deeper and keeping the same `Chain.RootId`, so everything set off by one action shares a root, which is what `once per chain` counts.
 
 ---
 
@@ -561,12 +561,12 @@ A question about entities in the game. Content builds these; a game builds one o
 
 **Parameters.**
 
-- `prompt` — What to ask, as content wrote it.
-- `options` — What may be picked. An answer outside this list is ignored.
-- `min` — The fewest that must be picked.
-- `max` — The most that may be.
-- `chooser` — The actor deciding, or null when nobody in the game is.
-- `span` — The line of content that asked.
+- `prompt`: What to ask, as content wrote it.
+- `options`: What may be picked. An answer outside this list is ignored.
+- `min`: The fewest that must be picked.
+- `max`: The most that may be.
+- `chooser`: The actor deciding, or null when nobody in the game is.
+- `span`: The line of content that asked.
 
 ### Properties
 
@@ -634,7 +634,7 @@ public sealed class DeferredChooser : IChoiceProvider
 
 A chooser for games whose decisions come from a player, where an answer cannot be produced on the spot. Instead of guessing, it stops the action; the runtime rolls the game back, the UI asks, and the action is replayed with the answer. Because the rollback is an exact snapshot, the replay is deterministic.
 
-Outside an action the runtime can roll back — setup calls, or a choice raised while nothing is being attempted — it behaves like `FirstOptionChooser` rather than throwing at game code that has nothing to answer with.
+Outside an action the runtime can roll back, which means a setup call or a choice raised while nothing is being attempted, it behaves like `FirstOptionChooser` rather than throwing at game code that has nothing to answer with.
 
 ### Properties
 
@@ -654,7 +654,7 @@ Replays an answer already given, or stops the action so the game can ask. Outsid
 
 **Throws.**
 
-- `ChoicePendingException` — No answer for this question yet, and an action is running that can be rolled back. It is caught by `CardRuntime`, not by the game.
+- `ChoicePendingException`: No answer for this question yet, and an action is running that can be rolled back. It is caught by `CardRuntime`, not by the game.
 
 ```csharp
 public EntityDefinition? ChooseDefinition(DefinitionChoice request, GameState state)
@@ -682,10 +682,10 @@ An offer of content that does not exist yet. Always one pick from the list, whic
 
 **Parameters.**
 
-- `prompt` — What to ask, as content wrote it.
-- `options` — The candidates. They are definitions: nothing has been made from any of them.
-- `chooser` — The actor deciding, or null when nobody in the game is.
-- `span` — The line of content that asked.
+- `prompt`: What to ask, as content wrote it.
+- `options`: The candidates. They are definitions: nothing has been made from any of them.
+- `chooser`: The actor deciding, or null when nobody in the game is.
+- `span`: The line of content that asked.
 
 ### Properties
 
@@ -819,7 +819,7 @@ True once the entity has left the game entirely. Removed entities never fire lis
 public EntityKind Kind { get; }
 ```
 
-What the engine treats this as, fixed when it was made — except by `transform`, which replaces what an entity is while keeping who it is.
+What the engine treats this as, fixed when it was made (except by `transform`, which replaces what an entity is while keeping who it is).
 
 ```csharp
 public int Lane { get; internal set; }
@@ -855,7 +855,7 @@ What `Entity.Rank` was called before a board had two axes. It is an alias, not a
 public int Rank { get; internal set; }
 ```
 
-Slot along the facing axis, counting from 0. On a `facing` board rank 0 is the front — nearest the other side — and a rank never means the same place on both sides.
+Slot along the facing axis, counting from 0. On a `facing` board rank 0 is the front (nearest the other side), and a rank never means the same place on both sides.
 
 ```csharp
 public long Sequence { get; internal set; }
@@ -879,7 +879,7 @@ The entity that created or applied this one, when that matters (status sources).
 public IEnumerable<string> StatNames { get; }
 ```
 
-The stats this entity actually has a stored value for. A stat that has never been written is not here even though reading it gives 0 — an ability that has never been used has no `ready_at`, which is why "absent" has to read as ready rather than as zero left.
+The stats this entity actually has a stored value for. A stat that has never been written is not here even though reading it gives 0: an ability that has never been used has no `ready_at`, which is why "absent" has to read as ready rather than as zero left.
 
 ```csharp
 public GameState State { get; }
@@ -911,7 +911,7 @@ Where the entity lives: `hand`, `draw`, `discard`, `exhaust`, `board`, `relics`,
 public void AddTag(string tag)
 ```
 
-Adds a tag, lower-cased, and tells the state — which matters, because modifier scopes and the stat cache are keyed on tags and one added behind their back would leave stale numbers in play. Adding a tag that is already there does nothing.
+Adds a tag, lower-cased, and tells the state. Telling the state matters, because modifier scopes and the stat cache are keyed on tags and one added behind their back would leave stale numbers in play. Adding a tag that is already there does nothing.
 
 ```csharp
 public int CounterOf(string statusName)
@@ -1073,7 +1073,7 @@ The name the entity had, which a `transform` may have changed from its definitio
 public int OwnerId { get; set; }
 ```
 
-Whose this is — whose hand the card is in, whose relic it is — or 0 for something nobody owns.
+Whose this is (whose hand the card is in, whose relic it is), or 0 for something nobody owns.
 
 ```csharp
 public int PatternIndex { get; set; }
@@ -1097,7 +1097,7 @@ Slot along the facing axis. Not a place in `ZoneSnapshot.Entities`. It keeps the
 public long Sequence { get; set; }
 ```
 
-When it came into play, which is what the "play order" listener tie-break compares — so restoring it is what keeps listener order stable across a save.
+When it came into play, which is what the "play order" listener tie-break compares. Restoring it is what keeps listener order stable across a save.
 
 ```csharp
 public int SourceId { get; set; }
@@ -1115,7 +1115,7 @@ Base stats, as raw `Num` values.
 public List<string> Tags { get; set; }
 ```
 
-Its tags as they stood, which includes any an effect added — not only the definition's.
+Its tags as they stood, which includes any an effect added, not only the definition's.
 
 ```csharp
 public int Team { get; set; }
@@ -1149,7 +1149,7 @@ A root context for running content outside a listener. It starts a fresh chain, 
 
 **Parameters.**
 
-- `self` — The entity whose content is about to run, or null for statements that belong to nothing.
+- `self`: The entity whose content is about to run, or null for statements that belong to nothing.
 
 ### Properties
 
@@ -1157,7 +1157,7 @@ A root context for running content outside a listener. It starts a fresh chain, 
 public Entity? Action { get; set; }
 ```
 
-The action being run, if any: the card being played, or — through a modifier's query — the ability being aimed or priced. Its tags become the tags of the damage it deals, and content reads it as `card`, which keeps its word.
+The action being run, if any: the card being played, or (through a modifier's query) the ability being aimed or priced. Its tags become the tags of the damage it deals, and content reads it as `card`, which keeps its word.
 
 It was `Card` until 1.0. `ModifierQuery.Action` is copied straight into it when a modifier's filter or amount is evaluated, and that one has always been able to hold an ability, so the old name was already wrong here.
 
@@ -1251,7 +1251,7 @@ Binds a local in this scope, shadowing any of the same name in a parent. Names a
 public bool TryGetLocal(string name, out Value value)
 ```
 
-Looks a local up through this scope and its parents, innermost first. False leaves `value` at `Value.None`, which is also what a local explicitly set to none reads as — so the return value is the one to test.
+Looks a local up through this scope and its parents, innermost first. False leaves `value` at `Value.None`, which is also what a local explicitly set to none reads as. The return value is therefore the one to test.
 
 ---
 
@@ -1341,7 +1341,7 @@ An event a verb or a game is about to raise. Building one does nothing; the inte
 
 **Parameters.**
 
-- `name` — The event name as content listens for it, without a phase prefix.
+- `name`: The event name as content listens for it, without a phase prefix.
 
 ### Properties
 
@@ -1441,13 +1441,13 @@ public static readonly int CurrentFormat
 
 The save format this build writes. It only ever increases, and a build reads every format up to its own: a save made by an earlier release loads here, brought forward by `GameSnapshot.Upgrade(GameSnapshot)`, and only a save that needs a reader this build is not is refused.
 
-`static readonly` rather than `const`, and deliberately: C# bakes a `const` into the assembly that reads it, so a game compiled against one release and given a newer Cantrip.Core — which is exactly what swapping the addon's dll does — would go on comparing saves against the number it was built with. The same goes for `GameSnapshot.CurrentMinimumReader` and `GameSnapshot.CurrentRng`.
+`static readonly` rather than `const`, and deliberately: C# bakes a `const` into the assembly that reads it, so a game compiled against one release and given a newer Cantrip.Core (which is exactly what swapping the addon's dll does) would go on comparing saves against the number it was built with. The same goes for `GameSnapshot.CurrentMinimumReader` and `GameSnapshot.CurrentRng`.
 
 ```csharp
 public static readonly int CurrentMinimumReader
 ```
 
-The oldest reader a save this build writes can be given to, which a reader compares against its own `GameSnapshot.CurrentFormat`. It moves only when a change would make an older reader get the game wrong rather than merely miss something it never knew about, so that adding an optional field can bump `GameSnapshot.CurrentFormat` — saying honestly that the shape changed — without locking every earlier build out of the save.
+The oldest reader a save this build writes can be given to, which a reader compares against its own `GameSnapshot.CurrentFormat`. It moves only when a change would make an older reader get the game wrong rather than merely miss something it never knew about, so that adding an optional field can bump `GameSnapshot.CurrentFormat` (saying honestly that the shape changed) without locking every earlier build out of the save.
 
 ```csharp
 public static readonly string CurrentRng
@@ -1467,13 +1467,13 @@ The version of Cantrip.Core doing the writing, as `GameSnapshot.WrittenBy` recor
 public List<int> ActedIds { get; set; }
 ```
 
-Everyone who has already taken their step this round — the party under `turns: sides`, both sides under `turns: initiative`. Ids rather than slots, so a member that moves, dies or is revived mid-round keeps having acted.
+Everyone who has already taken their step this round: the party under `turns: sides`, both sides under `turns: initiative`. Ids rather than slots, so a member that moves, dies or is revived mid-round keeps having acted.
 
 ```csharp
 public int ActiveMemberId { get; set; }
 ```
 
-Whose step it was when this was written, or zero when none of the party's was. It is written for a reader — a save browser, a bug report — and never read back: the restore works it out again from `GameSnapshot.ActedIds` and the party, so a save that carries a stale one cannot contradict the game it restores.
+Whose step it was when this was written, or zero when none of the party's was. It is written for a reader (a save browser, a bug report) and never read back: the restore works it out again from `GameSnapshot.ActedIds` and the party, so a save that carries a stale one cannot contradict the game it restores.
 
 ```csharp
 public int ActiveTeam { get; set; }
@@ -1497,7 +1497,7 @@ How many battles the run had started. It carries across battles, so it is part o
 public BoardSnapshot? Board { get; set; }
 ```
 
-The board's shape as it stood when the save was written. It is here so that a save is self-describing — a game whose content no longer declares that board still loads and plays on the board it was saved on — and so that a restore can say exactly what changed when content has reshaped it underneath.
+The board's shape as it stood when the save was written. It is here so that a save is self-describing (a game whose content no longer declares that board still loads and plays on the board it was saved on) and so that a restore can say exactly what changed when content has reshaped it underneath.
 
 ```csharp
 public string BoardName { get; set; }
@@ -1583,7 +1583,7 @@ The next activation number to hand out, which is what the "play order" listener 
 public List<int> PartyIds { get; set; }
 ```
 
-The party: every actor the game asks for input, leader first. A save that lists none — which is every save a game with no `hero` writes, and every save written before a party existed — restores as a party of one, `GameSnapshot.PlayerId` alone.
+The party: every actor the game asks for input, leader first. A save that lists none (which is every save a game with no `hero` writes, and every save written before a party existed) restores as a party of one, `GameSnapshot.PlayerId` alone.
 
 ```csharp
 public int PlayerId { get; set; }
@@ -1645,7 +1645,7 @@ It is for people, not for rules: nothing branches on it, and a refusal quotes it
 public List<ZoneSnapshot> Zones { get; set; }
 ```
 
-Where everything is, in order — and the order matters: a draw pile's is the sequence the player will see. A restore refuses a save whose zones and entities disagree.
+Where everything is, in order. The order matters: a draw pile's is the sequence the player will see. A restore refuses a save whose zones and entities disagree.
 
 ### Methods
 
@@ -1675,10 +1675,10 @@ Builds the rules state for one game. `CardRuntime` does this; a game builds one 
 
 **Parameters.**
 
-- `content` — The library the game is played from.
-- `rules` — The effective ruleset, usually `ContentLibrary.BuildRuleset(DiagnosticBag)`.
-- `clock` — Turns or ticks. It is not checked against the ruleset here; `CardRuntime` is where that mismatch is caught.
-- `seed` — The run's seed. Every roll in the game comes from it.
+- `content`: The library the game is played from.
+- `rules`: The effective ruleset, usually `ContentLibrary.BuildRuleset(DiagnosticBag)`.
+- `clock`: Turns or ticks. It is not checked against the ruleset here; `CardRuntime` is where that mismatch is caught.
+- `seed`: The run's seed. Every roll in the game comes from it.
 
 ### Properties
 
@@ -1688,7 +1688,7 @@ public Entity? ActiveMember { get; }
 
 The member whose step it is, or null when none of the party's is: outside a battle, on the enemies' turn, and once every member has acted.
 
-Under `turns: initiative` it is binding: that member and no other may act, and the round does not move on until it passes. Under `turns: sides` the whole party shares one turn and a game may act with its members in any order it likes, so this is the one the engine *would* offer next — the first that has not acted — and a suggestion rather than a rule. A game that wants the rule asks `CardRuntime.CanAct(Entity)`. It used to be null in `sides`, which meant a host polling it got nothing to show.
+Under `turns: initiative` it is binding: that member and no other may act, and the round does not move on until it passes. Under `turns: sides` the whole party shares one turn and a game may act with its members in any order it likes, so this is the one the engine *would* offer next (the first that has not acted) and a suggestion rather than a rule. A game that wants the rule asks `CardRuntime.CanAct(Entity)`. It used to be null in `sides`, which meant a host polling it got nothing to show.
 
 ```csharp
 public Team ActiveTeam { get; internal set; }
@@ -1786,7 +1786,7 @@ The causality log. Disabled unless `RuntimeOptions.Trace` asked for it, and free
 public int Turn { get; internal set; }
 ```
 
-The turn number within the current battle, counting from 1, and 0 before the first one. A real-time game has no turns, so it stays at 0 for the whole fight — which is a battle in progress, not one that has not started.
+The turn number within the current battle, counting from 1, and 0 before the first one. A real-time game has no turns, so it stays at 0 for the whole fight, which is a battle in progress, not one that has not started.
 
 ```csharp
 public IReadOnlyList<Entity> TurnOrder { get; }
@@ -1808,7 +1808,7 @@ Incremented by every mutation. Caches compare against it instead of tracking dep
 public IReadOnlyList<Entity> Actors(Team? team = null)
 ```
 
-Live actors on the board, optionally for one side, ordered by `(lane, rank)` — which is where they stand, and so the order a party takes its steps in and the order an area effect reaches them in.
+Live actors on the board, optionally for one side, ordered by `(lane, rank)`, which is where they stand, and so the order a party takes its steps in and the order an area effect reaches them in.
 
 It used to be insertion order, which its own summary already called position order; the two agreed only because a new actor always landed past everyone. Now that a freed slot is filled again, they do not, and where an actor stands is the answer that means something.
 
@@ -1820,7 +1820,7 @@ Puts an actor on a slot. Assigning a slot someone else is standing on *swaps* th
 
 **Throws.**
 
-- `ArgumentOutOfRangeException` — The slot is not one this board has.
+- `ArgumentOutOfRangeException`: The slot is not one this board has.
 
 ```csharp
 public Entity? At(Team team, int lane, int rank)
@@ -1840,7 +1840,7 @@ public void Become(Entity entity, EntityDefinition definition)
 
 Replaces what an entity *is* while keeping who it is. The same object keeps its id, owner, source, side, sequence, zone and place in that zone, its board slot and its history counters, and now wears another definition's name, stats, tags, listeners and modifiers. This is what `transform` is built from.
 
-Everything the old definition brought goes, and goes silently. Statuses and keywords leave through `GameState.Remove(Entity)` rather than raising `status_removed`, because one verb raising a variable number of cancellable events — each able to destroy the host half way through — is not something content could reason about. `destroy` already takes its attachments the same way. The one event is `transformed`, which the interpreter raises around this call.
+Everything the old definition brought goes, and goes silently. Statuses and keywords leave through `GameState.Remove(Entity)` rather than raising `status_removed`, because one verb raising a variable number of cancellable events (each able to destroy the host half way through) is not something content could reason about. `destroy` already takes its attachments the same way. The one event is `transformed`, which the interpreter raises around this call.
 
 ```csharp
 public void CloseRanks(Team team, int lane, int vacated)
@@ -1860,7 +1860,7 @@ public int Distance(Entity a, Entity b)
 
 How many steps apart two actors are, in slots, by the board's metric.
 
-On a `facing` board the two sides are mirrored, so a rank means a different place on each: across the sides the rank term is `a.rank + b.rank + 1`, which makes two front-rank actors one step apart however deep the board is. Within one side, and on a `shared` board — where a rank is the same place for everyone — it is the plain metric over `(lane, rank)`. Anything not standing on the board has no distance to anything, and gets `Int32.MaxValue`.
+On a `facing` board the two sides are mirrored, so a rank means a different place on each: across the sides the rank term is `a.rank + b.rank + 1`, which makes two front-rank actors one step apart however deep the board is. Within one side, and on a `shared` board (where a rank is the same place for everyone), it is the plain metric over `(lane, rank)`. Anything not standing on the board has no distance to anything, and gets `Int32.MaxValue`.
 
 ```csharp
 public Entity Duplicate(Entity original, Entity? owner = null, Team team = Neutral, string zone = "")
@@ -1868,7 +1868,7 @@ public Entity Duplicate(Entity original, Entity? owner = null, Team team = Neutr
 
 Makes a second entity from one already in the game: the same definition, but the stats and tags it has *now* rather than the ones it was printed with, and a fresh instance of everything attached to it. This is what `copy` is built from, and the whole difference between it and `create`: an upgraded, discounted or poisoned thing is duplicated as it stands.
 
-The side and the owner are the caller's to decide, because a copy takes them from the original rather than from whoever made it: copying an enemy's minion must not hand it to the player. Statuses come across as a snapshot of a state — no `status_applied` is raised and `immune` is not consulted — so `stacks`, `duration` and `expires_at` arrive exactly as they stand, because all three are ordinary stats.
+The side and the owner are the caller's to decide, because a copy takes them from the original rather than from whoever made it: copying an enemy's minion must not hand it to the player. Statuses come across as a snapshot of a state (no `status_applied` is raised and `immune` is not consulted), so `stacks`, `duration` and `expires_at` arrive exactly as they stand, because all three are ordinary stats.
 
 ```csharp
 public IReadOnlyList<Entity> Fallen(Team? team = null)
@@ -2026,7 +2026,7 @@ public interface IGameClock
 
 Abstract game time. The core only ever sees whole units: a `TurnClock` advances one unit per turn and a `TickClock` one unit per fixed-timestep tick, so durations, cooldowns and `every` triggers share one code path.
 
-`IGameClock.TryConvert(Num, string, long)` has a default, so a clock that measures only its own unit needs no body for it, and a member added in a later release will have one too. `IGameClock.Now`, `IGameClock.Advanced` and `IGameClock.Restore(long)` deliberately have none: a default for them could only be a clock stuck at zero, an event that never fires, and a restore that quietly keeps the wrong time — the kind of silent wrong answer an interface should not offer. See [Stability](https://github.com/AGomnes/Cantrip/blob/main/docs/stability.md).
+`IGameClock.TryConvert(Num, string, long)` has a default, so a clock that measures only its own unit needs no body for it, and a member added in a later release will have one too. `IGameClock.Now`, `IGameClock.Advanced` and `IGameClock.Restore(long)` deliberately have none: a default for them could only be a clock stuck at zero, an event that never fires, and a restore that quietly keeps the wrong time, which is the kind of silent wrong answer an interface should not offer. See [Stability](https://github.com/AGomnes/Cantrip/blob/main/docs/stability.md).
 
 ### Properties
 
@@ -2040,7 +2040,7 @@ The current time in this clock's own whole units: turns elapsed, or ticks elapse
 virtual int UnitsPerSecond { get; }
 ```
 
-How many of this clock's units make one second of game time, or 0 for a clock whose unit is not a length of real time at all — which is every turn clock, and the default here.
+How many of this clock's units make one second of game time, or 0 for a clock whose unit is not a length of real time at all (every turn clock, and the default here).
 
 It is what turns `3s` in content into a number of units, so it is saved with the game: `GameSnapshot.ClockUnitsPerSecond` records it and a restore refuses a save written at another rate, rather than silently reinterpreting every cooldown, every `for 3s` and every `on every 2s` in it. A clock that answers 0 both writes and accepts 0, so nothing changes for a turn-based game.
 
@@ -2066,7 +2066,7 @@ The default accepts a bare number as this clock's own unit and refuses every nam
 event Action<long>? Advanced
 ```
 
-Raised once per unit after the clock has moved, carrying the new `IGameClock.Now`. A runtime subscribes from the moment it is built — that is what runs scheduled work, periodic triggers and timed statuses — so a game that shares one clock between two runtimes drives both. `IGameClock.Restore(long)` deliberately does not raise it.
+Raised once per unit after the clock has moved, carrying the new `IGameClock.Now`. A runtime subscribes from the moment it is built, and that subscription is what runs scheduled work, periodic triggers and timed statuses. Every runtime subscribes, so a game that shares one clock between two runtimes drives both. `IGameClock.Restore(long)` deliberately does not raise it.
 
 ---
 
@@ -2084,12 +2084,12 @@ The tree-walking interpreter. It evaluates expressions, executes statements, dis
 public Interpreter(GameState state, IEffectHost? host = null)
 ```
 
-Builds the interpreter for a game and installs itself as the state's modifier evaluator — so a state without one computes every value unmodified. `CardRuntime` does this; a game builds one directly only when it drives the rules itself.
+Builds the interpreter for a game and installs itself as the state's modifier evaluator, so a state without one computes every value unmodified. `CardRuntime` does this; a game builds one directly only when it drives the rules itself.
 
 **Parameters.**
 
-- `state` — The game to run. It is left as it is; nothing starts here.
-- `host` — The game's side of the integration. Null installs one that answers nothing, which is right for a simulation.
+- `state`: The game to run. It is left as it is; nothing starts here.
+- `host`: The game's side of the integration. Null installs one that answers nothing, which is right for a simulation.
 
 ### Fields and constants
 
@@ -2183,13 +2183,13 @@ The core `change` verb. Applies resource bounds, raises `<stat>_changed`, remove
 
 **Parameters.**
 
-- `entity` — The entity whose stat changes.
-- `stat` — The stat, or a status counter such as `stacks`.
-- `op` — How `amount` combines with the current value.
-- `amount` — The operand, before resource bounds.
-- `context` — Who is acting, for the `<stat>_changed` event.
-- `span` — Where in content the change was written, for traces and errors.
-- `fromReset` — True when a `reset_on` rule is doing this, which puts `event.reset` on the `<stat>_changed` event. Content that wants to stop a reset can then say so exactly, instead of inferring it from the value — "block became 0" is also true of an effect that legitimately sets block to 0.
+- `entity`: The entity whose stat changes.
+- `stat`: The stat, or a status counter such as `stacks`.
+- `op`: How `amount` combines with the current value.
+- `amount`: The operand, before resource bounds.
+- `context`: Who is acting, for the `<stat>_changed` event.
+- `span`: Where in content the change was written, for traces and errors.
+- `fromReset`: True when a `reset_on` rule is doing this, which puts `event.reset` on the `<stat>_changed` event. Content that wants to stop a reset can then say so exactly, instead of inferring it from the value: "block became 0" is also true of an effect that legitimately sets block to 0.
 
 ```csharp
 public Entity? Copy(Entity original, string? zone, EvalContext context, Entity? owner = null)
@@ -2199,12 +2199,12 @@ Duplicates something already in the game, per the `copy` verb: the same definiti
 
 **Parameters.**
 
-- `original` — What to duplicate.
-- `zone` — Which pile the copy lands in, or null for the one its kind goes to.
-- `context` — The effect this is part of.
-- `owner` — Who gets the copy, as content's `to` clause says. Null keeps the original's.
+- `original`: What to duplicate.
+- `zone`: Which pile the copy lands in, or null for the one its kind goes to.
+- `context`: The effect this is part of.
+- `owner`: Who gets the copy, as content's `to` clause says. Null keeps the original's.
 
-The side and owner come from `original` unless `owner` says otherwise, so a player's card that copies an enemy's minion gives the enemy a second minion. The copy is then placed by *kind*, exactly where a new one would go — never in the zone the original happens to sit in, which would drop a copied power straight into `powers` as a second active power nobody played, and a copied exhausted card into the exhaust pile.
+The side and owner come from `original` unless `owner` says otherwise, so a player's card that copies an enemy's minion gives the enemy a second minion. The copy is then placed by *kind*, exactly where a new one would go, never in the zone the original happens to sit in, which would drop a copied power straight into `powers` as a second active power nobody played, and a copied exhausted card into the exhaust pile.
 
 ```csharp
 public Entity? Create(EntityDefinition definition, Entity? owner, string? zone, EvalContext context, Team? side = null)
@@ -2214,11 +2214,11 @@ Creates cards, relics or actors from a definition, per the `create` verb.
 
 **Parameters.**
 
-- `definition` — What to make.
-- `zone` — Which pile it lands in, or null for the one its kind goes to.
-- `context` — The effect this is part of.
-- `owner` — Whose pile a card lands in and whose relics a relic joins. This is what content's `to` clause says, and it is how an enemy's move puts a curse in the player's discard pile — the mechanic three of the nine games in `docs/coverage.md` are built on.
-- `side` — The side an actor joins, for the same `to` clause. Null takes the side the declaration says, which is what a summon with nothing after it means.
+- `definition`: What to make.
+- `zone`: Which pile it lands in, or null for the one its kind goes to.
+- `context`: The effect this is part of.
+- `owner`: Whose pile a card lands in and whose relics a relic joins. This is what content's `to` clause says, and it is how an enemy's move puts a curse in the player's discard pile: the mechanic three of the nine games in `docs/coverage.md` are built on.
+- `side`: The side an actor joins, for the same `to` clause. Null takes the side the declaration says, which is what a summon with nothing after it means.
 
 ```csharp
 public Num DealDamage(Entity? source, Entity target, Num amount, IEnumerable<string> tags, bool ignoreBlock, EvalContext context, SourceSpan span = default(SourceSpan))
@@ -2254,7 +2254,7 @@ Evaluates one expression in a context. Evaluating is not free of side effects: a
 
 **Throws.**
 
-- `RuntimeError` — The expression could not be evaluated, with the line it is written on.
+- `RuntimeError`: The expression could not be evaluated, with the line it is written on.
 
 ```csharp
 public bool EvaluateCondition(ExprNode node, EvalContext context)
@@ -2272,11 +2272,11 @@ Evaluates to a number. Ranges roll, lists count, booleans are 1 or 0.
 public void Execute(BlockNode block, EvalContext context)
 ```
 
-Runs a block of statements. It is how a game runs a block of its own that it read out of `EntityDefinition.Blocks` — and such a block has to be named in `LintOptions.HostBlocks`, or the linter reports it as a line that never runs (CT313).
+Runs a block of statements. It is how a game runs a block of its own that it read out of `EntityDefinition.Blocks`. Such a block has to be named in `LintOptions.HostBlocks`, or the linter reports it as a line that never runs (CT313).
 
 **Throws.**
 
-- `RuntimeError` — A statement failed, with the line it failed on.
+- `RuntimeError`: A statement failed, with the line it failed on.
 
 It runs the statements and nothing else: the trigger queue is drained by whoever started the action, which is why content run this way from inside a host callback resolves at a different moment than content run through `CardRuntime.Execute(string, Entity, Entity)`.
 
@@ -2288,11 +2288,11 @@ Gives block as content's own `block` does, raising `gained_block` and moving the
 
 **Parameters.**
 
-- `source` — Who is giving it. Null for block nobody gave.
-- `target` — Who gains it.
-- `amount` — How much, before modifiers and before any before listener changes it.
-- `context` — The effect this is part of.
-- `span` — The line responsible, for traces and errors.
+- `source`: Who is giving it. Null for block nobody gave.
+- `target`: Who gains it.
+- `amount`: How much, before modifiers and before any before listener changes it.
+- `context`: The effect this is part of.
+- `span`: The line responsible, for traces and errors.
 
 **Returns.** The block actually gained, which is 0 when a listener cancelled it.
 
@@ -2304,13 +2304,13 @@ Heals as content's own `heal` does: the hp is clamped to the maximum, `healed` i
 
 **Parameters.**
 
-- `source` — Who is healing, for `event.source` and `source:` filters. Null for a heal nobody did.
-- `target` — Who is healed.
-- `amount` — How much to try to heal. A before listener may change it.
-- `context` — The effect this is part of.
-- `span` — The line responsible, for traces and errors.
+- `source`: Who is healing, for `event.source` and `source:` filters. Null for a heal nobody did.
+- `target`: Who is healed.
+- `amount`: How much to try to heal. A before listener may change it.
+- `context`: The effect this is part of.
+- `span`: The line responsible, for traces and errors.
 
-**Returns.** The hp actually restored, which is 0 at full hp and 0 when a listener cancelled the heal — the two are not distinguished here.
+**Returns.** The hp actually restored, which is 0 at full hp and 0 when a listener cancelled the heal. Nothing here distinguishes the two.
 
 ```csharp
 public Entity? IntentTargetOf(Entity enemy)
@@ -2328,9 +2328,9 @@ Whether one entity may be aimed at, over a base of 1: zero or less means "not th
 
 **Parameters.**
 
-- `candidate` — Who is being pointed at.
-- `source` — Who is pointing, or null.
-- `action` — The card or ability being aimed, or null. Not `card`: an ability is aimed through here too, which is why `CardRuntime.LegalTargets(Entity)` is named as it is.
+- `candidate`: Who is being pointed at.
+- `source`: Who is pointing, or null.
+- `action`: The card or ability being aimed, or null. Not `card`: an ability is aimed through here too, which is why `CardRuntime.LegalTargets(Entity)` is named as it is.
 
 Area and random effects still resolve through the interpreter's own selectors, and do not ask: a taunt constrains what something may be pointed at, not what a blast reaches. The query carries the action when there is one, so a `where` on the group must say `it.` to mean the candidate; a bare `tag:` tests the action.
 
@@ -2374,12 +2374,12 @@ Moves an actor along one axis, which is what `target.rank = 0` and `self.lane +=
 
 **Parameters.**
 
-- `actor` — The actor to move. Anything that is not an actor is refused by name.
-- `lane` — True for the lane axis, false for the rank axis.
-- `op` — How `amount` combines with where the actor stands now.
-- `amount` — The operand: a slot to move to, or a number of slots to move by.
-- `context` — Who is moving it, for the `moved` event and any `until` scope.
-- `span` — Where in content the move was written, for traces and errors.
+- `actor`: The actor to move. Anything that is not an actor is refused by name.
+- `lane`: True for the lane axis, false for the rank axis.
+- `op`: How `amount` combines with where the actor stands now.
+- `amount`: The operand: a slot to move to, or a number of slots to move by.
+- `context`: Who is moving it, for the `moved` event and any `until` scope.
+- `span`: Where in content the move was written, for traces and errors.
 
 A step that would leave the board stops at its edge rather than failing: a shove against the back wall leaves the actor against the back wall, which is what every game that has ranks means by it, and it keeps `self.rank -1` at the front a no-op instead of an error. A whole number is written to a whole slot, so a fractional amount rounds.
 
@@ -2389,9 +2389,9 @@ public void Pause()
 
 Holds the queue from the next drain onwards.
 
-Pausing does not interrupt anything: whatever is running finishes, and what it queued waits. That is the only granularity the interpreter can offer honestly — a queue entry is a self-contained closure, while a before or instead listener runs inline on the raising thread's stack, nested arbitrarily deep, and cannot be suspended without turning the whole interpreter into a state machine.
+Pausing does not interrupt anything: whatever is running finishes, and what it queued waits. That is the only granularity the interpreter can offer honestly: a queue entry is a self-contained closure, while a before or instead listener runs inline on the raising thread's stack, nested arbitrarily deep, and cannot be suspended without turning the whole interpreter into a state machine.
 
-A paused game is deliberately not a saveable one: `Interpreter.HasPendingWork` stays true, so capture and restore keep refusing, which is right — the queue holds live closures over listeners, events and chains that no snapshot can represent.
+A paused game is deliberately not a saveable one: `Interpreter.HasPendingWork` stays true, so capture and restore keep refusing, which is right. The queue holds live closures over listeners, events and chains that no snapshot can represent.
 
 ```csharp
 public void ProcessDecay(Entity host, string trigger)
@@ -2407,10 +2407,10 @@ Raises an event through its three phases around `action`. Before listeners run i
 
 **Parameters.**
 
-- `gameEvent` — The event; before listeners may change its amount or cancel it.
-- `context` — Who is acting and on whose behalf, for the listeners and the action.
-- `action` — The default action, skipped when the event is cancelled or replaced.
-- `committed` — Runs once the before phase has passed without cancelling, ahead of the instead phase. Card play uses it to pay the cost: a replaced effect still costs energy, a cancelled play does not.
+- `gameEvent`: The event; before listeners may change its amount or cancel it.
+- `context`: Who is acting and on whose behalf, for the listeners and the action.
+- `action`: The default action, skipped when the event is cancelled or replaced.
+- `committed`: Runs once the before phase has passed without cancelling, ahead of the instead phase. Card play uses it to pay the cost: a replaced effect still costs energy, a cancelled play does not.
 
 ```csharp
 public void RegisterVerb(string name, VerbHandler handler)
@@ -2460,9 +2460,9 @@ Those of a group that may be aimed at, in the group's own order.
 
 **Parameters.**
 
-- `candidates` — Who is being pointed at.
-- `source` — Who is pointing, or null.
-- `action` — The card or ability being aimed, or null; see `Interpreter.IsTargetable(Entity, Entity, Entity)`.
+- `candidates`: Who is being pointed at.
+- `source`: Who is pointing, or null.
+- `action`: The card or ability being aimed, or null; see `Interpreter.IsTargetable(Entity, Entity, Entity)`.
 
 ```csharp
 public void Transform(Entity entity, EntityDefinition definition, EvalContext context, SourceSpan span = default(SourceSpan))
@@ -2470,7 +2470,7 @@ public void Transform(Entity entity, EntityDefinition definition, EvalContext co
 
 Replaces an entity with another definition, per the `transform` verb: it keeps its place, its id and everything holding it, and raises `transformed` once.
 
-The event is cancellable in the before phase and replaceable in the instead phase, and a before listener may well destroy or kill the target — so the committed work checks again that the entity is still here. Running `GameState.Become(Entity, EntityDefinition)` on something that has left the game would leave `transformed` claiming, in its after phase, that a transform happened.
+The event is cancellable in the before phase and replaceable in the instead phase, and a before listener may well destroy or kill the target, so the committed work checks again that the entity is still here. Running `GameState.Become(Entity, EntityDefinition)` on something that has left the game would leave `transformed` claiming, in its after phase, that a transform happened.
 
 ```csharp
 public bool TryDrainStep()
@@ -2480,7 +2480,7 @@ Resolves exactly one queued trigger, whether or not the game is paused, and retu
 
 One step is one queue entry. A step may queue more work of its own, which joins the back of the queue exactly as it would during a full drain, so stepping through a game and letting it run reach the same state in the same order.
 
-Each step resets the sandbox step budget, because a paused drain is spread across host frames and cannot share a budget with the action that queued it. A stepped game is therefore not protected from an unbounded loop by the budget — but every step is a deliberate request from a debugger, so there is nothing running away.
+Each step resets the sandbox step budget, because a paused drain is spread across host frames and cannot share a budget with the action that queued it. A stepped game is therefore not protected from an unbounded loop by the budget, but every step is a deliberate request from a debugger, so there is nothing running away.
 
 A trigger that throws drops the rest of the queue, exactly as it does in `Interpreter.Drain`: later triggers would run against half-resolved state.
 
@@ -2538,7 +2538,7 @@ Registration order, the "play order" tie-break.
 public Entity Owner { get; }
 ```
 
-The entity whose declaration this came from — the relic, the status, the card. Inside the listener's body, that is what `self` and a bare `source` mean; `event.source` is who caused the event, which is the other thing entirely.
+The entity whose declaration this came from: the relic, the status, the card. Inside the listener's body, that is what `self` and a bare `source` mean; `event.source` is who caused the event, which is the other thing entirely.
 
 ```csharp
 public EventPhase Phase { get; }
@@ -2652,7 +2652,7 @@ The window already used, as a clock time: the turn, battle or run the listener l
 public enum ListenerOrdering
 ```
 
-One tie-break in the order listeners run. The ruleset lists several, applied in turn, and an id comparison settles whatever is left — so the order never depends on a dictionary and a replay always agrees.
+One tie-break in the order listeners run. The ruleset lists several, applied in turn, and an id comparison settles whatever is left: the order never depends on a dictionary and a replay always agrees.
 
 | Member | |
 |---|---|
@@ -2785,7 +2785,7 @@ Whether anything at all modifies this channel, which is the cheap pre-check befo
 public IReadOnlyList<Modifier> OnChannel(string channel)
 ```
 
-Every modifier registered on a channel, in registration order — not the order they are applied in, which the layers decide. Empty for a channel nothing modifies.
+Every modifier registered on a channel, in registration order rather than the order they are applied in, which the layers decide. Empty for a channel nothing modifies.
 
 ```csharp
 public IReadOnlyList<Modifier> OwnedBy(Entity owner)
@@ -2819,7 +2819,7 @@ public Entity? Action { get; set; }
 
 The action this value came from, when there is one: the card being played, or the ability being used. It is what the `card:` qualifier reads.
 
-It was called `Card` until 1.0 and held an ability all along — the `targetable` channel sets it from whatever is being aimed, and `cost` and `cooldown` from whatever is priced — so the name was wrong on the day it was written and would have been frozen wrong. The DSL's `card:` filter keeps its word, because that is frozen content vocabulary and reads correctly in the case content overwhelmingly writes.
+It was called `Card` until 1.0 and held an ability all along. The `targetable` channel sets it from whatever is being aimed, and `cost` and `cooldown` from whatever is priced, so the name was wrong on the day it was written and would have been frozen wrong. The DSL's `card:` filter keeps its word, because that is frozen content vocabulary and reads correctly in the case content overwhelmingly writes.
 
 ```csharp
 public string Channel { get; }
@@ -2843,7 +2843,7 @@ The entity whose value this is: the stat holder, the damage target, the card who
 public IReadOnlyCollection<string> Tags { get; set; }
 ```
 
-The action's own tags — `fire` on fire damage — which a `tag:` filter tests. Empty rather than null by default, so a filter never has to guard.
+The action's own tags (`fire` on fire damage), which a `tag:` filter tests. Empty rather than null by default, so a filter never has to guard.
 
 ---
 
@@ -3135,7 +3135,7 @@ The part after the colon: what the qualifier is being tested against.
 public string Qualifier { get; }
 ```
 
-The part before the colon — `tag`, `source`, `card` — which says what kind of test this is.
+The part before the colon (`tag`, `source`, `card`), which says what kind of test this is.
 
 ### Methods
 
@@ -3169,7 +3169,7 @@ A chooser with a stream of its own, so its rolls never move the game's. A simula
 public IReadOnlyList<Entity> Choose(ChoiceRequest request, GameState state)
 ```
 
-Shuffles the options and takes a count somewhere between the request's bounds — so it varies how many it picks, not only which.
+Shuffles the options and takes a count somewhere between the request's bounds. It varies how many it picks, not only which.
 
 ```csharp
 public EntityDefinition? ChooseDefinition(DefinitionChoice request, GameState state)
@@ -3199,7 +3199,7 @@ Whether `on` listeners run. This is the common phase, so turning it off disables
 public bool BeforeEvents { get; set; }
 ```
 
-Whether `before_` listeners run at all. Turning it off makes every one of them silently dead, and with it every `cancel` — it is a performance switch for content that uses none.
+Whether `before_` listeners run at all. Turning it off makes every one of them silently dead, and with it every `cancel`. It is a performance switch for content that uses none.
 
 ```csharp
 public ClockKind Clock { get; set; }
@@ -3259,7 +3259,7 @@ Interpreter steps allowed per top-level action. This is the mod sandbox's step l
 public IReadOnlyList<ModifierLayer> ModifierLayers { get; set; }
 ```
 
-The order a value passes through the modifier layers. The default is add, multiply, clamp, override — so an override beats a clamp, and reordering these two changes which of a pair of modifiers has the last word.
+The order a value passes through the modifier layers. The default is add, multiply, clamp, override. An override therefore beats a clamp, and reordering these two changes which of a pair of modifiers has the last word.
 
 ```csharp
 public NewListeners NewListeners { get; set; }
@@ -3331,8 +3331,8 @@ An error in content, caught while it runs. It is thrown at whoever drove the act
 
 **Parameters.**
 
-- `message` — What went wrong, without the location.
-- `span` — The line of content, which is prefixed onto `Exception.Message` when there is one.
+- `message`: What went wrong, without the location.
+- `span`: The line of content, which is prefixed onto `Exception.Message` when there is one.
 
 ### Properties
 
@@ -3422,7 +3422,7 @@ What makes it come due, which decides whether `ScheduledAction.DueAt` or `Schedu
 public List<TemporaryChange> Undo { get; }
 ```
 
-What to put back when the deadline fires, in the order it was done — it is reverted from the end. Empty for a plain `next turn:` block, which changes nothing that has to be undone.
+What to put back when the deadline fires, in the order it was done. It is reverted from the end. Empty for a plain `next turn:` block, which changes nothing that has to be undone.
 
 ---
 
@@ -3440,7 +3440,7 @@ One piece of deferred work as plain data. The block itself is not written: it is
 public Dictionary<string, ValueSnapshot> Bindings { get; set; }
 ```
 
-The names the block captured when it was scheduled — `target`, `source` — so that the block still means what it meant, whatever has happened since.
+The names the block captured when it was scheduled (`target`, `source`), so that the block still means what it meant, whatever has happened since.
 
 ```csharp
 public string? Block { set; }
@@ -3454,7 +3454,7 @@ public string? BlockAddress { get; set; }
 
 Where the block to run is: its place in content, such as `card:Prepare/effect/0.body`, or within `ScheduledSnapshot.Statements` when those are set, such as `execute/0.body`.
 
-It was called `Block` through format 1, which reads as a `block` — the stat, the verb and the modifier channel — everywhere else in this language. Saves in format 1 still carry that name, and `ScheduledSnapshot.Block` takes it.
+It was called `Block` through format 1, which reads as a `block` (the stat, the verb and the modifier channel) everywhere else in this language. Saves in format 1 still carry that name, and `ScheduledSnapshot.Block` takes it.
 
 ```csharp
 public string? BlockHash { get; set; }
@@ -3532,7 +3532,7 @@ A chooser that reads from a queue of answers. Each answer is a comma-separated l
 
 **Parameters.**
 
-- `answers` — The answers, in the order the questions will be asked.
+- `answers`: The answers, in the order the questions will be asked.
 
 ### Properties
 
@@ -3588,11 +3588,11 @@ Records one reversible change made inside an `until` block. Exactly one of the t
 
 **Parameters.**
 
-- `entity` — What was changed.
-- `tag` — The tag that was added, to be taken off again.
-- `attached` — The status or keyword that was attached, to be removed again.
-- `stat` — The stat that moved.
-- `delta` — How far it moved, to be subtracted back off. Undoing a stat puts the delta back rather than restoring the old number, so a change made in between survives.
+- `entity`: What was changed.
+- `tag`: The tag that was added, to be taken off again.
+- `attached`: The status or keyword that was attached, to be removed again.
+- `stat`: The stat that moved.
+- `delta`: How far it moved, to be subtracted back off. Undoing a stat puts the delta back rather than restoring the old number, so a change made in between survives.
 
 ### Properties
 
@@ -3652,11 +3652,11 @@ A tick clock at a fixed rate. The rate is what turns `3s` in content into a numb
 
 **Parameters.**
 
-- `ticksPerSecond` — Ticks in one second of game time. It cannot be changed afterwards, and it is written into a save as `GameSnapshot.ClockUnitsPerSecond`: a restore into a clock running at another rate is refused rather than reinterpreting every cooldown and every timed status in it.
+- `ticksPerSecond`: Ticks in one second of game time. It cannot be changed afterwards, and it is written into a save as `GameSnapshot.ClockUnitsPerSecond`: a restore into a clock running at another rate is refused rather than reinterpreting every cooldown and every timed status in it.
 
 **Throws.**
 
-- `ArgumentOutOfRangeException` — Zero or fewer ticks per second.
+- `ArgumentOutOfRangeException`: Zero or fewer ticks per second.
 
 ### Properties
 
@@ -3690,7 +3690,7 @@ Sets the time from a snapshot without raising `TickClock.Advanced`, so restoring
 public void Tick(int count = 1)
 ```
 
-Moves time on, raising `TickClock.Advanced` once per tick rather than once per call — so a game that catches up four ticks at once resolves each of them in order, and nothing that was due in between is skipped.
+Moves time on, raising `TickClock.Advanced` once per tick rather than once per call, so a game that catches up four ticks at once resolves each of them in order, and nothing that was due in between is skipped.
 
 ```csharp
 public bool TryConvert(Num amount, string? unit, out long units)
@@ -3704,7 +3704,7 @@ Accepts seconds, milliseconds, ticks and a bare number, always rounding up, so a
 public event Action<long>? Advanced
 ```
 
-Raised once per tick, after `TickClock.Now` has moved — so a `TickClock.Tick(int)` of four raises it four times, and nothing that was due in between is skipped. `TickClock.Restore(long)` does not raise it.
+Raised once per tick, after `TickClock.Now` has moved, so a `TickClock.Tick(int)` of four raises it four times, and nothing that was due in between is skipped. `TickClock.Restore(long)` does not raise it.
 
 ---
 
@@ -3770,7 +3770,7 @@ Clock time when the step happened.
 public IReadOnlyDictionary<string, object> Values { get; }
 ```
 
-The numbers behind the step — the amount, the before and after, whatever the site recorded — so a tool can show a breakdown instead of parsing `TraceEntry.Description`. Empty rather than null when there are none.
+The numbers behind the step (the amount, the before and after, whatever the site recorded), so a tool can show a breakdown instead of parsing `TraceEntry.Description`. Empty rather than null when there are none.
 
 ### Methods
 
@@ -3834,7 +3834,7 @@ Walks from an entry up to the root action: the "why did this happen" view.
 public IEnumerable<TraceEntry> Children(long id)
 ```
 
-The steps one entry caused, oldest first — one level, not the whole subtree. It scans the whole log per call, so building a tree from it is quadratic; `TraceLog.FormatTree` does it in one pass.
+The steps one entry caused, oldest first: one level, not the whole subtree. It scans the whole log per call, so building a tree from it is quadratic; `TraceLog.FormatTree` does it in one pass.
 
 ```csharp
 public void Clear()
@@ -3858,18 +3858,18 @@ Renders the log as an indented tree, the text form of the causality view.
 public long Record(long time, string kind, string description, string? source = null, string? listener = null, SourceSpan span = default(SourceSpan), IReadOnlyDictionary<string, object>? values = null, long? parentOverride = null)
 ```
 
-Records one step and returns its id, or 0 when the log is disabled — and 0 is never a real id, so it can be passed to `TraceLog.Scope(long)` without checking.
+Records one step and returns its id, or 0 when the log is disabled. Zero is never a real id, so it can be passed to `TraceLog.Scope(long)` without checking.
 
 **Parameters.**
 
-- `time` — The clock time the step happened at.
-- `kind` — A category: `action`, `event`, `listener`, `verb`, `modifier`, `warning`.
-- `description` — One line, for a person.
-- `source` — The entity responsible, formatted as `Name#id`.
-- `listener` — The listener that ran, when this step is a trigger.
-- `span` — The line of content behind it.
-- `values` — The numbers behind it, for a tool that would rather not parse the description.
-- `parentOverride` — Attaches this to a parent other than the open scope — how work queued earlier is recorded under what queued it.
+- `time`: The clock time the step happened at.
+- `kind`: A category: `action`, `event`, `listener`, `verb`, `modifier`, `warning`.
+- `description`: One line, for a person.
+- `source`: The entity responsible, formatted as `Name#id`.
+- `listener`: The listener that ran, when this step is a trigger.
+- `span`: The line of content behind it.
+- `values`: The numbers behind it, for a tool that would rather not parse the description.
+- `parentOverride`: Attaches this to a parent other than the open scope: how work queued earlier is recorded under what queued it.
 
 ```csharp
 public IDisposable Scope(long id)
@@ -4025,7 +4025,7 @@ Whether the party takes one turn between them or every combatant takes its own s
 public sealed class UndoSnapshot
 ```
 
-One reversible change an `until` block made, as plain data — the saved form of `TemporaryChange`.
+One reversible change an `until` block made, as plain data: the saved form of `TemporaryChange`.
 
 ### Properties
 
@@ -4113,7 +4113,7 @@ The definition this names, or null for every other kind.
 public Entity? Entity { get; }
 ```
 
-The entity, or null — including for a `ValueKind.List` of exactly one, which is what most selectors give. `AsEntities` covers both.
+The entity, or null. It is null for a `ValueKind.List` of exactly one too, which is what most selectors give. `AsEntities` covers both.
 
 ```csharp
 public bool IsNone { get; }
@@ -4193,7 +4193,7 @@ A list of entities. The list is taken as it is and not copied, so a caller that 
 public static Value FromEntity(Entity? entity)
 ```
 
-One entity, or `Value.None` when it is null — so a lookup that failed needs no separate branch.
+One entity, or `Value.None` when it is null, so a lookup that failed needs no separate branch.
 
 ```csharp
 public static Value FromNumber(Num value, string? unit = null)
@@ -4237,7 +4237,7 @@ What a `Value` is holding. Worth branching on rather than guessing: several kind
 
 | Member | |
 |---|---|
-| `None = 0` | Nothing at all — a name that resolved to no entity, a selector that matched none. It is what `default(Value)` is. |
+| `None = 0` | Nothing at all: a name that resolved to no entity, a selector that matched none. It is what `default(Value)` is. |
 | `Number = 1` | A number, in `Num`, possibly with a unit such as `%` or `s`. |
 | `Bool = 2` | True or false, carried as 1 or 0 in `Value.Number`. Not the same kind as a number, though it reads as one. |
 | `Text = 3` | A string literal from content. |
@@ -4341,7 +4341,7 @@ Who is acting and on whom. Pass it on to any primitive called from here, or the 
 public Interpreter Interpreter { get; }
 ```
 
-The interpreter running this verb, which is where a C# verb reaches the primitives — `ChangeStat`, `Interpreter.Heal(Entity, Entity, Num, EvalContext, SourceSpan)`, `Interpreter.Raise(GameEvent, EvalContext, Action, Action)` — that do the same bookkeeping content's own verbs do.
+The interpreter running this verb, which is where a C# verb reaches the primitives (`ChangeStat`, `Interpreter.Heal(Entity, Entity, Num, EvalContext, SourceSpan)`, `Interpreter.Raise(GameEvent, EvalContext, Action, Action)`) that do the same bookkeeping content's own verbs do.
 
 ```csharp
 public CommandNode Node { get; }
@@ -4375,13 +4375,13 @@ public Num Amount(int index, Num fallback)
 
 A number argument that is not a percentage: stacks, cards, damage, block. The built-in verbs read their numbers through this.
 
-A bare percentage means nothing to any of them, and the unit used to be dropped: `apply Slow 40%` applied forty stacks, and the card's generated text said "Apply 40% Slow" — a percentage stated to the player that the engine does not implement. A percentage that is part of a sum is already a fraction by the time it arrives (`target.max_hp * 50%` is a number with no unit), so only one written on its own is refused.
+A bare percentage means nothing to any of them, and the unit used to be dropped: `apply Slow 40%` applied forty stacks, and the card's generated text said "Apply 40% Slow", a percentage stated to the player that the engine does not implement. A percentage that is part of a sum is already a fraction by the time it arrives (`target.max_hp * 50%` is a number with no unit), so only one written on its own is refused.
 
 ```csharp
 public Value Argument(int index)
 ```
 
-Evaluates a positional argument, or `Value.None` when it was not written. Arguments are evaluated on demand, so reading one twice runs it twice — including any roll in it.
+Evaluates a positional argument, or `Value.None` when it was not written. Arguments are evaluated on demand, so reading one twice runs it twice, including any roll in it.
 
 ```csharp
 public ExprNode? ArgumentNode(int index)
@@ -4445,7 +4445,7 @@ public sealed class ZoneSnapshot
 
 One owner's zone and what is in it, in order.
 
-This is where a card is. `EntitySnapshot.Zone` says the same thing from the entity's side, and a capture always writes the two consistently, but only this one carries the order — which for the draw pile is the next card the player will see. A restore checks that every entity naming a zone is in that zone's list and in no other, and that every entity naming none is in no list at all, and refuses the save before it touches the game when they disagree, so that a future change cannot quietly let the two drift apart in a format that has already been written to disk.
+This is where a card is. `EntitySnapshot.Zone` says the same thing from the entity's side, and a capture always writes the two consistently, but only this one carries the order, which for the draw pile is the next card the player will see. A restore checks that every entity naming a zone is in that zone's list and in no other, and that every entity naming none is in no list at all, and refuses the save before it touches the game when they disagree, so that a future change cannot quietly let the two drift apart in a format that has already been written to disk.
 
 ### Properties
 

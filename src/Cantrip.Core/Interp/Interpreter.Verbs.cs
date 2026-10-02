@@ -175,8 +175,8 @@ namespace Cantrip.Runtime
         /// <c>into</c> says which pile and <c>to</c> says whose, as <c>to</c> does for every other
         /// verb in the language. All three clause words used to mean the pile, so <c>to</c> was read
         /// and thrown away: an enemy's <c>create Brine into discard to leader</c> made the curse in
-        /// the *enemy's* discard pile, which is a card that reads as one thing and does another —
-        /// the thing CT323 exists to stop.
+        /// the *enemy's* discard pile, which is a card that reads as one thing and does another.
+        /// Stopping that is what CT323 exists for.
         /// </para>
         /// </remarks>
         private void VerbCreate(VerbCall call)
@@ -204,9 +204,9 @@ namespace Cantrip.Runtime
             Entity? owner = recipient ?? call.Context.Controller;
             Team? side = recipient != null && definition.Kind == EntityKind.Actor ? recipient.Team : (Team?)null;
 
-            // A summon a full lane refuses makes nothing, so `created` is short by one — empty, when
-            // every one of them was refused. The statements after this read what was made, which is
-            // what "the row is full" has to mean if it is not to be an error.
+            // A summon a full lane refuses makes nothing, so `created` is short by one, or empty
+            // when every one of them was refused. The statements after this read what was made,
+            // which is what "the row is full" has to mean if it is not to be an error.
             var created = new List<Entity>();
             for (int i = 0; i < count; i++)
             {
@@ -285,7 +285,7 @@ namespace Cantrip.Runtime
         /// </summary>
         /// <remarks>
         /// <c>into</c> takes a definition and never an entity. <c>transform a into b</c>, where
-        /// <c>b</c> is something in the game, parses and reads as if it copied it — and would give
+        /// <c>b</c> is something in the game, parses and reads as if it copied it. That would give
         /// the printed stats of whatever <c>b</c> is, which is a silent wrong answer rather than a
         /// feature. It is refused by name; a copy of another minion's state is what <c>copy</c> is for.
         /// </remarks>
@@ -339,7 +339,7 @@ namespace Cantrip.Runtime
         private EntityDefinition RequireBecoming(VerbCall call, ExprNode node)
         {
             // A bare name prefers content, so `transform target into Sheep` finds the enemy even when
-            // a status shares the name — the same lookup `create` does.
+            // a status shares the name. `create` does the same lookup.
             string? written = node switch
             {
                 NameExpr name when !call.Context.TryGetLocal(name.Name, out _) => name.Name,
@@ -565,8 +565,8 @@ namespace Cantrip.Runtime
 
         /// <summary>
         /// Who is swinging: whatever <c>with</c> names, else the running entity when that is an actor
-        /// (a creature attacking inside its own move or listener), else its controller — so a card or
-        /// relic that says <c>attack</c> swings with the player rather than with itself.
+        /// (a creature attacking inside its own move or listener), else its controller. A card or
+        /// relic that says <c>attack</c> therefore swings with the player rather than with itself.
         /// </summary>
         private static Entity AttackerOf(VerbCall call)
         {
@@ -654,8 +654,8 @@ namespace Cantrip.Runtime
         /// </summary>
         /// <remarks>
         /// The <c>into</c> clause names where the cards land and which pile is then shuffled. It used
-        /// to be dropped, so <c>shuffle hand into discard</c> — a form the language reference itself
-        /// lists — put the hand into the draw pile. The bare <c>shuffle</c> is unchanged and still
+        /// to be dropped, so <c>shuffle hand into discard</c> (a form the language reference itself
+        /// lists) put the hand into the draw pile. The bare <c>shuffle</c> is unchanged and still
         /// means the discard pile.
         /// </remarks>
         private void VerbShuffle(VerbCall call)

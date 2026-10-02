@@ -45,9 +45,9 @@ namespace Cantrip.Runtime
         public long RootId { get; }
 
         /// <summary>
-        /// Whether a listener is already somewhere up this chain — the check that keeps a listener from
-        /// re-triggering itself through its own effect. A listener id of 0 is the root and is never
-        /// contained.
+        /// Whether a listener is already somewhere up this chain. This is the check that keeps a
+        /// listener from re-triggering itself through its own effect. A listener id of 0 is the root
+        /// and is never contained.
         /// </summary>
         public bool Contains(int listenerId)
         {
@@ -60,7 +60,7 @@ namespace Cantrip.Runtime
 
         /// <summary>
         /// A new link for a listener about to run, one deeper and keeping the same
-        /// <see cref="RootId"/> — so everything set off by one action shares a root, which is what
+        /// <see cref="RootId"/>, so everything set off by one action shares a root, which is what
         /// <c>once per chain</c> counts.
         /// </summary>
         public Chain Extend(int listenerId) => new Chain(this, listenerId, Depth + 1, RootId);
@@ -115,7 +115,7 @@ namespace Cantrip.Runtime
         public Entity? Target { get; set; }
 
         /// <summary>
-        /// The action being run, if any: the card being played, or — through a modifier's query — the
+        /// The action being run, if any: the card being played, or (through a modifier's query) the
         /// ability being aimed or priced. Its tags become the tags of the damage it deals, and content
         /// reads it as <c>card</c>, which keeps its word.
         /// </summary>
@@ -166,7 +166,7 @@ namespace Cantrip.Runtime
         /// <summary>
         /// Looks a local up through this scope and its parents, innermost first. False leaves
         /// <paramref name="value"/> at <see cref="Value.None"/>, which is also what a local explicitly
-        /// set to none reads as — so the return value is the one to test.
+        /// set to none reads as. The return value is therefore the one to test.
         /// </summary>
         public bool TryGetLocal(string name, out Value value)
         {
@@ -414,7 +414,7 @@ namespace Cantrip.Runtime
         /// </summary>
         public RandomChooser(ulong seed) => _rng = new Rng(seed);
 
-        /// <summary>Shuffles the options and takes a count somewhere between the request's bounds — so it varies how many it picks, not only which.</summary>
+        /// <summary>Shuffles the options and takes a count somewhere between the request's bounds. It varies how many it picks, not only which.</summary>
         public IReadOnlyList<Entity> Choose(ChoiceRequest request, GameState state)
         {
             var options = request.Options.ToList();

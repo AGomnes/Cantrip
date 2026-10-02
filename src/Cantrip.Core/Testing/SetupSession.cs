@@ -89,7 +89,7 @@ namespace Cantrip.Testing
 
             // `grant` is not here. It used to be a verb only a test had; it is a rule verb now, and
             // `grant Cleave` with nothing after it means the same thing to the rules as it meant
-            // here — the ability goes to whoever is running the line, which in a test's setup is
+            // here: the ability goes to whoever is running the line, which in a test's setup is
             // the leader. One word, one meaning, and one fewer thing for a test to shadow.
         };
 
@@ -149,10 +149,10 @@ namespace Cantrip.Testing
 
         /// <summary>
         /// <c>hero Crusader</c>, <c>hero Vestal hp 20</c>: adds a party member from a <c>hero</c>
-        /// declaration, with its abilities. Binds <c>hero1</c>, <c>hero2</c>… and <c>hero</c> for
-        /// the first — and the member's own name, so <c>expect Vestal.hp == 28</c> reads the live
-        /// hero rather than the printed stat on its definition, which is what a bare content name
-        /// otherwise means.
+        /// declaration, with its abilities. Binds <c>hero1</c>, <c>hero2</c> and so on, and
+        /// <c>hero</c> for the first. It also binds the member's own name, so <c>expect Vestal.hp == 28</c>
+        /// reads the live hero rather than the printed stat on its definition, which is what a bare
+        /// content name otherwise means.
         /// </summary>
         private void Hero(VerbCall call)
         {

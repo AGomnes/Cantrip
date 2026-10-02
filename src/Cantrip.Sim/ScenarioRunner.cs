@@ -219,8 +219,8 @@ namespace Cantrip.Sim
         /// <summary>
         /// Reads each <c>expect</c> line and answers it from the runs of every bot. <c>stalls</c>
         /// and <c>errors</c> are facts about the content and are checked. <c>wins</c>,
-        /// <c>hp_left</c> and <c>turns</c> are levels, which are facts about the bot — two bots
-        /// reach two numbers on the same content — so they are reported unchecked rather than
+        /// <c>hp_left</c> and <c>turns</c> are levels, which are facts about the bot (two bots
+        /// reach two numbers on the same content), so they are reported unchecked rather than
         /// answered with a number nobody should quote.
         /// </summary>
         private static IEnumerable<ExpectResult> Measure(ScenarioDefinition scenario, ScenarioOutcome result)

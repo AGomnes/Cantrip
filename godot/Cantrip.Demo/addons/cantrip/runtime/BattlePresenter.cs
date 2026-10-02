@@ -127,7 +127,7 @@ namespace Cantrip.GodotAdapter
         /// <remarks>
         /// One line, because it used to be all thirteen keys written out a second time. The runtime
         /// node always installs <see cref="VariantMap.Event"/> as the <see cref="Formatter"/>, so
-        /// the copy only ran for a presenter used on its own — exactly where a key that had drifted
+        /// the copy only ran for a presenter used on its own: exactly where a key that had drifted
         /// apart from the real one would go unnoticed.
         /// </remarks>
         public static Godot.Collections.Dictionary DefaultFormat(EventRecord record) => VariantMap.Event(record);

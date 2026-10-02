@@ -230,7 +230,7 @@ namespace Cantrip.Descriptions
             // printed reach is its own rule and not a channel, so it is described on the card.
             ["range.melee"] = "Melee.",
             ["range.at_most"] = "Range {amount}.",
-            ["range.span"] = "Range {low}–{high}.",
+            ["range.span"] = "Range {low}-{high}.",
             ["target.rule"] = "Targets {who}{where}.",
             ["target.where"] = " {where}",
             ["target.and"] = "{first}, {second}",

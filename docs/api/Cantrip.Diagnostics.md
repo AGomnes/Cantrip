@@ -34,11 +34,11 @@ Builds a message a tool can report. Games rarely call this; the one that does is
 
 **Parameters.**
 
-- `severity` — Whether this stops content loading. See `DiagnosticSeverity`.
-- `code` — A stable `CT` code, so the message can be suppressed by code.
-- `message` — One sentence, in the voice the rest of the tool speaks in.
-- `span` — Where in the content. `SourceSpan.None` when there is no line to point at.
-- `suggestion` — A single closest spelling, or null. It is the word alone, not a sentence.
+- `severity`: Whether this stops content loading. See `DiagnosticSeverity`.
+- `code`: A stable `CT` code, so the message can be suppressed by code.
+- `message`: One sentence, in the voice the rest of the tool speaks in.
+- `span`: Where in the content. `SourceSpan.None` when there is no line to point at.
+- `suggestion`: A single closest spelling, or null. It is the word alone, not a sentence.
 
 ### Properties
 
@@ -54,7 +54,7 @@ The codes are not a fixed width. Loading and parsing use four digits (`CT0001` t
 public string Message { get; }
 ```
 
-The sentence to show, without the location or the code in front of it — `Diagnostic.ToString` is what assembles the whole line.
+The sentence to show, without the location or the code in front of it. `Diagnostic.ToString` is what assembles the whole line.
 
 ```csharp
 public DiagnosticSeverity Severity { get; }
@@ -130,7 +130,7 @@ Appends one already-built diagnostic. Nothing is deduplicated, so the same findi
 public void AddRange(IEnumerable<Diagnostic> diagnostics)
 ```
 
-Appends a whole run of diagnostics, keeping their order — how a linter's findings join a loader's.
+Appends a whole run of diagnostics, keeping their order: how a linter's findings join a loader's.
 
 ```csharp
 public void Error(string code, string message, SourceSpan span, string? suggestion = null)
@@ -181,7 +181,7 @@ How much a diagnostic matters. Only `DiagnosticSeverity.Error` stops content loa
 | Member | |
 |---|---|
 | `Info = 0` | Worth knowing, never wrong. The linter uses it for things that are legal and probably not what was meant. |
-| `Warning = 1` | The content loads and runs, but something in it does less than it looks like it does — a clause that is accepted and ignored, a modifier that can never match. Most of what the linter finds is here, and it is the severity worth failing a content build on. |
+| `Warning = 1` | The content loads and runs, but something in it does less than it looks like it does: a clause that is accepted and ignored, a modifier that can never match. Most of what the linter finds is here, and it is the severity worth failing a content build on. |
 | `Error = 2` | The content cannot be used as written. `DiagnosticBag.ThrowIfErrors` throws on these and nothing else. |
 
 ---
@@ -236,10 +236,10 @@ A location in a source file. Nothing is validated: a span the caller got wrong p
 
 **Parameters.**
 
-- `file` — The file, or null for none — which becomes the empty string and reads as `SourceSpan.None`.
-- `line` — 1-based. Zero with no file is `SourceSpan.None`.
-- `column` — 1-based.
-- `length` — How many characters, on that line alone.
+- `file`: The file, or null for none. Null becomes the empty string and reads as `SourceSpan.None`.
+- `line`: 1-based. Zero with no file is `SourceSpan.None`.
+- `column`: 1-based.
+- `length`: How many characters, on that line alone.
 
 ### Fields and constants
 
@@ -273,7 +273,7 @@ Whether there is a place to point at. Worth asking before jumping to a diagnosti
 public int Length { get; }
 ```
 
-How many characters the span covers, on `SourceSpan.Line` alone — a span never crosses a line break, so an editor can underline it without looking at what follows.
+How many characters the span covers, on `SourceSpan.Line` alone. A span never crosses a line break, so an editor can underline it without looking at what follows.
 
 ```csharp
 public int Line { get; }
@@ -299,7 +299,7 @@ The boxing form of `SourceSpan.Equals(SourceSpan)`.
 public override int GetHashCode()
 ```
 
-Hashes all four fields, so a span works as a dictionary key — which is how a tool groups diagnostics by location.
+Hashes all four fields, so a span works as a dictionary key, which is how a tool groups diagnostics by location.
 
 ```csharp
 public SourceSpan To(SourceSpan other)

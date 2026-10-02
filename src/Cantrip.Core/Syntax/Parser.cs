@@ -23,7 +23,7 @@ namespace Cantrip.Syntax
         /// <remarks>
         /// This is grammar, not meaning: the parser still attaches none to any of them, and which
         /// verb reads which is <see cref="Runtime.BuiltinClauses"/>'s business. Four of these words
-        /// — <c>at</c>, <c>over</c>, <c>against</c> and <c>using</c> — are read by no built-in verb
+        /// (<c>at</c>, <c>over</c>, <c>against</c> and <c>using</c>) are read by no built-in verb
         /// and stay that way. They are here so that a verb a game registers in C# can read them, and
         /// so that a built-in verb handed one can name the word that works instead.
         /// </remarks>

@@ -34,8 +34,8 @@ namespace Cantrip.Testing
 
         /// <summary>
         /// Whether every <c>expect</c> in the test held. False also covers a test that never reached its
-        /// expectations — a runtime error, or content the runner could not set up — so a failure is not
-        /// necessarily a failed assertion.
+        /// expectations, through a runtime error or content the runner could not set up, so a failure is
+        /// not necessarily a failed assertion.
         /// </summary>
         public bool Passed { get; }
 
@@ -114,14 +114,14 @@ namespace Cantrip.Testing
         /// creates one with 80 hp and 3 energy. The test verbs are registered afterwards, so they win
         /// over a verb of the same name. <c>play</c> is the exception, because it is a rule verb too:
         /// the test's wins only for the <c>play</c> statements in the test's own body, and every other
-        /// one goes to whatever was registered before — the rules', or the game's. An exception from
+        /// one goes to whatever was registered before: the rules', or the game's. An exception from
         /// this fails that test.
         /// </summary>
         public Action<CardRuntime>? ConfigureRuntime { get; set; }
 
         /// <summary>
-        /// Runs every test in the library, in the order they were loaded, and returns a result for each
-        /// — nothing stops at the first failure.
+        /// Runs every test in the library, in the order they were loaded, and returns a result for
+        /// each. Nothing stops at the first failure.
         /// </summary>
         /// <param name="nameFilter">
         /// Keeps only the tests whose name contains this, ignoring case. It is a substring match and not
@@ -140,8 +140,8 @@ namespace Cantrip.Testing
         /// is why the order they run in cannot matter.
         /// </summary>
         /// <remarks>
-        /// It does not throw. Anything that goes wrong — content that will not load into a runtime, a
-        /// runtime error mid-test, a choice the test did not answer — comes back as a result with
+        /// It does not throw. Anything that goes wrong (content that will not load into a runtime, a
+        /// runtime error mid-test, a choice the test did not answer) comes back as a result with
         /// <see cref="DslTestResult.Passed"/> false and the reason in
         /// <see cref="DslTestResult.Failure"/>.
         /// </remarks>
@@ -286,8 +286,8 @@ namespace Cantrip.Testing
 
                 // `play` is a rule verb as well as a test verb, and one word cannot mean two things
                 // by accident. It is decided lexically: the `play` statements in this test's own body
-                // are the test's, and a `play` written anywhere else — in a card's effect, or in a
-                // content verb this test calls — is the rules', even while the test is what set it
+                // are the test's, and a `play` written anywhere else (in a card's effect, or in a
+                // content verb this test calls) is the rules', even while the test is what set it
                 // going. A content verb takes its context from its caller, so no check made while the
                 // verb runs could get that right.
                 var own = new OwnPlays();

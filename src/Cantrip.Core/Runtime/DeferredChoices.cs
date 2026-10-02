@@ -121,8 +121,8 @@ namespace Cantrip.Runtime
     /// an exact snapshot, the replay is deterministic.
     /// </summary>
     /// <remarks>
-    /// Outside an action the runtime can roll back — setup calls, or a choice raised while nothing
-    /// is being attempted — it behaves like <see cref="FirstOptionChooser"/> rather than throwing
+    /// Outside an action the runtime can roll back, which means a setup call or a choice raised
+    /// while nothing is being attempted, it behaves like <see cref="FirstOptionChooser"/> rather than throwing
     /// at game code that has nothing to answer with.
     /// </remarks>
     public sealed class DeferredChooser : IChoiceProvider

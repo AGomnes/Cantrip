@@ -45,8 +45,8 @@ namespace Cantrip.Runtime
         public string Name { get; internal set; }
 
         /// <summary>
-        /// What the engine treats this as, fixed when it was made — except by <c>transform</c>, which
-        /// replaces what an entity is while keeping who it is.
+        /// What the engine treats this as, fixed when it was made (except by <c>transform</c>, which
+        /// replaces what an entity is while keeping who it is).
         /// </summary>
         public EntityKind Kind { get; }
 
@@ -115,8 +115,8 @@ namespace Cantrip.Runtime
         }
 
         /// <summary>
-        /// Slot along the facing axis, counting from 0. On a <c>facing</c> board rank 0 is the front
-        /// — nearest the other side — and a rank never means the same place on both sides.
+        /// Slot along the facing axis, counting from 0. On a <c>facing</c> board rank 0 is the
+        /// front (nearest the other side), and a rank never means the same place on both sides.
         /// </summary>
         public int Rank
         {
@@ -242,9 +242,9 @@ namespace Cantrip.Runtime
         public bool HasTag(string tag) => _tags.Contains(tag);
 
         /// <summary>
-        /// Adds a tag, lower-cased, and tells the state — which matters, because modifier scopes and the
-        /// stat cache are keyed on tags and one added behind their back would leave stale numbers in
-        /// play. Adding a tag that is already there does nothing.
+        /// Adds a tag, lower-cased, and tells the state. Telling the state matters, because modifier
+        /// scopes and the stat cache are keyed on tags and one added behind their back would leave
+        /// stale numbers in play. Adding a tag that is already there does nothing.
         /// </summary>
         public void AddTag(string tag)
         {
@@ -264,7 +264,7 @@ namespace Cantrip.Runtime
 
         /// <summary>
         /// The stats this entity actually has a stored value for. A stat that has never been written is
-        /// not here even though reading it gives 0 — an ability that has never been used has no
+        /// not here even though reading it gives 0: an ability that has never been used has no
         /// <c>ready_at</c>, which is why "absent" has to read as ready rather than as zero left.
         /// </summary>
         public IEnumerable<string> StatNames => _base.Keys;

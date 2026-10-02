@@ -87,13 +87,13 @@ Error: a named clause a built-in verb does not read, such as `block 8 for 2 turn
 public const string ContentWhereSomethingInPlayIsMeant = "CT320"
 ```
 
-Error: a verb that acts on something already in the game, handed the name of a definition instead — `copy Strike`, `transform Strike into Wound` — or `create` given a status or ability, which belong to whoever has them rather than to a zone. Each of these is a runtime error too.
+Error: a verb that acts on something already in the game, handed the name of a definition instead (`copy Strike`, `transform Strike into Wound`), or `create` given a status or ability, which belong to whoever has them rather than to a zone. Each of these is a runtime error too.
 
 ```csharp
 public const string EmitsBuiltinEvent = "CT322"
 ```
 
-Error: `emit` handed the name of a built-in event. Every listener of it would run while nothing had happened and no history counter had moved — the event forged and the record not.
+Error: `emit` handed the name of a built-in event. Every listener of it would run while nothing had happened and no history counter had moved: the event forged and the record not.
 
 ```csharp
 public const string EventCycle = "CT306"
@@ -147,7 +147,7 @@ Error: `position` assigned. It reads a rank and always will, but it names one ax
 public const string PlayerWhereAMemberIsMeant = "CT326"
 ```
 
-`player` written where a party member is meant. It is an error rather than a warning because the alternative is a party game whose every enemy move hits one hero forever, silently — and a silent wrong answer is the one class of change this project has a written policy against.
+`player` written where a party member is meant. It is an error rather than a warning because the alternative is a party game whose every enemy move hits one hero forever, silently. A silent wrong answer is the one class of change this project has a written policy against.
 
 ```csharp
 public const string PositionIsNowRank = "CT329"
@@ -159,7 +159,7 @@ Note: `position` read. It is the older name for `rank`, reads the same number an
 public const string ReachLimitsNothing = "CT332"
 ```
 
-Warning: a `range` that decides nothing — as wide as the widest board declared, written backwards, or `range 0` at an enemy, which on a facing board is a slot no enemy stands on. `range 1` is what melee is written as.
+Warning: a `range` that decides nothing: as wide as the widest board declared, written backwards, or `range 0` at an enemy, which on a facing board is a slot no enemy stands on. `range 1` is what melee is written as.
 
 ```csharp
 public const string ReachWithoutATarget = "CT331"
@@ -207,7 +207,7 @@ Warning: `stacks` read somewhere that is not a status, where it is a stat nothin
 public const string TagWrittenAsProperty = "CT316"
 ```
 
-Warning: a tag with behaviour of its own — `exhaust`, `retain`, `unplayable` and the rest — written on a line of its own instead of on the `tags` line, where it is a property nothing reads and the behaviour never happens.
+Warning: a tag with behaviour of its own (`exhaust`, `retain`, `unplayable` and the rest) written on a line of its own instead of on the `tags` line, where it is a property nothing reads and the behaviour never happens.
 
 ```csharp
 public const string TransformInsideUntil = "CT321"
@@ -239,19 +239,19 @@ Note: an event content emits that no content listens for. Harmless when the game
 public const string UnknownBlock = "CT313"
 ```
 
-Warning: a line in a declaration ending in `:` that is not `effect:`, a `move ...:` or a listener — `when card_played:`, or `once per battle` written before the `on`. It loads as a label and never runs. A block the game runs itself goes in `LintOptions.HostBlocks`.
+Warning: a line in a declaration ending in `:` that is not `effect:`, a `move ...:` or a listener. The shapes this catches are `when card_played:` and `once per battle` written before the `on`. Either loads as a label and never runs. A block the game runs itself goes in `LintOptions.HostBlocks`.
 
 ```csharp
 public const string UnknownEvent = "CT304"
 ```
 
-Warning: a listener on an event nothing raises — not built in, not emitted by content, and not `<stat>_changed` for a stat this content has. Events the game raises from C# go in `LintOptions.HostEvents`.
+Warning: a listener on an event nothing raises: not built in, not emitted by content, and not `<stat>_changed` for a stat this content has. Events the game raises from C# go in `LintOptions.HostEvents`.
 
 ```csharp
 public const string UnknownMeasurement = "CT319"
 ```
 
-Error: an `expect` a scenario cannot check. A scenario plays hundreds of games and measures them in aggregate, so a condition about one game — `expect enemy.hp == 3` — has nothing to read.
+Error: an `expect` a scenario cannot check. A scenario plays hundreds of games and measures them in aggregate, so a condition about one game (`expect enemy.hp == 3`) has nothing to read.
 
 ```csharp
 public const string UnknownMove = "CT312"
@@ -277,13 +277,13 @@ public const string UnknownTargetMode = "CT340"
 
 Error: a `target` line naming a word that is not one of `enemy`, `ally`, `self`, `any` or `none`.
 
-The set is closed — nothing a game registers adds to it — and the engine falls through to "nobody" for anything else, quietly. So `target freind` loaded, linted and tested clean, and the card it was written on stopped asking for a target and stopped checking the one it was handed: it would deal its damage to the party's own leader, or to anything else a caller passed, for the whole life of the game. It is an error rather than a warning for the same reason CT326 is: the alternative is a silent wrong answer.
+The set is closed (nothing a game registers adds to it) and the engine falls through to "nobody" for anything else, quietly. So `target freind` loaded, linted and tested clean, and the card it was written on stopped asking for a target and stopped checking the one it was handed: it would deal its damage to the party's own leader, or to anything else a caller passed, for the whole life of the game. It is an error rather than a warning for the same reason CT326 is: the alternative is a silent wrong answer.
 
 ```csharp
 public const string UnknownVerb = "CT301"
 ```
 
-Error: an unknown verb, or one written in the wrong kind of block — a test verb such as `cast` outside a test, `play` inside a scenario. A verb the game registers from C# looks unknown too until it is named in `LintOptions.HostVerbs`.
+Error: an unknown verb, or one written in the wrong kind of block: a test verb such as `cast` outside a test, `play` inside a scenario. A verb the game registers from C# looks unknown too until it is named in `LintOptions.HostVerbs`.
 
 ```csharp
 public const string UnusedTarget = "CT309"
@@ -301,7 +301,7 @@ Note: a verb declared in content that nothing calls.
 public const string WrongClock = "CT325"
 ```
 
-Error: a length in units this game's clock cannot measure — `for 3s` under `clock turns`, or `2 turns` under `clock ticks`. Only content that states its clock is checked. See `Linter.TurnMachineryWithoutTurns` for the declarations, as opposed to the units.
+Error: a length in units this game's clock cannot measure: `for 3s` under `clock turns`, or `2 turns` under `clock ticks`. Only content that states its clock is checked. See `Linter.TurnMachineryWithoutTurns` for the declarations, as opposed to the units.
 
 ### Methods
 

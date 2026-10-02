@@ -10,7 +10,7 @@ namespace Cantrip.Sim
     /// from that run's seed, so the same command plays the same runs on any machine.
     /// </summary>
     /// <remarks>
-    /// All of them weigh a position the same way — the player's hp against the enemies' — so they
+    /// All of them weigh a position the same way (the player's hp against the enemies'), so they
     /// are wrong in the same direction about a card that draws, and about anything that pays off
     /// several turns later. Two of them agreeing is therefore not evidence that either is right.
     /// </remarks>

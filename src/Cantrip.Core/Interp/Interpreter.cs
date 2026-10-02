@@ -24,8 +24,8 @@ namespace Cantrip.Runtime
         }
 
         /// <summary>
-        /// The interpreter running this verb, which is where a C# verb reaches the primitives —
-        /// <c>ChangeStat</c>, <see cref="Interpreter.Heal"/>, <see cref="Interpreter.Raise"/> — that do
+        /// The interpreter running this verb, which is where a C# verb reaches the primitives
+        /// (<c>ChangeStat</c>, <see cref="Interpreter.Heal"/>, <see cref="Interpreter.Raise"/>) that do
         /// the same bookkeeping content's own verbs do.
         /// </summary>
         public Interpreter Interpreter { get; }
@@ -59,7 +59,7 @@ namespace Cantrip.Runtime
 
         /// <summary>
         /// Evaluates a positional argument, or <see cref="Value.None"/> when it was not written.
-        /// Arguments are evaluated on demand, so reading one twice runs it twice — including any roll in it.
+        /// Arguments are evaluated on demand, so reading one twice runs it twice, including any roll in it.
         /// </summary>
         public Value Argument(int index)
         {
@@ -84,7 +84,7 @@ namespace Cantrip.Runtime
         /// </summary>
         /// <remarks>
         /// A bare percentage means nothing to any of them, and the unit used to be dropped: <c>apply
-        /// Slow 40%</c> applied forty stacks, and the card's generated text said "Apply 40% Slow" —
+        /// Slow 40%</c> applied forty stacks, and the card's generated text said "Apply 40% Slow",
         /// a percentage stated to the player that the engine does not implement. A percentage that
         /// is part of a sum is already a fraction by the time it arrives (<c>target.max_hp * 50%</c>
         /// is a number with no unit), so only one written on its own is refused.
@@ -166,7 +166,7 @@ namespace Cantrip.Runtime
         private int _callDepth;
 
         /// <summary>
-        /// Builds the interpreter for a game and installs itself as the state's modifier evaluator — so
+        /// Builds the interpreter for a game and installs itself as the state's modifier evaluator, so
         /// a state without one computes every value unmodified. <c>CardRuntime</c> does this; a game
         /// builds one directly only when it drives the rules itself.
         /// </summary>
@@ -228,7 +228,7 @@ namespace Cantrip.Runtime
         internal bool TryGetVerb(string name, out VerbHandler handler) => _verbs.TryGetValue(name, out handler!);
 
         /// <summary>
-        /// Registers a verb the runtime layer owns — <c>play</c>, <c>replay</c>, <c>use</c> — as one
+        /// Registers a verb the runtime layer owns (<c>play</c>, <c>replay</c>, <c>use</c>) as one
         /// of the built-in ones, so that its clauses are checked like any other built-in verb's and
         /// a game that registers its own over the top is left alone.
         /// </summary>
@@ -312,7 +312,7 @@ namespace Cantrip.Runtime
 
         /// <summary>
         /// Runs a block of statements. It is how a game runs a block of its own that it read out of
-        /// <c>EntityDefinition.Blocks</c> — and such a block has to be named in
+        /// <c>EntityDefinition.Blocks</c>. Such a block has to be named in
         /// <c>LintOptions.HostBlocks</c>, or the linter reports it as a line that never runs (CT313).
         /// </summary>
         /// <remarks>

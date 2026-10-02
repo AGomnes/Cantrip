@@ -61,8 +61,8 @@ namespace Cantrip.GodotAdapter
         /// <summary>
         /// Where <c>.cantrip</c> files are discovered, as a <c>res://</c> path. Left empty, which is
         /// the default, the project setting <c>cantrip/content/folder</c> is read, and
-        /// <c>res://content</c> when that is not set either — so the editor dock and the running
-        /// game read one folder rather than two that can disagree without either saying so.
+        /// <c>res://content</c> when that is not set either. The editor dock and the running game
+        /// then read one folder rather than two that can disagree without either saying so.
         /// </summary>
         [Export]
         public string ContentFolder { get; set; } = string.Empty;
@@ -127,9 +127,9 @@ namespace Cantrip.GodotAdapter
 
         /// <summary>
         /// One resolved event, as a dictionary with snake_case keys. It arrives <em>after</em> the whole
-        /// action has finished, never during it, so a handler may call back into the node — and
-        /// <c>after</c> carries the stats as they were at that event, which is what an animation should
-        /// show rather than the live values.
+        /// action has finished, never during it, so a handler may call back into the node. The
+        /// dictionary's <c>after</c> carries the stats as they were at that event, which is what an
+        /// animation should show rather than the live values.
         /// </summary>
         [Signal]
         public delegate void EffectEventEventHandler(Godot.Collections.Dictionary effect_event);
@@ -139,9 +139,9 @@ namespace Cantrip.GodotAdapter
         public delegate void BattleStartedEventHandler();
 
         /// <summary>
-        /// The battle is over, and the action that ended it has finished. It is safe to act from here —
-        /// hand out a reward, start the next battle — and the next battle will announce its own end when
-        /// it comes.
+        /// The battle is over, and the action that ended it has finished. It is safe to act from
+        /// here (hand out a reward, start the next battle), and the next battle will announce its
+        /// own end when it comes.
         /// </summary>
         [Signal]
         public delegate void BattleEndedEventHandler(bool won);
@@ -170,7 +170,7 @@ namespace Cantrip.GodotAdapter
 
         /// <summary>
         /// Puts a <see cref="Driver"/> on this node's tick rate and, when <see cref="AutoLoad"/> is on,
-        /// loads the content — reporting any problems to the Output panel, since nothing receives what
+        /// loads the content, reporting any problems to the Output panel, since nothing receives what
         /// an automatic load returns.
         /// </summary>
         public override void _Ready()
@@ -264,7 +264,7 @@ namespace Cantrip.GodotAdapter
         /// <remarks>
         /// The defaults are C# defaults, and GDScript does not see them: a script has to pass all three.
         /// A leader that needs a stat of its own, such as <c>speed</c> under <c>order: speed</c>, gets it
-        /// afterwards from <c>SetStat</c> — there is no fourth argument and no declaration this reads.
+        /// afterwards from <c>SetStat</c>. There is no fourth argument and no declaration this reads.
         /// </remarks>
         public int CreatePlayer(string name = "Player", int hp = 80, int max_energy = 3)
         {
@@ -358,9 +358,9 @@ namespace Cantrip.GodotAdapter
         /// target is unknown or no status of that name is loaded.
         /// </summary>
         /// <remarks>
-        /// Both failures answer 0. They used to differ — an unknown target gave 0 and an unknown
-        /// name threw, which from GDScript is null — so a caller checking for 0, as this method's
-        /// own documentation says to, was right only half the time.
+        /// Both failures answer 0. They used to differ: an unknown target gave 0 and an unknown
+        /// name threw, which from GDScript is null. A caller checking for 0, as this method's own
+        /// documentation says to, was right only half the time.
         /// </remarks>
         public int ApplyStatus(string status, int target_id, int stacks = 1)
         {
@@ -508,9 +508,9 @@ namespace Cantrip.GodotAdapter
         /// A method of its own rather than a third parameter on <see cref="Play"/>, for the reason
         /// <c>docs/godot.md</c> states at the top: a C# default argument is not a default in
         /// GDScript, so every parameter has to be passed. Adding one to <see cref="Play"/> would
-        /// have broken every <c>rules.Play(card, target)</c> written against a preview — and
-        /// <see cref="Play"/> is not ambiguous for a party the way <c>GetHand</c> was, because a
-        /// card played with nobody named is played by whoever owns it, which is a definite answer.
+        /// have broken every <c>rules.Play(card, target)</c> written against a preview.
+        /// <see cref="Play"/> is also not ambiguous for a party the way <c>GetHand</c> was, because
+        /// a card played with nobody named is played by whoever owns it, which is a definite answer.
         /// It is the same reasoning that gave <see cref="Pass"/> its own name beside
         /// <see cref="EndTurn"/>.
         /// </remarks>
@@ -651,7 +651,7 @@ namespace Cantrip.GodotAdapter
         public Godot.Collections.Array GetEnemies() => VariantMap.Ids(EnsureRuntime().State.Actors(Team.Enemy));
 
         /// <summary>
-        /// Everyone on the player's side, as ids — which includes summoned minions that take no step.
+        /// Everyone on the player's side, as ids, including summoned minions that take no step.
         /// <c>GetParty</c> is the narrower list of who the game asks for input.
         /// </summary>
         public Godot.Collections.Array GetAllies() => VariantMap.Ids(EnsureRuntime().State.Actors(Team.Player));
@@ -671,13 +671,13 @@ namespace Cantrip.GodotAdapter
         /// for input. A game that declares no <c>hero</c> gets one id, <see cref="PlayerId"/>.
         /// </summary>
         /// <remarks>
-        /// Not the same as <see cref="GetAllies"/>, which is everyone on the side — a summoned
+        /// Not the same as <see cref="GetAllies"/>, which is everyone on the side: a summoned
         /// minion is an ally and takes no step.
         /// </remarks>
         public Godot.Collections.Array GetParty() => VariantMap.Ids(EnsureRuntime().Party);
 
         /// <summary>
-        /// The party's dead, in the order they fell — what <see cref="GetParty"/> and
+        /// The party's dead, in the order they fell. These are what <see cref="GetParty"/> and
         /// <see cref="GetAllies"/> leave out, and what content calls <c>fallen</c>. Pair it with
         /// <see cref="Revive"/> for the shrine that offers to raise one.
         /// </summary>
@@ -695,7 +695,7 @@ namespace Cantrip.GodotAdapter
         /// <remarks>
         /// Under <c>turns: initiative</c> it is binding and a game drives its turn off it. Under
         /// <c>turns: sides</c> the party shares one turn and may act in any order, so this is the
-        /// one the engine would offer next — a suggestion for a UI to highlight. The rule is
+        /// one the engine would offer next, a suggestion for a UI to highlight. The rule is
         /// <see cref="CanAct"/>, which is true of every waiting member there.
         /// </remarks>
         public int ActiveMemberId() => EnsureRuntime().ActiveMember?.Id ?? VariantMap.NoEntity;
@@ -761,8 +761,8 @@ namespace Cantrip.GodotAdapter
         /// <remarks>
         /// Content reads this as <c>Warden.Fervour</c> and C# as <c>entity.CounterOf("Fervour")</c>.
         /// There was no third spelling, so a status bar walked the whole
-        /// <c>GetEntity(id)["statuses"]</c> dictionary — every stat, every tag and every status
-        /// built to answer one number — once per member per frame, and
+        /// <c>GetEntity(id)["statuses"]</c> dictionary (every stat, every tag and every status
+        /// built to answer one number) once per member per frame, and
         /// <c>GetStat(warden, "Fervour")</c>, which is what the DSL's own vocabulary suggests,
         /// answered 0 without saying why.
         /// </remarks>
@@ -779,7 +779,7 @@ namespace Cantrip.GodotAdapter
         /// </summary>
         /// <remarks>
         /// This is how a leader gets a <c>speed</c> under <c>order: speed</c>, where an actor with
-        /// none reads 0 and takes its step last — and the leader's step is when the party's hand is
+        /// none reads 0 and takes its step last, and the leader's step is when the party's hand is
         /// drawn. Before it, the only way was to build a statement and call <c>Execute</c>.
         /// </remarks>
         public int SetStat(int entity_id, string stat, int value)
@@ -800,7 +800,7 @@ namespace Cantrip.GodotAdapter
         }
 
         /// <summary>
-        /// What this card costs to play right now, after modifiers — not its printed number. 0 for an id
+        /// What this card costs to play right now, after modifiers, not its printed number. 0 for an id
         /// that names nothing, and 0 for a card that really is free, which is the same answer for two
         /// different things.
         /// </summary>
@@ -835,7 +835,7 @@ namespace Cantrip.GodotAdapter
         }
 
         /// <summary>
-        /// The entities that card or ability may be aimed at, after its own <c>target … where</c>
+        /// The entities that card or ability may be aimed at, after its own <c>target ... where</c>
         /// filter and content's <c>targetable</c> rules, so a UI highlights exactly what <c>Play</c>
         /// and <c>UseAbility</c> accept.
         /// </summary>
@@ -887,8 +887,8 @@ namespace Cantrip.GodotAdapter
         /// regard to case, as <see cref="GetDefinitions"/> matches the kind.
         /// </summary>
         /// <remarks>
-        /// The kind here is the keyword that declares the definition in content — "card", "relic",
-        /// "enemy" — and not the <c>kind</c> an entity's dictionary carries, which says what it is
+        /// The kind here is the keyword that declares the definition in content ("card", "relic",
+        /// "enemy"), and not the <c>kind</c> an entity's dictionary carries, which says what it is
         /// in the rules: the Slime spawned from <c>enemy Slime</c> reads back as an "actor". It
         /// reads the content alone, so it does not bring the rules into being.
         /// </remarks>
@@ -926,7 +926,7 @@ namespace Cantrip.GodotAdapter
         public bool IsInBattle() => EnsureRuntime().State.InBattle;
 
         /// <summary>
-        /// The turn within the current battle, counting from 1. It is 0 between battles — and 0 for the
+        /// The turn within the current battle, counting from 1. It is 0 between battles, and 0 for the
         /// whole of a real-time battle, which has no turns at all.
         /// </summary>
         public int GetTurn() => EnsureRuntime().State.Turn;
@@ -1210,7 +1210,7 @@ namespace Cantrip.GodotAdapter
 
             // The rules refuse this one too, and the refusal would arrive as "content_changed",
             // which is a lie: nothing about the content changed. What changed is the rate the clock
-            // counts at, and a game may want to say so — or put the exported rate back.
+            // counts at, and a game may want to say so, or put the exported rate back.
             int rate = core.State.Clock.UnitsPerSecond;
             if (snapshot.ClockUnitsPerSecond != 0 && snapshot.ClockUnitsPerSecond != rate)
             {
@@ -1358,9 +1358,9 @@ namespace Cantrip.GodotAdapter
 
                 SyncChoice();
 
-                // Written down before the signal goes out, not after. A handler that acts — which
+                // Written down before the signal goes out, not after. A handler that acts (which
                 // is the first thing anybody writes here, since the battle is over and the reward
-                // is due — comes back through this method, and with the old value still standing it
+                // is due) comes back through this method, and with the old value still standing it
                 // saw the same end-of-battle transition again and told the game again, for ever,
                 // until the stack died. Recording the transition the moment it is noticed is what
                 // makes it tell exactly once. It is not a flag held across the emit, because a

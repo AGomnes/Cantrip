@@ -16,8 +16,8 @@ namespace Cantrip.GodotAdapter
     /// on its own. This turns Variants into those calls and their answers back into Variants.
     /// </para>
     /// <para>
-    /// Nothing is pushed except one greeting. Godot's debugger channel is capped — a live 4.6.1 run
-    /// reports 2048 queued messages and 32768 characters a second — so the editor pulls batches at
+    /// Nothing is pushed except one greeting. Godot's debugger channel is capped (a live 4.6.1 run
+    /// reports 2048 queued messages and 32768 characters a second), so the editor pulls batches at
     /// its own pace, and a game that is busy cannot flood it or be slowed by it.
     /// </para>
     /// </remarks>

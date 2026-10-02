@@ -64,7 +64,7 @@ namespace Cantrip.Runtime
         public SourceSpan Span { get; }
 
         /// <summary>
-        /// The numbers behind the step — the amount, the before and after, whatever the site recorded —
+        /// The numbers behind the step (the amount, the before and after, whatever the site recorded),
         /// so a tool can show a breakdown instead of parsing <see cref="Description"/>. Empty rather
         /// than null when there are none.
         /// </summary>
@@ -125,7 +125,7 @@ namespace Cantrip.Runtime
         public long? CurrentParent => _scope.Count > 0 ? _scope.Peek() : (long?)null;
 
         /// <summary>
-        /// Records one step and returns its id, or 0 when the log is disabled — and 0 is never a real
+        /// Records one step and returns its id, or 0 when the log is disabled. Zero is never a real
         /// id, so it can be passed to <see cref="Scope"/> without checking.
         /// </summary>
         /// <param name="time">The clock time the step happened at.</param>
@@ -135,7 +135,7 @@ namespace Cantrip.Runtime
         /// <param name="listener">The listener that ran, when this step is a trigger.</param>
         /// <param name="span">The line of content behind it.</param>
         /// <param name="values">The numbers behind it, for a tool that would rather not parse the description.</param>
-        /// <param name="parentOverride">Attaches this to a parent other than the open scope — how work queued earlier is recorded under what queued it.</param>
+        /// <param name="parentOverride">Attaches this to a parent other than the open scope: how work queued earlier is recorded under what queued it.</param>
         public long Record(
             long time,
             string kind,
@@ -215,7 +215,7 @@ namespace Cantrip.Runtime
         }
 
         /// <summary>
-        /// The steps one entry caused, oldest first — one level, not the whole subtree. It scans the
+        /// The steps one entry caused, oldest first: one level, not the whole subtree. It scans the
         /// whole log per call, so building a tree from it is quadratic; <see cref="FormatTree"/> does it
         /// in one pass.
         /// </summary>

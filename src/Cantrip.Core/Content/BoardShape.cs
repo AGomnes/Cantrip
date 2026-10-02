@@ -184,7 +184,7 @@ namespace Cantrip.Content
 
         /// <summary>
         /// Whether a rank on this board holds one actor at most, which is true of a board one lane
-        /// wide — today's board, and so worth saying out loud when content writes <c>rank(who)</c>
+        /// wide (today's board), and so worth saying out loud when content writes <c>rank(who)</c>
         /// on it and gets a group of one.
         /// </summary>
         public bool RankHoldsOne => Lanes == 1;
@@ -270,7 +270,7 @@ namespace Cantrip.Content
                             case "gap": onVacated = OnVacated.Gap; break;
                             case "close_ranks": onVacated = OnVacated.CloseRanks; break;
                             default:
-                                Bad($"`on_vacated` in board \"{definition.Name}\" is `gap` — the default, where survivors never move — or `close_ranks`.", property.Span);
+                                Bad($"`on_vacated` in board \"{definition.Name}\" is either `gap`, the default, where survivors never move, or `close_ranks`.", property.Span);
                                 break;
                         }
                         break;

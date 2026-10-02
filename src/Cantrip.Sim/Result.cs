@@ -186,9 +186,9 @@ namespace Cantrip.Sim
 
         /// <summary>
         /// What the engine raised over this bot's runs: damage by what dealt it and by tag,
-        /// healing, block, moves, statuses and cards. The amounts are the content's — they are the
-        /// engine's own, and another bot making the same plays would reach the same ones — but
-        /// which plays were made is this bot's, which is why there is one meter per bot.
+        /// healing, block, moves, statuses and cards. The amounts are the content's: they are the
+        /// engine's own, and another bot making the same plays would reach the same ones. But which
+        /// plays were made is this bot's, which is why there is one meter per bot.
         /// </summary>
         public Meter Meter { get; internal set; } = new Meter();
 

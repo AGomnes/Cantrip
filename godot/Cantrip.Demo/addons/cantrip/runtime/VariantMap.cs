@@ -68,7 +68,7 @@ namespace Cantrip.GodotAdapter
 
         /// <summary>
         /// One entity as a dictionary: id, name, kind, team, zone, place, its tracked stats, its statuses
-        /// and its ability ids. The keys are a contract — a game reads them by name — so they do not
+        /// and its ability ids. The keys are a contract (a game reads them by name), so they do not
         /// change within 1.x.
         /// </summary>
         public static Godot.Collections.Dictionary Entity(EntityView view)
@@ -173,7 +173,7 @@ namespace Cantrip.GodotAdapter
         }
 
         /// <summary>
-        /// One run of a description: its text, whether it is a value, and — when it is — the printed
+        /// One run of a description: its text, whether it is a value, and, for a value, the printed
         /// number beside the current one, so "~~6~~ 9" can be drawn.
         /// </summary>
         public static Godot.Collections.Dictionary Segment(SegmentView view)
@@ -287,8 +287,8 @@ namespace Cantrip.GodotAdapter
         /// </summary>
         /// <remarks>
         /// A warning and not a refusal: the core lets a game invent zones of its own, and that is
-        /// deliberate. But nothing catches a typo either — <c>AddCard("Guard", "hnd")</c> makes a
-        /// real card in a pile nothing will ever draw from — and a warning is the only thing that
+        /// deliberate. But nothing catches a typo either (<c>AddCard("Guard", "hnd")</c> makes a
+        /// real card in a pile nothing will ever draw from), and a warning is the only thing that
         /// tells the two apart without taking the ability away.
         /// </remarks>
         public static void WarnUnknownZone(string zone, string calledFrom)
@@ -325,8 +325,8 @@ namespace Cantrip.GodotAdapter
         /// </summary>
         /// <remarks>
         /// The request says <c>mode</c> rather than <c>kind</c> because <c>kind</c> already means
-        /// three other things inside this one dictionary — what an entity is, what keyword declared
-        /// an offered definition, and whether a segment is text or a value — and the vocabulary of
+        /// three other things inside this one dictionary (what an entity is, what keyword declared
+        /// an offered definition, and whether a segment is text or a value), and the vocabulary of
         /// <c>options[i]["kind"]</c> changes with it.
         /// </remarks>
         public static Godot.Collections.Dictionary Choice(

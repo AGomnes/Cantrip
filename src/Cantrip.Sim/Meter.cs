@@ -77,7 +77,7 @@ namespace Cantrip.Sim
     /// These are engine truth, not a judgement: every number is the sum of an <see cref="GameEvent.Amount"/>
     /// the engine itself set after the hit landed, which is hp actually lost, hp actually restored
     /// and block actually gained. What it cannot tell you is whether those are the plays anyone
-    /// would have made — that part belongs to whoever was playing.
+    /// would have made. That part belongs to whoever was playing.
     /// </para>
     /// <para>
     /// <see cref="Recording"/> is the whole correctness problem. A bot that looks ahead plays its
@@ -136,7 +136,7 @@ namespace Cantrip.Sim
 
         /// <summary>
         /// Hp everything but the player lost, by what dealt it: the card where a card was played,
-        /// and otherwise whatever was running — a status ticking, or the actor that swung.
+        /// and otherwise whatever was running (a status ticking, or the actor that swung).
         /// </summary>
         public IReadOnlyList<Tally> DamageDealt => Sorted(_dealt);
 
@@ -360,8 +360,8 @@ namespace Cantrip.Sim
 
         /// <summary>
         /// What the report calls the thing that dealt a hit: the card where a card was played, and
-        /// otherwise whatever was running — the status whose listener ticked, or the enemy that
-        /// swung. <c>damaged.Source</c> is the actor a hit belongs to and <c>damaged.Action</c> the
+        /// otherwise whatever was running (the status whose listener ticked, or the enemy that
+        /// swung). <c>damaged.Source</c> is the actor a hit belongs to and <c>damaged.Action</c> the
         /// card that caused it, and inside a status's listener the source is the status itself.
         /// </summary>
         private static string Dealer(GameEvent gameEvent) =>
@@ -396,7 +396,7 @@ namespace Cantrip.Sim
     /// <summary>
     /// What the meter says happened to each actor's hp in one run, against what the engine says its
     /// hp actually did. They have to agree: damage taken less healing is the hp an actor lost, and
-    /// both sides of that come from the engine — one from the amounts it put on its events, the
+    /// both sides of that come from the engine: one from the amounts it put on its events, the
     /// other from <c>Entity.GetInt("hp")</c>.
     /// </summary>
     /// <remarks>

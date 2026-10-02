@@ -25,7 +25,7 @@ namespace Cantrip.Runtime
 
     /// <summary>
     /// One tie-break in the order listeners run. The ruleset lists several, applied in turn, and an
-    /// id comparison settles whatever is left — so the order never depends on a dictionary and a
+    /// id comparison settles whatever is left: the order never depends on a dictionary and a
     /// replay always agrees.
     /// </summary>
     public enum ListenerOrdering
@@ -123,8 +123,8 @@ namespace Cantrip.Runtime
     /// <remarks>
     /// A battle has always ended the instant the board was empty, which is right for a fight the
     /// engine lays out once and wrong for every fight that arrives in waves. In a wave game the
-    /// board is empty every few seconds by design — the keepers clear one wave and the next is two
-    /// seconds away — so the first run of a survival mode ends at two seconds, having been won.
+    /// board is empty every few seconds by design: the keepers clear one wave and the next is two
+    /// seconds away. So the first run of a survival mode ends at two seconds, having been won.
     /// The only way to keep such a fight open was an enemy that is always there and can never be
     /// pointed at, propping the battle open while every count and every <c>deal to enemies</c> in
     /// the game had to remember it was there.
@@ -177,7 +177,7 @@ namespace Cantrip.Runtime
 
         /// <summary>
         /// Whether <c>before_</c> listeners run at all. Turning it off makes every one of them silently
-        /// dead, and with it every <c>cancel</c> — it is a performance switch for content that uses none.
+        /// dead, and with it every <c>cancel</c>. It is a performance switch for content that uses none.
         /// </summary>
         public bool BeforeEvents { get; set; } = true;
 
@@ -207,8 +207,8 @@ namespace Cantrip.Runtime
 
         /// <summary>
         /// The order a value passes through the modifier layers. The default is add, multiply, clamp,
-        /// override — so an override beats a clamp, and reordering these two changes which of a pair of
-        /// modifiers has the last word.
+        /// override. An override therefore beats a clamp, and reordering these two changes which of a
+        /// pair of modifiers has the last word.
         /// </summary>
         public IReadOnlyList<ModifierLayer> ModifierLayers { get; set; } =
             new[] { ModifierLayer.Add, ModifierLayer.Multiply, ModifierLayer.Clamp, ModifierLayer.Override };

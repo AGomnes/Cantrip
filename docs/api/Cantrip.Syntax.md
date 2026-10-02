@@ -989,7 +989,7 @@ public static IReadOnlyList<string> ClauseWords { get; }
 
 Words that introduce a named clause and therefore terminate the argument list. These are the only reserved words inside a command line.
 
-This is grammar, not meaning: the parser still attaches none to any of them, and which verb reads which is `BuiltinClauses`'s business. Four of these words — `at`, `over`, `against` and `using` — are read by no built-in verb and stay that way. They are here so that a verb a game registers in C# can read them, and so that a built-in verb handed one can name the word that works instead.
+This is grammar, not meaning: the parser still attaches none to any of them, and which verb reads which is `BuiltinClauses`'s business. Four of these words (`at`, `over`, `against` and `using`) are read by no built-in verb and stay that way. They are here so that a verb a game registers in C# can read them, and so that a built-in verb handed one can name the word that works instead.
 
 ### Methods
 

@@ -60,7 +60,7 @@ The flavour line. Never mixed into the rules text.
 public bool IsEmpty { get; }
 ```
 
-Whether there is anything to show. True for a definition with no effect, no listeners and no modifiers — a vanilla card — so a UI can leave the rules box out rather than draw an empty one.
+Whether there is anything to show. True for a definition with no effect, no listeners and no modifiers (a vanilla card), so a UI can leave the rules box out rather than draw an empty one.
 
 ```csharp
 public DescriptionLevel Level { get; }
@@ -90,7 +90,7 @@ One entry for every keyword or status the text relies on, flattened: a keyword t
 public IEnumerable<DescriptionSegment> Values { get; }
 ```
 
-Just the values, in order — the numbers a tooltip or a comparison view wants without the prose. Evaluated on each enumeration.
+Just the values, in order: the numbers a tooltip or a comparison view wants without the prose. Evaluated on each enumeration.
 
 ### Methods
 
@@ -144,8 +144,8 @@ A builder over a loaded library. It is reusable and holds no per-description sta
 
 **Parameters.**
 
-- `content` — The library whose definitions will be described.
-- `localizer` — Where names, rules text and phrases come from. Null uses `EnglishDescriptions.Instance`. The localizer is consulted on every build, so switching language means making a new builder rather than rebuilding the content.
+- `content`: The library whose definitions will be described.
+- `localizer`: Where names, rules text and phrases come from. Null uses `EnglishDescriptions.Instance`. The localizer is consulted on every build, so switching language means making a new builder rather than rebuilding the content.
 
 ### Fields and constants
 
@@ -195,11 +195,11 @@ Describes a single enemy move, which is what an intent panel shows: "Deal 11 dam
 
 **Parameters.**
 
-- `definition` — The enemy's definition, which is where the move is written.
-- `moveName` — The move to describe, by the name its header gives it.
-- `runtime` — The live game, for the numbers the move would deal now.
-- `enemy` — The enemy making it, whose own modifiers are part of those numbers.
-- `against` — Who the move is aimed at, for the numbers and for the line it prints. Null reads the leader, which is what it meant when a side had one member.
+- `definition`: The enemy's definition, which is where the move is written.
+- `moveName`: The move to describe, by the name its header gives it.
+- `runtime`: The live game, for the numbers the move would deal now.
+- `enemy`: The enemy making it, whose own modifiers are part of those numbers.
+- `against`: Who the move is aimed at, for the numbers and for the line it prints. Null reads the leader, which is what it meant when a side had one member.
 
 ```csharp
 public static string EffectHash(EntityDefinition definition)
@@ -281,7 +281,7 @@ Whether this value is tied to a named part of the effect, and can therefore be l
 public SegmentKind Kind { get; }
 ```
 
-Whether this run is words or a value. Note that a value is not always a number — see `DescriptionSegment.HasNumber`, which is false for symbolic ones such as `X`.
+Whether this run is words or a value. Note that a value is not always a number: see `DescriptionSegment.HasNumber`, which is false for symbolic ones such as `X`.
 
 ```csharp
 public bool LowerIsBetter { get; }

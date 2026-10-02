@@ -53,7 +53,7 @@ namespace Cantrip.Runtime
         /// <param name="fromReset">
         /// True when a <c>reset_on</c> rule is doing this, which puts <c>event.reset</c> on the
         /// <c>&lt;stat&gt;_changed</c> event. Content that wants to stop a reset can then say so
-        /// exactly, instead of inferring it from the value — "block became 0" is also true of an
+        /// exactly, instead of inferring it from the value: "block became 0" is also true of an
         /// effect that legitimately sets block to 0.
         /// </param>
         public Num ChangeStat(Entity entity, string stat, AssignOperator op, Num amount, EvalContext context, SourceSpan span = default, bool fromReset = false)
@@ -591,8 +591,8 @@ namespace Cantrip.Runtime
         /// <param name="context">The effect this is part of.</param>
         /// <param name="span">The line responsible, for traces and errors.</param>
         /// <returns>
-        /// The hp actually restored, which is 0 at full hp and 0 when a listener cancelled the heal —
-        /// the two are not distinguished here.
+        /// The hp actually restored, which is 0 at full hp and 0 when a listener cancelled the heal.
+        /// Nothing here distinguishes the two.
         /// </returns>
         public Num Heal(Entity? source, Entity target, Num amount, EvalContext context, SourceSpan span = default)
         {
@@ -730,8 +730,8 @@ namespace Cantrip.Runtime
         //
         // Movement is a member write and not a verb: `target.rank = 0`, `self.lane += 1`,
         // `a.rank = b.rank`. `move` is taken by card zones, and an assignment arrives with four
-        // things already built — the `moved` event, `before_moved` cancellation, `until` reversion
-        // and rollback — which a new verb would have had to be given one at a time.
+        // things already built: the `moved` event, `before_moved` cancellation, `until` reversion
+        // and rollback. A new verb would have had to be given each of them one at a time.
 
         /// <summary>
         /// Moves an actor along one axis, which is what <c>target.rank = 0</c> and
@@ -821,13 +821,13 @@ namespace Cantrip.Runtime
         }
 
         /// <summary>
-        /// Announces the moves the board made on its own — a <c>close_ranks</c> shuffle behind a
-        /// death — as <c>moved</c>, one for each survivor that stepped forward.
+        /// Announces the moves the board made on its own (a <c>close_ranks</c> shuffle behind a
+        /// death) as <c>moved</c>, one for each survivor that stepped forward.
         /// </summary>
         /// <remarks>
         /// After the fact, because the row closes inside the death that caused it and half a closed
         /// row is not a board. So these are reports rather than requests: <c>before_moved</c> is
-        /// where a unit refuses to be pushed, and a unit is never pushed by the row closing — it
+        /// where a unit refuses to be pushed, and a unit is never pushed by the row closing: it
         /// steps forward because the slot in front of it stopped existing.
         /// </remarks>
         private void AnnounceShuffles()
@@ -853,7 +853,7 @@ namespace Cantrip.Runtime
         /// <param name="owner">
         /// Whose pile a card lands in and whose relics a relic joins. This is what content's
         /// <c>to</c> clause says, and it is how an enemy's move puts a curse in the player's discard
-        /// pile — the mechanic three of the nine games in <c>docs/coverage.md</c> are built on.
+        /// pile: the mechanic three of the nine games in <c>docs/coverage.md</c> are built on.
         /// </param>
         /// <param name="side">
         /// The side an actor joins, for the same <c>to</c> clause. Null takes the side the
@@ -876,7 +876,7 @@ namespace Cantrip.Runtime
         /// <remarks>
         /// The side and owner come from <paramref name="original"/> unless <paramref name="owner"/>
         /// says otherwise, so a player's card that copies an enemy's minion gives the enemy a second
-        /// minion. The copy is then placed by <em>kind</em>, exactly where a new one would go — never
+        /// minion. The copy is then placed by <em>kind</em>, exactly where a new one would go, never
         /// in the zone the original happens to sit in, which would drop a copied power straight into
         /// <c>powers</c> as a second active power nobody played, and a copied exhausted card into the
         /// exhaust pile.
@@ -989,7 +989,7 @@ namespace Cantrip.Runtime
 
         /// <summary>
         /// The lane a summon arrives in: its maker's, when whoever is running this is standing on
-        /// the board, and otherwise lane 0 — which on the default one-lane board is every lane there
+        /// the board, and otherwise lane 0, which on the default one-lane board is every lane there
         /// is, so nothing written before boards existed notices this rule at all.
         /// </summary>
         private int LaneOfMaker(EvalContext context)
@@ -1053,7 +1053,7 @@ namespace Cantrip.Runtime
         /// </summary>
         /// <remarks>
         /// The event is cancellable in the before phase and replaceable in the instead phase, and a
-        /// before listener may well destroy or kill the target — so the committed work checks again
+        /// before listener may well destroy or kill the target, so the committed work checks again
         /// that the entity is still here. Running <see cref="GameState.Become"/> on something that
         /// has left the game would leave <c>transformed</c> claiming, in its after phase, that a
         /// transform happened.
@@ -1175,7 +1175,7 @@ namespace Cantrip.Runtime
 
         /// <summary>
         /// Settles who the move an enemy has just telegraphed is aimed at, and stores it on the
-        /// enemy. This is the telegraph — what a UI shows before the blow lands — and not the last
+        /// enemy. This is the telegraph (what a UI shows before the blow lands) and not the last
         /// word: <see cref="IntentTargetOf"/> re-reads it against the rules of the moment, so a
         /// taunt applied afterwards changes what is shown with no event and no second roll.
         /// </summary>
@@ -1183,7 +1183,7 @@ namespace Cantrip.Runtime
         /// A move with an <c>at</c> clause names its own selector and is evaluated from the
         /// enemy's own point of view, where <c>enemies</c> is the party's side. A move with none
         /// aims at a living party member drawn uniformly from the game's own generator. With one
-        /// member there is nothing to draw and nothing is drawn — which is why a game with no
+        /// member there is nothing to draw and nothing is drawn, which is why a game with no
         /// <c>hero</c> plays out of exactly the same numbers it always did.
         /// </remarks>
         internal void RollIntentTarget(Entity enemy)
@@ -1203,7 +1203,7 @@ namespace Cantrip.Runtime
             if (legal.Count > 0)
             {
                 // Only the default aims at random, and only when there is more than one to aim at.
-                // With one member there is no choice, so nothing is drawn — which is the whole of
+                // With one member there is no choice, so nothing is drawn, and that is the whole of
                 // why an existing game's numbers do not move. A move that names its own selector
                 // has already said who it wants; rolling again would say it twice.
                 enemy.IntentTarget = move?.TargetSelector == null && legal.Count > 1
@@ -1223,8 +1223,8 @@ namespace Cantrip.Runtime
         }
 
         /// <summary>
-        /// Who a move names: its own <c>at</c> selector's answer, or — with nothing written — the
-        /// party.
+        /// Who a move names: its own <c>at</c> selector's answer, or the party when nothing is
+        /// written.
         /// </summary>
         /// <remarks>
         /// Not every player-side actor. A summon is not somebody the fight is about, and counting
@@ -1270,7 +1270,7 @@ namespace Cantrip.Runtime
 
             // The telegraph has gone stale: a taunt has covered whoever it named, or that member
             // has fallen. Whoever is left and legal takes its place, which is the same answer the
-            // move itself reaches when it runs — the two agree by asking one question of one rule.
+            // move itself reaches when it runs. The two agree by asking one question of one rule.
             IReadOnlyList<Entity> left = LegalTargets(rule, enemy, null, State.Party);
             if (left.Count > 0) return left[0];
 
@@ -1317,7 +1317,7 @@ namespace Cantrip.Runtime
         /// </summary>
         /// <remarks>
         /// The last declared phase whose condition holds wins, so thresholds can be written in the
-        /// order a designer thinks of them — three quarters, then half, then a quarter — and the
+        /// order a designer thinks of them (three quarters, then half, then a quarter), and the
         /// deepest one that is true is the one that applies.
         /// </remarks>
         private bool UpdatePhase(Entity enemy, EntityDefinition definition)
@@ -1346,8 +1346,8 @@ namespace Cantrip.Runtime
         /// </summary>
         /// <remarks>
         /// Checked where damage lands rather than inside <see cref="RollIntent"/>, because a phase
-        /// crossed during the player's turn has to be noticed before the next intent would be rolled
-        /// — which is the whole point of re-telegraphing.
+        /// crossed during the player's turn has to be noticed before the next intent would be
+        /// rolled. Noticing it then is the whole point of re-telegraphing.
         /// </remarks>
         private void RetelegraphIfPhaseChanged(Entity enemy)
         {
@@ -1416,7 +1416,7 @@ namespace Cantrip.Runtime
                     // A place is two integers, so its inverse is exact: putting the actor back is
                     // the same swap that brought it here, and whoever took its slot meanwhile goes
                     // where it came from. This is why `until` reverts a move where it refuses a
-                    // `transform` (CT321) — nothing remembers an old form, but a slot is remembered.
+                    // `transform` (CT321): nothing remembers an old form, but a slot is remembered.
                     MoveActor(change.Entity, slot.Lane, slot.Rank, context);
                 }
                 else if (change.Stat != null && !change.Entity.IsRemoved)

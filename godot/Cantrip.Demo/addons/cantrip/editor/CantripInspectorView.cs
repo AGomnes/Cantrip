@@ -12,7 +12,7 @@ namespace Cantrip.GodotAdapter
     /// </summary>
     /// <remarks>
     /// The trace tab answers "why did that happen". This answers the question that comes next,
-    /// which is "what is this thing currently doing" — and it answers it with the line of content
+    /// which is "what is this thing currently doing", and it answers it with the line of content
     /// behind each rule, because a modifier is invisible in a single number: an enemy with 6 attack
     /// says nothing, while 4 becoming 6 beside the <c>modify</c> line doing it says everything.
     /// </remarks>
@@ -186,11 +186,11 @@ namespace Cantrip.GodotAdapter
             Godot.Collections.Dictionary stats = entity["stats"].AsGodotDictionary();
 
             TreeItem about = Heading(root, payload["definition"].AsString().Length > 0
-                ? $"{entity["name"].AsString()}#{entity["id"].AsInt32()} — {payload["definition"].AsString()}"
+                ? $"{entity["name"].AsString()}#{entity["id"].AsInt32()}: {payload["definition"].AsString()}"
                 : $"{entity["name"].AsString()}#{entity["id"].AsInt32()}");
             Row(about, "kind", $"{entity["kind"].AsString()}, {entity["team"].AsString()}");
             Row(about, "zone", entity["zone"].AsString());
-            Row(about, "rules live", payload["active"].AsBool() ? "yes" : "no — its listeners hear nothing here");
+            Row(about, "rules live", payload["active"].AsBool() ? "yes" : "no, its listeners hear nothing here");
             about.SetCollapsed(false);
 
             // Base beside current, because a modifier is invisible in a single number.

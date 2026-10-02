@@ -40,7 +40,7 @@ namespace Cantrip.Linting
     public sealed class Linter
     {
         /// <summary>
-        /// Error: an unknown verb, or one written in the wrong kind of block — a test verb such as
+        /// Error: an unknown verb, or one written in the wrong kind of block: a test verb such as
         /// <c>cast</c> outside a test, <c>play</c> inside a scenario. A verb the game registers from C#
         /// looks unknown too until it is named in <see cref="LintOptions.HostVerbs"/>.
         /// </summary>
@@ -57,7 +57,7 @@ namespace Cantrip.Linting
         public const string UnknownTag = "CT303";
 
         /// <summary>
-        /// Warning: a listener on an event nothing raises — not built in, not emitted by content, and
+        /// Warning: a listener on an event nothing raises: not built in, not emitted by content, and
         /// not <c>&lt;stat&gt;_changed</c> for a stat this content has. Events the game raises from C#
         /// go in <see cref="LintOptions.HostEvents"/>.
         /// </summary>
@@ -95,8 +95,8 @@ namespace Cantrip.Linting
 
         /// <summary>
         /// Warning: a line in a declaration ending in <c>:</c> that is not <c>effect:</c>, a
-        /// <c>move ...:</c> or a listener — <c>when card_played:</c>, or <c>once per battle</c> written
-        /// before the <c>on</c>. It loads as a label and never runs. A block the game runs itself goes in
+        /// <c>move ...:</c> or a listener. The shapes this catches are <c>when card_played:</c> and
+        /// <c>once per battle</c> written before the <c>on</c>. Either loads as a label and never runs. A block the game runs itself goes in
         /// <see cref="LintOptions.HostBlocks"/>.
         /// </summary>
         public const string UnknownBlock = "CT313";
@@ -112,8 +112,8 @@ namespace Cantrip.Linting
         public const string IgnoredDuration = "CT315";
 
         /// <summary>
-        /// Warning: a tag with behaviour of its own — <c>exhaust</c>, <c>retain</c>, <c>unplayable</c>
-        /// and the rest — written on a line of its own instead of on the <c>tags</c> line, where it is a
+        /// Warning: a tag with behaviour of its own (<c>exhaust</c>, <c>retain</c>, <c>unplayable</c>
+        /// and the rest) written on a line of its own instead of on the <c>tags</c> line, where it is a
         /// property nothing reads and the behaviour never happens.
         /// </summary>
         public const string TagWrittenAsProperty = "CT316";
@@ -126,14 +126,14 @@ namespace Cantrip.Linting
 
         /// <summary>
         /// Error: an <c>expect</c> a scenario cannot check. A scenario plays hundreds of games and
-        /// measures them in aggregate, so a condition about one game — <c>expect enemy.hp == 3</c> — has
+        /// measures them in aggregate, so a condition about one game (<c>expect enemy.hp == 3</c>) has
         /// nothing to read.
         /// </summary>
         public const string UnknownMeasurement = "CT319";
 
         /// <summary>
         /// Error: a verb that acts on something already in the game, handed the name of a definition
-        /// instead — <c>copy Strike</c>, <c>transform Strike into Wound</c> — or <c>create</c> given a
+        /// instead (<c>copy Strike</c>, <c>transform Strike into Wound</c>), or <c>create</c> given a
         /// status or ability, which belong to whoever has them rather than to a zone. Each of these is a
         /// runtime error too.
         /// </summary>
@@ -144,7 +144,7 @@ namespace Cantrip.Linting
 
         /// <summary>
         /// Error: <c>emit</c> handed the name of a built-in event. Every listener of it would run while
-        /// nothing had happened and no history counter had moved — the event forged and the record not.
+        /// nothing had happened and no history counter had moved: the event forged and the record not.
         /// </summary>
         public const string EmitsBuiltinEvent = "CT322";
 
@@ -162,7 +162,7 @@ namespace Cantrip.Linting
         public const string PercentageWhereACountIsMeant = "CT324";
 
         /// <summary>
-        /// Error: a length in units this game's clock cannot measure — <c>for 3s</c> under
+        /// Error: a length in units this game's clock cannot measure: <c>for 3s</c> under
         /// <c>clock turns</c>, or <c>2 turns</c> under <c>clock ticks</c>. Only content that states its
         /// clock is checked. See <see cref="TurnMachineryWithoutTurns"/> for the declarations, as
         /// opposed to the units.
@@ -172,7 +172,7 @@ namespace Cantrip.Linting
         /// <summary>
         /// <c>player</c> written where a party member is meant. It is an error rather than a
         /// warning because the alternative is a party game whose every enemy move hits one hero
-        /// forever, silently — and a silent wrong answer is the one class of change this project
+        /// forever, silently. A silent wrong answer is the one class of change this project
         /// has a written policy against.
         /// </summary>
         public const string PlayerWhereAMemberIsMeant = "CT326";
@@ -202,7 +202,7 @@ namespace Cantrip.Linting
         public const string ReachWithoutATarget = "CT331";
 
         /// <summary>
-        /// Warning: a <c>range</c> that decides nothing — as wide as the widest board declared, written
+        /// Warning: a <c>range</c> that decides nothing: as wide as the widest board declared, written
         /// backwards, or <c>range 0</c> at an enemy, which on a facing board is a slot no enemy stands
         /// on. <c>range 1</c> is what melee is written as.
         /// </summary>
@@ -261,7 +261,7 @@ namespace Cantrip.Linting
         /// <c>self</c>, <c>any</c> or <c>none</c>.
         /// </summary>
         /// <remarks>
-        /// The set is closed — nothing a game registers adds to it — and the engine falls through
+        /// The set is closed (nothing a game registers adds to it) and the engine falls through
         /// to "nobody" for anything else, quietly. So <c>target freind</c> loaded, linted and
         /// tested clean, and the card it was written on stopped asking for a target and stopped
         /// checking the one it was handed: it would deal its damage to the party's own leader, or
@@ -293,8 +293,8 @@ namespace Cantrip.Linting
 
         /// <summary>
         /// Names that verbs bind for the statements after them, and the X of X-cost cards. Each verb
-        /// binds its own participle — <c>choose</c> binds <c>chosen</c>, <c>copy</c> binds
-        /// <c>copied</c> — so the line that reads the result says which verb produced it.
+        /// binds its own participle (<c>choose</c> binds <c>chosen</c>, <c>copy</c> binds
+        /// <c>copied</c>), so the line that reads the result says which verb produced it.
         /// </summary>
         private static readonly string[] BoundNames = { "chosen", "created", "copied", "discovered", "played", "index", "x" };
 
@@ -355,7 +355,7 @@ namespace Cantrip.Linting
         /// <summary>
         /// Verbs a <c>scenario</c> must not use even though the rules know them. A scenario states the
         /// fight and a bot plays it, so a hand-written <c>play</c> there is the documented error it has
-        /// always been — registering <c>play</c> as a rule verb would otherwise delete that diagnostic.
+        /// always been. Registering <c>play</c> as a rule verb would otherwise delete that diagnostic.
         /// </summary>
         private static readonly HashSet<string> NotInScenarios = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -394,7 +394,7 @@ namespace Cantrip.Linting
 
         /// <summary>
         /// The verbs whose <c>into</c> clause binds a name, rather than naming a zone. What a verb
-        /// achieved is not what it asked for — block absorbs damage, a heal stops at full health —
+        /// achieved is not what it asked for (block absorbs damage, a heal stops at full health),
         /// so these four bind what really happened.
         /// </summary>
         private static bool BindsIntoAName(string verb) =>
@@ -799,7 +799,7 @@ namespace Cantrip.Linting
                 // `create` is the other way round: content is exactly what it wants, but only the
                 // kinds that stand in a zone on their own. A status, keyword or ability is handed
                 // out, never made, so a name that is only one of those three is the same mistake in
-                // reverse — and it used to make orphans that raised `created` and went into saves.
+                // reverse. It used to make orphans that raised `created` and went into saves.
                 if (verb == "create")
                 {
                     if (_content.FindAny(written, "card", "enemy", "actor", "relic", "item") != null) continue;
@@ -1117,7 +1117,7 @@ namespace Cantrip.Linting
 
         /// <summary>
         /// CT327: a lane or rank no board this game has can hold. <c>it.lane == 2</c> on a one-lane
-        /// board matches nothing, and no message ever said so — the filter simply never passed and
+        /// board matches nothing, and no message ever said so. The filter simply never passed and
         /// the card did nothing, which is exactly the class of silence this linter exists for. The
         /// mirror case is reported too: <c>it.rank &lt;= 3</c> on a two-rank board passes for
         /// everybody, so the <c>where</c> that was meant to limit the card's reach limits nothing.
@@ -1260,7 +1260,7 @@ namespace Cantrip.Linting
         /// </summary>
         /// <remarks>
         /// This used to refuse <c>lane</c> and <c>rank</c> as well, because assigning either wrote a
-        /// stat that the slot shadowed and nothing ever read — a line that looked like a move and
+        /// stat that the slot shadowed and nothing ever read: a line that looked like a move and
         /// was none. Now that the write moves the actor, refusing it would be refusing the feature.
         /// </remarks>
         private void CheckPlaceAssignments(Body body)
@@ -1376,7 +1376,7 @@ namespace Cantrip.Linting
                 UnknownTargetMode,
                 $"`target {mode}` on {definition} names nobody: a `target` line takes " +
                 "`enemy`, `ally`, `self`, `any` or `none`. Anything else is never a side, so this " +
-                "action asks for no target and checks the one it is handed against nothing — it will " +
+                "action asks for no target and checks the one it is handed against nothing, so it will " +
                 "point at whoever the game passes it, the party's own leader included.",
                 property.Span,
                 Suggest.Closest(mode, TargetRule.Modes));
@@ -1396,7 +1396,7 @@ namespace Cantrip.Linting
             {
                 Warn(ReachWithoutATarget,
                     $"`range` says how far {definition} may be pointed, and it points at nobody, so nothing ever reads it. " +
-                    "Add a `target` line — `target enemy` — or take the `range` off.",
+                    "Add a `target` line, such as `target enemy`, or take the `range` off.",
                     property.Span);
                 return;
             }
@@ -1456,8 +1456,8 @@ namespace Cantrip.Linting
 
             Warn(ScopeCannotMatch,
                 $"`{name.Name}` holds cards, and `{modify.Channel}` belongs to whoever an action is by or to, " +
-                $"so `of {name.Name}` can never match and this modifier will never apply. Name a group of actors — " +
-                "`party`, `allies`, `enemies`, `everyone` — or move the rule to a channel a card carries, such as `cost`.",
+                $"so `of {name.Name}` can never match and this modifier will never apply. Name a group of actors: " +
+                "`party`, `allies`, `enemies` or `everyone`. Or move the rule to a channel a card carries, such as `cost`.",
                 scope.Span);
         }
 
@@ -1478,7 +1478,7 @@ namespace Cantrip.Linting
 
         /// <summary>
         /// CT333: a row selector on a board with only one actor in a row. <c>rank(who)</c> on a
-        /// one-lane board is <c>who</c> and nobody else, because one actor stands on a slot — so
+        /// one-lane board is <c>who</c> and nobody else, because one actor stands on a slot. So
         /// "deal 4 to the target's rank" quietly hits the target alone.
         /// </summary>
         private void CheckRowSelectors(Body body)
@@ -1535,9 +1535,9 @@ namespace Cantrip.Linting
         }
 
         /// <summary>
-        /// CT326: <c>player</c> written where a party member could be meant — an enemy's move, a
-        /// card's or an ability's effect, or a listener on any of them, on a status or on a relic
-        /// — in content that has a party.
+        /// CT326: <c>player</c> written in content that has a party, where a party member could
+        /// be meant: an enemy's move, a card's or an ability's effect, or a listener on any of
+        /// them, on a status or on a relic.
         /// </summary>
         /// <remarks>
         /// <para>
@@ -1558,8 +1558,8 @@ namespace Cantrip.Linting
         /// <para>
         /// Everywhere else <c>player</c> stays legal and stays right: a run's gold, a test's own
         /// lines, a scenario's setup, the game's own C#, and a status's or relic's listener that
-        /// is about its own owner. The whole rule is one sentence — <c>player</c> is refused
-        /// wherever a member could be meant — and the list of bodies below is only how that
+        /// is about its own owner. The whole rule is one sentence: <c>player</c> is refused
+        /// wherever a member could be meant. The list of bodies below is only how that
         /// sentence is spelled for a linter.
         /// </para>
         /// </remarks>
@@ -1610,13 +1610,13 @@ namespace Cantrip.Linting
         /// <remarks>
         /// <para>
         /// This is the rule, rather than a list: <b>every body on every declaration</b>. It was a
-        /// list until 1.0 — an enemy's <c>move</c>, a card's and an ability's <c>effect</c>, and
-        /// listeners on <c>enemy</c>, <c>card</c>, <c>ability</c>, <c>status</c> and <c>relic</c> —
+        /// list until 1.0 (an enemy's <c>move</c>, a card's and an ability's <c>effect</c>, and
+        /// listeners on <c>enemy</c>, <c>card</c>, <c>ability</c>, <c>status</c> and <c>relic</c>),
         /// and a list has holes. The one that mattered: a listener on a <c>hero</c>.
         /// <c>hero "Cleric" / on damaged: block 2 to player</c> blocked the <em>leader</em> whenever
         /// the Cleric was damaged, quietly, which is the exact shape CT326 was made an error to
         /// prevent, in the declaration a party game has most of. A listener on an <c>actor</c> or a
-        /// <c>keyword</c>, a <c>modify</c> line and a <c>target … where</c> filter were out too.
+        /// <c>keyword</c>, a <c>modify</c> line and a <c>target ... where</c> filter were out too.
         /// </para>
         /// <para>
         /// There is nothing to carve out for a <c>hero</c> or an <c>actor</c>, which is what makes
@@ -1625,7 +1625,7 @@ namespace Cantrip.Linting
         /// somebody other than the declaration itself. The word there is <c>self</c>.
         /// </para>
         /// <para>
-        /// The kinds an actor <em>carries</em> — <see cref="IsCarried"/> — keep the one exception,
+        /// The kinds an actor <em>carries</em> (<see cref="IsCarried"/>) keep the one exception,
         /// which is what lets the whole rule be a sentence rather than a list of places:
         /// <c>player</c> stays legal where the listener is about its own owner.
         /// <see cref="AboutItsOwner"/> says exactly what that means, and why those are the two shapes
@@ -1636,8 +1636,8 @@ namespace Cantrip.Linting
         /// <c>scenario</c>. A verb has no owner, so neither <c>self</c> nor <c>owner</c> exists inside
         /// one and its <c>target</c> is whatever its caller bound: there is no word this diagnostic
         /// could name, and CT326 is an error rather than a warning precisely because it can always
-        /// name one. <c>player</c> in a verb is also often right — <c>verb score(c): gain c.chips
-        /// chips to player</c> means the run's own pool — and the caller's own body is checked, which
+        /// name one. <c>player</c> in a verb is also often right, since <c>verb score(c): gain c.chips
+        /// chips to player</c> means the run's own pool, and the caller's own body is checked, which
         /// is where the leader-or-member decision is actually written. Severity may rise in a 1.x
         /// release, so a verb can still be warned about later; naming the wrong word now could not be
         /// taken back.
@@ -1675,7 +1675,7 @@ namespace Cantrip.Linting
 
         /// <summary>
         /// The bodies <c>player</c> is refused in, which is every body a declaration can carry: an
-        /// <c>effect</c>, a <c>move</c>, a listener, a <c>modify</c> line and a <c>target … where</c>
+        /// <c>effect</c>, a <c>move</c>, a listener, a <c>modify</c> line and a <c>target ... where</c>
         /// filter. Null for nothing else, which is how a body with no statements of its own is
         /// skipped.
         /// </summary>
@@ -1693,7 +1693,7 @@ namespace Cantrip.Linting
                     return $"`{block.Name}:` block";
 
                 // A `modify` line's scope, filter and amount, and the predicate of a
-                // `target … where`. Both are expressions the rules evaluate about somebody, so
+                // `target ... where`. Both are expressions the rules evaluate about somebody, so
                 // `player` in one is the same wrong answer as `player` in a statement.
                 case BodyKind.Modifier:
                     return body.Anchor is PropertyNode ? "`target` filter" : "`modify` line";
@@ -1709,8 +1709,8 @@ namespace Cantrip.Linting
         /// </summary>
         /// <remarks>
         /// <c>item</c> is here beside <c>status</c>, <c>relic</c> and <c>keyword</c> because the
-        /// engine already treats it as a relic by another name — <c>InDefaultScope</c> anchors both to
-        /// the holder's controller — so leaving it out would refuse <c>player</c> in an item's
+        /// engine already treats it as a relic by another name (<c>InDefaultScope</c> anchors both to
+        /// the holder's controller), so leaving it out would refuse <c>player</c> in an item's
         /// own-owner listener where a relic's is allowed.
         /// </remarks>
         private static bool IsCarried(string kind) =>
@@ -1734,13 +1734,13 @@ namespace Cantrip.Linting
         };
 
         /// <summary>
-        /// Whether a carried declaration's listener — a <c>status</c>, a <c>relic</c>, a
-        /// <c>keyword</c> or an <c>item</c> — is <em>about its own owner</em>: the one shape in which
+        /// Whether a carried declaration's listener (a <c>status</c>, a <c>relic</c>, a
+        /// <c>keyword</c> or an <c>item</c>) is <em>about its own owner</em>: the one shape in which
         /// <c>player</c> is refused nowhere, because no member is in view to have been meant instead.
         /// </summary>
         /// <remarks>
         /// <para>
-        /// It is true in exactly two cases, and the definition is the listener's header alone —
+        /// It is true in exactly two cases, and the definition is the listener's header alone,
         /// nothing about the body, so the same line is always read the same way:
         /// </para>
         /// <list type="number">
@@ -1757,7 +1757,7 @@ namespace Cantrip.Linting
         /// </item>
         /// <item>
         /// <description>
-        /// The event is <b>run-level</b> — <see cref="RunLevelEvents"/> — where the only actor the
+        /// The event is <b>run-level</b> (<see cref="RunLevelEvents"/>), where the only actor the
         /// engine puts in view is the leader, so <c>player</c> is the only thing it could be.
         /// <c>relic "Purse" / on battle_start: gain 5 gold to player</c> is this one.
         /// </description>
@@ -1791,7 +1791,7 @@ namespace Cantrip.Linting
         /// </summary>
         /// <remarks>
         /// Only built-in verbs are checked. A flag after a comma is not a clause and is never
-        /// reported, because a verb a game registers in C# reads its own flags — that is exactly
+        /// reported, because a verb a game registers in C# reads its own flags: that is exactly
         /// what <c>--suppress CT301</c> content does.
         /// </remarks>
         private void CheckClauses(Body body)
@@ -1839,7 +1839,7 @@ namespace Cantrip.Linting
         /// <summary>
         /// CT322: <c>emit</c> handed the name of a built-in event. <c>emit damaged 99 to player</c>
         /// dispatched to every <c>on damaged</c> listener although nothing was damaged, and no
-        /// history counter moved with it — the event was forged and the record was not. <c>emit</c>
+        /// history counter moved with it. The event was forged and the record was not. <c>emit</c>
         /// raises a <em>custom</em> event, and the runtime refuses this too.
         /// </summary>
         private void CheckEmits(Body body)
@@ -1859,7 +1859,7 @@ namespace Cantrip.Linting
 
         /// <summary>
         /// CT321: a <c>transform</c> written inside an <c>until</c> block. <c>until</c> promises to
-        /// put back what it did, and none of this can be put back — the stats, the statuses and the
+        /// put back what it did, and none of this can be put back: the stats, the statuses and the
         /// spent <c>once per ...</c> windows are gone. The runtime refuses it too, which is what
         /// catches a content verb containing one; this says so before the effect ever runs.
         /// </summary>
@@ -1886,7 +1886,7 @@ namespace Cantrip.Linting
         /// <summary>
         /// The <c>transform</c> statements lexically inside an <c>until</c> block. A <c>next turn:</c>
         /// or <c>in N turns:</c> block written inside one runs later, on its own, with none of the
-        /// block's undo scope — so it starts clear rather than inheriting the <c>until</c>.
+        /// block's undo scope, so it starts clear rather than inheriting the <c>until</c>.
         /// </summary>
         private sealed class UntilTransforms : AstWalker
         {
@@ -2958,8 +2958,8 @@ namespace Cantrip.Linting
         /// <c>lose</c> and <c>change</c> cover a resource and a status with one word, so the table
         /// has to name a death and a status applied for all three; <c>gain 2 gold</c> does neither,
         /// and only <c>hp</c> ever kills. Reading the word the command names is what stops CT306
-        /// calling <c>on killed: gain 2 gold</c> a loop with itself — one listener, paired with
-        /// itself, in the relic every roguelite ships.
+        /// calling <c>on killed: gain 2 gold</c> a loop with itself (one listener, paired with
+        /// itself, in the relic every roguelite ships).
         /// </summary>
         private static bool CanReallyRaise(CommandNode command, string raised)
         {
@@ -2970,7 +2970,7 @@ namespace Cantrip.Linting
                 ? (command.Arguments.Count > 0 ? StatOfChange(command.Arguments[0]) : null)
                 : WordAt(command, 1);
 
-            // Nothing to read — a computed name, or a shape this does not know — so say nothing.
+            // Nothing to read (a computed name, or a shape this does not know), so say nothing.
             if (named == null) return true;
 
             bool status = StartsUpper(named);

@@ -45,7 +45,7 @@ The name in the `test` line. Names are not required to be unique across a librar
 public bool Passed { get; }
 ```
 
-Whether every `expect` in the test held. False also covers a test that never reached its expectations — a runtime error, or content the runner could not set up — so a failure is not necessarily a failed assertion.
+Whether every `expect` in the test held. False also covers a test that never reached its expectations, through a runtime error or content the runner could not set up, so a failure is not necessarily a failed assertion.
 
 ```csharp
 public TestDefinition Test { get; }
@@ -98,7 +98,7 @@ A runner over a loaded library. It does not check the library first: content wit
 public Action<CardRuntime>? ConfigureRuntime { get; set; }
 ```
 
-Runs on each test's new runtime before the test's first line, for the verbs the game registers in C#: `runner.ConfigureRuntime = runtime => runtime.RegisterVerb("corrupt", Corrupt);`. The runtime has no player yet. If this creates one, the test uses it; otherwise the test creates one with 80 hp and 3 energy. The test verbs are registered afterwards, so they win over a verb of the same name. `play` is the exception, because it is a rule verb too: the test's wins only for the `play` statements in the test's own body, and every other one goes to whatever was registered before — the rules', or the game's. An exception from this fails that test.
+Runs on each test's new runtime before the test's first line, for the verbs the game registers in C#: `runner.ConfigureRuntime = runtime => runtime.RegisterVerb("corrupt", Corrupt);`. The runtime has no player yet. If this creates one, the test uses it; otherwise the test creates one with 80 hp and 3 energy. The test verbs are registered afterwards, so they win over a verb of the same name. `play` is the exception, because it is a rule verb too: the test's wins only for the `play` statements in the test's own body, and every other one goes to whatever was registered before: the rules', or the game's. An exception from this fails that test.
 
 ```csharp
 public Func<IEffectHost>? CreateHost { get; set; }
@@ -126,15 +126,15 @@ public DslTestResult Run(TestDefinition test)
 
 Runs one test in a runtime of its own: a fresh player at 80 hp and 3 energy, seed 1, and a tick clock only if the test says `realtime`. Nothing carries over between tests, which is why the order they run in cannot matter.
 
-It does not throw. Anything that goes wrong — content that will not load into a runtime, a runtime error mid-test, a choice the test did not answer — comes back as a result with `DslTestResult.Passed` false and the reason in `DslTestResult.Failure`.
+It does not throw. Anything that goes wrong (content that will not load into a runtime, a runtime error mid-test, a choice the test did not answer) comes back as a result with `DslTestResult.Passed` false and the reason in `DslTestResult.Failure`.
 
 ```csharp
 public IReadOnlyList<DslTestResult> RunAll(string? nameFilter = null)
 ```
 
-Runs every test in the library, in the order they were loaded, and returns a result for each — nothing stops at the first failure.
+Runs every test in the library, in the order they were loaded, and returns a result for each. Nothing stops at the first failure.
 
 **Parameters.**
 
-- `nameFilter` — Keeps only the tests whose name contains this, ignoring case. It is a substring match and not a pattern, and null runs everything. A filter that matches nothing gives an empty list rather than an error, which is worth checking for in a CI script that would otherwise report success.
+- `nameFilter`: Keeps only the tests whose name contains this, ignoring case. It is a substring match and not a pattern, and null runs everything. A filter that matches nothing gives an empty list rather than an error, which is worth checking for in a CI script that would otherwise report success.
 

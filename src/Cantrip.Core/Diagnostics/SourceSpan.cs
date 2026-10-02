@@ -19,7 +19,7 @@ namespace Cantrip.Diagnostics
         /// somewhere wrong rather than throwing, since a diagnostic that cannot be reported is worse than
         /// one that points at the wrong column.
         /// </summary>
-        /// <param name="file">The file, or null for none — which becomes the empty string and reads as <see cref="None"/>.</param>
+        /// <param name="file">The file, or null for none. Null becomes the empty string and reads as <see cref="None"/>.</param>
         /// <param name="line">1-based. Zero with no file is <see cref="None"/>.</param>
         /// <param name="column">1-based.</param>
         /// <param name="length">How many characters, on that line alone.</param>
@@ -41,7 +41,7 @@ namespace Cantrip.Diagnostics
         public int Column { get; }
 
         /// <summary>
-        /// How many characters the span covers, on <see cref="Line"/> alone — a span never crosses a
+        /// How many characters the span covers, on <see cref="Line"/> alone. A span never crosses a
         /// line break, so an editor can underline it without looking at what follows.
         /// </summary>
         public int Length { get; }
@@ -68,7 +68,7 @@ namespace Cantrip.Diagnostics
         /// <summary>The boxing form of <see cref="Equals(SourceSpan)"/>.</summary>
         public override bool Equals(object? obj) => obj is SourceSpan other && Equals(other);
 
-        /// <summary>Hashes all four fields, so a span works as a dictionary key — which is how a tool groups diagnostics by location.</summary>
+        /// <summary>Hashes all four fields, so a span works as a dictionary key, which is how a tool groups diagnostics by location.</summary>
         public override int GetHashCode()
         {
             unchecked

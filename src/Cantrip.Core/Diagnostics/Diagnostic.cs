@@ -19,7 +19,7 @@ namespace Cantrip.Diagnostics
         Info,
 
         /// <summary>
-        /// The content loads and runs, but something in it does less than it looks like it does — a
+        /// The content loads and runs, but something in it does less than it looks like it does: a
         /// clause that is accepted and ignored, a modifier that can never match. Most of what the linter
         /// finds is here, and it is the severity worth failing a content build on.
         /// </summary>
@@ -73,7 +73,7 @@ namespace Cantrip.Diagnostics
         public string Code { get; }
 
         /// <summary>
-        /// The sentence to show, without the location or the code in front of it —
+        /// The sentence to show, without the location or the code in front of it.
         /// <see cref="ToString"/> is what assembles the whole line.
         /// </summary>
         public string Message { get; }
@@ -138,7 +138,7 @@ namespace Cantrip.Diagnostics
         public void Info(string code, string message, SourceSpan span, string? suggestion = null) =>
             Add(new Diagnostic(DiagnosticSeverity.Info, code, message, span, suggestion));
 
-        /// <summary>Appends a whole run of diagnostics, keeping their order — how a linter's findings join a loader's.</summary>
+        /// <summary>Appends a whole run of diagnostics, keeping their order: how a linter's findings join a loader's.</summary>
         public void AddRange(IEnumerable<Diagnostic> diagnostics) => _items.AddRange(diagnostics);
 
         /// <summary>Throws if anything in the bag is an error. Used by the strict loading paths.</summary>

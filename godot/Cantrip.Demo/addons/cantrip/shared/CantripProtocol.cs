@@ -12,8 +12,8 @@ namespace Cantrip.GodotAdapter
     /// without launching Godot.
     /// </summary>
     /// <remarks>
-    /// Godot's debugger channel is capped — a live 4.6.1 run reports 2048 queued messages and
-    /// 32768 characters a second — so nothing here streams per event. The game keeps a ring buffer
+    /// Godot's debugger channel is capped (a live 4.6.1 run reports 2048 queued messages and
+    /// 32768 characters a second), so nothing here streams per event. The game keeps a ring buffer
     /// and the editor pulls batches with a cursor, which also means a slow editor cannot back the
     /// game up.
     /// </remarks>
@@ -218,7 +218,7 @@ namespace Cantrip.GodotAdapter
         /// <summary>
         /// Everything recorded after <paramref name="sinceId"/>, up to <paramref name="max"/>.
         /// Entries are handed out in the order they were recorded, and ids only ever rise, so the
-        /// cursor is enough to resume — even across a buffer that trimmed itself in between.
+        /// cursor is enough to resume, even across a buffer that trimmed itself in between.
         /// </summary>
         public static TraceBatch From(TraceLog log, long sinceId = 0, int max = DefaultMax)
         {

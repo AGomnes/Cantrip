@@ -28,8 +28,8 @@ namespace Cantrip.Content
 
         /// <summary>
         /// Every verb a scenario body may use: the setup verbs, plus <c>battle</c>, <c>runs</c> and
-        /// its own <c>expect</c>. The verbs that play a turn by hand — <c>play</c>, <c>cast</c>,
-        /// <c>end turn</c>, <c>tick</c> — are deliberately absent: a bot plays a scenario, and a
+        /// its own <c>expect</c>. The verbs that play a turn by hand (<c>play</c>, <c>cast</c>,
+        /// <c>end turn</c>, <c>tick</c>) are deliberately absent: a bot plays a scenario, and a
         /// hand-written line would fight it.
         /// </summary>
         public static IReadOnlyCollection<string> Verbs { get; } =

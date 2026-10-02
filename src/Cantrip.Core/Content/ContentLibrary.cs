@@ -20,7 +20,7 @@ namespace Cantrip.Content
         /// <summary>The parsed <c>test</c> block: its name, its body and its span.</summary>
         public TestDeclNode Syntax { get; }
         /// <summary>
-        /// The file this was loaded from, as it was named to the loader — a real path for
+        /// The file this was loaded from, as it was named to the loader: a real path for
         /// <see cref="ContentLibrary.LoadFile"/>, and whatever a host passed to
         /// <see cref="ContentLibrary.LoadText"/> otherwise.
         /// </summary>
@@ -91,8 +91,8 @@ namespace Cantrip.Content
         private readonly List<(string File, RulesetDeclNode Syntax)> _rulesets = new List<(string, RulesetDeclNode)>();
 
         /// <summary>
-        /// An empty library with the built-in resources already in it — <c>hp</c>, <c>block</c>,
-        /// <c>energy</c>, <c>stacks</c> and <c>gold</c> — which content may override with a
+        /// An empty library with the built-in resources already in it (<c>hp</c>, <c>block</c>,
+        /// <c>energy</c>, <c>stacks</c> and <c>gold</c>), which content may override with a
         /// <c>resource</c> block of its own. Load files into it with <see cref="LoadText"/>,
         /// <see cref="LoadFile"/> or <see cref="LoadFolder"/>.
         /// </summary>
@@ -156,8 +156,8 @@ namespace Cantrip.Content
         }
 
         /// <summary>
-        /// Every definition loaded, of every kind, <c>resource</c> and <c>board</c> included — filter on
-        /// <see cref="EntityDefinition.IsThing"/> for the ones a game can make one of.
+        /// Every definition loaded, of every kind, <c>resource</c> and <c>board</c> included. Filter
+        /// on <see cref="EntityDefinition.IsThing"/> for the ones a game can make one of.
         /// </summary>
         /// <remarks>
         /// The order is a dictionary's, and a reload removes and re-adds entries, so it is not stable
@@ -169,7 +169,7 @@ namespace Cantrip.Content
         /// <summary>The verbs content declares. Verbs the game registers from C# are not here; they belong to the runtime.</summary>
         public IEnumerable<VerbDefinition> Verbs => _verbs.Values;
 
-        /// <summary>Every <c>test</c> block, in load order — which is the order <c>DslTestRunner.RunAll(string)</c> runs them in.</summary>
+        /// <summary>Every <c>test</c> block, in load order, which is the order <c>DslTestRunner.RunAll(string)</c> runs them in.</summary>
         public IReadOnlyList<TestDefinition> Tests => _tests;
 
         /// <summary>Every <c>scenario</c> block, in load order. A real-time game should declare none: a bot plays a scenario by taking turns.</summary>
@@ -198,8 +198,9 @@ namespace Cantrip.Content
 
         /// <summary>
         /// The board a battle is fought on when nobody names one: the first board content declares,
-        /// or <see cref="BoardShape.Default"/> when it declares none — today's board, spelled out,
-        /// which is what keeps every game written before boards existed working unchanged.
+        /// or <see cref="BoardShape.Default"/> when it declares none. The default is today's board,
+        /// spelled out, which is what keeps every game written before boards existed working
+        /// unchanged.
         /// </summary>
         public BoardShape DefaultBoard
         {
@@ -218,8 +219,8 @@ namespace Cantrip.Content
 
         /// <summary>
         /// A library holding one piece of text, for a test or a snippet. It does <b>not</b> throw on
-        /// errors — check <see cref="Diagnostics"/>, or use <c>CardRuntime.FromText(string, RuntimeOptions)</c>,
-        /// which does.
+        /// errors. Check <see cref="Diagnostics"/>, or use
+        /// <c>CardRuntime.FromText(string, RuntimeOptions)</c>, which does.
         /// </summary>
         /// <param name="text">The content, as it would be written in a <c>.cantrip</c> file.</param>
         /// <param name="file">The name diagnostics will point at. It does not have to exist.</param>
@@ -412,7 +413,7 @@ namespace Cantrip.Content
         /// </summary>
         /// <param name="name">A definition's name, as content wrote it.</param>
         /// <param name="kind">
-        /// The declaring keyword — <c>card</c>, <c>status</c>, <c>enemy</c> — which is what makes the
+        /// The declaring keyword (<c>card</c>, <c>status</c>, <c>enemy</c>), which is what makes the
         /// answer unambiguous. Null takes the first definition of that name whatever its kind, and
         /// "first" is not defined when two kinds share a name, so pass a kind whenever the caller knows
         /// one. <see cref="FindAny"/> is the way to ask for several in a stated order.
@@ -462,8 +463,8 @@ namespace Cantrip.Content
         }
 
         /// <summary>
-        /// The first match among several kinds, in the order given — how a call that accepts either a
-        /// <c>relic</c> or an <c>item</c> asks for both without guessing which came first.
+        /// The first match among several kinds, in the order given. It is how a call that accepts
+        /// either a <c>relic</c> or an <c>item</c> asks for both without guessing which came first.
         /// </summary>
         public EntityDefinition? FindAny(string name, params string[] kinds)
         {

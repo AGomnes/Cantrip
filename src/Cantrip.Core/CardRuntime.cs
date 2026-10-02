@@ -34,14 +34,14 @@ namespace Cantrip
         NotInHand,
 
         /// <summary>
-        /// The card is tagged <c>unplayable</c> — a curse, a wound, a status card — so no hand it is
+        /// The card is tagged <c>unplayable</c> (a curse, a wound, a status card), so no hand it is
         /// in ever offers it. Never being playable is the whole of what it is, which is why
         /// <c>cantrip sim</c> leaves one out of its "held but never playable" finding.
         /// </summary>
         Unplayable,
 
         /// <summary>
-        /// The card costs more of its resource than the payer has — <em>whichever</em> resource that
+        /// The card costs more of its resource than the payer has, <em>whichever</em> resource that
         /// is. A card priced <c>cost 2 bones</c> is refused with this, so the word cannot say
         /// <c>energy</c>: it said so until 1.0, and it was a lie in every game with a second
         /// resource. <see cref="CardRuntime.CostResourceOf"/> names the resource and
@@ -53,7 +53,7 @@ namespace Cantrip
 
         /// <summary>
         /// Somebody was named, or settled on, that the action will not take: the wrong side, not an
-        /// actor, not alive, excluded by the action's own <c>target … where</c>, or drawn away by a
+        /// actor, not alive, excluded by the action's own <c>target ... where</c>, or drawn away by a
         /// taunt or hidden by a stealth on the <c>targetable</c> channel. It is about <em>who</em>,
         /// and it is the answer to ask <see cref="CardRuntime.LegalTargets"/> about, because the
         /// list is the filter's own answer.
@@ -61,7 +61,7 @@ namespace Cantrip
         /// <remarks>
         /// Reach and an empty table used to come back as this too. They are
         /// <see cref="OutOfRange"/> and <see cref="NoTarget"/> now, which narrows what this word
-        /// means — and narrowing it is why both had to exist before 1.0 rather than after it: a game
+        /// means. Narrowing it is why both had to exist before 1.0 rather than after it: a game
         /// that wrote <c>if (result == InvalidTarget) ShowOutOfRangeHint()</c> would have gone on
         /// compiling and quietly stopped firing.
         /// </remarks>
@@ -73,16 +73,16 @@ namespace Cantrip
         /// that shortens reach answers this as much as a card that printed a short one.
         /// </summary>
         /// <remarks>
-        /// It is the refusal a player can do something about — move, or pick a nearer target — which
-        /// is the whole reason it is worth a word of its own. On a <c>facing</c> board the distance
-        /// across the sides is <c>a.rank + b.rank + 1</c>, so a back rank facing a back rank on a
-        /// 2×2 board is three steps; <c>docs/troubleshooting.md</c> has the arithmetic.
+        /// It is the refusal a player can do something about, by moving or by picking a nearer
+        /// target, which is the whole reason it is worth a word of its own. On a <c>facing</c> board
+        /// the distance across the sides is <c>a.rank + b.rank + 1</c>, so a back rank facing a back
+        /// rank on a 2×2 board is three steps; <c>docs/troubleshooting.md</c> has the arithmetic.
         /// </remarks>
         OutOfRange,
 
         /// <summary>
         /// There is nobody on the side the action asks for: <c>target enemy</c> with no enemy alive.
-        /// Nothing was filtered out and nothing was too far away — the table is empty.
+        /// Nothing was filtered out and nothing was too far away: the table is empty.
         /// </summary>
         /// <remarks>
         /// In a turn game this usually means the battle should already have ended, and it is worth
@@ -116,8 +116,8 @@ namespace Cantrip
     /// <remarks>
     /// The two worth setting deliberately are <see cref="Seed"/>, which is the whole of what makes a
     /// run reproducible, and <see cref="Clock"/>, which decides whether this is a turn-based or a
-    /// real-time game — and which the content's own <c>clock</c> setting has to agree with, or the
-    /// constructor refuses the pair.
+    /// real-time game. The content's own <c>clock</c> setting has to agree with <see cref="Clock"/>,
+    /// or the constructor refuses the pair.
     /// </remarks>
     public sealed class RuntimeOptions
     {
@@ -144,8 +144,8 @@ namespace Cantrip
 
         /// <summary>
         /// Who answers a <c>choose</c> or a <c>discover</c>. Null installs a
-        /// <see cref="FirstOptionChooser"/>, which always takes the first option — fine for a headless
-        /// run and wrong for a game, which wants <see cref="CardRuntime.Pending"/> and
+        /// <see cref="FirstOptionChooser"/>, which always takes the first option: fine for a
+        /// headless run, and wrong for a game, which wants <see cref="CardRuntime.Pending"/> and
         /// <see cref="CardRuntime.Answer(int[])"/> instead.
         /// </summary>
         public IChoiceProvider? Chooser { get; set; }
@@ -175,7 +175,7 @@ namespace Cantrip
         /// <param name="content">
         /// The library to play. It is not re-checked here, so load it through
         /// <see cref="ContentLibrary.FromText"/> or <see cref="FromText"/> and look at its diagnostics
-        /// first — content with errors in it builds a runtime that fails one battle in.
+        /// first: content with errors in it builds a runtime that fails one battle in.
         /// </param>
         /// <param name="options">Null takes the defaults, which is the run the content describes.</param>
         /// <exception cref="InvalidOperationException">
@@ -218,7 +218,7 @@ namespace Cantrip
         /// </summary>
         /// <remarks>
         /// It only matters when a game passes its own clock in <see cref="RuntimeOptions.Clock"/> and
-        /// outlives a runtime that used it — two runtimes sharing one clock both keep running, and
+        /// outlives a runtime that used it: two runtimes sharing one clock both keep running, and
         /// the one nobody uses any more goes on resolving effects on a game that has been replaced.
         /// A runtime that made its own clock is collected with it, so nothing is leaked by not
         /// calling this. Nothing else is torn down: the state, the content and the entities are
@@ -233,7 +233,7 @@ namespace Cantrip
         }
 
         /// <summary>
-        /// The clock content asked for, or a turn clock when it did not say — which is what every
+        /// The clock content asked for, or a turn clock when it did not say, which is what every
         /// game written before the <c>clock</c> setting existed gets.
         /// </summary>
         private static IGameClock DeclaredClock(Ruleset rules) =>
@@ -285,13 +285,13 @@ namespace Cantrip
         /// <exception cref="InvalidOperationException">
         /// Before <see cref="CreatePlayer"/>. Every other call that needs a player needs it too, so
         /// the window in which this is empty is the few lines between building a runtime and setting
-        /// the game up — and a game that asks in that window has its order wrong rather than a
-        /// player that might not be there.
+        /// the game up. A game that asks in that window has its order wrong rather than a player
+        /// that might not be there.
         /// </exception>
         /// <remarks>
         /// Not nullable, deliberately. It used to be, and a host with
-        /// <c>&lt;Nullable&gt;enable&lt;/Nullable&gt;</c> — which this repository's own
-        /// <c>Directory.Build.props</c> sets, with <c>WarningsAsErrors=nullable</c> — could not
+        /// <c>&lt;Nullable&gt;enable&lt;/Nullable&gt;</c> (which this repository's own
+        /// <c>Directory.Build.props</c> sets, with <c>WarningsAsErrors=nullable</c>) could not
         /// write <c>runtime.Player.GetInt("hp")</c>, the line the guide gives, without a <c>!</c>
         /// the guide never mentions. <see cref="HasPlayer"/> is the question worth asking, and it is
         /// asked once, at setup.
@@ -313,7 +313,7 @@ namespace Cantrip
         public IReadOnlyList<Entity> Party => State.Party;
 
         /// <summary>
-        /// The party's dead, in the order they fell — what <see cref="Party"/> and
+        /// The party's dead, in the order they fell: what <see cref="Party"/> and
         /// <c>State.Actors</c> leave out, and what content calls <c>fallen</c>.
         /// </summary>
         /// <remarks>
@@ -390,7 +390,7 @@ namespace Cantrip
 
         /// <summary>
         /// That member is done for this turn. When the last one that could act has passed, the
-        /// party's turn ends and the enemies take theirs — so for a party of one this is
+        /// party's turn ends and the enemies take theirs. For a party of one this is therefore
         /// <see cref="EndTurn"/>, to the byte.
         /// </summary>
         /// <returns>
@@ -486,7 +486,7 @@ namespace Cantrip
         /// member of the party. Every game calls it once, before anything else.
         /// </summary>
         /// <param name="name">
-        /// What the leader is called. It is not looked up in content — the leader is built from these
+        /// What the leader is called. It is not looked up in content: the leader is built from these
         /// three numbers rather than from a declaration, which is why a game that wants the leader to
         /// have a stat of its own, such as <c>speed</c>, sets it afterwards with
         /// <see cref="SetStat"/>.
@@ -571,14 +571,14 @@ namespace Cantrip
         }
 
         /// <summary>
-        /// <see cref="AddCard"/> for a whole list, into the leader's draw pile, in the order given —
+        /// <see cref="AddCard"/> for a whole list, into the leader's draw pile, in the order given,
         /// which is the order they are drawn in if the battle starts without a shuffle. Repeating a name
         /// is how a deck holds five Strikes.
         /// </summary>
         public IReadOnlyList<Entity> AddDeck(params string[] names) => names.Select(n => AddCard(n)).ToList();
 
         /// <summary>
-        /// Gives an actor a relic and announces it with <c>obtained</c> — unlike <see cref="AddCard"/>,
+        /// Gives an actor a relic and announces it with <c>obtained</c>, unlike <see cref="AddCard"/>,
         /// which is silent. A relic whose whole effect is an <c>on obtained:</c> block therefore fires
         /// here, during setup, before any battle has started.
         /// </summary>
@@ -601,8 +601,8 @@ namespace Cantrip
         /// <remarks>
         /// The event is an announcement rather than a gate: the enemy is already in the game when
         /// it is raised, so a <c>before created:</c> listener cannot stop a spawn the host has
-        /// decided on. What it buys is the thing a wave game needs and had no way to write — an
-        /// arrival effect, a self-placement, a relic that hears anything entering the fight:
+        /// decided on. What it buys is the thing a wave game needs and had no way to write (an
+        /// arrival effect, a self-placement, a relic that hears anything entering the fight):
         /// <c>on created(target:self): self.rank = 3</c> on the enemy's own declaration. In a turn
         /// game a spawn happens once, before the battle, so this never came up; in a real-time game
         /// it is the most frequent event there is.
@@ -636,8 +636,8 @@ namespace Cantrip
         /// </returns>
         /// <remarks>
         /// Where somebody stands is a rule and not a view, so the Godot node has nothing that does
-        /// this — but a rule still has to be reachable from the game that owns the fight above it.
-        /// A host with waves to place had to execute a string of content for every spawn, which
+        /// this. Even so, a rule still has to be reachable from the game that owns the fight above
+        /// it. A host with waves to place had to execute a string of content for every spawn, which
         /// turned a typo in a lane number from a compile error into a <c>DslException</c> on a hot
         /// path. A slot off the board is refused here with the board's own name and shape, rather
         /// than clamped: a wave walking in at a rank that does not exist is a bug in the schedule,
@@ -714,7 +714,7 @@ namespace Cantrip
         /// runs again from <see cref="Answer(int[])"/>.
         /// </returns>
         /// <param name="board">
-        /// The board to fight this battle on, by name, or null to keep the one in play — which
+        /// The board to fight this battle on, by name, or null to keep the one in play, which
         /// before the first battle is <see cref="ContentLibrary.DefaultBoard"/>. Content owns the
         /// shapes: a name no <c>board</c> declaration matches is refused rather than invented,
         /// because the linter has to know how deep a board is to check what reaches across it.
@@ -871,8 +871,8 @@ namespace Cantrip
         }
 
         /// <summary>
-        /// Runs steps until a living party member's is next — at which point the game is asked what
-        /// it does — or until the round is over.
+        /// Runs steps until a living party member's is next (at which point the game is asked what
+        /// it does) or until the round is over.
         /// </summary>
         private void AdvanceInitiative()
         {
@@ -892,10 +892,10 @@ namespace Cantrip
 
                 if (next.IsAlive)
                 {
-                    // A summoned minion takes a step of its own — its `turn_start` and `turn_end`
-                    // fire, which is how a Monster Train or Hearthstone minion attacks — but nobody
-                    // is asked what it does, so the round runs straight on through it. Stopping
-                    // there would wait forever for a pass that only a member can give.
+                    // A summoned minion takes a step of its own: its `turn_start` and `turn_end`
+                    // fire, which is how a Monster Train or Hearthstone minion attacks. Nobody is
+                    // asked what it does, though, so the round runs straight on through it.
+                    // Stopping there would wait forever for a pass that only a member can give.
                     if (next.Team == Team.Enemy) RunEnemyMove(next);
                     if (!State.InBattle) return;
                     EndStep(next);
@@ -937,7 +937,7 @@ namespace Cantrip
 
             if (CheckBattleOver()) return;
 
-            // A member draws its own hand at its own step, which is where `sides` draws it too —
+            // A member draws its own hand at its own step, which is where `sides` draws it too:
             // there, every member's turn starts at once. One with no pile of its own draws nothing.
             if (actor.IsPartyMember && actor.IsAlive && !_skipNextDraw)
             {
@@ -976,7 +976,7 @@ namespace Cantrip
 
         /// <summary>
         /// <c>EndTurn</c> under <c>turns: initiative</c>: every member of ours that still has a step
-        /// this round gives it up, and the round runs to its end around them — the enemies still
+        /// this round gives it up, and the round runs to its end around them. The enemies still
         /// take their steps, in their places. For a party of one that is exactly the old
         /// <c>EndTurn</c>: pass the one member, the enemies answer, the next round begins.
         /// </summary>
@@ -1030,10 +1030,10 @@ namespace Cantrip
                 if (!State.InBattle) return;
             }
 
-            // Each member draws from its own pile. One with no pile of its own draws nothing —
-            // Draw stops at an empty draw and an empty discard without touching the generator — and
-            // plays from the party's hand instead, which is the second of the two shapes and needs
-            // no setting to tell them apart.
+            // Each member draws from its own pile. One with no pile of its own draws nothing (Draw
+            // stops at an empty draw and an empty discard without touching the generator) and plays
+            // from the party's hand instead, which is the second of the two shapes and needs no
+            // setting to tell them apart.
             if (team == Team.Player && State.Player != null && (State.Player.IsAlive || State.Party.Count > 0))
             {
                 if (_skipNextDraw) _skipNextDraw = false;
@@ -1047,8 +1047,8 @@ namespace Cantrip
         /// Deals a hand to every living member. Returns false when the battle ended while dealing.
         /// </summary>
         /// <remarks>
-        /// Each member draws from its own pile. One with no pile of its own draws nothing — Draw
-        /// stops at an empty draw and an empty discard without touching the generator — and plays
+        /// Each member draws from its own pile. One with no pile of its own draws nothing (Draw
+        /// stops at an empty draw and an empty discard without touching the generator) and plays
         /// from the party's hand instead, which is the second of the two shapes and needs no
         /// setting to tell them apart.
         /// </remarks>
@@ -1139,7 +1139,7 @@ namespace Cantrip
         /// <remarks>
         /// The companion of <c>ends: called</c>: a game that has turned the automatic ending off
         /// needs a way to say the fight is over, and a wave game's ending is a rule of the game
-        /// above the fight — a timer ran out, a boss arrived, the gate held. It works under
+        /// above the fight (a timer ran out, a boss arrived, the gate held). It works under
         /// <see cref="BattleEnd.LastEnemy"/> too, for a retreat or a surrender.
         /// </remarks>
         public ActionResult EndBattle(bool won)
@@ -1234,7 +1234,7 @@ namespace Cantrip
         /// <param name="card">The card to play, from whichever member's hand it is in.</param>
         /// <param name="target">Who it is aimed at, or null to settle from the card's <c>target</c> line.</param>
         /// <param name="performer">
-        /// The member doing it, or null for the card's own controller — which is what every game
+        /// The member doing it, or null for the card's own controller, which is what every game
         /// before a party existed means, and what a party of one always has.
         /// </param>
         /// <remarks>
@@ -1242,7 +1242,7 @@ namespace Cantrip
         /// Everything else is the performer's: <c>card_played.source</c> is the performer, the
         /// damage comes from the performer, <c>source:</c> filters match the performer, and the
         /// performer's own statuses and modifiers apply. A card that draws draws into the
-        /// performer's pile, so a member with no pile of its own draws nothing — which is the same
+        /// performer's pile, so a member with no pile of its own draws nothing, which is the same
         /// sentence as the rule that gave it the party's hand to play from.
         /// </remarks>
         public ActionResult Play(Entity card, Entity? target = null, Entity? performer = null)
@@ -1266,7 +1266,7 @@ namespace Cantrip
         /// <param name="from">
         /// The zone the card must be in. <see cref="Play(Entity, Entity, Entity)"/> passes <c>hand</c>, which
         /// is what playing a card means for a player. The <c>play</c> verb passes null, meaning any
-        /// pile the card is sitting in — the whole point of "play the top card of your draw pile" —
+        /// pile the card is sitting in (the whole point of "play the top card of your draw pile"),
         /// and a card that is already in <c>play</c> or <c>powers</c> is still refused, because a card
         /// being played cannot be played again.
         /// </param>
@@ -1377,8 +1377,8 @@ namespace Cantrip
         /// <param name="target">What to aim it at, or null for one that needs no target.</param>
         /// <param name="performer">
         /// The member making the play, or null for the card's controller. The card is looked for in
-        /// that member's own hand first and then in the party's, which is the leader's — the same
-        /// two shapes a party can take, told apart by whether the member has a hand at all.
+        /// that member's own hand first and then in the party's, which is the leader's. Those are
+        /// the same two shapes a party can take, told apart by whether the member has a hand at all.
         /// </param>
         public ActionResult Play(string cardName, Entity? target = null, Entity? performer = null)
         {
@@ -1401,7 +1401,7 @@ namespace Cantrip
 
         /// <summary>
         /// The entities this action may be pointed at right now, in board order, after its own
-        /// <c>target … where</c> filter and content's <c>targetable</c> rules: exactly what
+        /// <c>target ... where</c> filter and content's <c>targetable</c> rules: exactly what
         /// <see cref="Play(Entity, Entity, Entity)"/> and <see cref="UseAbility(Entity, Entity)"/> accept.
         /// Empty for one that takes no target. A <c>target any</c> action may also be played at
         /// nothing, which this list cannot say, so a UI that wants to offer that asks
@@ -1443,7 +1443,7 @@ namespace Cantrip
         /// <param name="user">Who is using it, or null for the action's own controller.</param>
         /// <remarks>
         /// Which candidates there are is <see cref="Interpreter.LegalTargets(TargetRule, Entity, Entity)"/>'s
-        /// answer and nothing else's; what is left here is only what to do with the list — take the
+        /// answer and nothing else's; what is left here is only what to do with the list: take the
         /// one, ask, or roll. The ask happens inside the rolled-back action, so a target chosen
         /// through a <see cref="DeferredChooser"/> is answer number one and replays in the same
         /// place as any other choice the action goes on to make.
@@ -1468,7 +1468,7 @@ namespace Cantrip
                     IReadOnlyList<Entity> candidates = Interpreter.LegalTargets(rule, user, action);
                     if (candidates.Count == 0) return RefuseNobody(Interpreter.WhyNobody(rule, user, action));
 
-                    // One candidate is not a choice, so nobody is asked and nothing is rolled — which
+                    // One candidate is not a choice, so nobody is asked and nothing is rolled, which
                     // is also why a party of one behaves exactly as it always has.
                     target = candidates.Count == 1 ? candidates[0]
                         : automatic ? candidates[State.Rng.NextInt(0, candidates.Count - 1)]
@@ -1490,8 +1490,8 @@ namespace Cantrip
 
         /// <summary>
         /// The refusal for somebody the caller named. Reach is the one worth telling apart, because
-        /// it is the one the player can do something about; everything else — the wrong side, a
-        /// corpse, an entity that is not an actor, the action's own filter, a taunt — is
+        /// it is the one the player can do something about; everything else (the wrong side, a
+        /// corpse, an entity that is not an actor, the action's own filter, a taunt) is
         /// <see cref="ActionResult.InvalidTarget"/>, which is exactly what that word now means.
         /// </summary>
         /// <remarks>
@@ -1531,7 +1531,7 @@ namespace Cantrip
         // for others, which is what Taunt needs:
         // `modify targetable of allies where source:enemies, not it.has(Taunt): set 0`.
         //
-        // Only the `target` words that name someone ask — `enemy`, `ally` and `any`. `target self`
+        // Only the `target` words that name someone ask: `enemy`, `ally` and `any`. `target self`
         // is not a choice, so nothing is asked of it. Area and random effects resolve through the
         // interpreter's own selectors rather than here, which is deliberate: Taunt constrains what a
         // card may be pointed at, not what a blast reaches.
@@ -1582,7 +1582,7 @@ namespace Cantrip
         /// <summary>
         /// Who a move is really aimed at, after its own <c>range</c> and content's <c>targetable</c>
         /// rules. A move points at somebody the way a card does, so a taunt that takes the player off
-        /// the table sends the move to whoever is left — which is the whole of what a taunt is.
+        /// the table sends the move to whoever is left, which is the whole of what a taunt is.
         /// </summary>
         /// <remarks>
         /// The move keeps the target it was given whenever that target is still legal, and falls
@@ -1703,7 +1703,7 @@ namespace Cantrip
         /// </summary>
         /// <remarks>
         /// There was no typed way to write a number onto an entity at all, so a game that finished
-        /// creating its leader — a <c>speed</c> for <c>order: speed</c>, a starting shard count —
+        /// creating its leader (a <c>speed</c> for <c>order: speed</c>, a starting shard count)
         /// or spent gold in a shop had to build a statement and call <c>Execute</c>:
         /// <c>runtime.Execute($"lose {amount} gold")</c>, a string-interpolated statement, unchecked
         /// until it runs, for subtracting an integer.
@@ -1743,9 +1743,9 @@ namespace Cantrip
         /// </returns>
         /// <remarks>
         /// The Godot node has had this since the addon shipped, with a worked <c>upgrade_card</c>
-        /// recipe beside it, while C# was told to write <c>Execute("destroy target", target: card)</c>
-        /// — the same operation as a typed call on one side of the engine and a parsed string on the
-        /// other.
+        /// recipe beside it, while C# was told to write
+        /// <c>Execute("destroy target", target: card)</c>: one operation, a typed call on one side
+        /// of the engine and a parsed string on the other.
         /// </remarks>
         public bool RemoveCard(Entity card)
         {
@@ -1829,8 +1829,8 @@ namespace Cantrip
         /// <remarks>
         /// Modifiers see the converted duration rather than the number content wrote, so <c>x0.75</c>
         /// means the same three quarters whether the ability was authored in seconds or in turns.
-        /// The cost of that choice is that an additive amount is in clock units — ticks in real time,
-        /// turns otherwise — so a multiplier is the spelling that travels. Rounding is up, matching
+        /// The cost of that choice is that an additive amount is in clock units (ticks in real time,
+        /// turns otherwise), so a multiplier is the spelling that travels. Rounding is up, matching
         /// how a duration converts in the first place rather than how damage rounds down, and a
         /// cooldown never falls below nothing. The text a card prints still shows the cooldown as
         /// written, the way a printed cost does.
@@ -1880,7 +1880,7 @@ namespace Cantrip
         public ActionResult Answer(params int[] entityIds) => Answer((IEnumerable<int>)entityIds);
 
         /// <summary>
-        /// <see cref="Answer(int[])"/> for a caller holding the entities rather than their ids — a UI
+        /// <see cref="Answer(int[])"/> for a caller holding the entities rather than their ids: a UI
         /// that kept what the player clicked. Null counts as an empty selection, which cancels.
         /// </summary>
         public ActionResult Answer(IEnumerable<Entity> entities) => Answer((entities ?? Enumerable.Empty<Entity>()).Select(e => e.Id));
@@ -1891,7 +1891,7 @@ namespace Cantrip
         /// </summary>
         /// <exception cref="InvalidOperationException">
         /// Nothing is pending, or what is pending is an offer of content rather than a choice between
-        /// entities — answer that one with <see cref="Answer(EntityDefinition)"/>.
+        /// entities. Answer that one with <see cref="Answer(EntityDefinition)"/>.
         /// </exception>
         public ActionResult Answer(IEnumerable<int> entityIds)
         {
@@ -2415,7 +2415,7 @@ namespace Cantrip
                 Value value = Interpreter.Evaluate(node, call.Context);
 
                 // `replay Strike` reads as if it repeated a Strike, and there is no Strike: it would
-                // run the printed effect for nothing — no card, no cost, no play — which is the one
+                // run the printed effect for nothing (no card, no cost, no play), which is the one
                 // free lunch the other three verbs were closed against. A quoted name is text and
                 // lands in the same place, so both are refused as `copy`, `play` and `transform`
                 // refuse them.
@@ -2466,7 +2466,7 @@ namespace Cantrip
         /// <remarks>
         /// Where <c>replay</c> resolves an effect again for nothing, this is a real play: the card
         /// leaves its pile, pays, counts, and is filed afterwards by its tags. A refusal the rules
-        /// allow — a Curse, an unaffordable cost, no legal target — is not an error, because "play the
+        /// allow (a Curse, an unaffordable cost, no legal target) is not an error, because "play the
         /// top card of your draw pile" must not crash the first time the top card is a Curse.
         /// <c>played == none</c> is the language's own way of asking.
         /// </remarks>
@@ -2531,7 +2531,7 @@ namespace Cantrip
         /// <remarks>
         /// A target written with <c>on</c> is an instruction and is passed through as it stands, legal
         /// or not. One taken from the running effect is a hint, and a `play` written in a listener
-        /// inherits whatever that event happened to be about — the actor whose turn started, the card
+        /// inherits whatever that event happened to be about: the actor whose turn started, the card
         /// that was drawn, the player who was hit. Handing that to a <c>target enemy</c> card refuses
         /// the play, silently, which is "play the top card of your draw pile" not working in the one
         /// place it is most often written (Mayhem, Monster Train's automatic plays). So an inherited
