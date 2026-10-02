@@ -1,6 +1,6 @@
 # Cantrip.Cli
 
-The `cantrip` command-line tool for [Cantrip](https://github.com/AGomnes/Cantrip) content: check it, lint it, run its tests, play it many times with a bot, print its rules text, and try statements against a live game. It is built for .NET 9 and runs on .NET 9 or later.
+The `cantrip` command-line tool for [Cantrip](https://github.com/AGomnes/Cantrip) content: check it, lint it, run its tests, play it many times with a bot, print its rules text, and try statements against a live game. It is built for .NET 9 and runs on .NET 9 or later. Installing it and running it as `dotnet cantrip` needs the .NET 9 SDK or later, not the runtime alone, because a local tool is installed and resolved by the SDK. It needs no game engine installed, Godot included: the content it checks is text.
 
 **In Godot**, the [Cantrip addon](https://github.com/AGomnes/Cantrip/blob/main/docs/godot.md)'s editor dock already lints the content, runs its tests and previews its rules text inside the editor, so this tool is optional there. What it adds is `sim`, which plays a scenario hundreds of times with a bot, the REPL, and a single command a build server can run.
 
@@ -8,7 +8,7 @@ Install it into your project's folder, then run it as `dotnet cantrip`:
 
 ```
 dotnet new tool-manifest
-dotnet tool install Cantrip.Cli --prerelease
+dotnet tool install Cantrip.Cli
 
 dotnet cantrip validate content
 dotnet cantrip lint content
@@ -24,7 +24,7 @@ dotnet cantrip --version
 | `validate <path>...` | Loads the content and reports its errors, including the linter's errors such as an unknown verb | `--suppress <codes>` |
 | `lint <path>...` | Reports what `validate` does, plus likely mistakes as warnings, such as a name nothing defines, an event nothing raises, a listener written without `on`, or rules text that has drifted from its effect | `--suppress <codes>`; `--warnings-as-errors` fails on a warning as well as an error |
 | `test <path>...` | Runs the `test` blocks in the content | `--filter <text>` runs only the tests whose name contains the text; `--trace` prints the causality trace of each failing test, with what its `log` statements wrote |
-| `sim <path>...` | Plays the `scenario` blocks many times with two bots and reports what the content allowed: a run that threw, a battle that never ended, a card that was never playable, an enemy move that never fired. Under that, a table per bot for what that bot did with it, and where the hp went | `--name <text>`, `--runs N`, `--seed S`, `--bot cautious\|patient\|random\|both`, `--turn-limit N`, `--watch SEED`, `--against <path>` and `--against-name <text>` to set two versions of the content against each other seed by seed, `--suppress <codes>` |
+| `sim <path>...` | Plays the `scenario` blocks many times with two bots and reports what the content allowed: a run that threw, a battle that never ended, a card that was never playable, an enemy move that never fired. Under that, a table per bot for what that bot did with it, and where the hp went. A bot plays a scenario by taking turns, so a `scenario` in `clock ticks` content is refused (CT338): a real-time game is covered by `test` blocks instead, which have `realtime <rate>` and `tick <n>` | `--name <text>`, `--runs N`, `--seed S`, `--bot cautious\|patient\|random\|both`, `--turn-limit N`, `--watch SEED`, `--against <path>` and `--against-name <text>` to set two versions of the content against each other seed by seed, `--suppress <codes>` |
 | `describe <path>...` | Prints the generated rules text of every definition | `--name <name>` prints only that one |
 | `repl <path>...` | Starts a game from the content and runs each statement you type as the player, against a 100 hp Dummy. `:state` shows the game, `:trace` the causality trace, `:quit` leaves | |
 | `--version` | Prints the version and the commit it was built from | |
@@ -38,4 +38,4 @@ Each message starts with the file, line and column, then its level and a code su
 
 When a message is not enough, [Troubleshooting](https://github.com/AGomnes/Cantrip/blob/main/docs/troubleshooting.md) has the diagnostics a new project meets first, how to read a trace, and the mistakes that produce no diagnostic at all.
 
-This is a **preview**; see [stability](https://github.com/AGomnes/Cantrip/blob/main/docs/stability.md). In Godot, start with [the Godot addon](https://github.com/AGomnes/Cantrip/blob/main/docs/godot.md); anywhere else, with the [quickstart](https://github.com/AGomnes/Cantrip/blob/main/docs/quickstart.md). Writing content rather than code? Start with [Writing content](https://github.com/AGomnes/Cantrip/blob/main/docs/writing-content.md), which needs no C#.
+Cantrip 1.0 is out. The language this tool checks, and what each diagnostic code means, do not change for the whole 1.x line; see [stability](https://github.com/AGomnes/Cantrip/blob/main/docs/stability.md). The wording of its messages, its `sim` reports and the rules text it prints is not part of that, so match on the code, never on the sentence. In Godot, start with [the Godot addon](https://github.com/AGomnes/Cantrip/blob/main/docs/godot.md); anywhere else, with the [quickstart](https://github.com/AGomnes/Cantrip/blob/main/docs/quickstart.md). Writing content rather than code? Start with [Writing content](https://github.com/AGomnes/Cantrip/blob/main/docs/writing-content.md), which needs no C#. The linked docs describe the `main` branch, which can be ahead of this version; each release's own docs are in [its tag](https://github.com/AGomnes/Cantrip/tags).

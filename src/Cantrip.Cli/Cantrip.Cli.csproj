@@ -7,7 +7,7 @@
     <AssemblyName>cantrip</AssemblyName>
     <!-- Built for net9.0 but runs on any later runtime, so a machine with only a newer .NET can use it. -->
     <RollForward>Major</RollForward>
-    <Description>The cantrip command-line tool: validate, lint, test and describe Cantrip content, and try statements in a REPL.</Description>
+    <Description>The cantrip command-line tool: validate, lint, test and describe Cantrip content, play its scenarios many times with a bot, and try statements in a REPL.</Description>
     <PackageId>Cantrip.Cli</PackageId>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>cantrip</ToolCommandName>

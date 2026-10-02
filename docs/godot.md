@@ -50,9 +50,9 @@ What a GDScript project takes on by using it:
 2. **Add the rules engine** from NuGet, in the folder with your `.csproj`, at the same version as
    the addon (the addon's is in its `plugin.cfg`):
    ```
-   dotnet add package Cantrip.Core --version 0.1.0-preview.5
+   dotnet add package Cantrip.Core --version 1.0.0
    ```
-   `--prerelease` alone would install the newest preview, which may not match the addon you have.
+   `--prerelease` would install a pre-release, which may not match the addon you have; plain `dotnet add package Cantrip.Core` installs the newest stable, which may be a later 1.x than your addon.
 
    Offline, reference the DLL instead. The Cantrip.Core `.nupkg` attached to each GitHub release is a
    zip file: copy `lib/netstandard2.1/Cantrip.Core.dll` (and `Cantrip.Core.xml`, for editor help)
@@ -1415,7 +1415,7 @@ trip, like the dock in use, is checked by hand.
   library out of step, and why the game will not speed up.
 - [The API reference](api/Cantrip.GodotAdapter.md) is the node's whole script surface, generated
   from the sources, beside [the rest of the library](api/README.md).
-- [stability.md](stability.md) says what may change between previews, where it has been tested,
+- [stability.md](stability.md) says what may change in a 1.x release, where it has been tested,
   its known limitations and how to report a problem.
 
 ## Working on the addon
@@ -1430,8 +1430,8 @@ It takes the version from `plugin.cfg`, so the two cannot disagree. Each release
 and copies the addon to AGomnes/cantrip-godot, whose README is `tools/addon-repo/README.md`.
 
 Both READMEs link this guide on `main`. Given a tag or branch as well, such as
-`bash tools/package-addon.sh artifacts v0.1.0-preview.5` or
-`pwsh tools/package-addon.ps1 -Ref v0.1.0-preview.5`, the script points the addon README's links
+`bash tools/package-addon.sh artifacts v1.0.0` or
+`pwsh tools/package-addon.ps1 -Ref v1.0.0`, the script points the addon README's links
 into this repository at that tag instead, and the release workflow does the same to the
 cantrip-godot README, so a user reads the guide for the version they installed. Without one, the
 links are left as they are.

@@ -5,7 +5,7 @@ game would be, from the published docs and the samples.
 
 Three keepers hold a burning line for forty-five seconds against things that walk out of the dark.
 Nothing in it takes a turn. The host advances a clock twenty times a second from its own fixed
-timestep; the keepers' five abilities wait between one and six seconds each; the enemies act from
+timestep; the keepers' six abilities wait between one and six seconds each; the enemies act from
 their own `on every 2s:` and `on every 3s:` listeners; a flare lights a target now and lands its
 fire two seconds later; and a save taken mid-fight brings the clock, the cooldowns, the burn part
 way through a second and the flare still in the air back with it.
@@ -15,7 +15,7 @@ way through a second and the flare still in the air back with it.
 | [`content/`](content) | The game, as `.cantrip`: a `clock ticks` ruleset, a board, two heroes, six abilities, four statuses, three enemies, two placement verbs and 18 tests |
 | [`host/`](host) | A C# host that plays the hold headlessly, with the wave schedule, the frame loop and the save test |
 | [`godot/`](godot) | The playable front end, a Godot project of its own, with its clock coming from the engine's physics loop through the addon's `TickDriver` |
-| [`FINDINGS.md`](FINDINGS.md) | What hurt while building it. The other half of the deliverable |
+| [`FINDINGS.md`](FINDINGS.md) | What hurt while building it, kept as it was written: sixteen findings ranked by how much each would hurt a real developer, then a section on what was genuinely good, then #18 — whether real time was ready to be called stable at 1.0. It answered no; all seven things it asked for were done, and every finding now says what was decided about it |
 
 ## Running it
 
@@ -40,18 +40,23 @@ project and an addon can only be placed, never referenced:
 ```
 bash realtime/godot/assemble.sh
 dotnet build realtime/godot/Cantrip.Realtime.Godot.csproj
-Godot_v4.6.2-stable_mono_win64.exe --path realtime/godot
+godot --path realtime/godot
 ```
 
 `assemble.sh` copies `godot/Cantrip.Demo/addons/cantrip` and `realtime/content` into the project;
 neither is in the repository twice, and both are gitignored there.
+
+`godot` is whatever your Godot 4.6.x .NET edition binary is called: the addon is tested on 4.6.1
+and 4.6.2, and CI runs 4.6.1 on Linux. To play it headlessly, as CI does, run
+`godot --headless --path realtime/godot --import` once, and then
+`godot --headless --path realtime/godot res://game/emberline.tscn -- --emberline-auto`.
 
 ## What it exercises, and why it was built that way
 
 A hold against waves was chosen over a duel or an arena for one reason: **it makes the clock the
 subject**. A duel on a tick clock is a turn game played quickly, and would have hidden most of
 what this round was for. A hold has to answer, every second, what is closing, what is in reach,
-which of five cooldowns is worth spending now and which is worth saving for the next three
+which of six cooldowns is worth spending now and which is worth saving for the next three
 seconds — and it forces the host to own time, spawning, pacing and the ending, which is precisely
 the surface a turn game never touches.
 
@@ -63,8 +68,10 @@ the surface a turn game never touches.
   the moment the last enemy is gone, and in a wave game the board is empty every few seconds by
   design. Here the game says when the fight is over: the host calls `EndBattle` at forty-five
   seconds, or the keepers fall.
-- **Five cooldowns competing.** 1s, 3s, 5s, 6s and 6s, deliberately not multiples of each other,
-  so they come back at different moments and the player is never offered all of them at once.
+- **Six cooldowns competing.** 1s, 3s, 5s, 5s, 6s and 6s — four different lengths across six
+  abilities. They all start ready, so the opening second is the one moment everything is
+  available; after that they are spent at different moments and come back at different ones, and
+  the player is choosing between whatever happens to be up.
 - **A board where range decides everything.** Three lanes, five ranks, `facing`. Keepers hold rank
   0; waves walk in at rank 3 and close a rank at a time. `Ember Bolt` reaches the whole line,
   `Backdraft` two ranks, `Haul` two — so letting something get close is both the danger and the
@@ -92,4 +99,4 @@ the surface a turn game never touches.
 | Scene | |
 |---|---|
 | `game/emberline.tscn` | The game, with its clock coming from `TickDriver` in the physics loop. Run with `-- --emberline-auto` and it plays itself and quits, which is what CI does |
-| `game/checks.tscn` | 40 checks of the node on a tick clock: real time through the node, `Place`, abilities and their cooldown sweeps in seconds, the clock read-out, reach, a save restored into a fresh node with a delayed effect in the air, an empty board not winning the fight, the driver advancing the clock from real physics frames, pausing it, and its `TotalTicks`, `DroppedTicks` and `Reset` |
+| `game/checks.tscn` | 42 checks of the node on a tick clock: real time through the node, `Place`, abilities and their cooldown sweeps in seconds, the clock read-out, reach, a save restored into a fresh node with a delayed effect in the air, an empty board not winning the fight, the driver advancing the clock from real physics frames, pausing it, and its `TotalTicks`, `DroppedTicks` and `Reset` |

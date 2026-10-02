@@ -131,7 +131,7 @@ namespace Cantrip.Tests.Snapshots
             // build metadata: what a changelog line, a bug report and a package all call it.
             Assert.NotEqual(string.Empty, GameSnapshot.CurrentWriter);
             Assert.DoesNotContain("+", GameSnapshot.CurrentWriter);
-            Assert.StartsWith("0.", GameSnapshot.CurrentWriter);
+            Assert.Matches(@"^\d+\.\d+\.\d+", GameSnapshot.CurrentWriter);
 
             // A snapshot built by hand rather than captured makes none of those three claims.
             var built = new GameSnapshot();

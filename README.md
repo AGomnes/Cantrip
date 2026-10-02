@@ -1,21 +1,32 @@
 # Cantrip
 
 [![CI](https://github.com/AGomnes/Cantrip/actions/workflows/ci.yml/badge.svg)](https://github.com/AGomnes/Cantrip/actions/workflows/ci.yml)
-[![NuGet](https://img.shields.io/nuget/vpre/Cantrip.Core?label=Cantrip.Core)](https://www.nuget.org/packages/Cantrip.Core)
+[![NuGet](https://img.shields.io/nuget/v/Cantrip.Core?label=Cantrip.Core)](https://www.nuget.org/packages/Cantrip.Core)
+[![NuGet](https://img.shields.io/nuget/v/Cantrip.Cli?label=cantrip%20tool)](https://www.nuget.org/packages/Cantrip.Cli)
 
 **Write your cards, abilities, statuses, relics and enemies as short scripts instead of code.**
 
 [Godot addon](docs/godot.md) · [Quickstart](docs/quickstart.md) · [Writing content](docs/writing-content.md) · [Language reference](docs/language.md) · [C# guide](docs/csharp.md) · [API reference](docs/api/README.md) · [Troubleshooting](docs/troubleshooting.md) · [Stability](docs/stability.md) · [Changelog](CHANGELOG.md)
 
-Cantrip is a rules language and rules engine for the combat in single-player games, where one side fights AI enemies. It was written for deckbuilders and roguelites in the style of Slay the Spire, and neither cards nor turns are required: a roguelike whose actors use abilities on cooldowns is the same engine without cards, as [samples/abilities](samples/abilities) shows, and a game that says `clock ticks` measures time in seconds instead of turns and is driven from its own fixed timestep, as [realtime/](realtime) shows. You write cards, abilities, statuses, relics and enemies as short `.cantrip` files, with their own tests, and the rules engine works out how they interact. Your game drives the battles and keeps the rendering, input, map and rewards between battles in its own code.
+Cantrip is a rules language and rules engine for the combat in single-player games, where one side fights AI enemies. You write cards, abilities, statuses, relics and enemies as short `.cantrip` files, with their own tests, and the rules engine works out how they interact. Your game drives the battles and keeps the rendering, input, map and rewards between battles in its own code.
+
+It was written for deckbuilders and roguelites in the style of Slay the Spire, but none of that shape is required: your side can be a party rather than one hero, the battle can be fought on a board rather than in one row, and the cards and the turns can both go.
+
+- **A party.** A `hero` is an actor on your side that the game asks for input, with its own hp, its own abilities on their own cooldowns, and its own hand, energy and piles if you give it them — or one hand and one energy pool for the party, with a member named as the one performing the play. The party takes its turn as a side (`turns: sides`) or in one order over both sides (`turns: initiative`), ordered by where they stand or by a `speed` stat. The battle is lost when the last member falls, not when the leader dies, and `revive` brings one back out of `fallen`. The leader `CreatePlayer` makes is already a member, so a party of one is every game written before this existed. [samples/party](samples/party) is a worked one, with a taunt that re-aims an enemy's telegraph.
+- **A board.** A `board` is a rectangle of lanes and ranks that content declares. A card, an ability or an enemy's move carries a `range`; `adjacent`, `within`, `lane`, `rank` and `distance` ask about the board; and movement is a write to a place, `target.rank = 0`. Content that declares no board is played on one lane, so nothing written before boards existed moves. [samples/board](samples/board) is a Monster Train style train, three floors tall.
+- **No cards.** A roguelike whose actors use abilities on cooldowns is the same engine without cards, as [samples/abilities](samples/abilities) shows.
+- **No turns.** A game that says `clock ticks` measures time in seconds rather than turns, and your own fixed timestep drives it, as [realtime/](realtime) shows.
 
 You use it from **Godot 4.6, on Godot's .NET edition**, writing GDScript or C#, through the [Cantrip addon](docs/godot.md) — or from **any other .NET project** on .NET 5 or later, because the rules engine underneath the addon references no game engine at all.
+
+Two whole games are in this repository, and CI plays both end to end, headlessly and in Godot: [reference/](reference) is *The Drowned Chapel*, a turn-based party roguelite fought on a board, and [realtime/](realtime) is *Emberline*, a forty-five second hold on the tick clock. Each has its content, a headless C# host, a Godot front end of its own, and a `FINDINGS.md` — [reference/FINDINGS.md](reference/FINDINGS.md), [realtime/FINDINGS.md](realtime/FINDINGS.md) — written while building it from the published docs alone, saying what hurt. Most of [docs/troubleshooting.md](docs/troubleshooting.md) comes from those two files.
 
 **Where to start**
 
 - **A Godot game, in GDScript or C#:** [docs/godot.md](docs/godot.md) installs the addon and plays a [first battle](docs/godot.md#your-first-battle). You need Godot's .NET edition, the .NET SDK, and a C# solution in the project even if the game is all GDScript — but no C# of your own to write.
 - **Any other .NET game:** the [quickstart](docs/quickstart.md) goes from an empty folder to a battle you can play in a terminal, in about fifteen minutes.
 - **Writing cards rather than code:** [docs/writing-content.md](docs/writing-content.md) walks through a first card, status, relic and enemy with their tests, then gives recipes for common effects. It needs no C#, and in Godot no command line either: the addon's dock checks and tests the files in the editor.
+- **Reading a finished game first:** [reference/](reference) is a whole turn-based roguelite — a party of three, two boards, thirteen cards, six relics, seven floors and a run above the battle — and [realtime/](realtime) is a whole real-time one, three keepers holding a line for forty-five seconds with nothing in it taking a turn. Each runs from this repository with one command.
 
 ## Why
 
@@ -66,25 +77,26 @@ None of these knows about the others. A Fireball on a frozen enemy deals its 6 d
 
 ## What you get
 
-- **A language for game effects.** Cards, statuses, relics, enemies with move patterns and phases, abilities, resources, and your own verbs beside built-in ones such as `deal` and `apply`. Listeners (`on ...` blocks) can act before, instead of or after any event. Modifiers combine in layers, by default adding first, then multiplying, then clamping and overriding. Effects can be scheduled for next turn or undone at the end of this one.
-- **A rules engine that runs it.** Turns, card play, draw and enemy intents. It is deterministic by design, with fixed-point maths and a seeded random generator, so the same seed and inputs replay the same game within one version of Cantrip; CI checks exact results on Linux and Windows x64. Battle state can be saved between actions and loaded again against the same content. Content can be reloaded into a running game. And an effect can stop to ask the player something, such as which card to discard, and carry on once your UI answers.
+- **A language for game effects.** Cards, statuses, relics, enemies with move patterns and phases, heroes, abilities, boards, resources, and your own verbs beside built-in ones such as `deal` and `apply`. Listeners (`on ...` blocks) can act before, instead of or after any event. Modifiers combine in layers, by default adding first, then multiplying, then clamping and overriding. Effects can be scheduled for next turn or undone at the end of this one.
+- **A rules engine that runs it.** Turns, card play, draw and enemy intents; a party of heroes taking their own steps, by side or by initiative; a board of lanes and ranks, with reach and movement over it; and a tick clock, for a game that takes no turns at all. It is deterministic by design, with fixed-point maths and a seeded random generator, so the same seed and inputs replay the same game within one version of Cantrip; CI checks exact results on Linux and Windows x64. Battle state can be saved between actions and loaded again against the same content. Content can be reloaded into a running game. And an effect can stop to ask the player something, such as which card to discard, and carry on once your UI answers.
 - **Tools for the people writing content.** Tests written in content, a linter for unknown names, events nothing raises and similar mistakes, rules text that shows live numbers ("deal ~~6~~ 9 damage"), and a trace of why everything happened.
 - **A Godot addon, over an engine-free core.** The [addon](docs/godot.md), for the .NET edition of Godot 4.6, adds a node GDScript can drive, an importer so `.cantrip` files reach exported builds, and an editor dock that writes content, lints it as you type, runs its tests and previews its card text. Underneath it the core targets `netstandard2.1` and references no game engine, so the same content runs in a console app, a plain .NET engine or a test with nothing of Godot's in the way.
+- **Survives being published.** A shipped game is usually published trimmed, and sometimes with Native AOT, which is where a rules engine tends to die: reflection, `System.Text.Json` and dynamic dispatch are the usual casualties. `Cantrip.Core` is marked `IsTrimmable` and nothing in it reflects over its own types, so it produces no trim or AOT warnings; CI publishes [the reference game](reference) both ways — the trim and AOT analysers on, every one of their warnings an error — and then plays eight whole runs with a save and a restore *in the binary that came out*. The one thing your game must do differently is give `System.Text.Json` a source-generated context, which is four lines; [Publishing a game](docs/stability.md#publishing-a-game) covers it.
 - **Checked against effects from real games.** [docs/coverage.md](docs/coverage.md) re-creates effects from Slay the Spire, Monster Train, Hearthstone, Balatro, Magic, Inscryption, Dominion, Darkest Dungeon and Dota 2 under its own names, and records which the language writes directly, which need a workaround and which it cannot express yet, such as Balatro's poker hands. Cantrip is not affiliated with these games or their publishers. [`samples/slice`](samples/slice) is a small five-floor roguelite that a bot plays, to find content that throws, stalls or can never be played. [samples/README.md](samples/README.md) lists it with the other samples and says how to test each one.
 
 ## What it does not do
 
-- **A second player.** There is one player; enemies act from move patterns, and nothing can respond to a card while it is being played, so a counterspell or an interrupt has nowhere to happen. There is no networking. An enemy *can* hold cards of its own and play them, since a card belongs to whoever controls it, but your game decides what it plays.
+- **A second player.** There is one side you control — one hero, or a party of them; enemies act from move patterns, and nothing can respond to a card while it is being played, so a counterspell or an interrupt has nowhere to happen. There is no networking. An enemy *can* hold cards of its own and play them, since a card belongs to whoever controls it, but your game decides what it plays.
 - **The run.** The map, rewards, shops and events between battles are your game's code.
-- **Space in metres.** A battle happens on a board of lanes and ranks — a rectangle of slots content declares, with reach, areas and movement over it — and never on a position in space. A query in real units, such as `within(target, 5m)`, still comes from your game.
+- **Space in metres.** A battle happens on a [board of lanes and ranks](docs/language.md#boards) — a rectangle of slots content declares, with reach, areas and movement over it — and never on a position in space. A query in real units, such as `within(target, 5m)`, still goes to your game's `IEffectHost.TryCall`.
 - **Rendering, input and animation.** Your game presents what happened from the events the rules engine reports.
 - Some mechanics are not expressible yet, among them a Magic-style priority window, copying or silencing another entity's effects, and grouping played cards into poker hands. [docs/coverage.md](docs/coverage.md) keeps the list.
 
 ## Status
 
-**Preview (0.x).** The current version is on the NuGet badge above and in the [changelog](CHANGELOG.md). The core has unit tests and content tests, and a small roguelite has been built with it and played headlessly by a bot, but no shipped game uses Cantrip yet. The API, the language and the save format may change between previews; [docs/stability.md](docs/stability.md) says how, and lists the tested platforms and the known limitations. Among them, the Godot addon has so far been installed only by its author and by an automated test.
+**Stable (1.x).** The current version is on the NuGet badges above and in the [changelog](CHANGELOG.md). The C# API, the Godot addon's script surface, the language and the save format are a promise for the whole 1.x line: code, content and saves written against 1.0 keep working in every 1.x release. [docs/stability.md](docs/stability.md) says exactly what that covers, what a 1.x release may still change — same-seed results, the wording of messages, a warning that becomes an error — how each of those is checked, which platforms are tested, and what is known not to work yet. The two games above are what has been built with it, and CI plays both; among the known limitations, the Godot addon has so far been installed only by its author and by an automated test, and no shipped game uses Cantrip yet.
 
-These docs describe the `main` branch, which can be ahead of the latest release. The changelog's [Unreleased](CHANGELOG.md#unreleased) section lists what that release lacks, and each release's own docs are in [its tag](https://github.com/AGomnes/Cantrip/tags).
+These docs describe the `main` branch, which can be ahead of the latest release. Each release's own docs are in [its tag](https://github.com/AGomnes/Cantrip/tags), and the [changelog](CHANGELOG.md) says what each release changed.
 
 Cantrip is written and maintained by one person. Feedback is the most useful thing right now, especially effects from your game that the language cannot express. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -94,7 +106,7 @@ Cantrip is written and maintained by one person. Feedback is the most useful thi
 
 You need the **.NET edition** of Godot 4.6 and the .NET SDK 8 or later. A project written entirely in GDScript also needs a C# solution in it, which Project → Tools → C# → Create C# solution writes: the addon is C# source, because Godot finds scripts by path inside the project's own assembly, so only the library underneath can be a package. You write none of that C# yourself.
 
-Put `addons/cantrip` in the project, from any of three places: the editor's AssetLib tab, once Cantrip is listed there; the zip on any [release](https://github.com/AGomnes/Cantrip/releases), whose root is `addons/cantrip`; or [AGomnes/cantrip-godot](https://github.com/AGomnes/cantrip-godot), the mirror each release copies the addon to in the layout the Asset Library installs from. Then add the rules engine, at the version in the addon's `plugin.cfg` rather than with `--prerelease`, which may fetch a newer preview than the addon you have:
+Put `addons/cantrip` in the project, from any of three places: the editor's AssetLib tab, once Cantrip is listed there; the zip on any [release](https://github.com/AGomnes/Cantrip/releases), whose root is `addons/cantrip`; or [AGomnes/cantrip-godot](https://github.com/AGomnes/cantrip-godot), the mirror each release copies the addon to in the layout the Asset Library installs from. Then add the rules engine, at the version in the addon's `plugin.cfg` rather than leaving the version off, which may fetch a release newer than the addon you have:
 
 ```
 dotnet add package Cantrip.Core --version <the version in plugin.cfg>
@@ -113,7 +125,7 @@ func _ready() -> void:
 	rules.CreatePlayer("Player", 80, 3)           # name, hp, energy each turn
 	rules.AddDeck(["Strike", "Strike", "Defend", "Fireball"])
 	rules.AddRelic("Kindling")
-	worm = rules.SpawnEnemy("Jaw Worm", 0)        # 0: the hp its content gives it
+	worm = rules.SpawnEnemy("Jaw Worm", -1)       # -1: the hp its content gives it
 	rules.StartBattle(true, true)                 # shuffle the draw pile, draw the opening hand
 
 # A card button in your scene calls this; an End turn button calls rules.EndTurn().
@@ -134,9 +146,9 @@ The library targets `netstandard2.1`, so your game can target .NET 5 or later, s
 In your game's project folder, add the library and the tool:
 
 ```
-dotnet add package Cantrip.Core --prerelease
+dotnet add package Cantrip.Core
 dotnet new tool-manifest
-dotnet tool install Cantrip.Cli --prerelease
+dotnet tool install Cantrip.Cli
 ```
 
 The tool manifest lets the folder run the tool as `dotnet cantrip`. With your `.cantrip` files in a `content` folder, `dotnet cantrip test content` runs their tests and `dotnet cantrip lint content` checks them. The [quickstart](docs/quickstart.md) takes the same steps to a battle you can play in the terminal.
@@ -178,6 +190,8 @@ Your game learns what happened, to animate it, from events: damage, cards moving
 - [Coverage](docs/coverage.md): which effects from existing games the language can express
 - [Simulating](docs/simulating.md): playing a scenario many times with a bot, and what that measures
 - [Slice friction](docs/slice-friction.md): what building a small roguelite on Cantrip needed
+- [The reference game](reference/README.md): *The Drowned Chapel*, a whole turn-based party roguelite, and [what building it found](reference/FINDINGS.md)
+- [The real-time game](realtime/README.md): *Emberline*, a whole game on the tick clock, and [what building it found](realtime/FINDINGS.md)
 - [Stability](docs/stability.md): what may change, platforms, performance and known limitations
 - [Changelog](CHANGELOG.md)
 
@@ -190,7 +204,7 @@ Installed as a local tool, the commands run as `dotnet cantrip ...`. In Godot th
 | `dotnet cantrip validate <path>... [--suppress codes]` | Reports errors, including unknown verbs |
 | `dotnet cantrip lint <path>... [--suppress codes] [--warnings-as-errors]` | Also reports likely mistakes, such as events nothing raises |
 | `dotnet cantrip test <path>... [--filter text] [--trace]` | Runs the `test` blocks; `--trace` adds the causality trace, with any `log` output, to each failure |
-| `dotnet cantrip sim <path>... [--runs N] [--seed S] [--bot name] [--turn-limit N] [--watch SEED]` | Plays the `scenario` blocks many times with two bots, and reports what the content allowed and where the hp went |
+| `dotnet cantrip sim <path>... [--name text] [--runs N] [--seed S] [--bot name] [--turn-limit N] [--watch SEED] [--against path] [--against-name text] [--suppress codes]` | Plays the `scenario` blocks many times with two bots, and reports what the content allowed and where the hp went; `--against` also plays the scenarios in a second path, with the same bots and the same seeds, and reports the difference seed by seed: content before and after a change, or two decks |
 | `dotnet cantrip describe <path>... [--name name]` | Prints generated rules text |
 | `dotnet cantrip repl <path>...` | Runs each statement you type as the player, against a 100 hp Dummy; `:state`, `:trace`, `:quit` |
 | `dotnet cantrip --version` | Prints the version and the commit it was built from |

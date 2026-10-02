@@ -5,7 +5,7 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <RootNamespace>Cantrip</RootNamespace>
     <AssemblyName>Cantrip.Core</AssemblyName>
-    <Description>Write cards, statuses, relics, enemies and abilities as short text files instead of code. The engine-free core of Cantrip: parser, content loading, entities, events, modifiers, interpreter, battle runtime, linter and DSL test runner.</Description>
+    <Description>Write cards, statuses, relics, enemies, heroes and abilities as short text files instead of code, and run them in turns or in real time. The engine-free core of Cantrip: parser, content loading, entities, party, board, clocks, events, modifiers, interpreter, battle runtime, linter and DSL test runner.</Description>
     <PackageId>Cantrip.Core</PackageId>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <!-- Ship the XML docs so editors show them; members without docs stay quiet (CS1591). -->
@@ -14,7 +14,9 @@
       PublicAPI.Shipped.txt lists the public surface each release shipped; the build fails (RS0016,
       RS0017) when that surface changes without the change being written into PublicAPI.Unshipped.txt,
       so an API change is always a visible diff. RS0026 flags overloads that both have optional
-      parameters; the ones it names shipped in 0.1.0-preview.1 and are kept for compatibility.
+      parameters; it names the two `Play` overloads, whose third parameter says which party member
+      is performing the play. Naming the performer has to be optional, because almost no game has a
+      party and every call written before 1.0 leaves it out.
     -->
     <WarningsAsErrors>$(WarningsAsErrors);RS0016;RS0017</WarningsAsErrors>
     <NoWarn>$(NoWarn);RS0026</NoWarn>
@@ -25,17 +27,19 @@
       The engine is safe to trim, and says so, so a published game's trimmer removes what its game
       does not use instead of keeping the whole assembly. It is warranted rather than hopeful:
       nothing in Cantrip.Core reflects over its own types — the snapshot is plain data by design
-      and the interpreter dispatches on syntax nodes, not on names — and the only reflection in it
-      is one read of this assembly's own version attribute. `tools/publish-check.sh` publishes the
-      reference game trimmed and AOT, with the analysers on and warnings not suppressed, and runs
-      what it built; CI runs it, so this claim is checked rather than asserted.
+      and the interpreter dispatches on syntax nodes, not on names — and the only reflection a
+      trimmer could take is one read of this assembly's own version attribute, which every save
+      records. A test asserts that read still works in the published binary, because nothing else
+      would notice if it stopped. `tools/publish-check.sh` publishes the reference game trimmed and
+      AOT, with the analysers on and warnings not suppressed, and runs what it built; CI runs it,
+      so this claim is checked rather than asserted.
     -->
     <AssemblyMetadata Include="IsTrimmable" Value="True" />
 
     <InternalsVisibleTo Include="Cantrip.Core.Tests" />
     <!--
-      The simulator is part of the tool, not part of the library's promise: it shares the setup
-      session and a few interpreter primitives that a game has no reason to reach for.
+      The simulator is part of the tool, not part of the library's promise. All it reaches for is
+      the setup session, which is how a `scenario` states the fight it plays.
     -->
     <InternalsVisibleTo Include="Cantrip.Sim" />
     <None Include="PACKAGE.md" Pack="true" PackagePath="README.md" />

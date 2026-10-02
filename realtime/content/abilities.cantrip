@@ -1,9 +1,10 @@
-# Five abilities on five different cooldowns, which is the whole of the player's interface.
+# Six abilities on six cooldowns, which is the whole of the player's interface.
 #
 # There are no cards in Emberline and no energy: an ability's only price is the seconds it makes
 # you wait, so the game is deciding what to spend the next second of attention on. The cooldowns
-# are deliberately coprime-ish -- 1s, 3s, 5s, 6s, 9s -- so they come off cooldown at different
-# moments and the player is never offered all five at once.
+# are 1s, 3s, 5s, 5s, 6s and 6s -- two to each of the three keepers, and all six ready when the
+# hold starts. The one-second bolt is always a second away; the longer ones are the ones worth
+# holding, because spending one now is deciding not to have it for the next three to six seconds.
 
 # The Stoker's workhorse. One second, reaches the whole board, small.
 ability "Ember Bolt"

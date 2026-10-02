@@ -14,9 +14,9 @@ You need the [.NET 9 SDK](https://dotnet.microsoft.com/download) or later. Creat
 ```
 dotnet new console -o HexDuel
 cd HexDuel
-dotnet add package Cantrip.Core --prerelease
+dotnet add package Cantrip.Core
 dotnet new tool-manifest
-dotnet tool install Cantrip.Cli --prerelease
+dotnet tool install Cantrip.Cli
 mkdir content
 ```
 
@@ -172,8 +172,12 @@ The whole rules engine is behind those few calls. Nothing in `Program.cs` knows 
 - [godot.md](godot.md) runs this same content in Godot 4.6 through the addon: a node GDScript drives, an importer that carries `.cantrip` files into exported builds, and an editor dock for problems, tests and card text.
 - [writing-content.md](writing-content.md) is for whoever writes the cards, statuses, relics and enemies: a tutorial that goes further than steps 2 and 3, the edit and test loop, and recipes for common mechanics.
 - [language.md](language.md) is the full language reference: every declaration, event, verb and modifier.
-- [csharp.md](csharp.md) covers the rest of the C# side: showing events in a game's frame loop, player choices a UI answers, several battles in one run, saving and loading, hot reload, shipping content, and tracing why something happened.
-- [samples/slice](../samples/slice) is a bigger example, a five-floor roguelite. `dotnet cantrip sim samples/slice` plays its tower hundreds of times with two bots and reports what the content allowed: a run that threw, a fight that never ended, a card that was never playable, an enemy move that never fired — and where the hp went, which is the engine's own arithmetic rather than a judgement about play. [Simulating](simulating.md) covers it. The samples are in the repository rather than the packages, so clone it to run them; [samples/README.md](../samples/README.md) shows how, and describes the other samples.
+- [csharp.md](csharp.md) covers the rest of the C# side: showing events in a game's frame loop, player choices a UI answers, a party of heroes the game asks for input in turn, several battles in one run, real time on a tick clock your game advances instead of turns, saving and loading, hot reload, shipping content, and tracing why something happened.
+- [api/README.md](api/README.md) lists every public type and member of `Cantrip.Core`, generated from the sources. The guides are the place to start; this is the place to look a call up.
+- [troubleshooting.md](troubleshooting.md) is where to go when something will not load, a card will not play, a fight never ends or a save is refused. Most of it comes from two people building whole games on Cantrip from these docs alone and writing down every place they got stuck.
+- [samples/slice](../samples/slice) is a larger sample, a five-floor roguelite. `dotnet cantrip sim samples/slice` plays its tower hundreds of times with two bots and reports what the content allowed: a run that threw, a fight that never ended, a card that was never playable, an enemy move that never fired — and where the hp went, which is the engine's own arithmetic rather than a judgement about play. [Simulating](simulating.md) covers it. The samples are in the repository rather than the packages, so clone it to run them; [samples/README.md](../samples/README.md) shows how, and describes the other samples.
+- [reference/](../reference) is a whole game rather than a sample: *The Drowned Chapel*, a party of three descending seven floors of a flooded chapel, on a board, with cards and abilities together and a C# host that plays the run above the battles. It was built from these docs alone, and [reference/FINDINGS.md](../reference/FINDINGS.md) records every place that hurt. [realtime/](../realtime) is the same on the tick clock: *Emberline*, three keepers holding a burning line for forty-five seconds with nothing in it taking a turn, driven from the host's own fixed timestep.
+- A battle need not be one hero taking turns with cards. [The party](csharp.md#the-party) adds heroes the game asks for input from, each with its own abilities and cooldowns; a [`board`](language.md#boards) puts a fight on lanes and ranks and gives a card, an ability or an enemy's move a `range`, which is what the `OutOfRange` in step 4 means; and [Real time](csharp.md#real-time) replaces turns with a clock the game ticks from its own frame loop. The small versions are [samples/party](../samples/party), a party with an enemy that telegraphs which of them it is going to hit; [samples/board](../samples/board), a Monster Train style train three floors tall; and [samples/abilities](../samples/abilities), a turn-based fight with no cards in it at all. Real time has no small sample of its own: [realtime/](../realtime) above is it.
 
 ## Working from source
 
@@ -188,4 +192,4 @@ dotnet add reference ../Cantrip/src/Cantrip.Core/Cantrip.Core.csproj
 dotnet run --project ../Cantrip/src/Cantrip.Cli -- test content
 ```
 
-The last line is the source equivalent of `dotnet cantrip test content`.
+The last line is the source equivalent of `dotnet cantrip test content`, and from here it is the one to use: the project now references the clone, but the tool manifest still pins the released `cantrip`, so `dotnet cantrip` would check new content with the old tool.

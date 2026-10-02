@@ -25,7 +25,7 @@ If your game is in Godot, the checking and the testing happen inside the editor:
 
 ```
 dotnet new tool-manifest
-dotnet tool install Cantrip.Cli --prerelease
+dotnet tool install Cantrip.Cli
 ```
 
 Run the commands below from that folder, or any folder inside it. Any text editor will do for the files; there is no syntax-highlighting package for one yet. In Godot you need none: the dock's Source tab writes them, highlighted and checked as you type.

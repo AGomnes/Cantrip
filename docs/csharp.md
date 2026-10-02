@@ -611,7 +611,7 @@ Four fields at the top of a `GameSnapshot` describe the save rather than the gam
 |---|---|
 | `FormatVersion` | The format the save is written in, `GameSnapshot.CurrentFormat` at the time it was written. It only ever increases, and it moves whenever the shape of a save changes at all, an added field included. |
 | `MinimumReader` | The oldest `CurrentFormat` that can be trusted with the save. It moves only when a change would make an older build get the game *wrong*, rather than merely miss something it never knew about. 0 in a save made before it was recorded, which is read as `FormatVersion`. |
-| `WrittenBy` | The version of Cantrip.Core that wrote the save, such as `0.1.0-preview.5`, as `cantrip --version` gives it. Nothing branches on it; a refusal quotes it, and [Stability](stability.md) asks you to keep it with a replay or a bug report, so the engine now keeps it for you. Empty in a save made before it was recorded, and in a `GameSnapshot` built by hand rather than captured. |
+| `WrittenBy` | The version of Cantrip.Core that wrote the save, such as `1.0.0`, as `cantrip --version` gives it. Nothing branches on it; a refusal quotes it, and [Stability](stability.md) asks you to keep it with a replay or a bug report, so the engine now keeps it for you. Empty in a save made before it was recorded, and in a `GameSnapshot` built by hand rather than captured. |
 | `RngGenerator` | The generator the saved random state came from, `xoshiro256**` today. Empty means that one: four numbers can only be a game's random future while something says what reads them, and a release may change the generator. |
 
 **Older saves keep loading.** `Restore` refuses a save only when it needs a reader this build is not — when `GameSnapshot.ReaderNeededBy(save)` is above `GameSnapshot.CurrentFormat` — and says so, naming the version that wrote it:
@@ -795,5 +795,5 @@ IReadOnlyList<DslTestResult> results = new DslTestRunner(content).RunAll();
 - [architecture.md](architecture.md) explains how the library fits together, and [Extending](architecture.md#extending) lists every seam a game can plug into.
 - [The API reference](api/README.md) lists every public type and member of `Cantrip.Core`, generated from the sources. This page teaches the twenty calls a game needs; that one is the list of everything.
 - [troubleshooting.md](troubleshooting.md) is the other end of this page: what each refusal means, how to read a `RuntimeError` and a trace, what every save refusal is telling you, and what a published game has to do differently.
-- [stability.md](stability.md) says what may change between previews, which platforms are tested, and what is known not to work yet.
+- [stability.md](stability.md) says what may change in a 1.x release, which platforms are tested, and what is known not to work yet.
 - [src/Cantrip.Sim](../src/Cantrip.Sim) is what `cantrip sim` runs: a scenario runner, three bots that play through this API, and a meter that records what the engine raised.

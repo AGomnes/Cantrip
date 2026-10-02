@@ -1637,7 +1637,7 @@ How the last battle went, or null while one is running or before the first.
 public string WrittenBy { get; set; }
 ```
 
-The version of Cantrip.Core that wrote this save, such as `0.1.0-preview.6`. Empty in a save made before it was recorded, and in one built by hand rather than captured.
+The version of Cantrip.Core that wrote this save, such as `1.0.0`. Empty in a save made before it was recorded, and in one built by hand rather than captured.
 
 It is for people, not for rules: nothing branches on it, and a refusal quotes it so that "this save needs a newer Cantrip" can say which one. Store it with a replay or a bug report, as `docs/stability.md` asks.
 

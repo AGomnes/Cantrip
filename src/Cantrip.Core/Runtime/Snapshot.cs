@@ -65,7 +65,7 @@ namespace Cantrip.Runtime
         public int MinimumReader { get; set; }
 
         /// <summary>
-        /// The version of Cantrip.Core that wrote this save, such as <c>0.1.0-preview.6</c>. Empty
+        /// The version of Cantrip.Core that wrote this save, such as <c>1.0.0</c>. Empty
         /// in a save made before it was recorded, and in one built by hand rather than captured.
         /// </summary>
         /// <remarks>
@@ -265,7 +265,7 @@ namespace Cantrip.Runtime
             string version = typeof(GameSnapshot).Assembly
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
-            // Strip the build metadata SourceLink appends (`0.1.0-preview.6+<commit>`): the release
+            // Strip the build metadata SourceLink appends (`1.0.0+<commit>`): the release
             // is what a player, a bug report and a changelog line all name.
             int build = version.IndexOf('+');
             return build < 0 ? version : version.Substring(0, build);
