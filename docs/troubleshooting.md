@@ -4,7 +4,7 @@ What goes wrong, what it means, and what to do about it. Most of this page comes
 building whole games on Cantrip from the published docs alone and writing down every place they
 got stuck: [reference/FINDINGS.md](../reference/FINDINGS.md) and
 [realtime/FINDINGS.md](../realtime/FINDINGS.md). Nearly everything they hit has been fixed. What is
-left is the part that cannot be fixed, only explained — and this is where it is explained.
+left is the part that cannot be fixed, only explained. This page explains it.
 
 If you are looking for what a call does rather than why it went wrong, the
 [API reference](api/README.md) lists every public type and member.
@@ -65,7 +65,7 @@ line it was on and a `Detail` of the message without the line. In Godot it reach
 
 **What the action already did stays done.** A runtime error part way through an effect leaves what
 it changed changed, and drops the work it had queued. To recover properly, restore a snapshot
-taken before the action — [When content fails at runtime](csharp.md#when-content-fails-at-runtime)
+taken before the action. [When content fails at runtime](csharp.md#when-content-fails-at-runtime)
 has the pattern.
 
 ### A trace
@@ -96,7 +96,7 @@ that fired twice is in it twice, indented under whatever caused each one.
 the same actor as that id in a save file or a bug report.
 
 From C#, `runtime.State.Trace.FormatTree()` is the same text, and `ComputeHash()` beside it is how
-two games are compared — [What a battle screen reads](csharp.md#what-a-battle-screen-reads) has the call.
+two games are compared. [What a battle screen reads](csharp.md#what-a-battle-screen-reads) has the call.
 
 ---
 
@@ -109,7 +109,7 @@ These are the ones a new project meets, in roughly the order it meets them.
 | Code | What it says | What to do |
 |---|---|---|
 | **CT0029** | `A name with spaces must be in quotes: card "Ice Shard".` | Quote it. A bare name is one word. |
-| **CT301** | `Unknown verb `dealt`. Did you mean `deal`?` | Spell it right, or — if your game registers the verb in C# — pass `--suppress CT301` so the tool stops reporting the verbs it cannot see. |
+| **CT301** | `Unknown verb `dealt`. Did you mean `deal`?` | Spell it right, or, if your game registers the verb in C#, pass `--suppress CT301` so the tool stops reporting the verbs it cannot see. |
 | **CT302** | `Nothing called `Ghost` is defined.` | The name is misspelled, or the file that declares it is not in the folder the tool was pointed at. `cantrip lint` takes several paths. |
 | **CT303** | A tag nothing has. | A `tag:frost` that matches nothing is almost always a typo in one of the two places. |
 | **CT0010** | `Expected ')' but found ,` | Usually a verb called like a function. Verbs are commands: `hold leader 1`, not `hold(leader, 1)`. Functions are called with parentheses; verbs are not. |
@@ -118,7 +118,7 @@ These are the ones a new project meets, in roughly the order it meets them.
 
 The language decides where a block ends by how deep a line is, and counts a tab as four columns. A
 line indented under a plain statement, or a dedent that lines up with no block, is one error that
-says so, and the rest of the declaration still loads — so fix the first one and re-run rather than
+says so, and the rest of the declaration still loads. Fix the first one and re-run rather than
 reading a cascade.
 
 The Godot dock never writes a tab, and indents at the width the buffer already uses.
@@ -151,8 +151,8 @@ run's relics and gold. It is never "whoever is acting" and never "all of you". I
 somebody else.
 
 Content that declares a `hero` is refused at lint for exactly that: **CT326**, an error, wherever a
-member could be meant, which is **every body on every declaration** — an `effect`, a `move`, a
-listener, a `modify` line and a `target … where` filter. A hero's own listener is the one that
+member could be meant, which is **every body on every declaration** (an `effect`, a `move`, a
+listener, a `modify` line and a `target … where` filter). A hero's own listener is the one that
 catches people: `hero "Cleric" / on damaged: block 2 to player` blocks the *leader*, not the
 Cleric. The message names the word that does what was meant: `owner` for something carried, `self`
 in a `hero` or an `actor`, `target` for a card, an ability or an enemy. `leader` says the run's own
@@ -160,7 +160,7 @@ actor where that really is meant, and `party` says all of them. See
 [The party](language.md#the-party).
 
 `player` stays legal, and stays right, in a carried declaration's listener that is **about its own
-owner** — `on owner.turn_start:`, or a run-level event such as `on battle_start:` — and in a
+owner** (`on owner.turn_start:`, or a run-level event such as `on battle_start:`), and in a
 `verb`, which has no owner for the diagnostic to name a word from, and in tests, scenarios, and
 your game's own C#.
 
@@ -178,15 +178,15 @@ modifier is reaching the wrong half of the fight, this is why.
 
 ### A line that looks like a block and is not
 
-Inside a declaration, a line ending in `:` that Cantrip does not run — `when card_played:` for
-`on card_played:` — loads as a label and does nothing at all. `lint` reports it as **CT313**, a
+Inside a declaration, a line ending in `:` that Cantrip does not run (`when card_played:` for
+`on card_played:`) loads as a label and does nothing at all. `lint` reports it as **CT313**, a
 warning, so it passes unless you use `--warnings-as-errors`. Anything that must happen deserves a
 `test`.
 
 ### A clause the verb does not read
 
 `block 8 for 2 turns` used to give ordinary block and drop the `for`. Now it is **CT323**, an
-error, naming the clause and the verb. If you meet it, the verb genuinely does not do that — the
+error, naming the clause and the verb. If you meet it, the verb genuinely does not do that. The
 diagnostic table says which clauses each built-in verb reads.
 
 ### An unknown member reads as zero
@@ -204,7 +204,7 @@ is what `created.zone` was reaching for.
 Under `clock ticks` there are no turns, so a `move`, a `pattern`, a `phase`, a
 `stacking duration` counted in turns, a `decay ... on turn_end`, an `until turn_end:` or a
 `next turn:` is dead content. All twelve shapes are **CT337**, an error, naming what to write
-instead — usually `on every <n>s:` or `in <n>s:`. **CT335** is the other half: a turn order stated
+instead (usually `on every <n>s:` or `in <n>s:`). **CT335** is the other half: a turn order stated
 in a game with no turns. A real-time enemy's whole behaviour is listeners.
 
 `cantrip sim` refuses a `clock ticks` folder outright, and a `scenario` written in one is
@@ -232,13 +232,13 @@ assuming:
 |---|---|
 | `NotInHand` | Not in hand, or not in the pile a `from` named. |
 | `Unplayable` | Tagged `unplayable`: a curse or a wound. It is never offered, on purpose. |
-| `CannotAfford` | The payer is short of whatever the card is priced in — not always energy, which is why the word does not say so. `CostResourceOf(card)` names it and `CostOf(card)` gives the price. An ability has no cost and never answers this. |
+| `CannotAfford` | The payer is short of whatever the card is priced in, which is not always energy. That is why the word does not say so. `CostResourceOf(card)` names it and `CostOf(card)` gives the price. An ability has no cost and never answers this. |
 | `NotReady` | An ability still on cooldown. `IsReady(ability)` asks in advance. |
 | `ChoicePending` | The action stopped for a decision and **rolled the game back**. Read `Pending`, then call `Answer(...)`. |
 | `Cancelled` | A choice was answered with nothing, or `CancelPending()` was called. Nothing stands. |
-| `OutOfRange` | Too far. The action's `range` after the `range` channel cannot reach — see below. |
+| `OutOfRange` | Too far. The action's `range` after the `range` channel cannot reach. See below. |
 | `NoTarget` | Nobody on the side it asks for. Nothing was filtered out and nothing was too far away: the table is empty. |
-| `InvalidTarget` | Somebody the action will not take — see below. |
+| `InvalidTarget` | Somebody the action will not take. See below. |
 
 ### Which refusal was it?
 
@@ -255,7 +255,7 @@ reading rather than lumping together, because a game says something different ab
 another behind a taunt, the answer is `InvalidTarget`, because "move closer" would send the player
 at somebody they still could not hit.
 
-To tell the last two of `InvalidTarget`'s cases apart — the action's own filter against a taunt —
+To tell the last two of `InvalidTarget`'s cases apart (the action's own filter against a taunt),
 call `LegalTargets(action)` and read the list:
 
 1. **The list is empty.** The action's own `target … where` excluded everybody, or a taunt drew
@@ -269,14 +269,14 @@ The engine does not name which of those two it was; `WhyNotTargetable` is not a 
 adding it later is additive, so it can arrive in a 1.x release.
 
 **Range is still the one that surprises people.** On a `facing` board the distance across the sides
-is `a.rank + b.rank + 1`, so on a 2×2 board your back rank to their back rank is **three** steps and
+is `a.rank + b.rank + 1`, so on a 2x2 board your back rank to their back rank is **three** steps and
 `range 1..2` cannot make it. A card printed `range 1..2` on a board two ranks deep can be unable to
 reach half the enemies, for ever, and nothing warns: lint knows the board's depth but does not yet
 check that a `range` can span it (`reference/FINDINGS.md` #8). Do the arithmetic once, write it in
 a comment, and pin both ends with a test. `OutOfRange` now says when it has happened, which is the
 difference between an hour and a minute.
 
-A `test` block cannot assert a refusal — `play` fails the test when a card cannot be played — so
+A `test` block cannot assert a refusal: `play` fails the test when a card cannot be played. So
 the way to test an exclusion today is to play the card with no target and check which one it
 picked.
 
@@ -341,8 +341,8 @@ waiting `next turn:` or `in N turns:` block, until that block has run. In Godot 
 `CanSave()`. Asking before offering the player a save button is the whole of the handling.
 
 **A save is trusted input.** It sets every stat, and it carries the text of work `Execute`
-scheduled, which the game will run. A game that loads saves it did not write — shared, downloaded,
-cloud — should sign them.
+scheduled, which the game will run. A game that loads saves it did not write (shared, downloaded,
+cloud) should sign them.
 
 **Saving is not the same as serializing.** `GameSnapshot` is plain data on purpose so that any
 serializer can store it. If you publish your game trimmed or AOT, the serializer is the part that
@@ -390,7 +390,7 @@ Repeated 789 times:
 ```
 
 Something called back into the runtime from inside a host callback. Every entry point that changes
-the game refuses such a call now, and the queries still answer — but if you are on an older build,
+the game refuses such a call now, and the queries still answer. But if you are on an older build,
 or you have written your own host, the rule is: **do not act from inside an event handler.** Queue
 it and act on the next frame. `BattleEnded` is the signal this used to bite hardest, because its
 name says the battle is over.
@@ -424,7 +424,7 @@ The addon is a set of scripts; `Cantrip.Core` is a separate assembly your `.cspr
 Updating one without the other gives missing-method errors at run time. Keep the version in
 `addons/cantrip/plugin.cfg` and the `Cantrip.Core` version in your `.csproj` the same.
 
-Put the DLL somewhere an update will not overwrite and `.gitignore` will not drop — `lib/`, not
+Put the DLL somewhere an update will not overwrite and `.gitignore` will not drop. Use `lib/`, not
 `addons/cantrip/` and not `bin/`.
 
 ### Unsaved dock buffers vanished
@@ -441,7 +441,7 @@ that a fixed step stays fixed, and a game's results never depend on how fast it 
 Raising the runtime's `TicksPerSecond` changes the game rather than its speed, because `cooldown 6s`
 would come to mean a different length of time.
 
-Fast-forward, slow motion and a 2× option are built by calling `Tick(count)` from your own loop.
+Fast-forward, slow motion and a 2x option are built by calling `Tick(count)` from your own loop.
 [Running faster or slower](godot.md#running-faster-or-slower) has the four lines.
 
 ### A wave of enemies acts in lockstep
@@ -453,11 +453,11 @@ each member a randomised `in <n>s:` warm-up.
 
 ### Everybody stands in one lane
 
-The board fills in single file: three party members on a 3×5 board go to (0,0), (0,1) and (0,2).
+The board fills in single file: three party members on a 3x5 board go to (0,0), (0,1) and (0,2).
 If the lanes mean something in your game, place people yourself with `Place`, which refuses an
 off-board slot with a message naming the board's shape. **Writing a slot that is taken swaps the
-two actors** rather than refusing — a swap is its own inverse, which is what makes `until` able to
-revert a move — so a queue of enemies advancing into each other shuffles instead of queueing.
+two actors** rather than refusing: a swap is its own inverse, which is what makes `until` able to
+revert a move. So a queue of enemies advancing into each other shuffles instead of queueing.
 `before_moved` can refuse a move, which is how a game that wants a queue gets one.
 
 ---
@@ -480,7 +480,7 @@ application. Either use the source generator APIs or explicitly configure the
 'JsonSerializerOptions.TypeInfoResolver' property.
 ```
 
-— which is to say, after the player has already finished a floor. The fix is four lines, and
+The first save comes after the player has already finished a floor. The fix is four lines, and
 `reference/host/RunState.cs` is the worked example:
 
 ```csharp
@@ -516,9 +516,9 @@ found` *after* compiling everything, which reads like a failure of your code and
 
 ## Where next
 
-- [The API reference](api/README.md) — every public type and member.
-- [Diagnostics](language.md#diagnostics) — every code, what it means and how to fix it.
-- [Stability](stability.md) — what is tested, what is not, and the known limitations in full.
+- [The API reference](api/README.md): every public type and member.
+- [Diagnostics](language.md#diagnostics): every code, what it means and how to fix it.
+- [Stability](stability.md): what is tested, what is not, and the known limitations in full.
 - [reference/FINDINGS.md](../reference/FINDINGS.md) and
-  [realtime/FINDINGS.md](../realtime/FINDINGS.md) — two records of building a whole game on this
+  [realtime/FINDINGS.md](../realtime/FINDINGS.md): two records of building a whole game on this
   library, kept as they were written.

@@ -52,7 +52,7 @@ Errors are collected, not thrown, with recovery to the end of the line or block,
 
 ### Adding a node
 
-No switch over node types in this codebase is exhaustive, so the compiler will not tell you where a new AST node has to be handled. Exactly two places fail loudly — `Interpreter.ExecuteStatement` and `Interpreter.Evaluate` both throw on a node they do not know — and every other place fails quietly:
+No switch over node types in this codebase is exhaustive, so the compiler will not tell you where a new AST node has to be handled. Exactly two places fail loudly: `Interpreter.ExecuteStatement` and `Interpreter.Evaluate` both throw on a node they do not know. Every other place fails quietly:
 
 | Place | What goes wrong when it is missed |
 |---|---|

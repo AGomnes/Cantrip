@@ -1,8 +1,8 @@
 # Simulating
 
-A test plays one fight the way you tell it to. A **scenario** states a whole run — a deck, some
-fights in order, and whatever happens between them — and `cantrip sim` plays it hundreds of times
-with two bots and reports what happened.
+A test plays one fight the way you tell it to. A **scenario** states a whole run: a deck, some
+fights in order, and whatever happens between them. `cantrip sim` plays it hundreds of times with
+two bots and reports what happened.
 
 It is a fuzzer and a coverage tool for your own content. It finds the run that throws, the fight
 that never ends, the card that is never playable and the enemy move that never fires, none of
@@ -44,8 +44,8 @@ battle at every `battle` line. Hp, deck, relics and persistent statuses carry fr
 the next, exactly as the engine leaves them. A run stops when the player dies, when a fight
 reaches the turn limit, or when something throws.
 
-The full rules for the body — what `battle`, `runs` and `expect` mean, and which of the test verbs
-a scenario shares — are under [Scenarios](language.md#scenarios) in the language reference.
+The full rules for the body are under [Scenarios](language.md#scenarios) in the language reference:
+what `battle`, `runs` and `expect` mean, and which of the test verbs a scenario shares.
 
 ## What the report says
 
@@ -111,18 +111,18 @@ never gets to the third move of a pattern, and a card never afforded because the
 elsewhere is reported like one your content can never play at all.
 
 The one place the report does not guess is the hand. A card drawn or created part way through a
-turn — by a `discover`, or by a card that draws — counts as having reached a hand and, if it was
+turn (by a `discover`, or by a card that draws) counts as having reached a hand and, if it was
 played, as having been playable, because the engine raised an event saying so. Reading the hand
 only at the start of each turn would have called such a card undrawable.
 
-The blocks after it are what one bot did on one day. Read them for a sense of shape — which fight
-is the long one, which one costs the hp, where the two bots part company — and nothing more.
+The blocks after it are what one bot did on one day. Read them for a sense of shape and nothing
+more: which fight is the long one, which one costs the hp, where the two bots part company.
 
 **Nothing a bot merely tried is in the first block.** A bot that looks ahead plays each of its
 options through the engine and rolls the game back, and a play tried that way raises the same
 events as a real one: the enemies answer every trial. Those moves are not recorded, so "every move
 of every enemy fired" still means what it says. Nor does a trial spend an `answer` the scenario
-wrote, or read the dice the run is about to roll — it rolls its own.
+wrote, or read the dice the run is about to roll. It rolls its own.
 
 ## The bots
 
@@ -135,14 +135,14 @@ Three of them, and two play by default.
 | `random` | Plays legal cards and abilities at random until it can play no more. | The floor, and the fastest way to fuzz: it tries nothing first, so it is eight to eleven times quicker than the other two. |
 
 None of them knows a card, status, ability or enemy by name, so new content needs no change to
-any of them. A position is scored on hp alone — one and a half times the party's, less the
-enemies' — taken after the enemies have answered, so a block that stopped a hit shows up as hp the
+any of them. A position is scored on hp alone (one and a half times the party's, less the
+enemies'), taken after the enemies have answered, so a block that stopped a hit shows up as hp the
 player still has.
 
 **A party takes its turn a member at a time.** Each bot asks every member that still has a step,
-plays with it and passes, and the turn ends when the last one has — which under
-[`turns: initiative`](language.md#the-turn) is the only way the round moves at all. A game with no
-`hero` in it has a party of one, is never passed, and plays the run it always did, to the seed.
+plays with it and passes, and the turn ends when the last one has. Under
+[`turns: initiative`](language.md#the-turn) that is the only way the round moves at all. A game with
+no `hero` in it has a party of one, is never passed, and plays the run it always did, to the seed.
 The `hp lost` column is the party's health between them, so a fight the heroes are losing while
 the leader stands untouched reads as the loss it is.
 
@@ -202,7 +202,7 @@ a hit actually took off, after block and capped by the hp that was left, so a ca
 against an enemy on 20 hp counts as 20. `healed` and `gained_block` carry what was actually
 restored and actually gained. The report adds those up and divides. It invents nothing, and it
 names each hit after the card that caused it, or after whatever was running when there was no card:
-a status ticking, or the enemy that swung. An ability is the one thing it cannot name — the engine
+a status ticking, or the enemy that swung. An ability is the one thing it cannot name. The engine
 puts the actor on a `damaged` event and not the ability, so in a fight with no cards in it the
 player's own hits are counted under the player. The tags on those hits are still the ability's.
 
@@ -224,7 +224,7 @@ though every amount in it is your content's. That is why there is one meter per 
 one for the report, and why it sits inside the bot's block.
 
 **What the tool cannot judge, it names.** When content asks the player to choose part way through
-an effect — `choose`, `discover` — a bot has nothing to decide it with: it looks one play ahead,
+an effect (`choose`, `discover`), a bot has nothing to decide it with: it looks one play ahead,
 not into the middle of one. Those choices are answered at random, counted with the line that asked
 for them, and reported. The slice's own scenario never holds a Spellbook, so this is from one whose
 deck is `4 Zap, 4 Ward, Spellbook`, over 20 runs of two battles with the cautious bot:
@@ -237,12 +237,12 @@ deck is `4 Zap, 4 Ward, Spellbook`, over 20 runs of two battles with the cautiou
 
 **Nothing a bot merely tried is counted**, and this is the whole correctness problem of the meter.
 It is larger than it looks: over 200 runs of the slice, the plays the cautious bot tried and rolled
-back raise about 1.18 million events against 91 thousand in the play that counted — thirteen times
-as many. Counted, every number above would be an order of magnitude too big. The check is one the
-engine can make on its own: for every actor, the damage counted less the healing counted has to be
-the hp that actor actually lost, read back from the engine's own `hp`. A test runs that over both
-sample folders with each bot on every build, and it fails loudly if the switch is ever wrong — with
-the flag removed the player on one seed of the slice "lost 60 hp" while the meter claimed 2160.
+back raise about 1.18 million events, thirteen times the 91 thousand in the play that counted.
+Counted, every number above would be an order of magnitude too big. The check is one the engine can
+make on its own: for every actor, the damage counted less the healing counted has to be the hp that
+actor actually lost, read back from the engine's own `hp`. A test runs that over both sample folders
+with each bot on every build, and it fails loudly if the switch is ever wrong. With the flag removed
+the player on one seed of the slice "lost 60 hp" while the meter claimed 2160.
 
 ## What it will not tell you
 
@@ -263,11 +263,11 @@ they are true of the content whoever plays.
 
 **No knobs.** There is no option for how far a bot looks ahead, and no way to tell it what a status
 is worth. Both were tried and measured while this was designed, and both moved the answer by tens
-of points with no principled way to choose the setting — which would make the report an argument
+of points with no principled way to choose the setting. That would make the report an argument
 about the setting rather than about the content.
 
 **A scenario never plays a card itself.** `play`, `cast`, `end turn` and `tick` belong to a test: a
-line choosing a card by hand would fight the bot. `realtime` is out for the same reason — when to
+line choosing a card by hand would fight the bot. `realtime` is out for the same reason: when to
 act in continuous time is the game's own frame loop.
 
 **`sim` cannot play a real-time game and refuses to try.** A bot plays a scenario by deciding what
@@ -308,8 +308,8 @@ an enemy nothing defines fails in milliseconds instead of after a hundred runs.
 In a Godot project the addon's editor dock lints, tests and previews, but it does not simulate:
 its Tests tab runs `test` blocks only, and neither counts nor plays a `scenario`. Install the tool
 beside the game, with the two lines in [Before you start](writing-content.md#before-you-start),
-point it at the folder the game loads from — `res://content` unless the game was told
-otherwise — and run it there:
+point it at the folder the game loads from (`res://content` unless the game was told otherwise),
+and run it there:
 
 ```
 dotnet cantrip sim content
@@ -381,8 +381,8 @@ honest reading of a comparison is *this bot finished more runs of this scenario*
 about what the content allows is the part that is true whoever plays.
 
 **A comparison never changes the exit code.** It is a reading, not a check. What fails `cantrip
-sim` is what always failed it — a run that threw, a battle that hit the turn limit, an expectation
-that did not hold — in the content the command was pointed at. A baseline that does not load, or
+sim` is what always failed it, in the content the command was pointed at: a run that threw, a
+battle that hit the turn limit, an expectation that did not hold. A baseline that does not load, or
 has no scenario to compare with, is refused before either side is played.
 
 Scenarios pair by name. One that is only on one side is named and skipped rather than dropped. Two
@@ -450,16 +450,16 @@ that the Ghast's Screech never fires: the Ghast is wounded before its turn comes
 wounded phase re-telegraphs, so the move at the end of its pattern is never reached. That is the
 sort of thing this tool is for.
 
-Both bots win it in five turns for six hp, and both would still report Screech as never fired even
-though each of them ends a turn dozens of times while deciding what to do — in a trial, where the
-Ghast does move. A trial is not play, and the first block counts only what was played.
+Both bots win it in five turns for six hp, and both would still report Screech as never fired. Each
+of them ends a turn dozens of times while deciding what to do, in trials where the Ghast does move.
+But a trial is not play, and the first block counts only what was played.
 
 ## Where next
 
-- [Scenarios](language.md#scenarios) — the body of a scenario, line by line, and the diagnostics
+- [Scenarios](language.md#scenarios): the body of a scenario, line by line, and the diagnostics
   `lint` reports for one.
-- [Tests](language.md#tests) — a single fight, played the way you say.
-- [The edit, lint and test loop](writing-content.md#5-the-edit-lint-and-test-loop) — where `sim`
+- [Tests](language.md#tests): a single fight, played the way you say.
+- [The edit, lint and test loop](writing-content.md#5-the-edit-lint-and-test-loop): where `sim`
   fits beside `test` and `lint`.
-- [Troubleshooting](troubleshooting.md#the-fight-never-ends) — what a stall usually turns out to
+- [Troubleshooting](troubleshooting.md#the-fight-never-ends): what a stall usually turns out to
   be, and how to find out which kind you have.

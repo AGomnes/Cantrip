@@ -288,8 +288,8 @@ the rest of this page assume `rules` is such a node, with its content loaded.
 ## The node
 
 `CantripRuntime` is the only surface a script touches. Entities cross as `int` ids, and 0 means
-none — except for the two arguments that name whose side a call acts on, `GetZone`'s `ownerId` and
-`Execute`'s `selfId`, where 0 means the player. Everywhere a call takes a target, 0 means nobody.
+none, except in the two arguments that name whose side a call acts on: in `GetZone`'s
+`ownerId` and `Execute`'s `selfId`, 0 means the player. Everywhere a call takes a target, 0 means nobody.
 Pass `PlayerId()` wherever the id is worked out rather than written down, so an id that comes out 0
 cannot read someone else's pile. Everything else crosses as strings, numbers, arrays and
 dictionaries with snake_case keys.
@@ -358,10 +358,10 @@ that is the value to pass if you have no other in mind.
 | `StartBattleOn(board: String, shuffle: bool, draw_opening_hand: bool) -> void` | The same, on a named `board`. `""` keeps the board in play. See [Boards](#boards). |
 | `Play(card_id: int, target_id: int) -> String` | Plays a card from the hand, aimed at `target_id`, or 0 for none. Default target: `0`. |
 | `PlayNamed(card_name: String, target_id: int) -> String` | Plays the first card of that name in the hand |
-| `PlayBy(card_id: int, target_id: int, by_id: int) -> String` | The same play, made by a named party member. The cost still comes out of the card owner's pool; everything else — `source`, the damage, the statuses that apply — is the performer's. `by_id` 0 is `Play`. |
+| `PlayBy(card_id: int, target_id: int, by_id: int) -> String` | The same play, made by a named party member. The cost still comes out of the card owner's pool; everything else (`source`, the damage, the statuses that apply) is the performer's. `by_id` 0 is `Play`. |
 | `PlayNamedBy(card_name: String, target_id: int, by_id: int) -> String` | The same, by name: the card is looked for in that member's own hand first, then in the party's |
 | `EndTurn() -> void` | Ends the party's turn: every member that has not acted gives its step up, the enemies act, and the next turn starts |
-| `Pass(actor_id: int) -> void` | One member is done for this turn. When the last one that could act has passed, the enemies take theirs — so for a party of one this is `EndTurn`. Does nothing for an id that names nobody, or somebody who is not a party member. |
+| `Pass(actor_id: int) -> void` | One member is done for this turn. When the last one that could act has passed, the enemies take theirs. For a party of one, this is `EndTurn`. Does nothing for an id that names nobody, or somebody who is not a party member. |
 | `Revive(actor_id: int, hp: int) -> bool` | Brings a fallen actor back, and says whether it rose. False for an unknown id, for somebody already alive, and when content cancelled the `revived` event. `heal` refuses a corpse and always will, which is why this is its own call. Default: `1`. |
 | `Tick(count: int) -> void` | Advances a real-time clock by `count` ticks. Default: `1`. In a turn game it fails with an error saying the runtime uses turns. |
 | `UseAbility(ability_id: int, target_id: int) -> String` | Uses an ability, answering with the same words `Play` does. An ability with a `target` line settles its own target from 0, the way a card does, and answers `no_target`, `out_of_range` or `invalid_target` when it cannot be aimed. Default target: `0`. |
@@ -370,7 +370,7 @@ that is the value to pass if you have no other in mind.
 `Play`, `PlayNamed` and `UseAbility` answer `played`, `pending`
 (see [Choices](#choices-the-player-makes)), `not_a_card`, `not_in_hand`, `unplayable`,
 `cannot_afford`, `invalid_target`, `out_of_range`, `no_target`, `cancelled` or `not_ready`. For an
-ability, `not_a_card` means the id is not an ability that can be used — gone, or on a dead owner —
+ability, `not_a_card` means the id is not an ability that can be used (gone, or on a dead owner),
 and `not_ready` means it is still on cooldown. `not_ready` never comes back from `Play`, and
 `not_in_hand` never from `UseAbility`; the one table is shared so that one ending always has one
 word.
@@ -379,8 +379,8 @@ word.
 name a resource: `CostOf` and the card's own `cost` segment say how much of what. The three
 targeting words split what one word used to say, and they are worth telling apart because a game
 says something different about each: `out_of_range` is the one a player can act on, `no_target`
-means the side it asks for is empty — usually a bug in the game's own loop rather than something to
-show — and `invalid_target` means the one it was handed is somebody the action will not take, which
+means the side it asks for is empty (usually a bug in the game's own loop rather than something to
+show), and `invalid_target` means the one it was handed is somebody the action will not take, which
 is where a taunt and the action's own `where` filter come out. `GetLegalTargets` is still the list
 to highlight from.
 
@@ -425,8 +425,8 @@ to highlight from.
 | `DescribeDefinition(name: String, kind: String) -> Dictionary` | A definition's rules text with its printed values, for something not in play, such as a reward. `kind` `""` takes the first definition of that name. Empty when none is loaded. Default kind: `""`. |
 
 **Two vocabularies called kind.** `GetDefinitions` and `DescribeDefinition` take the keyword that
-*declares* a definition in content — `"card"`, `"relic"`, `"enemy"`, `"status"`, `"ability"`. An
-entity's `kind`, in the dictionary `GetEntity` gives, says what it *is* in the rules — `"actor"`,
+*declares* a definition in content: `"card"`, `"relic"`, `"enemy"`, `"status"`, `"ability"`. An
+entity's `kind`, in the dictionary `GetEntity` gives, says what it *is* in the rules: `"actor"`,
 `"card"`, `"status"`, and so on. They overlap but are not the same list: a Slime declared with
 `enemy Slime` is an `"actor"` once it is in play, so `DescribeDefinition(name, "actor")` and
 `GetDefinitions("actor")` find nothing at all. Pass an entity's `kind` to either of them and the
@@ -479,13 +479,13 @@ that died, until the next battle starts, or `""`.
 
 Those eleven are the whole list. The rules take any other string as a zone too, so a game can
 invent one, but `AddCard` and `GetZone` say so in the Output panel when they are given a name that
-is not one of them — because `AddCard("Guard", "hnd")` otherwise makes a real card in a pile
-nothing will ever draw from, and answers no differently from the zone you meant.
+is not one of them. Otherwise `AddCard("Guard", "hnd")` makes a real card in a pile nothing will
+ever draw from, and answers no differently from the zone you meant.
 
 ### Boards
 
 A battle is fought on a **board**: lanes across and ranks along the facing axis, both counting from
-0. Content declares the shapes â [Boards](language.md#boards) in the language reference says how â
+0. Content declares the shapes ([Boards](language.md#boards) in the language reference says how),
 and a game with more than one says which fight is fought where:
 
 ```gdscript
@@ -501,7 +501,7 @@ no `board` declaration matches is refused rather than invented, because the lint
 deep a board is to check what reaches across it.
 
 With no `board` declared at all, content gets one lane, unbounded ranks, facing sides and a
-manhattan metric â today's board, spelled out â so a game that never mentions one never notices any
+manhattan metric (today's board, spelled out), so a game that never mentions one never notices any
 of this.
 
 Where each actor stands is in its entity dictionary, as `lane` and `rank`:
@@ -680,8 +680,8 @@ func _on_battle_ended(won: bool) -> void:
 **Starting the next battle from inside `BattleEnded` is ordinary too.** The battle it starts is
 the one in play when the handler returns, and its own end is told when it comes. There is one thing
 to know about the screen rather than the rules: a `BattleEnded` handler runs *while the play that
-won is still returning*, so whatever that play does afterwards â a `_refresh()` that rebuilds the
-hand â runs after your reward screen is already up. Leave the between-battles screen alone when
+won is still returning*, so whatever that play does afterwards (a `_refresh()` that rebuilds the
+hand) runs after your reward screen is already up. Leave the between-battles screen alone when
 `IsInBattle()` is false.
 
 Until 1.0 the first of those was a hard crash: a call from a `BattleEnded` handler re-entered it,
@@ -983,7 +983,7 @@ A save is refused, with the `reason` `"content_changed"`, when:
   block is in that place now, and is refused only if there is none.
 
 A save is refused, with the `reason` `"clock_changed"`, when it was written by a real-time game
-whose clock ran at another rate — a different `Ticks Per Second` on the node, or a turn-based game
+whose clock ran at another rate: a different `Ticks Per Second` on the node, or a turn-based game
 handed a real-time save. A tick is a length of time only while something says how many of them a
 second is, so restoring across a change of rate would re-time every cooldown, every `for 3s` and
 every `on every 2s` in the save. Put the rate back to what the save names, which the message
@@ -1015,7 +1015,7 @@ one. A `once per` listener that has fired stays used, and an `on every` listener
 interval, unless the reload changed its `on` line. The report is `LoadContent`'s, so `ok` says
 whether anything was an error, and it also says how many entities rebound, which definitions have
 gone, and whether the ruleset changed: a running game keeps the rules it started with until
-`NewRun`. A reload with errors in it is still applied — what parsed is in, and `ok` is false — so
+`NewRun`. A reload with errors in it is still applied: what parsed is in, and `ok` is false, so
 check it before telling a designer the change went through. The `ContentReloaded` signal carries
 the same dictionary, so a game that watches it sees everything the caller does. Wire it to a debug
 key, and a designer can change a number, save, press the key and play on.
@@ -1150,8 +1150,8 @@ wall time reads `GetTicks()` or `GetSeconds()` on the runtime, and calls `driver
 load so the two start together again.
 
 **A stall skips time rather than replaying it.** After a frame longer than `MaxCatchUp` allows, the
-driver abandons the ticks it could not run and `DroppedTicks()` counts them. That is deliberate — a
-frame that tried to run two seconds of simulation would stall the next one too — but it means the
+driver abandons the ticks it could not run and `DroppedTicks()` counts them. That is deliberate: a
+frame that tried to run two seconds of simulation would stall the next one too. It does mean the
 game's clock falls behind wall time on a slow machine, and a fight timed in seconds is shorter
 there. A game that cares should show `DroppedTicks()` in its diagnostics, or raise `MaxCatchUp`
 and accept the hitch.
@@ -1162,7 +1162,7 @@ and accept the hitch.
 `Engine.physics_ticks_per_second`.** The driver counts physics frames and converts them at its own
 configured rate; the frame's delta is deliberately ignored, because a fixed step is fixed by
 definition and using the measured delta would make the simulation depend on how long the last frame
-happened to take. Raising the runtime's `TicksPerSecond` is not the answer either — it is the rate
+happened to take. Raising the runtime's `TicksPerSecond` is not the answer either. It is the rate
 every `cooldown 6s` in the content converts through, so it changes the game rather than its speed.
 
 The way to run at any other speed is to drive the clock yourself:
@@ -1175,7 +1175,8 @@ func _process(_delta: float) -> void:
 ```
 
 `Tick(n)` and `n` calls to `Tick(1)` are the same game, to the state hash, so a replay, a
-fast-forward or a "2× speed" option changes nothing about what happens — only when it is watched.
+fast-forward or a "2x speed" option changes when the action is watched, not what happens. The
+action is watched.
 
 ### What has no turns
 
@@ -1185,7 +1186,7 @@ naming `Tick`. `GetTurn()` is 0 for the whole fight, and `turn_start` and `turn_
 raised. Ask `IsRealTime()` before drawing anything that ends a turn.
 
 `Place(actor_id, lane, rank)` is how a game that spawns its own waves says where they walk in, and
-`EndBattle(won)` is how a game whose ruleset says `ends: called` says the fight is over — without
+`EndBattle(won)` is how a game whose ruleset says `ends: called` says the fight is over. Without
 it, a wave game is won by the first empty board between two waves. Both are in the table above.
 
 [realtime/godot](../realtime/godot) is a whole real-time front end built on this: a forty-five
@@ -1256,8 +1257,8 @@ opening. A file written with four spaces gets four; one written with tabs gets f
 what its tabs already meant.
 
 A file written with spaces never acquires an indenting tab, whatever route the text arrives by.
-Typing is covered by Godot's own settings, both clipboards are widened as they are pasted — the
-ordinary one and the primary selection a middle click pastes on Linux — and a block dropped on the
+Typing is covered by Godot's own settings, both clipboards are widened as they are pasted (the
+ordinary one and the primary selection a middle click pastes on Linux), and a block dropped on the
 editor from another window, which Godot handles itself and no addon can stand in front of, is
 widened the moment it lands, into exactly the columns its tabs already stood for. A file whose
 author wrote it with tabs is left alone: its tabs mean what they mean, and rewriting somebody's
@@ -1270,8 +1271,8 @@ Windows is saved back with `\n`. Nothing in the language or the tools reads it d
 ### Problems while you type
 
 A third of a second after you stop typing, the content is loaded and linted again, and the file
-you are in shows what came of it: a mark in the gutter beside each line with a problem on it — `!`
-for an error, `*` for a warning, `.` for a note — the line tinted to match, and the problem itself
+you are in shows what came of it: a mark in the gutter beside each line with a problem on it (`!`
+for an error, `*` for a warning, `.` for a note), the line tinted to match, and the problem itself
 written out under the buffer as you put the caret on its line: its line and column, its code, its
 message, and the word it suggests when it has one. **Apply fix** puts that word in, so a misspelt
 `targt` becomes `target` without retyping it.
@@ -1285,13 +1286,13 @@ read it, with every unsaved buffer put in place of its own file, and lints the l
 worth knowing: a problem can appear in a file you are not editing, because of what you typed in the
 one you are; and the tests, the preview and the card text all answer about your unsaved text too.
 
-A file the dock does not load — one outside `cantrip/content/folder` — can still be opened and
+A file the dock does not load (one outside `cantrip/content/folder`) can still be opened and
 edited here, and the line under the buffer says that nothing checks it. "No problems" would be a
 claim about a file nobody looked at.
 
 A check costs one to three milliseconds in this repository's demo project, which has five files, and
-about ten with `samples/corpus` copied into it — 23 files, 1,800 lines, 131 definitions and 90 test
-blocks, the largest arrangement there is here. Reading the files is most of what a check would
+about ten with `samples/corpus` copied into it (23 files, 1,800 lines, 131 definitions and 90 test
+blocks, the largest arrangement there is here). Reading the files is most of what a check would
 otherwise cost, so the dock keeps what it read and reads again only when Godot says the project's
 files have changed; the first check after that takes about 20 ms on those same 23 files.
 `--cantrip-selftest` prints both numbers for your own project, as
@@ -1300,8 +1301,8 @@ window on one machine; the same thing headless, as CI runs it, measured two to t
 
 It is one folder's worth of parsing and linting, on the editor's own thread, so it grows with the
 project: a single 12,000-line file measured about 80 ms a check on that machine, which is a pause
-you would feel. Splitting content across files does not help by itself — the folder is what is
-loaded — but it is the shape the numbers above were measured in.
+you would feel. Splitting content across files does not help by itself, because the folder is what
+is loaded, but it is the shape the numbers above were measured in.
 
 ### Running the tests from the editor
 
@@ -1318,8 +1319,8 @@ nothing, the buffer is reread and a line under it says so. If you have unsaved c
 touched: one line appears across the top saying the file changed on disk, with **Keep mine**, which
 dismisses it and leaves your buffer to be saved over the top, and **Take theirs**, which throws your
 buffer away and reads the file. The same change cannot raise that line twice, the warning follows
-the file rather than the tab — switch away with one pending and it is there again when you come
-back — and there is no dialog anywhere in the dock.
+the file rather than the tab (switch away with one pending and it is there again when you come
+back), and there is no dialog anywhere in the dock.
 
 Delete the file from underneath an open buffer and the buffer stays: it is the only copy of that
 text left, and **Save** writes the file again. The line under the buffer says what happened. The
@@ -1349,7 +1350,7 @@ no equivalent of to test.
 
 ### What it does not do yet
 
-No completion, no go-to-definition, and no editing a file a running game has loaded — the game
+No completion, no go-to-definition, and no editing a file a running game has loaded. The game
 picks up a saved file only when its own code calls `ReloadContent`, as [Hot reload](#hot-reload)
 shows. Unsaved buffers do not survive a C# build. The check runs on the editor's thread, so a very
 large project pauses for it.

@@ -61,7 +61,7 @@ Everything a battle screen draws comes from the live state:
 | To show | Read |
 |---|---|
 | The player, and the enemies still standing | `runtime.Player`, and `runtime.State.Actors(Team.Enemy)` in board order |
-| A pile | `runtime.State.ZoneOf(player, Zones.Hand)`, and likewise `Draw`, `Discard`, `Exhaust`, `Powers` and `Relics`. `Zones.Attached` holds what is on an actor rather than in a pile — its statuses and its abilities — and `runtime.AbilitiesOf(who)` is the abilities alone |
+| A pile | `runtime.State.ZoneOf(player, Zones.Hand)`, and likewise `Draw`, `Discard`, `Exhaust`, `Powers` and `Relics`. `Zones.Attached` holds what is on an actor rather than in a pile (its statuses and its abilities), and `runtime.AbilitiesOf(who)` is the abilities alone |
 | Where a card is | `card.Zone`, such as `"hand"` or `"discard"`; `"play"` while its effect resolves |
 | hp, block, energy and other stats | `entity.GetInt("hp")`, after modifiers |
 | Statuses and their numbers | `entity.Attached`, and `entity.CounterOf(status.Name)` for each |
@@ -134,7 +134,7 @@ A player expects to see the cause first, so present those two the other way roun
 
 Never call back into the runtime from `OnEvent`, under either chooser: the call that raised the event has not returned yet. Record the event and act once the call is over, as this screen does.
 
-That rule is about `OnEvent` and the other [host callbacks](#the-host), which the interpreter invokes in the middle of resolving. It is not about a game noticing that a battle has ended: once `Play`, `EndTurn` or `Execute` has returned, `runtime.Won` is settled and acting again — the reward, the gold, the next `StartBattle` — is ordinary. The Godot node says the same thing with a signal, and [Acting from a signal](godot.md#acting-from-a-signal) spells it out there.
+That rule is about `OnEvent` and the other [host callbacks](#the-host), which the interpreter invokes in the middle of resolving. It is not about a game noticing that a battle has ended: once `Play`, `EndTurn` or `Execute` has returned, `runtime.Won` is settled and acting again (the reward, the gold, the next `StartBattle`) is ordinary. The Godot node says the same thing with a signal, and [Acting from a signal](godot.md#acting-from-a-signal) spells it out there.
 
 ```csharp
 sealed class BattleScreen
@@ -256,7 +256,7 @@ Nothing happens until the action completes: host events are held back, so the ga
 
 `Prompt` is the engine's short summary of what is asked, in English: `choose a target`, `discard 2`, `exhaust 1`, `choose 1`, or `discover 1 of 3` for an offer. It suits a log rather than the player. Word what the player sees from the card being played and the options instead: each option's `Zone` says which pile it is in, `Chooser` is who chooses, and `Span` points at the line of content that asked.
 
-`Play` is not the only call that can stop. A relic whose turn-end effect asks the player to choose stops `EndTurn`: the whole call, enemy turn included, is rolled back and runs again once the choice is answered. Every call that can stop says so the same way, by returning `ActionResult.ChoicePending`: `Play`, `Answer`, `StartBattle`, `EndTurn`, `Execute` and `UseAbility`. There is nothing to remember and no table to consult — read what the call hands back, as you would `Play`'s.
+`Play` is not the only call that can stop. A relic whose turn-end effect asks the player to choose stops `EndTurn`: the whole call, enemy turn included, is rolled back and runs again once the choice is answered. Every call that can stop says so the same way, by returning `ActionResult.ChoicePending`: `Play`, `Answer`, `StartBattle`, `EndTurn`, `Execute` and `UseAbility`. There is nothing to remember and no table to consult. Read what the call hands back, as you would `Play`'s.
 
 `UseAbility` answers with the same type, so a cooldown is no longer the same answer as a question:
 
@@ -270,7 +270,7 @@ switch (runtime.UseAbility(ability, target))
 }
 ```
 
-An ability settles its own target from its `target` and `range` lines when none is given, so the three targeting refusals are all real answers: `NoTarget` when there is nobody on the side it asks for, `OutOfRange` when it cannot reach from where its owner stands, and `InvalidTarget` when the one it was handed is somebody it will not take. An ability has no cost and never will have one -- its price is the seconds it makes you wait, and a `cost` line on an `ability` declaration is refused at lint as CT339 -- so it never answers `CannotAfford`, which is in the type only because one enum serves cards as well.
+An ability settles its own target from its `target` and `range` lines when none is given, so the three targeting refusals are all real answers: `NoTarget` when there is nobody on the side it asks for, `OutOfRange` when it cannot reach from where its owner stands, and `InvalidTarget` when the one it was handed is somebody it will not take. An ability has no cost and never will have one: its price is the seconds it makes you wait, and a `cost` line on an `ability` declaration is refused at lint as CT339. So it never answers `CannotAfford`, which is in the type only because one enum serves cards as well.
 
 `AddRelic`, `ApplyStatus` and `Tick` never stop: a choice they raise takes the first option.
 
@@ -317,7 +317,7 @@ foreach (Entity member in runtime.Party)            // the living members, in st
 }
 ```
 
-When the last member that could act has passed, the enemies take their turn and the next one begins — so for a party of one `Pass` is `EndTurn`, to the turn number and the state hash. A game that never calls any of this is unchanged: `Party` is `[Player]`, `CanAct(Player)` is true while it is the player's turn, and `EndTurn` means what it always did.
+When the last member that could act has passed, the enemies take their turn and the next one begins. So for a party of one, `Pass` is `EndTurn`, to the turn number and the state hash. A game that never calls any of this is unchanged: `Party` is `[Player]`, `CanAct(Player)` is true while it is the player's turn, and `EndTurn` means what it always did.
 
 | Member | What it answers |
 |---|---|
@@ -325,17 +325,17 @@ When the last member that could act has passed, the enemies take their turn and 
 | `Fallen` | the party's dead, in the order they fell. `Party` and `State.Actors` both leave them out, so this is the list a shrine that offers to raise somebody reads; `State.Fallen(team)` answers for either side. Content calls the same group [`fallen`](language.md#death-and-revival). |
 | `Player` | the leader: the one `CreatePlayer` made, the one that holds the run's relics and gold. Not nullable: before `CreatePlayer` it throws, and `HasPlayer` is the question to ask in the few lines where that is in doubt |
 | `AddHero(name, hp = null)` | adds a member from a `hero` declaration, with its abilities |
-| `CanAct(member)` | a battle is running, the member is alive and has not passed, and it is the party's turn — or, under `turns: initiative`, this member's own step |
+| `CanAct(member)` | a battle is running, the member is alive and has not passed, and either it is the party's turn or, under `turns: initiative`, this member's own step |
 | `Pass(member)` | that member is done this turn; the last one ends the turn |
-| `ActiveMember` | the member whose step it is, or null when none of ours is. Binding under `turns: initiative`; under `turns: sides` it is the one the engine would offer next — the first that has not acted — which a UI highlights and `CanAct` overrules |
+| `ActiveMember` | the member whose step it is, or null when none of ours is. Binding under `turns: initiative`; under `turns: sides` it is the one the engine would offer next (the first that has not acted), which a UI highlights and `CanAct` overrules |
 | `Revive(actor, hp = 1)` | brings a fallen actor back. False for one that was never dead |
 | `SetStat(entity, stat, value)` | writes a stat, exactly as content's `speed = 6` does: the resource's bounds, the `<stat>_changed` event, and death when hp reaches zero. Returns the change applied. This is how the leader gets a `speed` under `order: speed`, where an actor with none reads 0 and takes its step last |
 | `ChangeStat(entity, stat, by)` | adds to a stat, or takes away with a negative amount: content's `gain 2 gold` and `lose 2 gold`, and how a shop spends the run's purse |
 | `Entity.IsPartyMember` | true for the leader and every `hero`; false for a summon standing beside them |
-| `State.TurnOrder` | every living combatant on both sides, in the one order `turns: initiative` runs them in — what an order bar draws |
+| `State.TurnOrder` | every living combatant on both sides, in the one order `turns: initiative` runs them in (what an order bar draws) |
 | `State.HasActed(actor)` | whether that combatant has already taken its step this round |
 
-**Playing a card with a named performer.** `Play(card, target, performer)` is how one member plays out of the party's hand: the cost comes out of the card controller's pool, and everything else is the performer's — `card_played`'s source, the damage, `source:` filters, that member's own statuses and modifiers. With no performer it means what it always meant, the card's own controller.
+**Playing a card with a named performer.** `Play(card, target, performer)` is how one member plays out of the party's hand: the cost comes out of the card controller's pool, and everything else is the performer's (`card_played`'s source, the damage, `source:` filters, that member's own statuses and modifiers). With no performer it means what it always meant, the card's own controller.
 
 ```csharp
 runtime.Play(sanctuary, crusader, performer: vestal);
@@ -343,7 +343,7 @@ runtime.Play(sanctuary, crusader, performer: vestal);
 
 **Abilities.** `CanUse(ability)` is `CanPlay`'s companion: the owner is alive, the cooldown is up, and one that needs somebody to point at has somebody. `LegalTargets` and `TargetMode` answer for an ability as well as a card, so the same targeting UI serves both. A cooldown belongs to the ability entity, so two members with the same ability have two of them.
 
-**Two turn modes.** `turns: sides` is the default: the party takes one turn between them, every member's `turn_start` fires at its start, and the game acts with them in any order. `turns: initiative` puts both sides in one order — set by `order: position` or `order: speed` — so a hero acts between two enemies and each combatant's `turn_start` and `turn_end` fire at its own step. There, `ActiveMember` drives the loop:
+**Two turn modes.** `turns: sides` is the default: the party takes one turn between them, every member's `turn_start` fires at its start, and the game acts with them in any order. `turns: initiative` puts both sides in one order (set by `order: position` or `order: speed`), so a hero acts between two enemies and each combatant's `turn_start` and `turn_end` fire at its own step. There, `ActiveMember` drives the loop:
 
 ```csharp
 while (runtime.Won == null)
@@ -370,7 +370,7 @@ ruleset
   ends: called
 ```
 
-An empty board is then just an empty board: the battle runs until the party falls, which is still the rules' own answer, or until the game says otherwise with `runtime.EndBattle(won)`. That call raises `battle_end`, ends the temporary statuses, sends the cards home and sets `Won`, exactly as the last enemy falling does — so everything downstream of the ending is unchanged, and only what *causes* it moved. It works under the default rule too, for a retreat or a surrender.
+An empty board is then just an empty board: the battle runs until the party falls, which is still the rules' own answer, or until the game says otherwise with `runtime.EndBattle(won)`. That call raises `battle_end`, ends the temporary statuses, sends the cards home and sets `Won`, exactly as the last enemy falling does. So everything downstream of the ending is unchanged, and only what *causes* it moved. It works under the default rule too, for a retreat or a surrender.
 
 One runtime plays a whole run. Between battles, give rewards, heal, spawn the next encounter and start again:
 
@@ -394,9 +394,9 @@ if (runtime.Won == true)
 
 A card made during a battle, such as a Wound, stays in the deck like any other. To make it temporary, take it out between battles with `runtime.RemoveCard(wound)`, which is `destroy` in content and the same call the [Godot node](godot.md#removing-upgrading-rewards-and-a-new-run) has. An upgrade is the same two calls on either side: `RemoveCard(censer)` then `AddCard("Censer+")`.
 
-When a run is over and the game starts a new one with a new runtime, let the old one go with `runtime.Dispose()`. A runtime listens to its clock from the moment it is built — that is how scheduled work, `on every` triggers and timed statuses run — so a runtime given a clock through `RuntimeOptions.Clock` that the game keeps using goes on resolving effects on a game nobody is playing, and the clock holds it alive while it does. A runtime that made its own clock, which is every turn-based game that passes no clock, is collected with it either way. `Dispose` tears nothing else down: the state, the entities and the content are ordinary objects and still read afterwards.
+When a run is over and the game starts a new one with a new runtime, let the old one go with `runtime.Dispose()`. A runtime listens to its clock from the moment it is built. That is how scheduled work, `on every` triggers and timed statuses run. So a runtime given a clock through `RuntimeOptions.Clock` that the game keeps using goes on resolving effects on a game nobody is playing, and the clock holds it alive while it does. A runtime that made its own clock, which is every turn-based game that passes no clock, is collected with it either way. `Dispose` tears nothing else down: the state, the entities and the content are ordinary objects and still read afterwards.
 
-[src/Cantrip.Sim/ScenarioRunner.cs](../src/Cantrip.Sim/ScenarioRunner.cs) is a worked example of a run above the battle: one runtime carries hp, deck and relics from fight to fight, and whatever the scenario writes between them — `heal 12`, `relic "Ember Charm"` — runs as a statement.
+[src/Cantrip.Sim/ScenarioRunner.cs](../src/Cantrip.Sim/ScenarioRunner.cs) is a worked example of a run above the battle: one runtime carries hp, deck and relics from fight to fight, and whatever the scenario writes between them (`heal 12`, `relic "Ember Charm"`) runs as a statement.
 
 ## Real time
 
@@ -419,7 +419,7 @@ var clock = new TickClock(20);                     // 20 ticks a second
 var runtime = new CardRuntime(content, new RuntimeOptions { Clock = clock, Seed = seed });
 ```
 
-**The tick rate is part of the game, not part of the machine.** Every `cooldown 1s`, `for 3s`, `in 2s:` and `on every 2s:` in the content converts through it, so the same content at `new TickClock(20)` and at `new TickClock(60)` is the same game — but a rate the content was not balanced against is a different one, in the way that changing gravity is. Keep the number beside the content it belongs to, not beside the frame rate. Content whose ruleset says `clock ticks` and which is given no clock gets a `TickClock(60)` of its own, which is a reasonable default and nobody's considered choice.
+**The tick rate is part of the game, not part of the machine.** Every `cooldown 1s`, `for 3s`, `in 2s:` and `on every 2s:` in the content converts through it, so the same content at `new TickClock(20)` and at `new TickClock(60)` is the same game. But a rate the content was not balanced against is a different one, in the way that changing gravity is. Keep the number beside the content it belongs to, not beside the frame rate. Content whose ruleset says `clock ticks` and which is given no clock gets a `TickClock(60)` of its own, which is a reasonable default and nobody's considered choice.
 
 Then `Tick` is the whole of the game's clock:
 
@@ -444,7 +444,7 @@ Every turn-shaped call refuses on a tick runtime, the way `Tick` refuses on a tu
 
 So a shared front end asks before it draws an **End turn** button. There is no flag to read from C# because the game made the clock and knows: `options.Clock is TickClock`. (The Godot node, which makes its own, has `IsRealTime()`.)
 
-Half the turn-based vocabulary follows the turn events and is therefore dead under ticks — `move`, `pattern`, `phase`, `stacking duration`, `decay ... on turn_end`, `until turn_end:`, `next turn:`, `once per turn`, `reset_on turn_start`. **The linter refuses all of it as CT337** when the ruleset says `clock ticks`, and each message names the real-time shape of the same idea, so this is a thing content is told once and not a rule to remember. In particular: an enemy's whole behaviour is `on every <n>s:` listeners, and a status ends because something said `for <n>s` where it was applied.
+Half the turn-based vocabulary follows the turn events and is therefore dead under ticks: `move`, `pattern`, `phase`, `stacking duration`, `decay ... on turn_end`, `until turn_end:`, `next turn:`, `once per turn`, `reset_on turn_start`. **The linter refuses all of it as CT337** when the ruleset says `clock ticks`, and each message names the real-time shape of the same idea, so this is a thing content is told once and not a rule to remember. In particular: an enemy's whole behaviour is `on every <n>s:` listeners, and a status ends because something said `for <n>s` where it was applied.
 
 One consequence worth stating outright: **`cantrip sim` cannot play a real-time game and refuses to try.** When to act in continuous time is the game's own frame loop, not a bot's. Cover a real-time game with `test` blocks, which have `realtime <rate>` and `tick <n>`.
 
@@ -459,7 +459,7 @@ runtime.Place(hollow, lane: 1, rank: 3);            // and the game says where i
 
 `Place` is content's `target.rank = 0` from C#: it raises `moved`, a `before_moved` listener can refuse it, and it answers whether the actor stands there afterwards. A slot the board does not have is refused with the board's own name and shape rather than clamped, because a wave arriving at a rank that does not exist is a bug in the schedule. Writing a slot that is taken **swaps** the two actors, which is the same rule content gets.
 
-`SpawnEnemy` raises `created`, the same event `create` raises, so an arrival is something content can hear: an entrance effect, a relic that reacts to anything joining the fight, an enemy that places itself. It is an announcement rather than a gate — the enemy is already in the game — so a `before created:` listener cannot cancel a spawn the game has decided on.
+`SpawnEnemy` raises `created`, the same event `create` raises, so an arrival is something content can hear: an entrance effect, a relic that reacts to anything joining the fight, an enemy that places itself. It is an announcement rather than a gate: the enemy is already in the game. So a `before created:` listener cannot cancel a spawn the game has decided on.
 
 ### What a real-time interface reads
 
@@ -479,7 +479,7 @@ foreach (Entity ability in runtime.AbilitiesOf(member))
 | `AbilitiesOf(owner)` | the abilities that actor is carrying, in the order they were granted |
 | `GrantAbility(name, owner)` | gives one from an `ability` declaration. A `hero`'s own are granted by `AddHero` |
 | `IsReady(ability)` | whether its cooldown has run out |
-| `ReadyIn(ability)` | how much longer it has to wait, **in clock units** — ticks here, turns on a turn clock. 0 when it is ready |
+| `ReadyIn(ability)` | how much longer it has to wait, **in clock units**: ticks here, turns on a turn clock. 0 when it is ready |
 | `CanUse(ability)` | ready, its owner alive, and somebody in reach if it needs one: what a button is greyed out on |
 | `LegalTargets(ability)`, `TargetMode(ability)` | answer for an ability exactly as for a card, so one targeting UI serves both |
 | `UseAbility(ability, target = null)` | with no target it settles its own from the ability's `target` and `range`, and answers `NoTarget`, `OutOfRange` or `InvalidTarget` when it cannot be aimed |
@@ -489,13 +489,13 @@ Content can ask the first two of those itself, which is how a test says what a k
 
 ### Saving a running clock
 
-A save carries the clock's position, every cooldown's due tick, a burn part way through its second, a `for 3s` buff part way through its three and an `in 2s:` effect still in the air. Restore it into a runtime with a `TickClock` of the same rate and both copies play on identically, hash for hash — `IGameClock.Restore` puts the clock back where it was, which is the detail that makes it work. There is nothing extra to do and nothing extra to write down.
+A save carries the clock's position, every cooldown's due tick, a burn part way through its second, a `for 3s` buff part way through its three and an `in 2s:` effect still in the air. Restore it into a runtime with a `TickClock` of the same rate and both copies play on identically, hash for hash. `IGameClock.Restore` puts the clock back where it was, which is the detail that makes it work. There is nothing extra to do and nothing extra to write down.
 
 What a save does **not** carry is anything above the fight: a wave schedule, a mission timer, the score. Those are the game's, and go beside the save in the game's own file.
 
 ### A whole one
 
-[realtime/](../realtime) is a complete real-time game built on this — *Emberline*, a forty-five second hold against waves — with the content, a headless C# host and a Godot front end. [realtime/host/Emberline.cs](../realtime/host/Emberline.cs) is the shortest thing to read first: a clock, a fixed timestep, a wave schedule and an ending.
+[realtime/](../realtime) is a complete real-time game built on this (*Emberline*, a forty-five second hold against waves), with the content, a headless C# host and a Godot front end. [realtime/host/Emberline.cs](../realtime/host/Emberline.cs) is the shortest thing to read first: a clock, a fixed timestep, a wave schedule and an ending.
 
 ## Enemy intents
 
@@ -507,7 +507,7 @@ string move = worm.Intent!;                                // "Chomp", for choos
 Description intent = text.DescribeIntent(worm, runtime);   // "Deal 11 damage to the player."
 ```
 
-`IntentTargetOf(enemy)` is who that move is aimed at: the member the enemy telegraphed, while that member is still a legal target, and otherwise whoever is left. **It is recomputed on every call**, so a taunt applied mid-turn, a death or a swap changes what the panel shows with no event for the UI to have missed — and it agrees with what the move itself does when it runs, because both ask one question of one rule. It is null while `Intent` is. `Entity.IntentTarget` is the raw telegraph as it was rolled, which is what a save holds; a UI wants `IntentTargetOf`.
+`IntentTargetOf(enemy)` is who that move is aimed at: the member the enemy telegraphed, while that member is still a legal target, and otherwise whoever is left. **It is recomputed on every call**, so a taunt applied mid-turn, a death or a swap changes what the panel shows with no event for the UI to have missed. It agrees with what the move itself does when it runs, because both ask one question of one rule. It is null while `Intent` is. `Entity.IntentTarget` is the raw telegraph as it was rolled, which is what a save holds; a UI wants `IntentTargetOf`.
 
 `DescribeIntent` is empty while `Intent` is null. It returns the same `Description` as a card's rules text, so it is drawn the same way (below); in an intent, a `Buffed` value is one the enemy hits harder with. `DescribeMove(definition, moveName, runtime, enemy)` describes any one of an enemy's moves, for a bestiary or a tooltip.
 
@@ -614,11 +614,11 @@ Four fields at the top of a `GameSnapshot` describe the save rather than the gam
 | `WrittenBy` | The version of Cantrip.Core that wrote the save, such as `1.0.0`, as `cantrip --version` gives it. Nothing branches on it; a refusal quotes it, and [Stability](stability.md) asks you to keep it with a replay or a bug report, so the engine now keeps it for you. Empty in a save made before it was recorded, and in a `GameSnapshot` built by hand rather than captured. |
 | `RngGenerator` | The generator the saved random state came from, `xoshiro256**` today. Empty means that one: four numbers can only be a game's random future while something says what reads them, and a release may change the generator. |
 
-**Older saves keep loading.** `Restore` refuses a save only when it needs a reader this build is not — when `GameSnapshot.ReaderNeededBy(save)` is above `GameSnapshot.CurrentFormat` — and says so, naming the version that wrote it:
+**Older saves keep loading.** `Restore` refuses a save only when it needs a reader this build is not (when `GameSnapshot.ReaderNeededBy(save)` is above `GameSnapshot.CurrentFormat`), and says so, naming the version that wrote it:
 
 > This save is in format 4 and needs a Cantrip that reads format 3; this one reads up to format 2. It was written by Cantrip 1.4.0.
 
-Anything older goes through an upgrade step first, which brings it into the current shape in place; the `GameSnapshot` you passed comes back at `CurrentFormat`. A save from a *newer* release is read whenever that release said it could be — that is what `MinimumReader` is for — and fields this build has never heard of are ignored. Call `GameSnapshot.ReaderNeededBy` yourself before restoring if you would rather tell the player that a save needs a newer version of your game than catch the exception.
+Anything older goes through an upgrade step first, which brings it into the current shape in place; the `GameSnapshot` you passed comes back at `CurrentFormat`. A save from a *newer* release is read whenever that release said it could be (that is what `MinimumReader` is for), and fields this build has never heard of are ignored. Call `GameSnapshot.ReaderNeededBy` yourself before restoring if you would rather tell the player that a save needs a newer version of your game than catch the exception.
 
 That is the promise in [Stability](stability.md): after 1.0, a save made by any 1.x release loads in every later 1.x. Bumping `FormatVersion` is how a release describes its saves honestly, not how it stops reading old ones.
 

@@ -15,7 +15,7 @@ way through a second and the flare still in the air back with it.
 | [`content/`](content) | The game, as `.cantrip`: a `clock ticks` ruleset, a board, two heroes, six abilities, four statuses, three enemies, two placement verbs and 18 tests |
 | [`host/`](host) | A C# host that plays the hold headlessly, with the wave schedule, the frame loop and the save test |
 | [`godot/`](godot) | The playable front end, a Godot project of its own, with its clock coming from the engine's physics loop through the addon's `TickDriver` |
-| [`FINDINGS.md`](FINDINGS.md) | What hurt while building it, kept as it was written: sixteen findings ranked by how much each would hurt a real developer, then a section on what was genuinely good, then #18 — whether real time was ready to be called stable at 1.0. It answered no; all seven things it asked for were done, and every finding now says what was decided about it |
+| [`FINDINGS.md`](FINDINGS.md) | What hurt while building it, kept as it was written: sixteen findings ranked by how much each would hurt a real developer, then a section on what was genuinely good, then #18 (whether real time was ready to be called stable at 1.0). It answered no; all seven things it asked for were done, and every finding now says what was decided about it |
 
 ## Running it
 
@@ -57,8 +57,8 @@ A hold against waves was chosen over a duel or an arena for one reason: **it mak
 subject**. A duel on a tick clock is a turn game played quickly, and would have hidden most of
 what this round was for. A hold has to answer, every second, what is closing, what is in reach,
 which of six cooldowns is worth spending now and which is worth saving for the next three
-seconds — and it forces the host to own time, spawning, pacing and the ending, which is precisely
-the surface a turn game never touches.
+seconds. It also forces the host to own time, spawning, pacing and the ending, which is the
+surface a turn game never touches.
 
 - **`ruleset clock ticks`**, so that `cooldown 6s`, `for 3s`, `in 2s:` and `on every 2s:` are
   checked at lint rather than hoped for. A `2 turns` anywhere in the content is error CT325, and a
@@ -68,13 +68,13 @@ the surface a turn game never touches.
   the moment the last enemy is gone, and in a wave game the board is empty every few seconds by
   design. Here the game says when the fight is over: the host calls `EndBattle` at forty-five
   seconds, or the keepers fall.
-- **Six cooldowns competing.** 1s, 3s, 5s, 5s, 6s and 6s — four different lengths across six
+- **Six cooldowns competing.** 1s, 3s, 5s, 5s, 6s and 6s: four different lengths across six
   abilities. They all start ready, so the opening second is the one moment everything is
   available; after that they are spent at different moments and come back at different ones, and
   the player is choosing between whatever happens to be up.
 - **A board where range decides everything.** Three lanes, five ranks, `facing`. Keepers hold rank
   0; waves walk in at rank 3 and close a rank at a time. `Ember Bolt` reaches the whole line,
-  `Backdraft` two ranks, `Haul` two — so letting something get close is both the danger and the
+  `Backdraft` two ranks, `Haul` two. So letting something get close is both the danger and the
   only way to use the heavy abilities. The Wisps never close at all, which is what punishes a
   player who only ever shoots what is nearest.
 - **Enemies with no telegraph.** There are no turns, so there are no `move` blocks, no patterns,

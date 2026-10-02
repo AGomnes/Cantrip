@@ -347,7 +347,7 @@ Useful lines:
 | `create "Bog Troll"` | Adds one of your enemies. It never takes a turn here. |
 | `log "text" target.Poison` | Prints values. Separate them with spaces, not commas: text after a comma is read as a flag. |
 
-The REPL has limits. It has none of the test verbs, so `enemy`, `end turn` and `expect` are unknown there, and no turns pass. The test's `play`, which puts a card into hand by name, is not there either — but the rules' `play` is, so `play hand.first on target` plays a card that is already in a pile. `replay` is not a play at all: it pays no energy and raises no `card_played`, so a listener such as `on card_played` does not hear it. Each line runs on its own, so a `let` on one line is gone on the next. A status shows its stacks, so a status that counts turns shows 1; `log target.Weak` shows the turns left. For anything that spans turns, write a test.
+The REPL has limits. It has none of the test verbs, so `enemy`, `end turn` and `expect` are unknown there, and no turns pass. The test's `play`, which puts a card into hand by name, is not there either, but the rules' `play` is, so `play hand.first on target` plays a card that is already in a pile. `replay` is not a play at all: it pays no energy and raises no `card_played`, so a listener such as `on card_played` does not hear it. Each line runs on its own, so a `let` on one line is gone on the next. A status shows its stacks, so a status that counts turns shows 1; `log target.Weak` shows the turns left. For anything that spans turns, write a test.
 
 ## 7. In Godot
 
@@ -362,7 +362,7 @@ Once the Cantrip addon is enabled, the Godot editor has a Cantrip dock at the bo
 | Preview | Any definition's rules text, with live values |
 | Source | The editor. Write content here, save with **Ctrl+S** or the **Save** button, and see each problem marked in the gutter and written out under the buffer a moment after you stop typing, with **Apply fix** for the ones that suggest a word. It indents with spaces at the width the file already uses, never a tab. **Run tests** runs your `test` blocks against the buffers, saved or not; **Open externally** opens the file in whatever your system uses for text files. |
 
-A file you save in the dock is loaded and linted straight away, and so is one saved elsewhere, once Godot notices it — and a `.cantrip` file added or deleted outside the editor joins or leaves the content the same way. **Reload** re-reads the `cantrip/` project settings and reads every file again from scratch; it keeps your unsaved buffers. A running game picks up changed files when it reloads its content, which the game's own code starts, for example from a debug key. See [The editor dock](godot.md#the-editor-dock) and [Hot reload](godot.md#hot-reload).
+A file you save in the dock is loaded and linted straight away, and so is one saved elsewhere, once Godot notices it. A `.cantrip` file added or deleted outside the editor joins or leaves the content the same way. **Reload** re-reads the `cantrip/` project settings and reads every file again from scratch; it keeps your unsaved buffers. A running game picks up changed files when it reloads its content, which the game's own code starts, for example from a debug key. See [The editor dock](godot.md#the-editor-dock) and [Hot reload](godot.md#hot-reload).
 
 `sim` and the REPL are the two commands with no tab. To play a scenario hundreds of times with a bot, install the command-line tool beside the game as [Before you start](#before-you-start) shows, and run `dotnet cantrip sim content` in the project folder; [Simulating](simulating.md) covers it.
 
@@ -776,7 +776,7 @@ More in [Built-in verbs](language.md#built-in-verbs). File: [discover.cantrip](.
 
 ### Copy a card as it is now
 
-`create Slash` makes a Slash as it is *printed*. `copy picked` makes one as it *is* — with the buff it was given this battle, the cost it was discounted to. That is the difference between the two verbs, and it is usually the one you want:
+`create Slash` makes a Slash as it is *printed*. `copy picked` makes one as it *is*, with the buff it was given this battle and the cost it was discounted to. That is the difference between the two verbs, and it is usually the one you want:
 
 ```
 status Sharpened
@@ -816,7 +816,7 @@ test "Dual Wield copies the honed Slash, not a fresh one"
 
 - `copy` binds **`copied`**, always a list; one copy still reads through it, so `copied.hp` and `copied.first.hp` are the same.
 - The copy takes its **side and owner from the original**, so a card that copies an enemy's minion gives the *enemy* a second minion.
-- It is placed **where a new one would go** — hand for a card, the board for an actor, `relics` for a relic — never in the zone the original sits in. `into hand`, `into draw` and the rest override that.
+- It is placed **where a new one would go** (hand for a card, the board for an actor, `relics` for a relic), never in the zone the original sits in. `into hand`, `into draw` and the rest override that.
 - Nothing is restored: a wounded minion is copied wounded. Write `copied.hp = copied.max_hp` if you want a fresh one.
 
 More in [Built-in verbs](language.md#built-in-verbs). File: [copy-a-card-in-play.cantrip](../samples/recipes/copy-a-card-in-play.cantrip).

@@ -34,7 +34,7 @@ The tables say what each effect needs. [What cannot be expressed yet](#open-gaps
 | Darkest Dungeon | 8 | 7 | 0 | 1 |
 | **Total** | **93** | **75** | **8** | **10** |
 
-Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics. Inscryption models creatures the same way, with sigils as `keyword` definitions applied to them and bones as a declared `resource`. Dominion is treasure and victory cards as cards, with actions, buys and coins as declared resources that establish and refresh themselves each turn. Darkest Dungeon has heroes as actors, stress as a declared resource with bounds and no reset, and trinkets as `item` definitions. 1.0 adds a [`hero`](language.md#the-party) declaration for a party the game asks for input from, and with it `turns: initiative` and `order: speed`, which put both sides in one order by a `speed` stat — the turn order Darkest Dungeon itself uses. No row of the tables above moved when either landed: the corpus writes each of these effects about one hero at a time, and none of the eight Darkest Dungeon rows is about whose turn it is.
+Units and minions in Monster Train and Hearthstone are modelled as `actor` definitions on the player's side, attacking from their own `turn_end` listeners. Balatro scoring is modelled with `chips`, `mult` and `score` stats on the player. The Dota 2 effects run on the tick clock. Magic creatures are `actor` definitions too, spells are cards, and permanents that only sit there are relics. Inscryption models creatures the same way, with sigils as `keyword` definitions applied to them and bones as a declared `resource`. Dominion is treasure and victory cards as cards, with actions, buys and coins as declared resources that establish and refresh themselves each turn. Darkest Dungeon has heroes as actors, stress as a declared resource with bounds and no reset, and trinkets as `item` definitions. 1.0 adds a [`hero`](language.md#the-party) declaration for a party the game asks for input from, and with it `turns: initiative` and `order: speed`, which put both sides in one order by a `speed` stat. That is the turn order Darkest Dungeon itself uses. No row of the tables above moved when either landed: the corpus writes each of these effects about one hero at a time, and none of the eight Darkest Dungeon rows is about whose turn it is.
 
 ## Slay the Spire
 
@@ -48,22 +48,22 @@ Content: [slay_the_spire.cantrip](../samples/corpus/slay_the_spire.cantrip). Tes
 | 4 | Heavy Blade | Titan Blade | Workaround | Strength must count three times; the extra two are written as `2 * player.Strength` because the Strength modifier already adds one |
 | 5 | Demon Form | Fiend Form | Works | A power with a turn-start listener |
 | 6 | Blade Dance | Knife Flurry | Works | Creates exhausting Shivs in hand |
-| 7 | Accuracy | Honed Edge | Works | `modify damage of player where card:Shiv` on the power card itself. An `of` group names whoever the value belongs to, which on `damage` is whoever deals it. A modifier with no scope is anchored to what it is written on — for a card, its own damage — and naming a scope reaches past that |
+| 7 | Accuracy | Honed Edge | Works | `modify damage of player where card:Shiv` on the power card itself. An `of` group names whoever the value belongs to, which on `damage` is whoever deals it. A modifier with no scope is anchored to what it is written on (for a card, its own damage), and naming a scope reaches past that |
 | 8 | Corruption | Rot Pact | Works | Skills cost 0 and exhaust |
-| 9 | Barricade | Bastion | Works | `on before_block_changed(target:owner): if event.reset: cancel`. The reset marks the change it raises, so this refuses that and nothing else — an effect that means to strip block still strips it |
+| 9 | Barricade | Bastion | Works | `on before_block_changed(target:owner): if event.reset: cancel`. The reset marks the change it raises, so this refuses that and nothing else. An effect that means to strip block still strips it |
 | 10 | Burst | Reverb | Workaround | The next skill is replayed. A listener that becomes active during an event also hears that event's after phase, so Echo needs `not card:Reverb`. A game that would rather it did not says `new_listeners: miss_the_event` in its ruleset; the corpus cannot, because one ruleset covers all nine games loaded together |
-| 11 | Reaper | Soul Reap | Works | `deal 4 to all enemies into dealt`, then `heal dealt`. The clause binds what actually landed — past block, and only what a dying enemy could still take |
+| 11 | Reaper | Soul Reap | Works | `deal 4 to all enemies into dealt`, then `heal dealt`. The clause binds what actually landed: past block, and only what a dying enemy could still take |
 | 12 | Envenom | Venom Coat | Works | Unblocked attack damage applies Poison |
 | 13 | Pain | Ache | Works | A curse that hurts while held |
 | 14 | Pen Nib | Quill Nib | Works | Every tenth attack deals double, with a counter stat |
-| 15 | Anchor | Heavy Anchor | Works | `on turn_start once per battle: block 10`. The battle sequence is documented — `battle_start`, then the turn start that resets block — so granting it on the first turn is the ordinary way to write this, and the `Naive Anchor` test beside it shows what the intuitive version does |
+| 15 | Anchor | Heavy Anchor | Works | `on turn_start once per battle: block 10`. The battle sequence is documented (`battle_start`, then the turn start that resets block), so granting it on the first turn is the ordinary way to write this, and the `Naive Anchor` test beside it shows what the intuitive version does |
 | 16 | Snecko Eye | Serpent Eye | Works | Drawn cards get a random cost |
 | 17 | Artifact | Nullify | Works | Cancels the next debuff |
 | 18 | Intangible | Phased | Works | Damage taken is clamped to 1 |
 | 19 | Cultist and Ritual | Chanter | Works | A phase for the opening and one for afterwards, so the chant is its own move and the telegraphed intent is the real one. Ritual still skips its first turn with a counter stat, which is cross-turn state rather than a temporary |
 | 20 | Louse Curl Up | Rolling Louse | Works | Blocks the first time it is attacked |
 | 21 | Gremlin Nob Enrage | Fury | Works | Gains Strength when the player uses a skill |
-| 22 | Slime Boss split | Slime King | Works | A phase gates the Split, and `retelegraph` on that phase re-rolls the intent the moment the threshold is crossed, so the player is shown the Split before it lands rather than after. The King becomes one of the halves with `transform self into Slimeling` rather than `kill self`, so it keeps its slot and its id and nothing hears a death — which is what lets a boss both split and have a death rattle |
+| 22 | Slime Boss split | Slime King | Works | A phase gates the Split, and `retelegraph` on that phase re-rolls the intent the moment the threshold is crossed, so the player is shown the Split before it lands rather than after. The King becomes one of the halves with `transform self into Slimeling` rather than `kill self`, so it keeps its slot and its id and nothing hears a death. That is what lets a boss both split and have a death rattle |
 | 23 | Spore Cloud | Sporeling | Works | Debuffs the player when it dies |
 
 ## Monster Train
@@ -96,12 +96,12 @@ Content: [hearthstone.cantrip](../samples/corpus/hearthstone.cantrip). Tests: [h
 | 5 | Dire Wolf Alpha (adjacency aura) | Dire Wolf | Works | `modify attack of adjacent(self): +1`. Until 1.0 this silently stopped working across a death: a minion summoned after a neighbour died landed one slot past the hole rather than in it, so it stood two slots from the wolf and got nothing. A freed slot is reusable now, and survivors still do not shift |
 | 6 | Knife Juggler | Knife Juggler | Workaround | A listener that becomes active during an event hears it, so the Juggler must leave its own summon out. `not target:self` says it as a filter rather than a guard in the body, but it still has to be said. `new_listeners: miss_the_event` drops the filter for a game that wants that rule throughout; the corpus keeps it, because one ruleset covers all nine games loaded together |
 | 7 | Minion combat | `trade` verb | Works | The `attack` verb makes each creature the source of its own hit. A content verb still spells the trade out, which is where combat rules belong |
-| 8 | Taunt | Taunt | Works | `modify targetable of allies where source:enemies, not it.has(Taunt): set 0`. The `targetable` channel is asked before anything is pointed at somebody — a card's target, the `attack` verb, an enemy's move — so a taunt binds a minion's swing as well as a card, and the chooser is only offered what passes |
+| 8 | Taunt | Taunt | Works | `modify targetable of allies where source:enemies, not it.has(Taunt): set 0`. The `targetable` channel is asked before anything is pointed at somebody (a card's target, the `attack` verb, an enemy's move), so a taunt binds a minion's swing as well as a card, and the chooser is only offered what passes |
 | 9 | Silence | | Not expressible | Nothing can switch off an entity's own listeners and modifiers |
 | 10 | Discover | Discovery | Works | `discover 3 cards where tag:arcane as found`, then `create found into hand`. The two candidates nobody picks never become cards at all, so no `created` listener hears about them |
 | 11 | Stealth | Stealth | Works | The same channel with no scope, so it anchors to its host: `modify targetable: set 0`. Pointing a card or an `attack` at it is refused; a blast still reaches it |
 
-A Deathrattle that draws a card needs to name who draws — `draw 1 to player` — because `draw` otherwise draws for the running entity's controller, and a minion controls itself.
+A Deathrattle that draws a card needs to name who draws (`draw 1 to player`), because `draw` otherwise draws for the running entity's controller, and a minion controls itself.
 
 ## Balatro
 
@@ -113,11 +113,11 @@ Content: [balatro.cantrip](../samples/corpus/balatro.cantrip). Tests: [balatro.t
 | 2 | Abstract Joker | Abstract Joker | Workaround | After listeners resolve too late for the score computed on the next line, so the joker listens in the before phase |
 | 3 | Cavendish | Cavendish | Works | `modify mult: x3` |
 | 4 | Glass Card | Glass Queen | Works | `player.mult *= 2` and `chance 25%: destroy self` |
-| 5 | Joker order | | Not expressible | Jokers apply left to right, so a ×Mult joker before a +Mult joker scores less. The modifier pipeline applies layers in a fixed order, not by source position |
+| 5 | Joker order | | Not expressible | Jokers apply left to right, so an xMult joker before a +Mult joker scores less. The modifier pipeline applies layers in a fixed order, not by source position |
 | 6 | Blueprint | | Not expressible | Copying another joker's ability needs effects as first-class values |
 | 7 | Poker hands | | Not expressible | Pairs, flushes and straights need grouping over the played cards (count by rank, by suit) |
 
-A score that multiplies grows fast. Arithmetic is correct while values stay within ±1 million, and past that a result can be wrong with no error, so a game scored like this has to keep its numbers in range: see [Numbers](stability.md#numbers).
+A score that multiplies grows fast. Arithmetic is correct while values stay within 1 million either way, and past that a result can be wrong with no error, so a game scored like this has to keep its numbers in range: see [Numbers](stability.md#numbers).
 
 ## Dota 2
 
@@ -127,10 +127,10 @@ Content: [dota2.cantrip](../samples/corpus/dota2.cantrip). Tests: [dota2.tests.c
 |---|---|---|---|---|
 | 1 | Lifesteal | Lifesteal | Works | `heal event.amount * stacks / 100 to owner` |
 | 2 | Damage over time | Poison Sting | Works | The venom carries the ticking: a debuff applied `for 2s` with `on every 1s:` deals its damage once a second |
-| 3 | Skull Basher | Skull Basher | Works | Stun cancels its host's move in the before phase — `on before_move(source:owner): cancel` — so a stunned unit really does lose its turn |
+| 3 | Skull Basher | Skull Basher | Works | Stun cancels its host's move in the before phase (`on before_move(source:owner): cancel`), so a stunned unit really does lose its turn |
 | 4 | Vladmir's Offering | War Banner | Works | `modify damage of allies: x1.25` |
 | 5 | Cooldown reduction | Arcane Vestments | Works | `modify cooldown: x0.5` on a relic shortens every ability its holder has; on an ability it shortens only that one. Modifiers see the duration already in clock units, so a multiplier reads the same on either clock |
-| 6 | Crystal Nova (area) | Crystal Nova | Works | `range 3` from the caster and `deal 6 to enemies in within(target, 1)` for the square it covers, on a declared `shared` board with a `chebyshev` metric. `within` with a *unit* — `5m` — still goes to the host, unchanged, for a game whose fight is in continuous space |
+| 6 | Crystal Nova (area) | Crystal Nova | Works | `range 3` from the caster and `deal 6 to enemies in within(target, 1)` for the square it covers, on a declared `shared` board with a `chebyshev` metric. `within` with a *unit* (`5m`) still goes to the host, unchanged, for a game whose fight is in continuous space |
 | 7 | Blink | Blink | Works | `owner.rank -2` on a declared board. A move is instantaneous in the rules on both clocks; the engine never owns travel time. Still slots and never metres |
 | 8 | Mana regeneration | Mana Font | Works | `on every 1s: gain 1 mana to player` on a relic |
 
@@ -177,8 +177,8 @@ Content: [dominion.cantrip](../samples/corpus/dominion.cantrip). Tests: [dominio
 | 3 | Cellar | Larder | Workaround | `discard N` takes a fixed count, so "discard any number, draw that many" becomes a particular number. Which cards go is still the player's choice; how many is not |
 | 4 | Chapel | Shrine | Works | `exhaust 1` trashes a card out of the deck, resolved through the chooser |
 | 5 | Moat | Bulwark | Works | A card in hand is active, so it reacts from there without being played: `on before_damaged(target:player) once per turn: cancel` |
-| 6 | Throne Room | Regent | Works | `choose 1 from hand where tag:action as picked`, then `play picked, free` and `replay played`. The chosen card is really played — it leaves hand, raises `card_played` and is discarded — and then resolves a second time. Before `play` existed both halves were `replay`, so the card never left hand and nothing counted it as played |
-| 7 | Buying from the supply | | Not expressible | Pools exist now (gap 7), but a supply is a pile that runs out and a definition cannot hold a count. `cost 5 coins` is already refused when unaffordable; what is missing is a buy phase — nothing in the repo ever spends `buys` — and a cost in two currencies at once (gap 15) |
+| 6 | Throne Room | Regent | Works | `choose 1 from hand where tag:action as picked`, then `play picked, free` and `replay played`. The chosen card is really played (it leaves hand, raises `card_played` and is discarded) and then resolves a second time. Before `play` existed both halves were `replay`, so the card never left hand and nothing counted it as played |
+| 7 | Buying from the supply | | Not expressible | Pools exist now (gap 7), but a supply is a pile that runs out and a definition cannot hold a count. `cost 5 coins` is already refused when unaffordable; what is missing is a buy phase (nothing in the repo ever spends `buys`) and a cost in two currencies at once (gap 15) |
 | 8 | Militia | | Not expressible | There is one player, and enemies are actors without hands or decks, so an effect reaching into another player's hand has nobody to reach |
 
 ## Darkest Dungeon
@@ -188,11 +188,11 @@ Content: [darkest_dungeon.cantrip](../samples/corpus/darkest_dungeon.cantrip). T
 | # | Mechanic | Ours | Status | Notes |
 |---|---|---|---|---|
 | 1 | Stress | Dread | Works | `resource "stress"` with `min 0 max 200` and no reset, so it accumulates across turns instead of refreshing. Both bounds are tested |
-| 2 | Affliction at 100 stress | Focus Ring | Works | `on any.stress_changed: if event.new >= 100` — a threshold on a custom stat's own change event, which is how content notices a resource crossing a line rather than polling it. Declared as an `item` |
+| 2 | Affliction at 100 stress | Focus Ring | Works | `on any.stress_changed: if event.new >= 100` is a threshold on a custom stat's own change event, which is how content notices a resource crossing a line rather than polling it. Declared as an `item` |
 | 3 | Rally | Rally | Works | `lose 25 stress`, which the resource's floor stops below zero |
 | 4 | Bleed | Bleeding, Lash | Works | `decay 1 on turn_end` beside a `turn_end` listener; the listener sees the stacks before they tick down |
 | 5 | Death's Door | Faltering | Works | `on instead_of_died(target:owner) once per battle: heal 1 to owner` |
-| 6 | Rank-limited skills | Pike | Works | `target enemy where it.rank <= 1` — the skill's own reach written on the skill, with `it` the candidate and ranks counting from zero. Until 1.0 this was a `targetable` modifier that had to name its own card (`card:Pike`), because without that the limit bound every card played while this one sat in hand |
+| 6 | Rank-limited skills | Pike | Works | `target enemy where it.rank <= 1` is the skill's own reach written on the skill, with `it` the candidate and ranks counting from zero. Until 1.0 this was a `targetable` modifier that had to name its own card (`card:Pike`), because without that the limit bound every card played while this one sat in hand |
 | 7 | Camping between fights | | Not expressible | Camping happens between battles, and nothing models a run of battles with stress and health carried across them. The same shape as Inscryption's candles |
 | 8 | Virtue or affliction | Breaking Point | Works | `discover 1 statuses where tag:affliction or tag:virtue, weighted`. Offering one candidate is a pick with nothing to decide, so nobody is asked; "rarely a virtue" is a weight of 1 against three 5s |
 
@@ -203,7 +203,7 @@ What the language cannot say yet, ranked by how many rows of the tables above ea
 | Gap | What is missing | Rows | What works today |
 |---|---|---|---|
 | 15 | **Costs in several currencies, or paid by a sacrifice.** A cost is one amount in one resource. | Magic #7; Inscryption #6; Dominion #7 | A cost in a named resource, `cost 2 bones`. A sacrifice written into the effect, which cannot refuse the play. |
-| 5 | **Effects as values.** Nothing can copy another entity's effects, or switch them off. `copy` duplicates an entity's *state* — its live stats, tags and statuses — which is a different thing. | Balatro #6; Hearthstone #9 | `copy` for an entity's state. Nothing for its effects. |
+| 5 | **Effects as values.** Nothing can copy another entity's effects, or switch them off. `copy` duplicates an entity's *state* (its live stats, tags and statuses), which is a different thing. | Balatro #6; Hearthstone #9 | `copy` for an entity's state. Nothing for its effects. |
 | 17 | **A run above the battle.** A battle is the outermost thing content can see: nothing carries lives, candles or stress from one battle to the next, and `once per run` is the only nod to runs. | Inscryption #8; Darkest Dungeon #7 | The game carries hp, deck and relics between battles in its own code, as [Winning, losing and several battles](csharp.md#winning-losing-and-several-battles) shows. `cantrip sim` plays a gauntlet a `scenario` states; it does not generate one. |
 | 3 | **A blocking step.** There is no step in which one side's rule stops an attack from landing, as Flying needs. | Magic #8 | The `targetable` channel, asked wherever something is pointed at somebody, and `target … where` for an action's own reach. Neither of them can interpose on a swing that is already aimed. |
 | 18 | **A priority window.** Nothing lets one side respond to a card while it is being played. | Magic #5 | A permanent that commits in advance to countering the next spell, which is still cast and paid for. |
@@ -220,14 +220,14 @@ The other workarounds are explained in their rows: Heavy Blade (Slay the Spire #
 
 - **1. Time-based triggers.** `on every 1s:` fires on the clock (Dota 2 #2, #8).
 - **2. Re-telegraphing when a phase changes.** `retelegraph` on a phase re-rolls the intent as the threshold is crossed (Slay the Spire #22). It is opt-in: see [Phases](language.md#phases).
-- **3, in part. Target validity.** Everything that is pointed at somebody — a card, an ability, the `attack` verb and an enemy's move — settles its target through one function, which asks the `targetable` channel (how a taunt and stealth are written: Hearthstone #8, #11) and the action's own `target … where` (how a reach limit is written: Darkest Dungeon #6). A card no longer has to name itself to have a rule about itself. What is left open above is a blocking step.
+- **3, in part. Target validity.** Everything that is pointed at somebody (a card, an ability, the `attack` verb and an enemy's move) settles its target through one function, which asks the `targetable` channel (how a taunt and stealth are written: Hearthstone #8, #11) and the action's own `target … where` (how a reach limit is written: Darkest Dungeon #6). A card no longer has to name itself to have a rule about itself. What is left open above is a blocking step.
 - **7, in part. Definition pools.** `discover` offers content that nothing has been made from yet (Hearthstone #10, Darkest Dungeon #8). Since 0.1.0-preview.2 the player can answer the offer in a game, as with any other choice. The rest is open above.
 - **10. Cancellable resets.** `event.reset` marks a reset, so `if event.reset: cancel` keeps block across turns (Slay the Spire #9).
 - **11. Cooldown as a modifier channel.** `modify cooldown: x0.5` (Dota 2 #5).
 - **12. Space, and reaching across a board.** A [`board`](language.md#boards) is a rectangle of lanes and ranks, and content reads it with `it.lane`, `it.rank`, `adjacent(who)`, `within(who, n)`, `lane(who)`, `rank(who)` and `distance(a, b)`; narrows what an action may be pointed at with `range 1` or `range 2..3`, which is also a modifier channel; and moves an actor by writing a place, `target.rank = 0` or `self.lane += 1` (Monster Train #10, Dota 2 #6 and #7). It is slots throughout and never metres: `within(x, 5m)`, with a unit, still goes to the game's host exactly as it always did.
 - **13. Not a gap: the modifier anchor.** A modifier without `of` applies to what it is written on, and naming a scope reaches past that (Slay the Spire #7, Hearthstone #4).
 - **14. `draw` for someone else.** `draw 1 to player` lets a creature draw for the player (Inscryption #7).
-- **6. Whether a listener hears the event that brought it into play.** It is a ruleset setting, `new_listeners`, defaulting to `hear_the_event` — today's behaviour, which the sample roguelite's Chill and Slay the Spire #10's Echo are written against. Content that wants the other rule writes `new_listeners: miss_the_event` and drops the `not target:self` filter (Hearthstone #6). The default can move in a later release without breaking anyone, because content that cares now says which it means.
+- **6. Whether a listener hears the event that brought it into play.** It is a ruleset setting, `new_listeners`, defaulting to `hear_the_event`. That is today's behaviour, which the sample roguelite's Chill and Slay the Spire #10's Echo are written against. Content that wants the other rule writes `new_listeners: miss_the_event` and drops the `not target:self` filter (Hearthstone #6). The default can move in a later release without breaking anyone, because content that cares now says which it means.
 - **15, in part. A cost in another resource.** `cost 2 bones` is refused when the bones are not there, as an energy cost is (Inscryption #2). The rest is open above.
 - **16. A declared resource creates its own stat.** `resource "actions"` with `reset_to 1` gives every actor one action a turn with nothing else to grant it (Dominion #1).
 
@@ -244,7 +244,7 @@ Rules that are stated in the language reference but still catch authors out, mos
 - **A place on the board is a `lane` across and a `rank` along, both counting from 0,** so the front two ranks are `rank <= 1`. `position` is the older name for `rank` and reads the same number. See [Boards](language.md#boards).
 - **`draw` draws for the controller, and a creature controls itself,** so a creature draws for the player with `draw 1 to player`. See [Built-in verbs](language.md#built-in-verbs).
 - **`discover` offers from everything loaded,** not only from the card's own file. Give a pool a tag of its own. See [Built-in verbs](language.md#built-in-verbs).
-- **`player` is the party's leader, and only the leader.** It is one entity — the one `CreatePlayer` made, the one that holds the run's relics and gold — whichever side is acting and however many heroes there are. In content that declares a `hero`, writing it where a member could be meant — every body on every declaration, from an enemy's move to a hero's own listener — is error CT326, because it would act on that one member however carefully the rules settled on another. Write `owner`, `self`, `target`, `leader` or `party`; a carried declaration's listener that is about its own owner keeps `player`, and a `verb` is left out because it has no owner to name. See [The party](language.md#the-party) and [Names](language.md#names).
+- **`player` is the party's leader, and only the leader.** It is one entity (the one `CreatePlayer` made, the one that holds the run's relics and gold), whichever side is acting and however many heroes there are. In content that declares a `hero`, writing it where a member could be meant (every body on every declaration, from an enemy's move to a hero's own listener) is error CT326, because it would act on that one member however carefully the rules settled on another. Write `owner`, `self`, `target`, `leader` or `party`; a carried declaration's listener that is about its own owner keeps `player`, and a `verb` is left out because it has no owner to name. See [The party](language.md#the-party) and [Names](language.md#names).
 - **`once per turn` is once per round, per listening entity.** A status on each of four party members fires four times a round, once each, because each is a different listener; a relic on the leader fires once. See [Listeners](language.md#listeners) and [The party](language.md#the-party).
 - **In a listener's body, `source` is the listening entity and `event.source` is who caused the event.** A relic that wants to know which party member played the card reads `event.source`; `source` there is the relic. See [Listeners](language.md#listeners).
 - **In a test, block set in setup, and energy set below the maximum, are reset when the first turn starts;** winning the battle removes the player's statuses and returns every card to the draw pile; `play` cannot check that a card is refused; and an `item` is given with `relic`. See [Tests](language.md#tests).
