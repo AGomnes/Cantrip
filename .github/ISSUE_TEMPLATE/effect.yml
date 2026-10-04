@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        This is the most useful thing an outside user can tell this project: it is how docs/coverage.md grows and how the language finds out what it is missing.
+        This is the most useful thing an outside user can tell this project: it is how [docs/coverage.md](https://github.com/AGomnes/Cantrip/blob/main/docs/coverage.md) grows and how the language finds out what it is missing. [What cannot be expressed yet](https://github.com/AGomnes/Cantrip/blob/main/docs/coverage.md#open-gaps-most-useful-first) lists the gaps found so far; report yours whether or not it is there.
   - type: input
     id: game
     attributes:

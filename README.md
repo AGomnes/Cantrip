@@ -8,9 +8,7 @@
 
 [Godot addon](docs/godot.md) | [Quickstart](docs/quickstart.md) | [Writing content](docs/writing-content.md) | [Language reference](docs/language.md) | [C# guide](docs/csharp.md) | [API reference](docs/api/README.md) | [Troubleshooting](docs/troubleshooting.md) | [Stability](docs/stability.md) | [Changelog](CHANGELOG.md)
 
-Cantrip is a rules language and rules engine for single-player combat: your side against enemies the computer plays. Each card, status, relic, ability and enemy is a short `.cantrip` file with its own tests, and writing them needs no C#. The engine works out how they interact. Your game keeps the rendering, the input, and the map and rewards between battles.
-
-It was written for deckbuilders and roguelites in the style of Slay the Spire, but that shape is not required: a party instead of one hero, a board instead of one row, cooldowns instead of cards, a clock instead of turns. [realtime/](realtime) is a whole game with none of the four.
+Cantrip is a rules language and rules engine for single-player combat: your side against enemies the computer plays. You write each card, status, relic, ability and enemy as a short `.cantrip` file with its own tests, and the engine works out how they interact. Your game keeps the rendering, the input, and the map and rewards between battles.
 
 ## What it looks like
 
@@ -51,27 +49,29 @@ None of these knows about the others. A Fireball on a frozen enemy deals its 6 d
 
 `{damage}` in the card's text is the first amount it deals, shown with whatever modifiers apply at the moment; leave `text:` out and Cantrip writes the rules text itself. The `test` block is content too, and `dotnet cantrip test` runs it.
 
-Nothing above was anticipated by the code. Sooner or later a game needs an effect the language cannot say, so a game can register verbs of its own in C#, and content calls them like any built-in one. The grammar keeps clause words aside for them, so they read the same way.
+## What it is for
 
-You use it from **Godot 4.6.x, on Godot's .NET edition**, writing GDScript or C#, through the [Cantrip addon](docs/godot.md). 4.6 is a pin rather than a floor: the addon is C# source your game compiles, so it is tested against 4.6.1 and 4.6.2 and not against 4.5 or 4.7. You can also use it from **any other .NET project** on .NET 5 or later, because the rules engine underneath the addon references no game engine at all.
+The hard part is rarely one card or ability. It is how they combine: a relic that reacts when a status wears off, a status that changes what fire damage does, a boss that changes its moves at half health. Written by hand, cards become classes, combinations become special cases, and a balance change means a rebuild.
+
+Cantrip models the combat action. A card is an action whose availability is a deck, an ability is one on a cooldown, and an enemy's move is one its pattern picks. The effect body is the same in all three, which is why a game with no cards is the same engine with the piles left out.
+
+Each effect says only what that effect does. Events, ordering, stacking, modifiers and targeting are the engine's job, so two effects written months apart still combine, by rules the [language reference](docs/language.md) sets out. Those rules have sharp edges, and [docs/coverage.md](docs/coverage.md) records every one found so far. A designer can change a number, save, and see it in the running game once it reloads the content.
+
+It was written for deckbuilders and roguelites in the style of Slay the Spire, and none of that shape is required. Your side can be a party of heroes rather than one. The battle can be fought on a board of lanes and ranks rather than in a single row. Content that says `clock ticks` measures cooldowns in seconds and runs from your own fixed timestep instead of taking turns. [realtime/](realtime) is a whole game with no cards and no turns.
+
+Sooner or later a game needs an effect the language cannot say. A game registers verbs of its own in C# and content calls them like any built-in one, and the grammar keeps clause words aside for them so they read the same way.
+
+You use it from **Godot 4.6.x on the .NET edition**, writing GDScript or C#, through the [Cantrip addon](docs/godot.md). 4.6 is a pin and not a floor: the addon is C# source your game compiles, tested against 4.6.1 and 4.6.2. You can also use it from **any .NET 5 or later project**, because the engine underneath the addon references no game engine at all.
 
 Two whole games are in this repository, and CI plays both end to end, headlessly and in Godot. [reference/](reference) is *The Drowned Chapel*, a turn-based party roguelite fought on a board. [realtime/](realtime) is *Emberline*, a forty-five second hold on the tick clock. Each has its content, a headless C# host and a Godot front end of its own. Each also has a FINDINGS.md, written while building it from the published docs alone, saying what hurt: [reference/FINDINGS.md](reference/FINDINGS.md), [realtime/FINDINGS.md](realtime/FINDINGS.md). Most of [docs/troubleshooting.md](docs/troubleshooting.md) comes from those two files.
 
-**Where to start**
+## Where to start
 
 - **A Godot game, in GDScript or C#:** [docs/godot.md](docs/godot.md) installs the addon and plays a [first battle](docs/godot.md#your-first-battle). You need Godot's .NET edition, the .NET SDK, and a C# solution in the project even if the game is all GDScript. You write no C# of your own.
 - **Any other .NET game:** the [quickstart](docs/quickstart.md) goes from an empty folder to a battle you can play in a terminal, in about fifteen minutes.
 - **Writing cards rather than code:** [docs/writing-content.md](docs/writing-content.md) walks through a first card, status, relic and enemy with their tests, then gives recipes for common effects. It needs no C#, and in Godot no command line either: the addon's dock checks and tests the files in the editor.
 - **A game with no cards or no turns:** [samples/abilities](samples/abilities) is a fight whose actors use abilities on cooldowns. [realtime/](realtime) has no cards and no turns together, which is a tested combination rather than an untried intersection. Statuses, modifiers and targeting work the same on both clocks.
 - **Reading a finished game first:** [reference/](reference) is a whole turn-based roguelite: a party of three, two boards, thirteen cards, six relics, seven floors and a run above the battle. [realtime/](realtime) is a whole real-time one, three keepers holding a line for forty-five seconds with nothing in it taking a turn. Each runs from this repository with one command.
-
-## Why
-
-The hard part is rarely a single card or ability. It is how they combine: a relic that reacts when a status wears off, a status that changes what fire damage does, a boss that changes its moves at half health. Hand-written in C#, cards tend to become classes, combinations tend to become special cases, and a balance tweak usually means a rebuild.
-
-What Cantrip models is the combat action. A card is an action whose availability is a deck, an ability is one on a cooldown, and an enemy's move is one its pattern picks; the effect body is the same in all three. That is why a game with no cards is the same engine with the piles left out.
-
-In Cantrip each effect is a few readable lines that say only what that effect does. Events, ordering, stacking, modifiers and targeting are the rules engine's job, so effects that were never written with each other in mind still combine, by rules the [language reference](docs/language.md) sets out. Those rules have sharp edges, and [docs/coverage.md](docs/coverage.md) records each one found so far. A designer can change a number, save, and see it in the running game once it reloads the content.
 
 ## What you get
 
@@ -187,7 +187,6 @@ Your game learns what happened, to animate it, from events: damage, cards moving
 - [Architecture](docs/architecture.md): how the library fits together, and where to extend it
 - [Coverage](docs/coverage.md): which effects from existing games the language can express
 - [Simulating](docs/simulating.md): playing a scenario many times with a bot, and what that measures
-- [Slice friction](docs/slice-friction.md): what building a small roguelite on Cantrip needed
 - [The reference game](reference/README.md): *The Drowned Chapel*, a whole turn-based party roguelite, and [what building it found](reference/FINDINGS.md)
 - [The real-time game](realtime/README.md): *Emberline*, a whole game on the tick clock, and [what building it found](realtime/FINDINGS.md)
 - [Stability](docs/stability.md): what may change, platforms, performance and known limitations

@@ -1,16 +1,27 @@
 name: Bug report
-description: Content does something other than what the language reference says, or something crashes.
+description: Cantrip does something other than what the docs say, or something crashes.
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        The best bug report is a failing `test` block: it describes the problem and proves the fix at once. See the Tests section of docs/language.md.
+        The best bug report is a failing `test` block: it describes the problem and proves the fix at once. [Tests](https://github.com/AGomnes/Cantrip/blob/main/docs/language.md#tests) shows how to write one.
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where it happened
+      options:
+        - The Godot addon
+        - Content, or the cantrip tool
+        - The Cantrip.Core library from C#
+        - Not sure, or more than one
+    validations:
+      required: true
   - type: textarea
     id: content
     attributes:
-      label: The smallest content that shows it
-      description: A `.cantrip` file, ideally with a `test` block that fails.
+      label: The smallest thing that shows it
+      description: A `.cantrip` file, ideally with a `test` block that fails. If the bug is not in the content, the smallest C# or GDScript that reproduces it, or the `cantrip` command you ran and its output. Where there is nothing to paste, such as a bug in the editor dock, the steps that show it.
       render: text
     validations:
       required: true
@@ -24,12 +35,12 @@ body:
     id: version
     attributes:
       label: Version
-      description: The output of `dotnet cantrip --version`, or the Cantrip.Core package version.
+      description: The output of `dotnet cantrip --version`. In a Godot project without the tool, the version in `addons/cantrip/plugin.cfg` and the Cantrip.Core version in your `.csproj`.
     validations:
       required: true
   - type: textarea
     id: environment
     attributes:
       label: Environment
-      description: Operating system, `dotnet --version`, and your Godot version if the addon is involved.
+      description: Operating system, `dotnet --version`, and your Godot version and edition (standard or .NET) if the addon is involved.
       render: text

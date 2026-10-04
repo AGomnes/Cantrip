@@ -6,14 +6,16 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for trying Cantrip. A stranger's first hour is the part of a project its author can no longer see, so every stumble you report is worth more than a fix you could make yourself. Short and rough is fine.
+        Thank you for trying Cantrip. Short and rough is fine.
   - type: dropdown
     id: path
     attributes:
       label: What did you try?
       options:
-        - The quickstart (docs/quickstart.md)
         - The Godot addon (docs/godot.md)
+        - The quickstart (docs/quickstart.md)
+        - Writing content (docs/writing-content.md)
+        - A sample, or one of the two games (samples/, reference/, realtime/)
         - Cantrip in my own game
         - Something else
     validations:
@@ -39,5 +41,5 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: Operating system, the output of `dotnet --version`, your Godot version if you used the addon, and `dotnet cantrip --version` if you got that far.
+      description: Operating system, the output of `dotnet --version`, your Godot version and edition (standard or .NET) if you used the addon, and `dotnet cantrip --version` if you got that far.
       render: text

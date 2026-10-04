@@ -1,1 +1,8 @@
 blank_issues_enabled: true
+contact_links:
+  - name: Troubleshooting
+    url: https://github.com/AGomnes/Cantrip/blob/main/docs/troubleshooting.md
+    about: What goes wrong, what it means, and what to do about it, including the mistakes that produce no diagnostic at all.
+  - name: Diagnostics
+    url: https://github.com/AGomnes/Cantrip/blob/main/docs/language.md#diagnostics
+    about: Every CT code, what it means, and how to fix it.
