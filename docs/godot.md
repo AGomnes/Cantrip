@@ -52,7 +52,8 @@ What a GDScript project takes on by using it:
    ```
    dotnet add package Cantrip.Core --version 1.0.0
    ```
-   `--prerelease` would install a pre-release, which may not match the addon you have; plain `dotnet add package Cantrip.Core` installs the newest stable, which may be a later 1.x than your addon.
+   Without `--version`, `dotnet add package Cantrip.Core` installs the newest stable, which may be a
+later 1.x than your addon.
 
    Offline, reference the DLL instead. The Cantrip.Core `.nupkg` attached to each GitHub release is a
    zip file: copy `lib/netstandard2.1/Cantrip.Core.dll` (and `Cantrip.Core.xml`, for editor help)
@@ -289,7 +290,7 @@ the rest of this page assume `rules` is such a node, with its content loaded.
 
 `CantripRuntime` is the only surface a script touches. Entities cross as `int` ids, and 0 means
 none, except in the two arguments that name whose side a call acts on: in `GetZone`'s
-`ownerId` and `Execute`'s `selfId`, 0 means the player. Everywhere a call takes a target, 0 means nobody.
+`owner_id` and `Execute`'s `self_id`, 0 means the player.
 Pass `PlayerId()` wherever the id is worked out rather than written down, so an id that comes out 0
 cannot read someone else's pile. Everything else crosses as strings, numbers, arrays and
 dictionaries with snake_case keys.
@@ -367,22 +368,21 @@ that is the value to pass if you have no other in mind.
 | `UseAbility(ability_id: int, target_id: int) -> String` | Uses an ability, answering with the same words `Play` does. An ability with a `target` line settles its own target from 0, the way a card does, and answers `no_target`, `out_of_range` or `invalid_target` when it cannot be aimed. Default target: `0`. |
 | `Execute(statements: String, self_id: int, target_id: int) -> void` | Runs statements as content would, for a console, a cheat key or a heal between battles. `self_id` 0 runs them as the player; `target_id` 0 means nobody. Defaults: `0, 0`. |
 
-`Play`, `PlayNamed` and `UseAbility` answer `played`, `pending`
-(see [Choices](#choices-the-player-makes)), `not_a_card`, `not_in_hand`, `unplayable`,
-`cannot_afford`, `invalid_target`, `out_of_range`, `no_target`, `cancelled` or `not_ready`. For an
-ability, `not_a_card` means the id is not an ability that can be used (gone, or on a dead owner),
-and `not_ready` means it is still on cooldown. `not_ready` never comes back from `Play`, and
-`not_in_hand` never from `UseAbility`; the one table is shared so that one ending always has one
-word.
+`Play`, `PlayNamed` and `UseAbility` answer `played`, `pending` (see
+[Choices](#choices-the-player-makes)), `not_a_card`, `not_in_hand`, `unplayable`, `cannot_afford`,
+`invalid_target`, `out_of_range`, `no_target`, `cancelled` or `not_ready`. For an ability,
+`not_a_card` means the id is not an ability that can be used (gone, or on a dead owner), and
+`not_ready` means it is still on cooldown. `not_ready` never comes back from `Play`, and neither
+`not_in_hand` nor `cannot_afford` ever from `UseAbility`: an ability is priced in cooldown, not in a
+resource.
 
 `cannot_afford` says the payer is short of whatever the card is priced in, which is why it does not
 name a resource: `CostOf` and the card's own `cost` segment say how much of what. The three
-targeting words split what one word used to say, and they are worth telling apart because a game
-says something different about each: `out_of_range` is the one a player can act on, `no_target`
-means the side it asks for is empty (usually a bug in the game's own loop rather than something to
-show), and `invalid_target` means the one it was handed is somebody the action will not take, which
-is where a taunt and the action's own `where` filter come out. `GetLegalTargets` is still the list
-to highlight from.
+targeting words split what one word used to say, and a game says something different about each:
+`out_of_range` is the one a player can act on, `no_target` means the side it asks for is empty
+(usually a bug in the game's own loop rather than something to show), and `invalid_target` means the
+one it was handed is somebody the action will not take, which is where a taunt and the action's own
+`where` filter come out. `GetLegalTargets` is still the list to highlight from.
 
 **Reading the game**
 
@@ -393,7 +393,7 @@ to highlight from.
 | `GetFallen() -> Array` | The party's dead, in the order they fell. `GetParty`, `GetAllies` and `GetActors` all leave them out, so this is the list a shrine that offers to raise somebody reads. Pair it with `Revive`. Content calls the same group `fallen`. |
 | `ActiveMemberId() -> int` | The member whose step it is, or 0 when none of the party's is. Binding under `turns: initiative`; under `turns: sides` it is the one the engine would offer next, which a UI highlights and `CanAct` overrules. |
 | `CanAct(actor_id: int) -> bool` | Whether that member still has a step this turn. False for an unknown id, for anyone who is not a party member, and for one that has passed. |
-| `CanUse(ability_id: int) -> bool` | `CanPlay` for an ability: off cooldown, affordable, and with something legal to aim at if it needs one. False for an id that is not an ability. |
+| `CanUse(ability_id: int) -> bool` | `CanPlay` for an ability: off cooldown, on a living owner, and with something legal to aim at if it needs one. False for an id that is not an ability. |
 | `GetZone(owner_id: int, zone: String) -> Array` | Ids in one of an owner's zones; `owner_id` 0 means the player. The player's hand is `GetZone(PlayerId(), "hand")`. |
 | `GetEnemies() -> Array`, `GetAllies() -> Array`, `GetActors() -> Array` | Ids of the living enemies, the living actors on the player's side, or both |
 | `GetEntity(entity_id: int) -> Dictionary` | Everything a UI shows about one entity; empty for an unknown id |
@@ -429,8 +429,7 @@ to highlight from.
 entity's `kind`, in the dictionary `GetEntity` gives, says what it *is* in the rules: `"actor"`,
 `"card"`, `"status"`, and so on. They overlap but are not the same list: a Slime declared with
 `enemy Slime` is an `"actor"` once it is in play, so `DescribeDefinition(name, "actor")` and
-`GetDefinitions("actor")` find nothing at all. Pass an entity's `kind` to either of them and the
-answer is empty, with no error.
+`GetDefinitions("actor")` find nothing at all, and raise no error.
 
 **Choices**
 
@@ -493,12 +492,11 @@ rules.StartBattleOn("Nave", true, true)   # this fight is in the nave
 rules.StartBattle(true, true)             # this one is wherever the last one was
 ```
 
-`StartBattleOn` is a method of its own rather than a third argument to `StartBattle` for the reason
-under [Two rules for GDScript](#two-rules-for-gdscript): a C# default is not a default here, so a
-third parameter would have been a parse error in every game that already calls `StartBattle`. An
-empty name keeps the board in play, which before the first battle is the content's default. A name
-no `board` declaration matches is refused rather than invented, because the linter has to know how
-deep a board is to check what reaches across it.
+`StartBattleOn` is a method of its own because a C# default is not a default here; see
+[Two rules for GDScript](#two-rules-for-gdscript). An empty name keeps the board in play, which
+before the first battle is the content's default. A name no `board` declaration matches is refused
+rather than invented, because the linter has to know how deep a board is to check what reaches
+across it.
 
 With no `board` declared at all, content gets one lane, unbounded ranks, facing sides and a
 manhattan metric (today's board, spelled out), so a game that never mentions one never notices any
@@ -513,8 +511,8 @@ print("aisle %d, rank %d" % [who["lane"], who["rank"]])
 
 Those two are the whole of a board a front end needs: lay the party out by `(lane, rank)`, and
 `GetLegalTargets` already answers what is in reach, so a highlight needs no distance arithmetic of
-its own. Content moves an actor by writing `target.rank = 0`; nothing on the node does, because
-where somebody stands is a rule and not a view.
+its own. Content moves an actor by writing `target.rank = 0`, and `Place(actor_id, lane, rank)` is
+the same move from the node, for a game that spawns its own waves.
 
 ### Dictionaries
 
@@ -595,8 +593,7 @@ there. `message` says in a sentence what `reason` says in a word:
 | `"too_many"` | More picks than `max` |
 
 **A content report**, from `LoadContent`, `ReloadContent` and `ContentReloaded`: `ok` (true when
-nothing was an error), `errors` and `warnings` (how many of each), and `diagnostics`. `ok` is there
-so that no caller has to scan the array to find out whether its game has content to play.
+nothing was an error), `errors` and `warnings` (how many of each), and `diagnostics`.
 
 **A problem**, in that `diagnostics` array: `severity` (`"error"`, `"warning"` or `"info"`), `code`
 (such as `"CT0101"`), `message`, `suggestion`, `file`, `line` and `column`.
@@ -624,9 +621,7 @@ The rules resolve an action completely and at once; presentation watches afterwa
 
 - **Events are emitted before the call that caused them returns, but only after the whole action
   has resolved**, never part way through it; with a [`Presenter`](#pacing-events-with-a-battlepresenter),
-  they go to it then, and it hands them on one at a time. So acting again from a handler is fine,
-  such as answering a choice or playing the next card, because by then nothing is resolving. An
-  action taken in an `EffectEvent` handler resolves at once as well, and its events are emitted
+  they go to it then, and it hands them on one at a time. An action taken in an `EffectEvent` handler resolves at once, and its events are emitted
   after the rest of those already on their way, still before the outer call returns; `BattleEnded`
   comes after all of them. What is refused, with an error, is acting from a
   [callback](#callbacks-from-content): those run in the middle of an effect.
@@ -684,10 +679,7 @@ won is still returning*, so whatever that play does afterwards (a `_refresh()` t
 hand) runs after your reward screen is already up. Leave the between-battles screen alone when
 `IsInBattle()` is false.
 
-Until 1.0 the first of those was a hard crash: a call from a `BattleEnded` handler re-entered it,
-and the process died with a stack overflow and no diagnostic. Reads were fine and writes were
-fatal. Nothing about it needs a workaround now, and `call_deferred` around the reward is no longer
-doing anything for you.
+A `call_deferred` around the reward, which a preview needed, is no longer doing anything for you.
 
 ## Pacing events with a BattlePresenter
 
@@ -824,8 +816,7 @@ func start_next_battle() -> void:  # when the reward screen closes
 
 Either function may act: see [Acting from a signal](#acting-from-a-signal).
 
-Outside the `BattleEnded` handler, `GetWon()` says how the last battle ended: `true` or `false`,
-or `null` while a battle is running and before the first one has ended.
+Outside the `BattleEnded` handler, `GetWon()` says how the last battle ended.
 
 `Execute` suits a step like the rest above: a line or two, run now and then. It is checked only
 when it runs, so anything longer, or anything a card, relic or status should own, belongs in
@@ -1144,7 +1135,7 @@ func _on_ticked(_count: int) -> void:
 | `DroppedTicks() -> int` | How many it abandoned to `MaxCatchUp`: time the game skipped |
 | `Reset()` | Clears the carried remainder and both counters, as after loading a save |
 
-`TotalTicks()` is the driver's count and not the game's clock. They agree until a save is restored:
+The driver's count and the game's clock agree until a save is restored:
 the clock comes back where it was and the counter does not, so a game that schedules anything off
 wall time reads `GetTicks()` or `GetSeconds()` on the runtime, and calls `driver.Reset()` after a
 load so the two start together again.
@@ -1175,8 +1166,7 @@ func _process(_delta: float) -> void:
 ```
 
 `Tick(n)` and `n` calls to `Tick(1)` are the same game, to the state hash, so a replay, a
-fast-forward or a "2x speed" option changes when the action is watched, not what happens. The
-action is watched.
+fast-forward or a "2x speed" option changes when the action is watched, not what happens.
 
 ### What has no turns
 
@@ -1185,9 +1175,7 @@ turn-based one: `EndTurn()`, `Pass(id)`, `CanAct(id)` and `ActiveMemberId()` all
 naming `Tick`. `GetTurn()` is 0 for the whole fight, and `turn_start` and `turn_end` are never
 raised. Ask `IsRealTime()` before drawing anything that ends a turn.
 
-`Place(actor_id, lane, rank)` is how a game that spawns its own waves says where they walk in, and
-`EndBattle(won)` is how a game whose ruleset says `ends: called` says the fight is over. Without
-it, a wave game is won by the first empty board between two waves. Both are in the table above.
+Without `EndBattle(won)`, a wave game is won by the first empty board between two waves; `Place(actor_id, lane, rank)` is where a game that spawns its own waves says they walk in. Both are under [The node](#the-node).
 
 [realtime/godot](../realtime/godot) is a whole real-time front end built on this: a forty-five
 second hold against waves, with ability buttons and cooldown sweeps, targeting, saving mid-fight and
@@ -1201,7 +1189,7 @@ that works in the editor would be missing from a shipped game. The addon therefo
 not reach the build. The node always loads through the engine's file access, which works inside
 an exported package, where the C# library's own `ContentLibrary.LoadFolder` sees nothing.
 
-Two things to know before exporting a .NET game, both of which cost an afternoon to discover:
+Two things to know before exporting a .NET game:
 
 - **Godot needs a solution file beside the project.** Without `YourGame.sln` next to the
   `.csproj`, the export prints "This project contains C# files but no solution file was found",
@@ -1291,7 +1279,7 @@ edited here, and the line under the buffer says that nothing checks it. "No prob
 claim about a file nobody looked at.
 
 A check costs one to three milliseconds in this repository's demo project, which has five files, and
-about ten with `samples/corpus` copied into it (23 files, 1,800 lines, 131 definitions and 90 test
+about ten with `samples/corpus` copied into it (23 files, 1,997 lines, 136 definitions and 94 test
 blocks, the largest arrangement there is here). Reading the files is most of what a check would
 otherwise cost, so the dock keeps what it read and reads again only when Godot says the project's
 files have changed; the first check after that takes about 20 ms on those same 23 files.
@@ -1355,10 +1343,9 @@ picks up a saved file only when its own code calls `ReloadContent`, as [Hot relo
 shows. Unsaved buffers do not survive a C# build. The check runs on the editor's thread, so a very
 large project pauses for it.
 
-The next pass should send a save to the attached game over the debugger channel, which already
-accepts one; offer the names a file can use as you type them, which the linter already knows, since
-CT302 is the same question asked after the fact; keep unsaved buffers across an assembly reload; and
-do the check off the editor's thread so that a big project does not wait for it.
+The next pass should send a save to the attached game over the debugger channel; offer the names a
+file can use as you type them; keep unsaved buffers across an assembly reload; and do the check off
+the editor's thread so that a big project does not wait for it.
 
 ### Settings
 
@@ -1454,9 +1441,7 @@ godot --headless --path godot/Cantrip.Demo --import -- --cantrip-selftest
 
 The `ExportRelease` build is the cheap proof that no editor-only code escaped `#if TOOLS`; the
 scenes exit non-zero on failure, and `--cantrip-selftest` exercises the dock without a mouse,
-exiting with 1 when one of its own checks prints `FAILED`. That includes the editing: it asks
-Godot to indent a line and measures what went in, then types into a scratch file, checks it while
-it is unsaved, parks it, applies a suggested fix, saves it and takes it away again. Always give Godot a timeout: a script
+exiting with 1 when one of its own checks prints `FAILED`. Always give Godot a timeout: a script
 that cannot parse never quits. `gdscript_smoke` enforces the two rules for GDScript, because both
 fail in confusing ways.
 

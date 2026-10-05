@@ -60,7 +60,7 @@ Everything a battle screen draws comes from the live state:
 
 | To show | Read |
 |---|---|
-| The player, and the enemies still standing | `runtime.Player`, and `runtime.State.Actors(Team.Enemy)` in board order |
+| Everyone on the board | `runtime.State.Actors(Team.Player)`, and `runtime.State.Actors(Team.Enemy)`, each in board order. The player's side is the leader, the heroes beside it and anything they summoned; `runtime.Party` is the living members alone, in the order they take their steps, which is the list to offer input for, and `runtime.Player` is the leader (see [The party](#the-party)) |
 | A pile | `runtime.State.ZoneOf(player, Zones.Hand)`, and likewise `Draw`, `Discard`, `Exhaust`, `Powers` and `Relics`. `Zones.Attached` holds what is on an actor rather than in a pile (its statuses and its abilities), and `runtime.AbilitiesOf(who)` is the abilities alone |
 | Where a card is | `card.Zone`, such as `"hand"` or `"discard"`; `"play"` while its effect resolves |
 | hp, block, energy and other stats | `entity.GetInt("hp")`, after modifiers |
@@ -270,7 +270,7 @@ switch (runtime.UseAbility(ability, target))
 }
 ```
 
-An ability settles its own target from its `target` and `range` lines when none is given, so the three targeting refusals are all real answers: `NoTarget` when there is nobody on the side it asks for, `OutOfRange` when it cannot reach from where its owner stands, and `InvalidTarget` when the one it was handed is somebody it will not take. An ability has no cost and never will have one: its price is the seconds it makes you wait, and a `cost` line on an `ability` declaration is refused at lint as CT339. So it never answers `CannotAfford`, which is in the type only because one enum serves cards as well.
+An ability settles its own target from its `target` and `range` lines when none is given, so the three targeting refusals are all real answers: `NoTarget` when there is nobody on the side it asks for, `OutOfRange` when it cannot reach from where its owner stands, and `InvalidTarget` when the one it was handed is somebody it will not take. An ability has no cost: its price is the seconds it makes you wait, and a `cost` line on an `ability` declaration is refused at lint as CT339. So it never answers `CannotAfford`: that one serves cards, and it is in the type for the day an ability does have a cost, so adding one would not change this signature.
 
 `AddRelic`, `ApplyStatus` and `Tick` never stop: a choice they raise takes the first option.
 
@@ -335,7 +335,7 @@ When the last member that could act has passed, the enemies take their turn and 
 | `State.TurnOrder` | every living combatant on both sides, in the one order `turns: initiative` runs them in (what an order bar draws) |
 | `State.HasActed(actor)` | whether that combatant has already taken its step this round |
 
-**Playing a card with a named performer.** `Play(card, target, performer)` is how one member plays out of the party's hand: the cost comes out of the card controller's pool, and everything else is the performer's (`card_played`'s source, the damage, `source:` filters, that member's own statuses and modifiers). With no performer it means what it always meant, the card's own controller.
+**Playing a card with a named performer.** `Play(card, target, performer)` is how one member plays out of the party's hand: the cost comes out of the card controller's pool, and everything else is the performer's (`card_played`'s source, the damage, `source:` filters, that member's own statuses and modifiers). No performer means the card's own controller.
 
 ```csharp
 runtime.Play(sanctuary, crusader, performer: vestal);
@@ -359,6 +359,37 @@ while (runtime.Won == null)
 
 **Losing.** The battle is lost when no member is alive, not when the leader dies. A surviving summon does not keep it going.
 
+## The board
+
+A battle is fought on a **board**: `lanes` across, and `ranks` along the axis the two sides face
+each other on, both counting from 0. Content declares the shapes, which [Boards](language.md#boards)
+sets out, and a game with more than one says which fight is fought where:
+
+```csharp
+runtime.StartBattle(board: "Train");   // this fight is on the train
+runtime.StartBattle();                 // this one is wherever the last was
+```
+
+A name no `board` declaration matches throws `ArgumentException`, naming the closest declared
+board rather than inventing one: the linter has to know how deep a board is to check what can reach
+across it. Content that declares no board is played on one lane with unbounded ranks, facing sides
+and a manhattan metric, which is the board every game was on before 1.0, so a game that never
+mentions one notices none of this.
+
+| To know | Read |
+|---|---|
+| Where an actor stands | `entity.Lane` and `entity.Rank`, both from 0, or `entity.Slot` for the pair. `entity.Position` is an alias for `Rank` and stays for the whole 1.x line |
+| The shape in play | `runtime.State.Board`, a `BoardShape`: `Lanes`, `Ranks`, `RanksAreUnbounded`, and `LaneWord` and `RankWord` for a game that calls a lane a floor |
+| How far apart two are | `runtime.State.Distance(a, b)`, in steps, by the board's metric. Across a facing board the rank term is `a.Rank + b.Rank + 1`, so two front-rank actors are one step apart however deep the board is. Anything not on the board is `int.MaxValue` |
+| Who is one step away | `runtime.State.Neighbours(actor)`, **on that actor's own side** |
+| Who is on a slot | `runtime.State.At(team, lane, rank)`, or `null` |
+| Whether a lane has room | `runtime.State.HasRoom(team, lane)` |
+| Where an arrival stands | `runtime.Place(actor, lane, rank)`: see [Placing what arrives](#placing-what-arrives) |
+
+`LegalTargets` already answers what an action can reach, so a targeting highlight needs no
+distance arithmetic of its own. Content moves an actor by writing `target.rank = 0`, and `Place`
+is that write from C#.
+
 ## Winning, losing and several battles
 
 `runtime.Won` is null while a battle runs, and before the first one; once a side is gone it is true or false. A battle ends when no party member is alive or no enemy is left alive, so check `Won` after each call, or listen for `battle_end`, whose data holds `won`.
@@ -370,7 +401,7 @@ ruleset
   ends: called
 ```
 
-An empty board is then just an empty board: the battle runs until the party falls, which is still the rules' own answer, or until the game says otherwise with `runtime.EndBattle(won)`. That call raises `battle_end`, ends the temporary statuses, sends the cards home and sets `Won`, exactly as the last enemy falling does. So everything downstream of the ending is unchanged, and only what *causes* it moved. It works under the default rule too, for a retreat or a surrender.
+An empty board is then just an empty board: the battle runs until the party falls, which is still the rules' own answer, or until the game says otherwise with `runtime.EndBattle(won)`. That call raises `battle_end`, ends the temporary statuses, sends the cards home and sets `Won`, exactly as the last enemy falling does. It works under the default rule too, for a retreat or a surrender.
 
 One runtime plays a whole run. Between battles, give rewards, heal, spawn the next encounter and start again:
 
@@ -459,7 +490,7 @@ runtime.Place(hollow, lane: 1, rank: 3);            // and the game says where i
 
 `Place` is content's `target.rank = 0` from C#: it raises `moved`, a `before_moved` listener can refuse it, and it answers whether the actor stands there afterwards. A slot the board does not have throws `ArgumentException`, naming the board and its shape, rather than being clamped, because a wave arriving at a rank that does not exist is a bug in the schedule. Writing a slot that is taken **swaps** the two actors, which is the same rule content gets.
 
-`SpawnEnemy` raises `created`, the same event `create` raises, so an arrival is something content can hear: an entrance effect, a relic that reacts to anything joining the fight, an enemy that places itself. It is an announcement rather than a gate: the enemy is already in the game. So a `before created:` listener cannot cancel a spawn the game has decided on.
+`SpawnEnemy` raises `created`, the same event `create` raises, so an arrival is something content can hear: an entrance effect, a relic that reacts to anything joining the fight, an enemy that places itself. It is an announcement rather than a gate: the enemy is already in the game when it is raised, so a `before created:` listener cannot cancel a spawn the game has decided on.
 
 ### What a real-time interface reads
 
@@ -489,7 +520,7 @@ Content can ask `IsReady` and `CanUse` itself, which is how a test says what a k
 
 ### Saving a running clock
 
-A save carries the clock's position, every cooldown's due tick, a burn part way through its second, a `for 3s` buff part way through its three and an `in 2s:` effect still in the air. Restore it into a runtime with a `TickClock` of the same rate and both copies play on identically, hash for hash. `IGameClock.Restore` puts the clock back where it was, which is the detail that makes it work. There is nothing extra to do and nothing extra to write down.
+A save carries the clock's position, every cooldown's due tick, a burn part way through its second, a `for 3s` buff part way through its three and an `in 2s:` effect still in the air. Restore it into a runtime with a `TickClock` of the same rate and both copies play on identically, hash for hash. `IGameClock.Restore` puts the clock back where it was.
 
 What a save does **not** carry is anything above the fight: a wave schedule, a mission timer, the score. Those are the game's, and go beside the save in the game's own file.
 
@@ -587,7 +618,7 @@ catch (InvalidOperationException error)
 }
 ```
 
-`Restore` looks up everything a save needs before it changes anything, so when it refuses one, the game it was called on carries on untouched. That includes a damaged save, one with a list or a record missing, which it refuses as damaged. Restoring into the running runtime keeps its options and the verbs the game registered with `RegisterVerb`, and an `Entity` the game holds stays the same object if the save has it too. A new runtime works as well, given the same options (a real-time game's `TickClock` included) and the same verbs; its entities are new objects, so look them up again: `runtime.Player` is the player, `runtime.State.Actors(Team.Enemy)` the enemies still standing, and `runtime.State.Find(id)` finds anything else by the `Id` it had, which the save keeps.
+`Restore` looks up everything a save needs before it changes anything, so when it refuses one, the game it was called on carries on untouched. That includes a damaged save, one with a list or a record missing, which it refuses as damaged. Restoring into the running runtime keeps its options and the verbs the game registered with `RegisterVerb`, and an `Entity` the game holds stays the same object if the save has it too. A new runtime works as well, given the same options (a real-time game's `TickClock` included) and the same verbs; its entities are new objects, so look them up again: `runtime.Party` is the living members, `runtime.State.Actors(Team.Enemy)` the enemies still standing, and `runtime.State.Find(id)` finds anything else by the `Id` it had, which the save keeps.
 
 The fingerprint covers the kinds and names of the definitions, content verbs and resources, and nothing else, so rebalancing a card leaves it unchanged. What a content change does to a save:
 
@@ -793,7 +824,7 @@ IReadOnlyList<DslTestResult> results = new DslTestRunner(content).RunAll();
 - [godot.md](godot.md) is the same ground for a Godot game: the node that wraps these calls, the dictionaries it hands GDScript, and the editor dock.
 - [language.md](language.md) describes everything content can say; its [Built-in events](language.md#built-in-events) table lists each event's fields.
 - [architecture.md](architecture.md) explains how the library fits together, and [Extending](architecture.md#extending) lists every seam a game can plug into.
-- [The API reference](api/README.md) lists every public type and member of `Cantrip.Core`, generated from the sources. This page teaches the twenty calls a game needs; that one is the list of everything.
+- [The API reference](api/README.md) lists every public type and member of `Cantrip.Core`, generated from the sources. This page teaches the calls a game needs, in the order it needs them; that one is the list of everything.
 - [troubleshooting.md](troubleshooting.md) is the other end of this page: what each refusal means, how to read a `RuntimeError` and a trace, what every save refusal is telling you, and what a published game has to do differently.
 - [stability.md](stability.md) says what may change in a 1.x release, which platforms are tested, and what is known not to work yet.
 - [src/Cantrip.Sim](../src/Cantrip.Sim) is what `cantrip sim` runs: a scenario runner, three bots that play through this API, and a meter that records what the engine raised.
