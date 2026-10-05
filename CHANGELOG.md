@@ -11,7 +11,7 @@ When a release changes any of the following, its section says so under that name
 
 ## [Unreleased]
 
-Documentation only. Nothing in the engine, the language or the save format has changed since 1.0.0.
+Documentation, and one lint fix. Nothing in the language, the save format or what a seed plays out as has changed since 1.0.0.
 
 ### Changed
 
@@ -23,6 +23,10 @@ Documentation only. Nothing in the engine, the language or the save format has c
 ### Removed
 
 - **`docs/slice-friction.md`**, a log of what building `samples/slice` needed during the previews. Four of its entries had gone stale, and the two [FINDINGS](reference/FINDINGS.md) files record the same kind of thing for two complete games.
+
+### Fixed
+
+- **`grant Surge to player` in a test or a scenario is no longer CT302.** The line is the form [the language reference](docs/language.md#statements) documents, and the runtime always ran it, but the linter read the word after `to` as another ability to look up and reported the actor as an undefined name. Since CI runs `lint --warnings-as-errors`, a game that wrote the documented line got a hard failure. `grant` is the only setup verb the linter name-checks that takes a clause, so nothing else was affected, and a misspelt ability in the same line is still caught with its suggestion. Found while checking what [docs/language.md](docs/language.md) claims against the engine.
 
 ## [1.0.0] - 2026-10-02
 

@@ -91,6 +91,33 @@ namespace Cantrip.Tests.Linting
         }
 
         /// <summary>
+        /// <c>grant Surge to player</c> is the form language.md documents, and the <c>to</c> carries
+        /// whoever gets the ability. The linter used to read that word as another name to look up
+        /// among the abilities, so the documented line was CT302 on a perfectly good actor while the
+        /// runtime ran it without complaint. It is the only name-checked setup verb with a clause,
+        /// so it was the only one that could go wrong this way.
+        /// </summary>
+        [Theory]
+        [InlineData("scenario \"Given\"\n  battle Archmage\n  grant Surge to player\n")]
+        [InlineData("test \"given\"\n  setup:\n    grant Surge to player\n  expect player.hp == 20\n")]
+        [InlineData("test \"given\"\n  setup:\n    player hp 20\n  grant Surge to player\n  expect player.hp == 20\n")]
+        public void A_clause_on_a_setup_verb_is_not_another_name_to_look_up(string dsl)
+        {
+            Assert.DoesNotContain(Linter.UnknownName, Lint(dsl).Select(d => d.Code));
+        }
+
+        /// <summary>And the ability itself is still looked up, so a misspelling is still caught.</summary>
+        [Fact]
+        public void The_ability_in_a_grant_with_a_clause_is_still_checked()
+        {
+            Diagnostic error = Single(
+                Lint("scenario \"Given\"\n  battle Archmage\n  grant Serge to player\n"), Linter.UnknownName);
+
+            Assert.Contains("`Serge`", error.Message);
+            Assert.Equal("Surge", error.Suggestion);
+        }
+
+        /// <summary>
         /// The count in <c>deck 4 Zap, 4 Ward</c> is a repetition, not a name: the linter reads past
         /// it to both cards, in a scenario and in a test alike.
         /// </summary>

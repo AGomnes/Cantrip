@@ -2299,6 +2299,12 @@ namespace Cantrip.Linting
             foreach (ClauseNode clause in command.Clauses)
             {
                 if (clause.Value == null) yield return new NameExpr(clause.Keyword, clause.Span);
+
+                // A real clause names whoever the line acts on, not another definition of the verb's
+                // own kind: the `to` in `grant Mend to Vestal` carries the member, so checking it
+                // against the abilities reported CT326's neighbour, CT302, for a hero. The verb
+                // itself skips these the same way (Interpreter.Verbs.cs, VerbGrant).
+                else if (Parser.IsClauseWord(clause.Keyword)) continue;
                 else if (clause.Value is NameExpr || clause.Value is StringExpr) yield return clause.Value;
             }
         }
