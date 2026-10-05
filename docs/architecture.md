@@ -2,6 +2,8 @@
 
 How the library is put together, what each part is responsible for, and where to extend it. The language itself is described in [language.md](language.md), and [csharp.md](csharp.md) shows a game using the library.
 
+> These docs describe the `main` branch, which can be ahead of the latest release. The changelog's [Unreleased](../CHANGELOG.md#unreleased) section lists what that release lacks, and each release's own docs are in [its tag](https://github.com/AGomnes/Cantrip/tags).
+
 ## Extending
 
 A game extends Cantrip through these seams, without changing the library:
@@ -152,7 +154,7 @@ Each queued trigger carries its `Chain`: an immutable list of the listeners that
 
 ## Determinism
 
-- `Num` is a 64-bit fixed-point value with six decimal places. Multiplication splits integer and fractional parts so no intermediate overflows for values up to about ±1 million. The arithmetic is unchecked, so a result beyond about ±9.2 trillion wraps round silently, with no error; [Numbers](stability.md#numbers) gives the limits.
+- `Num` is a 64-bit fixed-point value with six decimal places. Multiplication splits integer and fractional parts so no intermediate overflows for values up to about plus or minus 1 million. The arithmetic is unchecked, so a result beyond about plus or minus 9.2 trillion wraps round silently, with no error; [Numbers](stability.md#numbers) gives the limits.
 - `Rng` is xoshiro256** seeded through splitmix64, with rejection sampling for bounded values. Its full state is saved in snapshots.
 - Anything that could depend on hash order is sorted: listener candidates, resource resets, zone and history hashing.
 - `GameState.ComputeHash` covers entities, zones, RNG, clock, history, scheduled work and listener limits. A waiting block counts by the hash of its statements rather than the place it was written, so a save restored after a patch that moved the block hashes like the game that was saved. Tests play a hundred random battles twice each, and play a battle side by side with a saved-and-restored copy of itself, comparing hashes after every step.

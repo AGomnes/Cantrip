@@ -4,6 +4,8 @@ A test plays one fight the way you tell it to. A **scenario** states a whole run
 fights in order, and whatever happens between them. `cantrip sim` plays it hundreds of times with
 two bots and reports what happened.
 
+> These docs describe the `main` branch, which can be ahead of the latest release. The changelog's [Unreleased](../CHANGELOG.md#unreleased) section lists what that release lacks, and each release's own docs are in [its tag](https://github.com/AGomnes/Cantrip/tags).
+
 It is a fuzzer and a coverage tool for your own content. It finds the run that throws, the fight
 that never ends, the card that is never playable and the enemy move that never fires, none of
 which a single test would reach.

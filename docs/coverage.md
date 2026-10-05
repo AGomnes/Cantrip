@@ -2,6 +2,8 @@
 
 To measure how much the language can express without new C#, the coverage corpus re-creates effects from existing games under our own names. The effects are in [`samples/corpus`](../samples/corpus), and each one the language can express has at least one test. Cantrip is not affiliated with these games or their publishers.
 
+> These docs describe the `main` branch, which can be ahead of the latest release. The changelog's [Unreleased](../CHANGELOG.md#unreleased) section lists what that release lacks, and each release's own docs are in [its tag](https://github.com/AGomnes/Cantrip/tags).
+
 From a clone of the repository, run the tests and the linter over the corpus with:
 
 ```
@@ -205,7 +207,7 @@ What the language cannot say yet, ranked by how many rows of the tables above ea
 | 15 | **Costs in several currencies, or paid by a sacrifice.** A cost is one amount in one resource. | Magic #7; Inscryption #6; Dominion #7 | A cost in a named resource, `cost 2 bones`. A sacrifice written into the effect, which cannot refuse the play. |
 | 5 | **Effects as values.** Nothing can copy another entity's effects, or switch them off. `copy` duplicates an entity's *state* (its live stats, tags and statuses), which is a different thing. | Balatro #6; Hearthstone #9 | `copy` for an entity's state. Nothing for its effects. |
 | 17 | **A run above the battle.** A battle is the outermost thing content can see: nothing carries lives, candles or stress from one battle to the next, and `once per run` is the only nod to runs. | Inscryption #8; Darkest Dungeon #7 | The game carries hp, deck and relics between battles in its own code, as [Winning, losing and several battles](csharp.md#winning-losing-and-several-battles) shows. `cantrip sim` plays a gauntlet a `scenario` states; it does not generate one. |
-| 3 | **A blocking step.** There is no step in which one side's rule stops an attack from landing, as Flying needs. | Magic #8 | The `targetable` channel, asked wherever something is pointed at somebody, and `target … where` for an action's own reach. Neither of them can interpose on a swing that is already aimed. |
+| 3 | **A blocking step.** There is no step in which one side's rule stops an attack from landing, as Flying needs. | Magic #8 | The `targetable` channel, asked wherever something is pointed at somebody, and a `target` line's `where` for an action's own reach. Neither of them can interpose on a swing that is already aimed. |
 | 18 | **A priority window.** Nothing lets one side respond to a card while it is being played. | Magic #5 | A permanent that commits in advance to countering the next spell, which is still cast and paid for. |
 | 8 | **Grouping over collections.** Counting by rank or suit, distinct values, runs. | Balatro #7 | `where` filters and `.count`. |
 | 9 | **Modifiers in source order.** Layers apply in a fixed order, not by the position of their sources, as Balatro's jokers need. It would be a ruleset option. | Balatro #5 | The fixed layer order, which `modifier_layers` can rearrange. |
@@ -220,7 +222,7 @@ The other workarounds are explained in their rows: Heavy Blade (Slay the Spire #
 
 - **1. Time-based triggers.** `on every 1s:` fires on the clock (Dota 2 #2, #8).
 - **2. Re-telegraphing when a phase changes.** `retelegraph` on a phase re-rolls the intent as the threshold is crossed (Slay the Spire #22). It is opt-in: see [Phases](language.md#phases).
-- **3, in part. Target validity.** Everything that is pointed at somebody (a card, an ability, the `attack` verb and an enemy's move) settles its target through one function, which asks the `targetable` channel (how a taunt and stealth are written: Hearthstone #8, #11) and the action's own `target … where` (how a reach limit is written: Darkest Dungeon #6). A card no longer has to name itself to have a rule about itself. What is left open above is a blocking step.
+- **3, in part. Target validity.** Everything that is pointed at somebody (a card, an ability, the `attack` verb and an enemy's move) settles its target through one function, which asks the `targetable` channel (how a taunt and stealth are written: Hearthstone #8, #11) and the `where` on the action's own `target` line (how a reach limit is written: Darkest Dungeon #6). A card no longer has to name itself to have a rule about itself. What is left open above is a blocking step.
 - **7, in part. Definition pools.** `discover` offers content that nothing has been made from yet (Hearthstone #10, Darkest Dungeon #8). Since 0.1.0-preview.2 the player can answer the offer in a game, as with any other choice. The rest is open above.
 - **10. Cancellable resets.** `event.reset` marks a reset, so `if event.reset: cancel` keeps block across turns (Slay the Spire #9).
 - **11. Cooldown as a modifier channel.** `modify cooldown: x0.5` (Dota 2 #5).

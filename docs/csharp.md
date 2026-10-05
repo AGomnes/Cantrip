@@ -8,7 +8,7 @@ These docs describe the `main` branch, which can be ahead of the latest release.
 
 ## Load content and play a battle
 
-The examples use the Fireball, Frozen, Burn and Kindling content from the [README](../README.md), plus the Strike, Defend and Jaw Worm in [samples/basic](../samples/basic/content.cantrip). The types live in a handful of namespaces; this page's snippets use:
+The examples use the Strike, Defend, Fireball, Frozen, Burn, Kindling and Jaw Worm content in [samples/basic](../samples/basic/content.cantrip). The types live in a handful of namespaces; this page's snippets use:
 
 ```csharp
 using Cantrip;               // CardRuntime, RuntimeOptions, ActionResult, Num, Team
@@ -110,7 +110,7 @@ var host = new GameHost();
 var runtime = new CardRuntime(content, new RuntimeOptions { Host = host });
 ```
 
-`TryResolveName` answers a bare name the same way. Both run in the middle of an effect while the rules wait, so they answer and return without calling back into the runtime. They are also the one place where determinism depends on your code, as [verbs written in C#](#verbs-written-in-c) are: answer from the game's own state, never from the clock or `System.Random`, or the same seed and inputs stop producing the same game. [Determinism](stability.md#determinism) lists what else to avoid.
+`TryResolveName` answers a bare name the same way. Both run in the middle of an effect while the rules wait, so they answer and return without calling back into the runtime. Like [verbs written in C#](#verbs-written-in-c), they are where determinism depends on your code: answer from the game's own state, never from the clock or `System.Random`, or the same seed and inputs stop producing the same game. [Determinism](stability.md#determinism) lists what else to avoid.
 
 ## Presenting events in a frame loop
 
@@ -121,7 +121,7 @@ When the host hears about an event depends on the chooser (see [Player choices](
 | Chooser | `OnEvent` is called | Stats read inside `OnEvent` |
 |---|---|---|
 | any but `DeferredChooser`, including the default `FirstOptionChooser` | during the call, as each event finishes | as they stood when that event finished |
-| `DeferredChooser` | once `Play`, `EndTurn`, `StartBattle`, `Execute`, `UseAbility` or `Answer` has finished, for all its events in a row; never for an attempt rolled back for a choice | the final values, after the whole call |
+| `DeferredChooser` | once `Play`, `EndTurn`, `Pass`, `StartBattle`, `EndBattle`, `Execute`, `UseAbility` or `Answer` has finished, for all its events in a row; never for an attempt rolled back for a choice | the final values, after the whole call |
 
 Under `DeferredChooser`, the other calls (`AddRelic`, `ApplyStatus`, `Tick`) deliver as the default chooser does.
 
@@ -218,16 +218,16 @@ Not everything raises an event. These changes happen without one:
 | Change | When |
 |---|---|
 | A played card moving to the `play` zone, then to the discard pile, or to `powers` for a power | during `Play`; a card that exhausts raises `exhausted` instead of reaching the discard pile |
-| The hand going to the discard pile, retained cards apart | during `EndTurn`, after the player's `turn_end`; ethereal cards raise `exhausted` |
+| Every member's hand going to the discard pile, retained cards apart | during `EndTurn`, after each member's `turn_end`; ethereal cards raise `exhausted` |
 | Block falling to 0 and energy refilling | at each `turn_start` |
 | A stat changing other than by damage, healing or gaining block, such as the energy paid for a card or `lose 3 hp`, and a status's number changing other than by `apply`: `stacks -1`, `decay`, or `gain 2 Strength` on a host that already has Strength | whenever it happens |
 | An enemy's new intent | when intents are rolled: at the start of a battle, after the enemy turn and when an enemy joins; and when a hit takes the enemy into a `retelegraph` phase |
 | An enemy's phase | when a hit takes the enemy across a phase's threshold, and otherwise when its intent is rolled |
 | Tags added or taken away | whenever it happens |
 | The draw pile shuffled, and enemies that died in an earlier battle taken away | during `StartBattle`; shuffling the discard pile into the draw pile raises `shuffled` |
-| The player's statuses taken away, unless `persistent`, and every card back in the draw pile | when the battle ends, after `battle_end` |
+| Every party member's statuses taken away, unless `persistent`, and every card back in its owner's draw pile | when the battle ends, after `battle_end` |
 
-A stat change, the turn-start resets included, does raise `<stat>_changed`, but only when some content listens for it. `CreatePlayer`, `AddCard`, `AddDeck` and `SpawnEnemy` raise nothing, and nor do `Restore` and `ApplyContentChanges`; of the setup calls, only `AddRelic` (`obtained`) and `ApplyStatus` (`status_applied`) raise an event. An event that a listener cancels never reaches the host; one that an `instead_of_` listener replaced does, with `Replaced` true. So when the queue is empty, redraw the hand, the piles, the bars and the intents from the live state.
+A stat change, the turn-start resets included, does raise `<stat>_changed`, but only when some content listens for it. `CreatePlayer`, `AddHero`, `AddCard` and `AddDeck` raise nothing, and nor do `Restore` and `ApplyContentChanges`; of the setup calls, `AddRelic` (`obtained`), `SpawnEnemy` (`created`) and `ApplyStatus` (`status_applied`) raise an event. An event that a listener cancels never reaches the host; one that an `instead_of_` listener replaced does, with `Replaced` true. So when the queue is empty, redraw the hand, the piles, the bars and the intents from the live state.
 
 ## Player choices
 
@@ -256,9 +256,9 @@ Nothing happens until the action completes: host events are held back, so the ga
 
 `Prompt` is the engine's short summary of what is asked, in English: `choose a target`, `discard 2`, `exhaust 1`, `choose 1`, or `discover 1 of 3` for an offer. It suits a log rather than the player. Word what the player sees from the card being played and the options instead: each option's `Zone` says which pile it is in, `Chooser` is who chooses, and `Span` points at the line of content that asked.
 
-`Play` is not the only call that can stop. A relic whose turn-end effect asks the player to choose stops `EndTurn`: the whole call, enemy turn included, is rolled back and runs again once the choice is answered. Every call that can stop says so the same way, by returning `ActionResult.ChoicePending`: `Play`, `Answer`, `StartBattle`, `EndTurn`, `Execute` and `UseAbility`. There is nothing to remember and no table to consult. Read what the call hands back, as you would `Play`'s.
+`Play` is not the only call that can stop. A relic whose turn-end effect asks the player to choose stops `EndTurn`: the whole call, enemy turn included, is rolled back and runs again once the choice is answered. Every call that can stop says so the same way, by returning `ActionResult.ChoicePending`: `Play`, `Answer`, `StartBattle`, `EndTurn`, `Pass`, `EndBattle`, `Execute` and `UseAbility`.
 
-`UseAbility` answers with the same type, so a cooldown is no longer the same answer as a question:
+`UseAbility` answers with the same type, so a cooldown is a different answer from a question:
 
 ```csharp
 switch (runtime.UseAbility(ability, target))
@@ -329,7 +329,7 @@ When the last member that could act has passed, the enemies take their turn and 
 | `Pass(member)` | that member is done this turn; the last one ends the turn |
 | `ActiveMember` | the member whose step it is, or null when none of ours is. Binding under `turns: initiative`; under `turns: sides` it is the one the engine would offer next (the first that has not acted), which a UI highlights and `CanAct` overrules |
 | `Revive(actor, hp = 1)` | brings a fallen actor back. False for one that was never dead |
-| `SetStat(entity, stat, value)` | writes a stat, exactly as content's `speed = 6` does: the resource's bounds, the `<stat>_changed` event, and death when hp reaches zero. Returns the change applied. This is how the leader gets a `speed` under `order: speed`, where an actor with none reads 0 and takes its step last |
+| `SetStat(entity, stat, value)` | writes a stat, exactly as content's `speed = 6` does: the resource's bounds, the `<stat>_changed` event, and death when hp reaches zero. Returns the change applied |
 | `ChangeStat(entity, stat, by)` | adds to a stat, or takes away with a negative amount: content's `gain 2 gold` and `lose 2 gold`, and how a shop spends the run's purse |
 | `Entity.IsPartyMember` | true for the leader and every `hero`; false for a summon standing beside them |
 | `State.TurnOrder` | every living combatant on both sides, in the one order `turns: initiative` runs them in (what an order bar draws) |
@@ -363,7 +363,7 @@ while (runtime.Won == null)
 
 `runtime.Won` is null while a battle runs, and before the first one; once a side is gone it is true or false. A battle ends when no party member is alive or no enemy is left alive, so check `Won` after each call, or listen for `battle_end`, whose data holds `won`.
 
-**A fight that does not end with the last enemy.** A wave defence, a horde mode, a survival run or an endless arena has an empty board every few seconds by design, and under the default rule the first gap between two waves wins it. Content says so once, in its ruleset:
+**A fight that does not end with the last enemy.** A wave defence or a survival run has an empty board every few seconds by design, and under the default rule the first gap between two waves wins it. Content says so once, in its ruleset:
 
 ```
 ruleset
@@ -419,7 +419,7 @@ var clock = new TickClock(20);                     // 20 ticks a second
 var runtime = new CardRuntime(content, new RuntimeOptions { Clock = clock, Seed = seed });
 ```
 
-**The tick rate is part of the game, not part of the machine.** Every `cooldown 1s`, `for 3s`, `in 2s:` and `on every 2s:` in the content converts through it, so the same content at `new TickClock(20)` and at `new TickClock(60)` is the same game. But a rate the content was not balanced against is a different one, in the way that changing gravity is. Keep the number beside the content it belongs to, not beside the frame rate. Content whose ruleset says `clock ticks` and which is given no clock gets a `TickClock(60)` of its own, which is a reasonable default and nobody's considered choice.
+**The tick rate is part of the game, not part of the machine.** Every `cooldown 1s`, `for 3s`, `in 2s:` and `on every 2s:` in the content converts through it, so the same content at `new TickClock(20)` and at `new TickClock(60)` is the same game. But a rate the content was not balanced against is a different one. Keep the number beside the content it belongs to, not beside the frame rate. Content whose ruleset says `clock ticks` and which is given no clock gets a `TickClock(60)` of its own, which is a reasonable default and nobody's considered choice.
 
 Then `Tick` is the whole of the game's clock:
 
@@ -442,11 +442,11 @@ Every turn-shaped call refuses on a tick runtime, the way `Tick` refuses on a tu
 | `State.Turn` | stays 0 for the whole fight |
 | `turn_start`, `turn_end` | never raised |
 
-So a shared front end asks before it draws an **End turn** button. There is no flag to read from C# because the game made the clock and knows: `options.Clock is TickClock`. (The Godot node, which makes its own, has `IsRealTime()`.)
+So a shared front end asks before it draws an **End turn** button. There is no flag to read from C#, because the runtime's own clock answers it: `runtime.State.Clock is TickClock`. (The Godot node, which makes its own, has `IsRealTime()`.)
 
 Half the turn-based vocabulary follows the turn events and is therefore dead under ticks: `move`, `pattern`, `phase`, `stacking duration`, `decay ... on turn_end`, `until turn_end:`, `next turn:`, `once per turn`, `reset_on turn_start`. **The linter refuses all of it as CT337** when the ruleset says `clock ticks`, and each message names the real-time shape of the same idea, so this is a thing content is told once and not a rule to remember. In particular: an enemy's whole behaviour is `on every <n>s:` listeners, and a status ends because something said `for <n>s` where it was applied.
 
-One consequence worth stating outright: **`cantrip sim` cannot play a real-time game and refuses to try.** When to act in continuous time is the game's own frame loop, not a bot's. Cover a real-time game with `test` blocks, which have `realtime <rate>` and `tick <n>`.
+**`cantrip sim` cannot play a real-time game and refuses to try.** When to act in continuous time is the game's own frame loop, not a bot's. Cover a real-time game with `test` blocks, which have `realtime <rate>` and `tick <n>`.
 
 ### Placing what arrives
 
@@ -457,13 +457,13 @@ Entity hollow = runtime.SpawnEnemy("Hollow");       // raises `created`, so cont
 runtime.Place(hollow, lane: 1, rank: 3);            // and the game says where it arrives
 ```
 
-`Place` is content's `target.rank = 0` from C#: it raises `moved`, a `before_moved` listener can refuse it, and it answers whether the actor stands there afterwards. A slot the board does not have is refused with the board's own name and shape rather than clamped, because a wave arriving at a rank that does not exist is a bug in the schedule. Writing a slot that is taken **swaps** the two actors, which is the same rule content gets.
+`Place` is content's `target.rank = 0` from C#: it raises `moved`, a `before_moved` listener can refuse it, and it answers whether the actor stands there afterwards. A slot the board does not have throws `ArgumentException`, naming the board and its shape, rather than being clamped, because a wave arriving at a rank that does not exist is a bug in the schedule. Writing a slot that is taken **swaps** the two actors, which is the same rule content gets.
 
 `SpawnEnemy` raises `created`, the same event `create` raises, so an arrival is something content can hear: an entrance effect, a relic that reacts to anything joining the fight, an enemy that places itself. It is an announcement rather than a gate: the enemy is already in the game. So a `before created:` listener cannot cancel a spawn the game has decided on.
 
 ### What a real-time interface reads
 
-A row of ability buttons with cooldown sweeps is the whole of a real-time interface, and it is two calls:
+A row of ability buttons with cooldown sweeps is three calls:
 
 ```csharp
 foreach (Entity ability in runtime.AbilitiesOf(member))
@@ -485,7 +485,7 @@ foreach (Entity ability in runtime.AbilitiesOf(member))
 | `UseAbility(ability, target = null)` | with no target it settles its own from the ability's `target` and `range`, and answers `NoTarget`, `OutOfRange` or `InvalidTarget` when it cannot be aimed |
 | `clock.Now` | what time it is, in ticks. Divide by `TicksPerSecond` for a read-out |
 
-Content can ask the first two of those itself, which is how a test says what a keeper may *not* do yet: `leader.is_ready(Bulwark)` is whether the cooldown has run out, and `leader.can_use(Bulwark)` also asks whether anything is in reach.
+Content can ask `IsReady` and `CanUse` itself, which is how a test says what a keeper may *not* do yet: `leader.is_ready(Bulwark)` is whether the cooldown has run out, and `leader.can_use(Bulwark)` also asks whether anything is in reach.
 
 ### Saving a running clock
 
@@ -507,7 +507,7 @@ string move = worm.Intent!;                                // "Chomp", for choos
 Description intent = text.DescribeIntent(worm, runtime);   // "Deal 11 damage to the player."
 ```
 
-`IntentTargetOf(enemy)` is who that move is aimed at: the member the enemy telegraphed, while that member is still a legal target, and otherwise whoever is left. **It is recomputed on every call**, so a taunt applied mid-turn, a death or a swap changes what the panel shows with no event for the UI to have missed. It agrees with what the move itself does when it runs, because both ask one question of one rule. It is null while `Intent` is. `Entity.IntentTarget` is the raw telegraph as it was rolled, which is what a save holds; a UI wants `IntentTargetOf`.
+`IntentTargetOf(enemy)` is who that move is aimed at: the member the enemy telegraphed, while that member is still a legal target, and otherwise whoever is left. **It is recomputed on every call**, so a taunt applied mid-turn, a death or a swap changes what the panel shows with no event for the UI to have missed. It agrees with what the move itself does when it runs. It is null while `Intent` is. `Entity.IntentTarget` is the raw telegraph as it was rolled, which is what a save holds; a UI wants `IntentTargetOf`.
 
 `DescribeIntent` is empty while `Intent` is null. It returns the same `Description` as a card's rules text, so it is drawn the same way (below); in an intent, a `Buffed` value is one the enemy hits harder with. `DescribeMove(definition, moveName, runtime, enemy)` describes any one of an enemy's moves, for a bestiary or a tooltip.
 
@@ -616,7 +616,7 @@ Four fields at the top of a `GameSnapshot` describe the save rather than the gam
 
 **Older saves keep loading.** `Restore` refuses a save only when it needs a reader this build is not (when `GameSnapshot.ReaderNeededBy(save)` is above `GameSnapshot.CurrentFormat`), and says so, naming the version that wrote it:
 
-> This save is in format 4 and needs a Cantrip that reads format 3; this one reads up to format 2. It was written by Cantrip 1.4.0.
+> This save is in format 5 and needs a Cantrip that reads format 4; this one reads up to format 3. It was written by Cantrip 1.4.0.
 
 Anything older goes through an upgrade step first, which brings it into the current shape in place; the `GameSnapshot` you passed comes back at `CurrentFormat`. A save from a *newer* release is read whenever that release said it could be (that is what `MinimumReader` is for), and fields this build has never heard of are ignored. Call `GameSnapshot.ReaderNeededBy` yourself before restoring if you would rather tell the player that a save needs a newer version of your game than catch the exception.
 

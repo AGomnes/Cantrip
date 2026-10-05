@@ -6,6 +6,8 @@ got stuck: [reference/FINDINGS.md](../reference/FINDINGS.md) and
 [realtime/FINDINGS.md](../realtime/FINDINGS.md). Nearly everything they hit has been fixed. What is
 left is the part that cannot be fixed, only explained. This page explains it.
 
+> These docs describe the `main` branch, which can be ahead of the latest release. The changelog's [Unreleased](../CHANGELOG.md#unreleased) section lists what that release lacks, and each release's own docs are in [its tag](https://github.com/AGomnes/Cantrip/tags).
+
 If you are looking for what a call does rather than why it went wrong, the
 [API reference](api/README.md) lists every public type and member.
 
@@ -152,7 +154,7 @@ somebody else.
 
 Content that declares a `hero` is refused at lint for exactly that: **CT326**, an error, wherever a
 member could be meant, which is **every body on every declaration** (an `effect`, a `move`, a
-listener, a `modify` line and a `target … where` filter). A hero's own listener is the one that
+listener, a `modify` line and a `target` line's `where` filter). A hero's own listener is the one that
 catches people: `hero "Cleric" / on damaged: block 2 to player` blocks the *leader*, not the
 Cleric. The message names the word that does what was meant: `owner` for something carried, `self`
 in a `hero` or an `actor`, `target` for a card, an ability or an enemy. `leader` says the run's own
@@ -249,7 +251,7 @@ reading rather than lumping together, because a game says something different ab
 |---|---|---|
 | `OutOfRange` | The one you named is too far, or every candidate is. Reach is the action's `range` after the `range` channel has had it. | "Out of reach." It is the only one of the three a player can act on. |
 | `NoTarget` | There is nobody on the side it asks for. | Usually nothing: it is a bug in your own loop. The battle should have ended, or the wave should not have let you act. |
-| `InvalidTarget` | Somebody the action will not take: the wrong side, not alive, excluded by its own `target … where`, or drawn away by a taunt or hidden by a stealth on the `targetable` channel. | "Not that one." |
+| `InvalidTarget` | Somebody the action will not take: the wrong side, not alive, excluded by the `where` on its own `target` line, or drawn away by a taunt or hidden by a stealth on the `targetable` channel. | "Not that one." |
 
 `OutOfRange` is only said when reach is the **whole** of the problem. With one enemy too far and
 another behind a taunt, the answer is `InvalidTarget`, because "move closer" would send the player
@@ -258,7 +260,7 @@ at somebody they still could not hit.
 To tell the last two of `InvalidTarget`'s cases apart (the action's own filter against a taunt),
 call `LegalTargets(action)` and read the list:
 
-1. **The list is empty.** The action's own `target … where` excluded everybody, or a taunt drew
+1. **The list is empty.** The `where` on the action's own `target` line excluded everybody, or a taunt drew
    targeting elsewhere. Read the `where` clause against the actual board.
 2. **The list does not hold the target you passed.** You aimed at somebody the action will not
    accept. In a party game, check you are not passing the leader out of habit.
@@ -399,7 +401,7 @@ name says the battle is over.
 
 Build the C# project first. Until the assembly exists Godot cannot load a C# plugin, and every node
 the addon adds is simply missing, with no error to say why. Then enable the plugin in **Project
-Settings → Plugins**; the Output panel says `Cantrip: dock ready, ...` when it has.
+Settings > Plugins**; the Output panel says `Cantrip: dock ready, ...` when it has.
 
 ### The content is not there
 

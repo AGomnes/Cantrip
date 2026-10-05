@@ -11,7 +11,9 @@ This page sets out the declarations, statements and rules of the `.cantrip` lang
 - [Statuses](#statuses)
 - [Relics, items and keywords](#relics-items-and-keywords)
 - [Enemies](#enemies)
+- [The party](#the-party)
 - [Abilities and real time](#abilities-and-real-time)
+- [Boards](#boards)
 - [Resources](#resources)
 - [Listeners](#listeners)
 - [Built-in events](#built-in-events)
@@ -48,7 +50,7 @@ Content lives in `.cantrip` files. A folder loads every `.cantrip` file under it
 |---|---|
 | definition | What one declaration describes, such as `card Strike`. It is loaded once. |
 | entity | One thing in play made from a definition: each Strike in the deck, each Poison on an enemy. |
-| actor | An entity that takes turns and has hp: the player, an enemy, or an `actor` such as a summoned minion. |
+| actor | An entity that takes turns and has hp: the player, a `hero`, an enemy, or an `actor` such as a summoned minion. |
 | stat | A number on an entity: `hp`, `block`, `cost`, or any name content gives one. |
 | host, owner | The entity a status is attached to is its host; inside the status, `owner` is the host. A card or relic's owner is the actor holding it. |
 | controller | The actor at the top of the ownership chain: the player for their cards, relics and the statuses on them; an actor controls itself. |
@@ -93,12 +95,12 @@ What each declaration reads, beyond the listeners, modifiers, `tags` and present
 
 | Declaration | Properties it reads | Blocks it runs |
 |---|---|---|
-| `card` | `cost`, `target` | `effect:` |
+| `card` | `cost`, `target`, `range` | `effect:` |
 | `status`, `keyword` | `stacking`, `max_stacks`, `decay`, `flags`, `immune` | none |
 | `relic`, `item` | none | none |
 | `enemy`, `actor` | `hp`, `phase`, `pattern`, `immune` | `move "Name":` |
 | `hero` | `hp`, `abilities`, `immune` | none |
-| `ability` | `cooldown` | `effect:` |
+| `ability` | `cooldown`, `target`, `range` | `effect:` |
 | `resource` | `min`, `max`, `reset_to`, `reset_on` | none |
 | `board` | `lanes`, `ranks`, `facing`/`shared`, `metric`, `on_vacated`, `lane_word`, `rank_word` | none |
 
@@ -144,7 +146,7 @@ card "Whirlwind"
 | `cost N <resource>` | Paid in that resource instead of energy: `cost 2 bones`. The card is refused when the payer has too little, exactly as it would be for energy, and `cost x bones` spends all of it. Declare the resource with `resource` so its bounds are known. |
 | `target enemy` | Needs a living enemy. With one candidate it is chosen automatically; with several, the chooser picks. |
 | `target ally` | Needs a living ally. With one candidate (a party of one, so usually the player) it is chosen automatically; with several, the chooser picks. |
-| `target self` | Targets the player. Not a choice, so nothing is asked about it. |
+| `target self` | Targets whoever is using it: the player, or the member performing it. Not a choice, so nothing is asked about it. |
 | `target any` | Any living actor, or none. |
 | `target <side> where <filter>` | The same, narrowed to the candidates the filter accepts. See [Targets](#targets). |
 | `range N` | How far it reaches, in slots on the [board](#boards): `range 1` is melee. Goes through the `range` modifier channel. |
@@ -382,7 +384,7 @@ enemy "Gremlin"
 | `pattern random` | A weighted random move each turn (`weight N` on the move, default 1). |
 | `pattern random_no_repeat` | Weighted random, never the same move twice in a row (unless it is the only move). |
 
-The next move (the intent, readable as `enemy.intent`) is rolled when the battle starts, when an enemy spawns or is created mid-battle, and after each enemy turn. Inside a move, `self` is the enemy and `target` is the player. `use Chant` makes an enemy perform one of its moves.
+The next move (the intent, readable as `enemy.intent`) is rolled when the battle starts, when an enemy spawns or is created mid-battle, and after each enemy turn. Inside a move, `self` is the enemy and `target` is whoever the move is aimed at: the member it telegraphed at (see [Telegraphed targets](#telegraphed-targets)). `use Chant` makes an enemy perform one of its moves.
 
 ### Telegraphed targets
 
@@ -400,7 +402,7 @@ enemy "Brigand"
 
 `at` takes an ordinary selector, so `at lowest hp enemies`, `at highest hp enemies`, `at lowest rank enemies` and `at random enemies` all work with no words of their own. Inside an enemy, `enemies` is the player's side.
 
-**With no `at`, the move aims at a living party member, drawn uniformly.** For a party of one that is that one member, and nothing is drawn. That is why adding this moved no existing game's results.
+**With no `at`, the move aims at a living party member, drawn uniformly.** For a party of one that is that one member, and nothing is drawn.
 
 `enemy.intent` is still the move's name. `enemy.intent_target` is who it is aimed at, and it is **recomputed every time it is read**, not stored: a taunt applied after the intent was rolled changes the answer with no event for a UI to have missed, and so does a death or a swap. What it answers is exactly what the move itself decides when it runs, because both ask one question of one rule. When every option is hidden the enemy still swings, at the one it was going to hit.
 
@@ -499,13 +501,13 @@ hero "Vestal"
 | `allies` | everyone on the side, members and summons both |
 | `fallen` | the dead of the side, in the order they fell (the group the other three leave out) |
 
-`player` keeps meaning the leader and always will. The rule for content that declares a `hero` is one sentence: **`player` is refused wherever a member could be meant**, and that refusal is error **CT326**. The place is **every body on every declaration**: an `effect`, a `move`, a listener, a `modify` line and a `target … where` filter, on a `card`, an `enemy`, an `ability`, a `hero`, an `actor`, a `status`, a `relic`, a `keyword` or an `item`. That is because `deal 5 to player` in an enemy move would hit one hero however carefully the enemy telegraphed somebody else, quietly, which is the one class of wrong answer this project refuses to ship. A `hero`'s own listener is the same mistake at even closer range: `hero "Cleric" / on damaged: block 2 to player` blocks the *leader* whenever the Cleric is damaged. Listeners count for one more reason too: under `clock ticks` an enemy has no `move` at all, so its whole behaviour is written in listeners, and a status is how damage over time is spelled on either clock. `on every 2s: deal 5 to player` on a Burn burns the leader rather than the member wearing it.
+`player` keeps meaning the leader and always will. The rule for content that declares a `hero` is one sentence: **`player` is refused wherever a member could be meant**, and that refusal is error **CT326**. The place is **every body on every declaration**: an `effect`, a `move`, a listener, a `modify` line and a `target` line's `where` filter, on a `card`, an `enemy`, an `ability`, a `hero`, an `actor`, a `status`, a `relic`, a `keyword` or an `item`. That is because `deal 5 to player` in an enemy move would hit one hero however carefully the enemy telegraphed somebody else, quietly. A `hero`'s own listener is the same mistake at even closer range: `hero "Cleric" / on damaged: block 2 to player` blocks the *leader* whenever the Cleric is damaged. Listeners count for one more reason too: under `clock ticks` an enemy has no `move` at all, so its whole behaviour is written in listeners, and a status is how damage over time is spelled on either clock. `on every 2s: deal 5 to player` on a Burn burns the leader rather than the member wearing it.
 
 Which word does what was meant depends on the declaration, and the message says which: **`owner`** for something carried, **`self`** for a `hero` or an `actor`, which *is* a member, and **`target`** for a card, an ability or an enemy, which acts on one. `leader` says the run's own actor where that really is meant, and `party` says all of them.
 
 A content `verb` is the one body left out, deliberately. A verb has no owner, so neither `self` nor `owner` exists inside one and its `target` is whatever its caller bound: there is no word CT326 could name, and it is an error rather than a warning precisely because it can always name one. `player` in a verb is often right, too: `verb score(c): gain c.chips chips to player` means the run's own pool. The body that *calls* it is checked, which is where the leader-or-member decision is actually written.
 
-A carried declaration's listener (a `status`, a `relic`, a `keyword` or an `item`) has one exception, and it is the reason the rule is a sentence rather than a list: **`player` stays legal where the listener is about its own owner.** That is two shapes, both decided by the listener's header alone:
+A carried declaration's listener (a `status`, a `relic`, a `keyword` or an `item`) has one exception: **`player` stays legal where the listener is about its own owner.** That is two shapes, both decided by the listener's header alone:
 
 - the event is scoped to the holder (`on owner.turn_start:` or `on self.damaged:`), so the declaration has said in its own first line that it is about the thing it is attached to. `on controller.turn_start:` and `on player.turn_start:` are scopes too and are *not* this, because they name somebody who is not the holder;
 - the event is one the engine raises about the run rather than about an actor (`battle_start`, `battle_end` and `obtained`), where the only actor in view is the leader, so `player` is the only thing it could be.
@@ -552,7 +554,7 @@ The order is read off the living every time it is asked, never stored. So a memb
 
 A summoned `actor` on your side is in the order but is not a member, so under `initiative` its step runs straight through: its `turn_start` and `turn_end` fire, which is how a minion that attacks from its own turn end attacks, and nobody is asked what it does. That is the same division `sides` makes, where a summon's turn events fire with the side's and only members are passed.
 
-**`once per turn` is once per round, per listening entity.** A status on each of four members fires four times a round: once each, because each is a different listener. A relic on the leader fires once. That was always true and is worth saying twice.
+**`once per turn` is once per round, per listening entity.** A status on each of four members fires four times a round: once each, because each is a different listener. A relic on the leader fires once.
 
 ### Resources, cards and abilities
 
@@ -594,7 +596,7 @@ ability "Cull"
 
 It reads like any other group: `fallen.count`, `fallen.first`, `fallen.last`, `for each one in fallen`. From C# it is [`runtime.Fallen`](csharp.md#the-party) and `State.Fallen(team)`, and from GDScript [`GetFallen()`](godot.md#methods).
 
-At the end of a battle **every** member is tidied up (statuses that are not `persistent` removed, cards returned to that member's draw pile), and at the end of a turn **every** member's hand is discarded. Before 1.0 both touched the leader only.
+At the end of a battle **every** member is tidied up (statuses that are not `persistent` removed, cards returned to that member's draw pile), and at the end of a turn **every** member's hand is discarded.
 
 ## Abilities and real time
 
@@ -863,6 +865,7 @@ relic "Choirmaster's Baton"
 | `damage`, `block`, `heal`, `draw` | what the anchor's controller deals, gains, heals or draws (or what the card itself does, when anchored to a card) |
 | `damage_taken`, `block_taken`, `heal_taken` | what the anchor's controller receives |
 | `cost` | the card itself, when anchored to a card; otherwise all of the controller's cards |
+| `cooldown` | the ability itself, when written on one; otherwise every ability its holder has |
 | `range` | the card or ability itself, when written on one; otherwise everything its controller points at |
 | any stat | that stat on the anchor |
 
@@ -903,7 +906,7 @@ Four things ask, and they ask through the one function described under [Targets]
 - **The `attack` verb.** `attack enemy` swings only at what the attacker may be pointed at. Everything named being untouchable is a rules outcome and not a mistake: the swing lands nowhere, and `into` binds 0.
 - **An enemy's move.** The move keeps the target it was handed whenever that target is still legal, and otherwise goes to the first legal entity on that side. That is what a taunt is. An enemy whose every option is hidden still takes its turn, against the one it was going to hit.
 
-Area and random effects use the selectors under [Expressions](#expressions) and are not filtered, so a blast still reaches what a card may not single out. It is the rule these games actually have. Inside a move, likewise, only the target the move is *handed* moves; a `deal 5 to all enemies` in its body reaches whoever it reaches.
+Area and random effects use the selectors under [Expressions](#expressions) and are not filtered, so a blast still reaches what a card may not single out. Inside a move, likewise, only the target the move is *handed* moves; a `deal 5 to all enemies` in its body reaches whoever it reaches.
 
 Because the query carries the card being played, a `where` on the group must write `it.` to mean the candidate: a bare `tag:` there tests the card, not the entity being considered. An enemy's move carries no card, so a rule scoped with `card:` never binds one. A card that wants a rule about *itself* writes it on its own `target` line instead, where there is nothing to name: see [Targets](#targets).
 
@@ -1019,7 +1022,7 @@ Percent values multiply as fractions: `10 * 50%` is 5. Division by zero gives 0.
 
 `has` is true when the entity has the tag (directly or on an attached status), has a status of that name, or is that entity.
 
-**Members of an entity**: `dead`, `alive`, `removed`, `name`, `id`, `owner`, `source`, `controller`, `team`, `zone`, `lane`, `rank`, `position`, `intent`, `phase`, `statuses`, `kind`, a status name (its counter), a history name (`damage_taken_this_turn`), or any stat. Stats that nothing has set read as 0. `lane` and `rank` are where the entity stands on the [board](#boards), both counting from 0, so the front two ranks are `rank <= 1`; `position` is the older name for `rank` and reads the same number. `intent` and `phase` are text, or `none`; compare them with a quoted string, as in `enemy.intent == "Chomp"`, or with `none` unquoted. `enemy.phase == "none"` is never true.
+**Members of an entity**: `dead`, `alive`, `removed`, `name`, `id`, `owner`, `source`, `controller`, `team`, `zone`, `lane`, `rank`, `position`, `intent`, `intent_target`, `phase`, `statuses`, `kind`, a status name (its counter), a history name (`damage_taken_this_turn`), or any stat. Stats that nothing has set read as 0. `lane` and `rank` are where the entity stands on the [board](#boards), both counting from 0, so the front two ranks are `rank <= 1`; `position` is the older name for `rank` and reads the same number. `intent` and `phase` are text, or `none`; compare them with a quoted string, as in `enemy.intent == "Chomp"`, or with `none` unquoted. `enemy.phase == "none"` is never true.
 
 **Members of a group**: `count`, `size`, `length`, `first`, `last`, `empty`, `any`, `lane` and `rank` (where the first of them stands, so a group of one answers like the one it holds), or a stat, which sums it across the group (`enemies.hp`).
 
@@ -1046,6 +1049,7 @@ A bare name resolves in this order: local variables (`let` bindings, `for each` 
 | `card` | the card being played |
 | `player`, `leader`, `controller` | the party's leader (two names for one entity); the running entity's controller |
 | `party` | the living [party members](#the-party), in the order they take their steps |
+| `fallen` | the [dead of the running side](#death-and-revival), in the order they fell |
 | `enemy`, `enemies`, `allies`, `everyone` | relative to the side the effect runs for |
 | `hand`, `draw`, `discard`, `exhaust`, `powers`, `relics`, `deck`, `cards` | the controller's zones (`deck` is draw, hand and discard) |
 | `statuses` | statuses on the candidate or controller |
@@ -1065,7 +1069,7 @@ A bare name resolves in this order: local variables (`let` bindings, `for each` 
 | `heal` | `heal N [to who] [into name]`. Defaults to yourself. Refuses a dead target; see `revive`. |
 | `revive` | `revive who [N]`. Brings a fallen actor back at N hp (1 by default) and raises `revived`. Does nothing to somebody living, so it cannot become a heal. |
 | `grant` | `grant Ability[, Ability] [to who]`. Gives an actor an ability. Defaults to whoever is running the line. Granting one somebody already has does nothing. |
-| `draw` | `draw [N] [to who]` for the controller, or for whoever `to` names. Reshuffles the discard pile when the draw pile runs out. A creature controls itself, so `draw 1 to player` is how a creature draws for you. |
+| `draw` | `draw [N] [to who]` for the controller, or for whoever `to` names. Reshuffles the discard pile when the draw pile runs out. A creature controls itself, so `draw 1 to leader` is how a creature draws for you. |
 | `discard`, `exhaust` | `discard N` asks the chooser to pick from hand; `discard who` and `exhaust self` name the cards. |
 | `apply` | `apply Status [N] [for duration] [to who]`. Defaults to the target, or a status's host, or the controller. |
 | `add` | `add tag:x [to who]` adds a tag; `add Status N` is `apply`. |
@@ -1110,6 +1114,7 @@ A bare name resolves in this order: local variables (`let` bindings, `for each` 
 | `discover` | `as` |
 | `emit` | `to` |
 | `kill` | `to` |
+| `revive`, `grant` | `to` |
 | `destroy`, `discard`, `exhaust`, `cancel`, `log`, `play`, `replay`, `use` | none |
 
 The grammar knows thirteen clause words, four of which (`at`, `over`, `against` and `using`) no built-in verb reads. They stay reserved so that a verb a game registers in C# can read them, and so that a built-in verb handed one can name the word that works: `apply Poison 3 at target` says to write `to`. Three spellings of one clause would be language to learn and content to keep consistent, for nothing, so they are not synonyms.
@@ -1194,7 +1199,7 @@ card "Havoc"
 
 **A refusal the rules allow is not an error.** An empty pile, a Curse, a cost the payer cannot afford, no legal target, a card already in `play` or `powers`: nothing happens, `played` is `none`, and the trace says so. That is what lets "play the top card of your draw pile" be written once and not crash the first time the top card is a Curse. `played` is bound before anything else, so the name always exists.
 
-**Targeting never prompts.** `on <target>` if written, exactly as written; otherwise the effect's own target, but only where the card could legally be pointed at it (a `play` inside a listener inherits whatever that event happened to be about, which is usually the actor whose turn started or the card that was drawn, and a hint the card cannot take is dropped rather than allowed to refuse the play); otherwise, for a `target enemy` or `target ally` card, one **at random** from the legal targets, rolled from the game's own RNG, so the roll replays and saves like any other, and one candidate costs no roll. The roll picks from [the same legal targets](#targets) a player would be offered, so a Taunt, or the card's own `target … where`, binds an automatic play exactly as it binds a hand-played one. A `target self` card is aimed at the controller, and a card with no legal target is not played.
+**Targeting never prompts.** `on <target>` if written, exactly as written; otherwise the effect's own target, but only where the card could legally be pointed at it (a `play` inside a listener inherits whatever that event happened to be about, which is usually the actor whose turn started or the card that was drawn, and a hint the card cannot take is dropped rather than allowed to refuse the play); otherwise, for a `target enemy` or `target ally` card, one **at random** from the legal targets, rolled from the game's own RNG, so the roll replays and saves like any other, and one candidate costs no roll. The roll picks from [the same legal targets](#targets) a player would be offered, so a Taunt, or the card's own `where` filter, binds an automatic play exactly as it binds a hand-played one. A `target self` card is aimed at the controller, and a card with no legal target is not played.
 
 A card played by another card's effect **extends that effect's chain**, so a `once per chain` limit counts one chain across the whole cascade rather than restarting at every play. A card that plays a card that plays a card is fine; direct recursion stops at `max_call_depth` (64) with an error that says what happened. A nested play does not drain the outer effect's queued triggers: they resolve after the outer effect, as they would without it.
 
@@ -1424,6 +1429,7 @@ test "Poison ticks and decays"
 | `seed N` | yes | Reseeds the game's RNG |
 | `answer "A, B"` | yes | Queues the answer to the next choice, by name; `"A, B"` picks both |
 | `realtime N` | yes | Uses a tick clock with N ticks per second for the whole test. Write it first: an ability is registered against the clock that exists when it is granted, so a `hero` line or a `grant` above it registers cooldowns in turns |
+| `board "Name"` | yes | Fights the rest of the test on a board the content declares: `board "Train"`. With none named, the first board declared. Write it above any line that places an actor, because a `lane` or a `rank` is checked against the board in play at the moment that line runs. See [Boards](#boards) |
 | `setup:` | yes | A block of setup statements |
 | `play Card [by who] [on who]` | no | Plays a card, adding it to the hand if needed; fails the test if it cannot be played. `by` names the member performing it, and may be written either side of `on`. See the note below: `play` is a rule verb too |
 | `end turn` | no | Ends the turn, runs the enemies' turn and starts the next one |
@@ -1488,7 +1494,7 @@ The body is statements, as a test's is, and most of it is ordinary DSL: `heal 12
 | `runs N` | How many times to play the scenario |
 | `expect <measurement> <op> <number>` | Fails the scenario if it does not hold. `expect no stalls` is the same as `expect stalls == 0`. |
 
-Setup is shared with a test, and each verb means the same thing in both: `player`, `hero`, `deck`, `hand`, `discard_pile`, `relic`, `grant`, `seed` and `answer`. See [Tests](#tests) for what each one does. A `setup:` block groups them here too, though nothing turns on where setup ends: a scenario starts a battle where it says `battle`, and nowhere else.
+Setup is shared with a test, and each verb means the same thing in both: `player`, `hero`, `board`, `deck`, `hand`, `discard_pile`, `relic`, `grant`, `seed` and `answer`. See [Tests](#tests) for what each one does. A `setup:` block groups them here too, though nothing turns on where setup ends: a scenario starts a battle where it says `battle`, and nowhere else.
 
 **A scenario never plays a card itself.** `play`, `cast`, `end turn` and `tick` belong to a test: a bot plays a scenario, and a line choosing a card by hand would fight it. `realtime` is out for the same reason: when to act in continuous time is the game's own frame loop, not a bot's.
 
@@ -1620,7 +1626,7 @@ Codes with four digits come from reading and loading the files. An error among t
 | CT323 | error | A named clause a built-in verb does not read, such as `block 8 for 2 turns`, `apply Poison 3 at target` or `deal 5 against enemy2`. The clause was dropped in silence, so the line read as one thing and did another. It is a runtime error too. A flag after a comma is not a clause and is never reported, and neither is a verb content declares or a game registers. | Write the clause the verb reads (the message names it, and [Built-in verbs](#built-in-verbs) has the table), or drop the clause. Some of them are not a spelling at all: block is not timed, and a heal happens once. `--suppress CT323`, or `LintOptions.HostVerbs`, for content that reaches a verb of that name another way. |
 | CT324 | error | A bare percentage where a built-in verb counts whole things, such as `apply Slow 40%`. The unit was dropped, so forty stacks were applied while the card's generated text said "Apply 40% Slow". It is a runtime error too. | Write the number (`apply Slow 40`), or a share of something (`deal target.max_hp * 40% to target`), which is what a percentage is for. |
 | CT325 | error | A length in units the game's clock cannot measure: `on every 1s:` or `for 3s` where the ruleset says `clock turns`, or `2 turns` where it says `clock ticks`. Only content that states its clock is checked. | Write the length in the units that clock measures, or change the `clock` setting. The message says which units the stated clock takes. |
-| CT326 | error | `player` written where a member could be meant, in content that declares a [`hero`](#the-party): every body on every declaration (an `effect`, a `move`, a listener, a `modify` line or a `target … where` filter). `player` is one entity (the party's leader), so the line acts on that one member however carefully the rules settled on another, and it does it quietly. Content with no `hero` is never reported; nor is a carried declaration's listener that is [about its own owner](#the-party), nor a `verb`, a `test` or a `scenario`, nor a run's gold. | Write `owner` for whoever is carrying it, `self` in a `hero` or an `actor`, `target` for whoever the line is aimed at, `leader` where the run's own actor really is meant, or `party` for all of them. |
+| CT326 | error | `player` written where a member could be meant, in content that declares a [`hero`](#the-party): every body on every declaration (an `effect`, a `move`, a listener, a `modify` line or a `target` line's `where` filter). `player` is one entity (the party's leader), so the line acts on that one member however carefully the rules settled on another, and it does it quietly. Content with no `hero` is never reported; nor is a carried declaration's listener that is [about its own owner](#the-party), nor a `verb`, a `test` or a `scenario`, nor a run's gold. | Write `owner` for whoever is carrying it, `self` in a `hero` or an `actor`, `target` for whoever the line is aimed at, `leader` where the run's own actor really is meant, or `party` for all of them. |
 | CT327 | warning | A lane or rank no [board](#boards) this game declares can hold. Compared against one, the comparison is the same for every actor before the game runs: `it.lane == 4` on a three-lane board matches nobody, and `it.rank <= 3` on a three-rank board matches everybody and limits nothing. Moved to one, the move stops at the edge of the board instead. | Use a place the board has, counting from 0, or declare the board the rule is written for. |
 | CT328 | error | `position` assigned. It reads a rank and always will, but it names one axis of a place that has two, so a move written with it would have to guess which. | Write `rank`. `who.rank = 0` and `who.lane += 1` are moves; see [Boards](#boards). |
 | CT329 | note | `position` read, which is the older name for `rank`. | Nothing is wrong: it reads the same number and keeps working for the whole 1.x line. Write `rank` when you next touch the line. |

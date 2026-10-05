@@ -32,7 +32,7 @@ What a GDScript project takes on by using it:
    - The .NET SDK 8 or later, from [dotnet.microsoft.com](https://dotnet.microsoft.com/download).
      In a terminal, `dotnet --version` should print 8 or higher.
    - A C# solution in the project. A GDScript-only project has none: open it and choose
-     Project → Tools → C# → Create C# solution. That writes `YourGame.csproj` and `YourGame.sln`
+     Project > Tools > C# > Create C# solution. That writes `YourGame.csproj` and `YourGame.sln`
      into the project folder.
    - Building, which later steps ask for, is the editor's **Build** button, the hammer at the top
      right, or `dotnet build` in the project folder.
@@ -66,7 +66,7 @@ What a GDScript project takes on by using it:
      </Reference>
    </ItemGroup>
    ```
-3. **Build, then enable the plugin** in Project Settings → Plugins. Build first: until the
+3. **Build, then enable the plugin** in Project Settings > Plugins. Build first: until the
    assembly exists, Godot cannot load a C# plugin, and every node the addon adds is missing from
    the Create New Node dialog, with no error to say why. Once the plugin is enabled, a *Cantrip*
    dock appears at the bottom of the editor and the Output panel says
@@ -404,7 +404,7 @@ to highlight from.
 | `CostOf(card_id: int) -> int` | What the card costs now; 0 for an unknown id |
 | `CanPlay(card_id: int) -> bool` | Whether `Play` would accept it: in hand, affordable, with a legal target if it needs one |
 | `GetTargetMode(card_id: int) -> String` | What the card is aimed at: whatever word content wrote after `target`, usually `"enemy"`, `"ally"`, `"self"`, `"any"` or `"none"`. An ability id works here too, and answers about its `target` line. `""` for an id that names nothing, which is how a stale id is told from a card needing no target. |
-| `GetLegalTargets(card_id: int) -> Array` | The ids it may be aimed at, for highlighting, after the card's own `target … where` and content's `targetable` rules. An ability id works here too. Empty for a `target` word the rules do not recognise. |
+| `GetLegalTargets(card_id: int) -> Array` | The ids it may be aimed at, for highlighting, after the `where` on the card's own `target` line and content's `targetable` rules. An ability id works here too. Empty for a `target` word the rules do not recognise. |
 | `IsInBattle() -> bool` | Whether a battle is running |
 | `GetTurn() -> int` | The turn number, counted from 1 in each battle. 0 for the whole of a real-time battle, which takes none |
 | `IsRealTime() -> bool` | Whether this runtime measures time in ticks. True when `RealTime` is set, and when the content's ruleset says `clock ticks`. A shared UI asks this before it draws an **End turn** button, because every turn-shaped call below refuses on a tick runtime |
