@@ -65,8 +65,7 @@ func _run() -> void:
 	var intent: Dictionary = rules.DescribeIntent(acolyte)
 	_check("the enemy telegraphs a move and a member", intent["name"] == "Clutch"
 		and intent["target"] != 0, str(intent))
-	_check("and the intent line names them both", intent["line"].contains("->")
-		or intent["line"].contains("→"), intent["line"])
+	_check("and the intent line names them both", intent["line"].contains("->"), intent["line"])
 	var aimed_at: int = intent["target"]
 
 	rules.Pass(leader)

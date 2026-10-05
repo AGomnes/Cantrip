@@ -85,7 +85,7 @@ namespace Cantrip.Runtime
         public IReadOnlyCollection<string> Tags { get; set; } = NoTags;
     }
 
-    /// <summary>One step of a modifier breakdown, for the "base 6 → +3 Strength → ×1.5 Codex → 13" view.</summary>
+    /// <summary>One step of a modifier breakdown, for the "base 6 -> +3 Strength -> x1.5 Codex -> 13" view.</summary>
     public readonly struct ModifierStep
     {
         /// <summary>Records one modifier's effect on a value. Built by the pipeline; a game reads these rather than making them.</summary>
@@ -109,13 +109,13 @@ namespace Cantrip.Runtime
         /// <summary>The running value coming out. <c>After - Before</c> is the difference this step actually made, which for a clamp may be zero.</summary>
         public Num After { get; }
 
-        /// <summary>The step as a breakdown line: <c>+3 Strength</c>, <c>×1.5 Codex</c>, <c>clamp Ward</c>.</summary>
+        /// <summary>The step as a breakdown line: <c>+3 Strength</c>, <c>x1.5 Codex</c>, <c>clamp Ward</c>.</summary>
         public override string ToString()
         {
             string op = Modifier.Layer switch
             {
                 ModifierLayer.Add => Amount.IsNegative ? Amount.ToString() : "+" + Amount,
-                ModifierLayer.Multiply => "×" + Amount,
+                ModifierLayer.Multiply => "x" + Amount,
                 ModifierLayer.Clamp => "clamp",
                 ModifierLayer.Override => "=" + Amount,
                 _ => Amount.ToString(),
@@ -125,7 +125,7 @@ namespace Cantrip.Runtime
     }
 
     /// <summary>
-    /// A value and everything that was done to it: what a "base 6 → +3 Strength → ×1.5 Codex → 13"
+    /// A value and everything that was done to it: what a "base 6 -> +3 Strength -> x1.5 Codex -> 13"
     /// tooltip is drawn from.
     /// </summary>
     public sealed class ModifierResult
@@ -154,8 +154,8 @@ namespace Cantrip.Runtime
         public override string ToString()
         {
             var text = new StringBuilder("base ").Append(Base);
-            foreach (ModifierStep step in Steps) text.Append(" → ").Append(step);
-            text.Append(" → ").Append(Final);
+            foreach (ModifierStep step in Steps) text.Append(" -> ").Append(step);
+            text.Append(" -> ").Append(Final);
             return text.ToString();
         }
     }

@@ -151,7 +151,7 @@ namespace Cantrip.Tests.Descriptions
         {
             string text = Describe(Samples(), "Pyromancer's Codex", "relic").ToPlainText();
 
-            Assert.Equal("Damage dealt ×1.5 (fire). Cost -1 for cards (fire).", text);
+            Assert.Equal("Damage dealt x1.5 (fire). Cost -1 for cards (fire).", text);
         }
 
         /// <summary>
@@ -283,7 +283,7 @@ namespace Cantrip.Tests.Descriptions
             try
             {
                 CultureInfo.CurrentCulture = new CultureInfo("de-DE");
-                Assert.Contains("×1.5", Describe(Samples(), "Pyromancer's Codex", "relic").ToPlainText());
+                Assert.Contains("x1.5", Describe(Samples(), "Pyromancer's Codex", "relic").ToPlainText());
             }
             finally
             {

@@ -863,7 +863,7 @@ namespace Cantrip.GodotAdapter
         /// <remarks>
         /// Beside the keys every description has, this one's <c>target</c> is the member it is
         /// telegraphing against and <c>target_name</c> is that member's name, with <c>line</c>
-        /// reading "Cutthroat → Vestal: Deal 8 damage and apply 2 Bleeding." The target is asked
+        /// reading "Cutthroat -> Vestal: Deal 8 damage and apply 2 Bleeding." The target is asked
         /// afresh on every call, so a taunt applied since the intent was rolled has already moved
         /// it, with no event to listen for and no second roll.
         /// </remarks>

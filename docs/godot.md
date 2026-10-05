@@ -421,7 +421,7 @@ one it was handed is somebody the action will not take, which is where a taunt a
 | Method | |
 |---|---|
 | `Describe(entity_id: int, target_id: int) -> Dictionary` | Rules text with live values, for a card frame or a tooltip. `target_id` counts that target's statuses, or 0 for none. |
-| `DescribeIntent(enemy_id: int) -> Dictionary` | What an enemy will do next and who to, with live values. `target` is the member it is telegraphing against and `target_name` is that member's name, so `line` reads `"Cutthroat → Vestal: Deal 8 damage and apply 2 Bleeding."` The target is asked afresh on every call, so a taunt applied since the intent was rolled has already moved it. Until intents have been rolled, its `empty` is true, its text is `""`, its `target` is 0, and its `name` is the enemy's own name rather than a move's. |
+| `DescribeIntent(enemy_id: int) -> Dictionary` | What an enemy will do next and who to, with live values. `target` is the member it is telegraphing against and `target_name` is that member's name, so `line` reads `"Cutthroat -> Vestal: Deal 8 damage and apply 2 Bleeding."` The target is asked afresh on every call, so a taunt applied since the intent was rolled has already moved it. Until intents have been rolled, its `empty` is true, its text is `""`, its `target` is 0, and its `name` is the enemy's own name rather than a move's. |
 | `DescribeDefinition(name: String, kind: String) -> Dictionary` | A definition's rules text with its printed values, for something not in play, such as a reward. `kind` `""` takes the first definition of that name. Empty when none is loaded. Default kind: `""`. |
 
 **Two vocabularies called kind.** `GetDefinitions` and `DescribeDefinition` take the keyword that
@@ -553,7 +553,7 @@ leaves out.
 | `flavour` | The flavour line, never mixed into the rules text; `""` when there is none |
 | `level` | Where the words came from: `"auto"`, `"custom"` (a `text:` line) or `"override"` (a `text_override:` line, shown as written, without live values) |
 | `target`, `target_name` | For an intent, the member it is telegraphed against, by id and by name. 0 and `""` for everything else, and for an intent before it has been rolled. |
-| `line` | The whole thing on one line, as an intent panel shows it: `"Cutthroat → Vestal: Deal 8 damage and apply 2 Bleeding."` For a card it is its name and its text. |
+| `line` | The whole thing on one line, as an intent panel shows it: `"Cutthroat -> Vestal: Deal 8 damage and apply 2 Bleeding."` For a card it is its name and its text. |
 | `empty` | True when there is nothing to show, as for an intent before the battle starts |
 
 Each segment has `kind` (`"text"` or `"value"`), `text` (what to show), `placeholder` (the value

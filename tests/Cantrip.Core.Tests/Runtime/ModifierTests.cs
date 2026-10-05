@@ -658,7 +658,7 @@ namespace Cantrip.Tests.Runtime
             Assert.Equal(Num.FromInt(6), result.Base);
             Assert.Equal(Num.Parse("12"), result.Final);
             Assert.Equal(3, result.Steps.Count);
-            Assert.Equal("base 6 → +3 Strength → -1 Lead → ×1.5 Codex → 12", result.ToString());
+            Assert.Equal("base 6 -> +3 Strength -> -1 Lead -> x1.5 Codex -> 12", result.ToString());
         }
 
         [Fact]
@@ -672,7 +672,7 @@ namespace Cantrip.Tests.Runtime
             var query = new ModifierQuery("damage") { Source = runtime.Player, Subject = enemy };
             ModifierResult result = runtime.State.Modifiers.Explain(query, Num.FromInt(20));
 
-            Assert.Equal("base 20 → clamp Cap → =4 Fixed4 → 4", result.ToString());
+            Assert.Equal("base 20 -> clamp Cap -> =4 Fixed4 -> 4", result.ToString());
             Assert.Equal(runtime.State.Modifiers.Compute(query, Num.FromInt(20)), result.Final);
         }
 
@@ -685,7 +685,7 @@ namespace Cantrip.Tests.Runtime
             ModifierResult result = runtime.State.Modifiers.Explain(new ModifierQuery("damage") { Source = runtime.Player, Subject = enemy }, Num.FromInt(6));
 
             Assert.Empty(result.Steps);
-            Assert.Equal("base 6 → 6", result.ToString());
+            Assert.Equal("base 6 -> 6", result.ToString());
         }
 
         [Fact]

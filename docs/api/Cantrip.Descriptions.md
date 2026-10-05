@@ -104,7 +104,7 @@ The first value in the text linked to `placeholder`, if any.
 public string ToLine()
 ```
 
-The whole thing on one line, as an intent panel shows it: "Cutthroat → Vestal: Deal 8 damage and apply 2 Bleeding." The name and the target are left out when there are none, so a description with neither is just its text.
+The whole thing on one line, as an intent panel shows it: "Cutthroat -> Vestal: Deal 8 damage and apply 2 Bleeding." The name and the target are left out when there are none, so a description with neither is just its text.
 
 ```csharp
 public string ToMarkup()
@@ -185,7 +185,7 @@ Describes a definition with its printed values, as in a card library or wiki.
 public Description DescribeIntent(Entity enemy, CardRuntime runtime)
 ```
 
-Describes what an enemy intends to do on its next turn, and who to: "Cutthroat → Vestal: Deal 8 damage and apply 2 Bleeding" as `Description.ToLine` prints it. Empty while intents have not been rolled, which is also what a UI should show then.
+Describes what an enemy intends to do on its next turn, and who to: "Cutthroat -> Vestal: Deal 8 damage and apply 2 Bleeding" as `Description.ToLine` prints it. Empty while intents have not been rolled, which is also what a UI should show then.
 
 ```csharp
 public Description DescribeMove(EntityDefinition definition, string moveName, CardRuntime? runtime = null, Entity? enemy = null, Entity? against = null)

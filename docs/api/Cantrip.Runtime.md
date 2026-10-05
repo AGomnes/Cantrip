@@ -40,8 +40,8 @@ Part of [the API reference](README.md). The guides are [docs/csharp.md](../cshar
 | [`Modifier`](#modifier) | An active `modify` line, bound to the entity that declared it. |
 | [`ModifierPipeline`](#modifierpipeline) | The modifier pipeline. Values pass through fixed layers in ruleset order (add, multiply, clamp, override by default). Stat reads are cached and the cache is dropped whenever `GameState.Version` moves, which covers every mutation that could change a modifier's scope, filter or amount. |
 | [`ModifierQuery`](#modifierquery) | What a value is being computed for. Stats use only `ModifierQuery.Subject`; action channels such as `damage` also carry the source, the card and the action's tags. |
-| [`ModifierResult`](#modifierresult) | A value and everything that was done to it: what a "base 6 → +3 Strength → ×1.5 Codex → 13" tooltip is drawn from. |
-| [`ModifierStep`](#modifierstep) | One step of a modifier breakdown, for the "base 6 → +3 Strength → ×1.5 Codex → 13" view. |
+| [`ModifierResult`](#modifierresult) | A value and everything that was done to it: what a "base 6 -> +3 Strength -> x1.5 Codex -> 13" tooltip is drawn from. |
+| [`ModifierStep`](#modifierstep) | One step of a modifier breakdown, for the "base 6 -> +3 Strength -> x1.5 Codex -> 13" view. |
 | [`NewListeners`](#newlisteners) | Whether a listener that comes into play during an event hears that event. |
 | [`OfferPendingException`](#offerpendingexception) | Raised by `DeferredChooser` when content offers a choice of content that does not exist yet, as `discover` does, and the game has not answered it. Handled exactly like `ChoicePendingException`. |
 | [`PartyOrder`](#partyorder) | The order the engine offers a party's members in when it runs the side itself. |
@@ -2853,7 +2853,7 @@ The action's own tags (`fire` on fire damage), which a `tag:` filter tests. Empt
 public sealed class ModifierResult
 ```
 
-A value and everything that was done to it: what a "base 6 → +3 Strength → ×1.5 Codex → 13" tooltip is drawn from.
+A value and everything that was done to it: what a "base 6 -> +3 Strength -> x1.5 Codex -> 13" tooltip is drawn from.
 
 ### Properties
 
@@ -2891,7 +2891,7 @@ The whole breakdown on one line, as a trace prints it.
 public struct ModifierStep
 ```
 
-One step of a modifier breakdown, for the "base 6 → +3 Strength → ×1.5 Codex → 13" view.
+One step of a modifier breakdown, for the "base 6 -> +3 Strength -> x1.5 Codex -> 13" view.
 
 ### Constructors
 
@@ -2933,7 +2933,7 @@ Which modifier this step was, so a breakdown can name the relic or status respon
 public override string ToString()
 ```
 
-The step as a breakdown line: `+3 Strength`, `×1.5 Codex`, `clamp Ward`.
+The step as a breakdown line: `+3 Strength`, `x1.5 Codex`, `clamp Ward`.
 
 ---
 

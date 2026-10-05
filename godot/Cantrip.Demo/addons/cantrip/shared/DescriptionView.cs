@@ -194,7 +194,7 @@ namespace Cantrip.GodotAdapter
         public string Against { get; }
 
         /// <summary>
-        /// The whole thing on one line, as an intent panel shows it: "Cutthroat → Vestal: Deal 8
+        /// The whole thing on one line, as an intent panel shows it: "Cutthroat -> Vestal: Deal 8
         /// damage and apply 2 Bleeding." For a card it is its name and its text.
         /// </summary>
         public string Line { get; }

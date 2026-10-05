@@ -113,7 +113,7 @@ namespace Cantrip.Descriptions
         }
 
         /// <summary>
-        /// Describes what an enemy intends to do on its next turn, and who to: "Cutthroat → Vestal:
+        /// Describes what an enemy intends to do on its next turn, and who to: "Cutthroat -> Vestal:
         /// Deal 8 damage and apply 2 Bleeding" as <see cref="Description.ToLine"/> prints it. Empty
         /// while intents have not been rolled, which is also what a UI should show then.
         /// </summary>
@@ -1076,7 +1076,7 @@ namespace Cantrip.Descriptions
                         amount.AddRange(Amount(modify.Amount, "bonus", "none", null));
                         break;
                     case ModifierLayer.Multiply:
-                        amount.Add(DescriptionSegment.Plain("×"));
+                        amount.Add(DescriptionSegment.Plain("x"));
                         amount.AddRange(Amount(modify.Amount, "multiplier", "none", null));
                         break;
                     case ModifierLayer.Clamp:
@@ -1288,7 +1288,7 @@ namespace Cantrip.Descriptions
                             // "to the target" is left off a move for the same reason it is left off
                             // a card: it says nothing a reader did not already know, and an enemy's
                             // move now names who it is aimed at beside the text rather than inside
-                            // it ("Cutthroat → Vestal: Deal 8 damage" instead of "Deal 8 damage to
+                            // it ("Cutthroat -> Vestal: Deal 8 damage" instead of "Deal 8 damage to
                             // the target"). It is still written out where the word is not the
                             // subject of the sentence, such as "Pull the target to the front".
                             case "target": return implicitTarget && (IsCard || IsEnemy) ? string.Empty : Word("who.target") ?? "the target";

@@ -295,7 +295,7 @@ namespace Cantrip.GodotAdapter.Demo
             Godot.Collections.Dictionary intent = rules.DescribeIntent(slime);
             Check("an intent describes the move", intent["plain"].AsString() == "Deal 4 damage.", intent["plain"].AsString());
             Check("and names who it is telegraphed against", intent["target"].AsInt32() == rules.PlayerId() && intent["target_name"].AsString() == "Player", intent["target_name"].AsString());
-            Check("and reads as one line, move and target together", intent["line"].AsString() == "Swipe → Player: Deal 4 damage.", intent["line"].AsString());
+            Check("and reads as one line, move and target together", intent["line"].AsString() == "Swipe -> Player: Deal 4 damage.", intent["line"].AsString());
             Check("while a card has no target of its own to name", described["target"].AsInt32() == 0 && described["target_name"].AsString().Length == 0, described["target_name"].AsString());
 
             rules.QueueFree();

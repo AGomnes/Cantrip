@@ -297,7 +297,7 @@ namespace Cantrip.Descriptions
         }
 
         /// <summary>
-        /// The whole thing on one line, as an intent panel shows it: "Cutthroat → Vestal: Deal 8
+        /// The whole thing on one line, as an intent panel shows it: "Cutthroat -> Vestal: Deal 8
         /// damage and apply 2 Bleeding." The name and the target are left out when there are none,
         /// so a description with neither is just its text.
         /// </summary>
@@ -306,7 +306,7 @@ namespace Cantrip.Descriptions
             string body = ToPlainText();
             var text = new StringBuilder(Name);
 
-            if (!string.IsNullOrEmpty(Against)) text.Append(" → ").Append(Against);
+            if (!string.IsNullOrEmpty(Against)) text.Append(" -> ").Append(Against);
             if (body.Length > 0) text.Append(text.Length > 0 ? ": " : string.Empty).Append(body);
             return text.ToString();
         }

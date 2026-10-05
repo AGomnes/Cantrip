@@ -75,7 +75,7 @@ hero ""Scout""
 
             Entity aim = Assert.IsType<Entity>(runtime.IntentTargetOf(enemy));
             Assert.Equal(aim.Name, view.Against);
-            Assert.Equal("Chomp → " + aim.Name + ": Deal 11 damage.", view.Line);
+            Assert.Equal("Chomp -> " + aim.Name + ": Deal 11 damage.", view.Line);
         }
 
         /// <summary>A card is aimed by whoever plays it, so it has no target of its own to name.</summary>

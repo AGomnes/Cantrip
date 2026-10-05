@@ -2943,7 +2943,7 @@ namespace Cantrip.Linting
                     string key = string.Join(",", path.Select(p => p.Event).OrderBy(e => e, StringComparer.Ordinal));
                     if (reportedCycles.Add(key))
                     {
-                        string chain = string.Join(" → ", path.Select(p => $"`{p.Event}`")) + $" → `{start}`";
+                        string chain = string.Join(" -> ", path.Select(p => $"`{p.Event}`")) + $" -> `{start}`";
                         Info(EventCycle, $"These listeners can re-trigger each other: {chain}. Loop protection stops each after one pass; check that is intended.", path[0].Via.Span);
                     }
                 }

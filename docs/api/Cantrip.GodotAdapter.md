@@ -1101,7 +1101,7 @@ public Godot.Collections.Dictionary DescribeIntent(int enemy_id)
 
 What an enemy will do next, and who to. Empty until intents have been rolled.
 
-Beside the keys every description has, this one's `target` is the member it is telegraphing against and `target_name` is that member's name, with `line` reading "Cutthroat → Vestal: Deal 8 damage and apply 2 Bleeding." The target is asked afresh on every call, so a taunt applied since the intent was rolled has already moved it, with no event to listen for and no second roll.
+Beside the keys every description has, this one's `target` is the member it is telegraphing against and `target_name` is that member's name, with `line` reading "Cutthroat -> Vestal: Deal 8 damage and apply 2 Bleeding." The target is asked afresh on every call, so a taunt applied since the intent was rolled has already moved it, with no event to listen for and no second roll.
 
 ```csharp
 public bool EndBattle(bool won)
@@ -1923,7 +1923,7 @@ public string Level { get; }
 public string Line { get; }
 ```
 
-The whole thing on one line, as an intent panel shows it: "Cutthroat → Vestal: Deal 8 damage and apply 2 Bleeding." For a card it is its name and its text.
+The whole thing on one line, as an intent panel shows it: "Cutthroat -> Vestal: Deal 8 damage and apply 2 Bleeding." For a card it is its name and its text.
 
 ```csharp
 public string Name { get; }

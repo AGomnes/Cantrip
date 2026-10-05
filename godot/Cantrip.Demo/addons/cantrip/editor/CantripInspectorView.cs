@@ -201,7 +201,7 @@ namespace Cantrip.GodotAdapter
                 int current = stats[key].AsInt32();
                 int printed = baseStats.ContainsKey(stat) ? baseStats[stat].AsInt32() : current;
 
-                TreeItem row = Row(statRows, stat, printed == current ? current.ToString() : $"{printed} → {current}");
+                TreeItem row = Row(statRows, stat, printed == current ? current.ToString() : $"{printed} -> {current}");
                 if (printed != current) row.SetCustomColor(DetailColumn, ChangedColour);
             }
 

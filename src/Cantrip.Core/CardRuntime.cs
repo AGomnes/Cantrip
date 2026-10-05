@@ -76,7 +76,7 @@ namespace Cantrip
         /// It is the refusal a player can do something about, by moving or by picking a nearer
         /// target, which is the whole reason it is worth a word of its own. On a <c>facing</c> board
         /// the distance across the sides is <c>a.rank + b.rank + 1</c>, so a back rank facing a back
-        /// rank on a 2×2 board is three steps; <c>docs/troubleshooting.md</c> has the arithmetic.
+        /// rank on a 2x2 board is three steps; <c>docs/troubleshooting.md</c> has the arithmetic.
         /// </remarks>
         OutOfRange,
 
