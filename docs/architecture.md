@@ -99,7 +99,7 @@ The parser knows nothing about verbs, so a new one introduces no AST node and th
 
 **`EventBus`** stores listeners by event name and answers which ones hear an event, in the ruleset's deterministic order. It executes nothing.
 
-**`ModifierPipeline`** stores modifiers by channel and computes a value through the ruleset's layers. The interpreter decides whether a modifier applies (scope and filter) and evaluates its amount, through an internal `IModifierEvaluator` it implements explicitly. That interface is internal on purpose: the interpreter is its only implementer and the pipeline is not a seam a game replaces, so a public one would have frozen a surface nobody outside could implement.
+**`ModifierPipeline`** stores modifiers by channel and computes a value through the ruleset's layers. The interpreter decides whether a modifier applies (scope and filter) and evaluates its amount, through an internal `IModifierEvaluator` it implements explicitly.
 
 **Clocks.** `IGameClock` exposes whole units only. `TurnClock` advances once per round, `TickClock` once per fixed step, so durations, cooldowns and scheduling share one code path.
 

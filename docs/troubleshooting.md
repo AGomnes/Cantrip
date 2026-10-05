@@ -41,8 +41,6 @@ content/cards.cantrip:10:5: error CT301: Unknown verb `dealt`. Did you mean `dea
 [language.md's diagnostics table](language.md#diagnostics), with what it means and how to fix it.
 Some carry a suggestion the Godot dock's **Apply fix** button can write for you.
 
-The severities are not decoration:
-
 | | Means |
 |---|---|
 | **error** | The content is wrong. `lint` and `validate` exit 1. A four-digit error from reading the files stops `test` too; a three-digit error from the linter does not, so a misspelt verb fails a test only when the test runs it. |

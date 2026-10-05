@@ -4,7 +4,7 @@
 
 This guide is for whoever writes a game's cards, statuses, relics and enemies. It needs no C#. It builds a card, a status, a relic and an enemy whose moves change at half health, each with a test. Then come the commands, the REPL, and [recipes](#recipes) for common card-game mechanics.
 
-If your game is in Godot, the checking and the testing happen inside the editor: the addon's Cantrip dock lints your files, runs your tests and previews your card text, so almost nothing here needs a command line. You write the files in the dock's Source tab, which lints them as you type and saves with Ctrl+S, or in a text editor of your own if you would rather. [7. In Godot](#7-in-godot) says what each of its tabs does, and [godot.md](godot.md) is the guide to the addon itself.
+If your game is in Godot, the checking and the testing happen inside the editor: the addon's Cantrip dock lints your files, runs your tests and previews your card text, so almost nothing here needs a command line. [7. In Godot](#7-in-godot) says what each of its tabs does, and [godot.md](godot.md) is the guide to the addon itself.
 
 - [Before you start](#before-you-start)
 - [1. A first card](#1-a-first-card)
@@ -28,7 +28,7 @@ dotnet new tool-manifest
 dotnet tool install Cantrip.Cli
 ```
 
-Run the commands below from that folder, or any folder inside it. Any text editor will do for the files; there is no syntax-highlighting package for one yet. In Godot you need none: the dock's Source tab writes them, highlighted and checked as you type.
+Run the commands below from that folder, or any folder inside it. Any text editor will do for the files; there is no syntax-highlighting package for one yet.
 
 Make a folder called `tutorial` with two empty files in it, `game.cantrip` and `tests.cantrip`. If you have done the quickstart, keep this folder apart from its `content` folder: a folder loads as one game, and both define a Strike.
 
@@ -290,7 +290,7 @@ The full list of test verbs is under [Tests](language.md#tests).
 
 Some mistakes neither command reports:
 
-- **A property the engine does not read.** It is only a stat: `max_stack 3`, with the `s` missing, leaves the status with no cap, and `duration 2` on a status that stacks by intensity does not make it last two turns.
+- **A property the engine does not read.** It is only a stat: `max_stack 3`, with the `s` missing, leaves the status with no cap.
 - **A misspelt status in a test's `enemy` or `player` line.** In `enemy hp 20 Posion 3`, a word that is not a status becomes a plain stat, so the enemy gets a stat called Posion and no status. Neither command reports the line itself; `lint` reports CT302 only where the test goes on to read `enemy.Posion`. Check what the status does, such as the hp the enemy has lost after `end turn`, and the test fails instead. A misspelt card, relic, ability or enemy on a test line is different: `hand Strik` is an error in `lint`, and the test fails naming the nearest definition.
 
 Nor is `describe` a check: it prints rules text for what was written, whether or not it will ever run. Only a test shows that it does.
@@ -347,13 +347,13 @@ Useful lines:
 | `create "Bog Troll"` | Adds one of your enemies. It never takes a turn here. |
 | `log "text" target.Poison` | Prints values. Separate them with spaces, not commas: text after a comma is read as a flag. |
 
-The REPL has limits. It has none of the test verbs, so `enemy`, `end turn` and `expect` are unknown there, and no turns pass. The test's `play`, which puts a card into hand by name, is not there either, but the rules' `play` is, so `play hand.first on target` plays a card that is already in a pile. `replay` is not a play at all: it pays no energy and raises no `card_played`, so a listener such as `on card_played` does not hear it. Each line runs on its own, so a `let` on one line is gone on the next. A status shows its stacks, so a status that counts turns shows 1; `log target.Weak` shows the turns left. For anything that spans turns, write a test.
+It has none of the test verbs, so `enemy`, `end turn` and `expect` are unknown there, and no turns pass. The test's `play`, which puts a card into hand by name, is not there either, but the rules' `play` is, so `play hand.first on target` plays a card that is already in a pile. `replay` is not a play at all: it pays no energy and raises no `card_played`, so a listener such as `on card_played` does not hear it. Each line runs on its own, so a `let` on one line is gone on the next. A status shows its stacks, so a status that counts turns shows 1; `log target.Weak` shows the turns left. For anything that spans turns, write a test.
 
 ## 7. In Godot
 
 In a Godot game the files, the language and the tests are the same. Keep them where the game loads them from, which is `res://content` unless the programmer chose another folder.
 
-Once the Cantrip addon is enabled, the Godot editor has a Cantrip dock at the bottom, and the loop in [section 5](#5-the-edit-lint-and-test-loop) happens there: write a card in its Source tab, read the problems as they appear, press **Run tests**, save with Ctrl+S. Nothing to install, and no command line for any of that.
+Once the Cantrip addon is enabled, the Godot editor has a Cantrip dock at the bottom, and the loop in [section 5](#5-the-edit-lint-and-test-loop) happens there: write a card in its Source tab, read the problems as they appear, press **Run tests**, save with Ctrl+S.
 
 | Tab | What it shows |
 |---|---|
@@ -364,7 +364,7 @@ Once the Cantrip addon is enabled, the Godot editor has a Cantrip dock at the bo
 
 A file you save in the dock is loaded and linted straight away, and so is one saved elsewhere, once Godot notices it. A `.cantrip` file added or deleted outside the editor joins or leaves the content the same way. **Reload** re-reads the `cantrip/` project settings and reads every file again from scratch; it keeps your unsaved buffers. A running game picks up changed files when it reloads its content, which the game's own code starts, for example from a debug key. See [The editor dock](godot.md#the-editor-dock) and [Hot reload](godot.md#hot-reload).
 
-`sim` and the REPL are the two commands with no tab. To play a scenario hundreds of times with two bots, install the command-line tool beside the game as [Before you start](#before-you-start) shows, and run `dotnet cantrip sim content` in the project folder; [Simulating](simulating.md) covers it.
+To play a scenario hundreds of times with two bots, install the command-line tool beside the game as [Before you start](#before-you-start) shows, and run `dotnet cantrip sim content` in the project folder; [Simulating](simulating.md) covers it.
 
 ## Recipes
 
@@ -473,7 +473,7 @@ test "Vulnerable 2 from an enemy's move covers only the enemy's next turn"
 ```
 
 - `damage` is what the status's host deals and `damage_taken` what it receives. Weak uses `modify damage: x0.75`. Written with `damage` instead, Vulnerable would make the enemy's own hits bigger by half.
-- The status loses 1 at the end of each of its host's turns. On an enemy, it is the player's attacks that it changes, so `apply Vulnerable 2` covers the rest of the player's turn and the whole of the next one.
+- On an enemy, it is the player's attacks that it changes, so `apply Vulnerable 2` covers the rest of the player's turn and the whole of the next one.
 - On the player it is the enemies' hits that count, and the player's own turn end ticks it first, so 2 from an enemy's move covers only the next enemy turn. [How long a duration status lasts](language.md#how-long-a-duration-status-lasts) sets out both cases.
 
 File: [debuff-more-damage-taken.cantrip](../samples/recipes/debuff-more-damage-taken.cantrip).
@@ -599,7 +599,7 @@ test "Kettle gives 3 block at the start of every turn"
   expect player.block == 3
 ```
 
-On a relic, `on turn_start` with nothing in front of it hears only the player's turns, not the enemies'. It also runs after the start of the turn has reset block and energy, so the block is kept. The test's first `expect` starts the battle, and so the first turn. File: [relic-each-turn.cantrip](../samples/recipes/relic-each-turn.cantrip).
+It also runs after the start of the turn has reset block and energy, so the block is kept. The test's first `expect` starts the battle, and so the first turn. File: [relic-each-turn.cantrip](../samples/recipes/relic-each-turn.cantrip).
 
 ### A relic that works once per battle
 
@@ -853,7 +853,7 @@ test "Havoc plays the top card for nothing"
   expect exhaust.count == 2
 ```
 
-- `played` is the card, or **`none`** when it was not played: an empty pile, an unplayable Curse, a cost the player cannot afford, no legal target. None of those is an error, which is what lets one line cover them all.
+- `played` is the card, or **`none`** when it was not played: an empty pile, an unplayable Curse, a cost the player cannot afford, no legal target. None of those is an error.
 - A card that needs a target and was not given one has one **rolled** for it. Nobody is ever asked.
 - `replay` is the other verb, and it is not a play: see [section 6](#6-trying-lines-in-the-repl).
 
@@ -896,7 +896,7 @@ test "Polymorph keeps the seat and the identity"
 ```
 
 - `enemy2` is the test's own binding to that entity, so `expect enemy2.name == "Sheepling"` is the identity claim: it is the same thing, not a replacement beside it. With `destroy` plus `create` the binding would still name the Ogre, and the Ogre would be gone.
-- Everything the old definition brought goes: stats, tags, statuses, the intent, the used-up `once per ...` limits, and its own `next turn:` plans. The new thing arrives whole. Carry a wound across with three lines: `let wounds = target.max_hp - target.hp`, the transform, then `target.hp = target.max_hp - wounds`.
+- Everything the old definition brought goes: stats, tags, statuses, the intent, the used-up `once per ...` limits, and its own `next turn:` plans. Carry a wound across with three lines: `let wounds = target.max_hp - target.hp`, the transform, then `target.hp = target.max_hp - wounds`.
 - It is **not** a death: no `died`, no `killed`, no `destroyed`, so a death rattle does not fire. The one event is `transformed`.
 - It cannot be undone, so it cannot go inside an `until` block; `lint` says so (CT321).
 

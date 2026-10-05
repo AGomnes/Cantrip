@@ -6,12 +6,9 @@ two bots and reports what happened.
 
 > These docs describe the `main` branch, which can be ahead of the latest release. The changelog's [Unreleased](../CHANGELOG.md#unreleased) section lists what that release lacks, and each release's own docs are in [its tag](https://github.com/AGomnes/Cantrip/tags).
 
-It is a fuzzer and a coverage tool for your own content. It finds the run that throws, the fight
+`sim` is a fuzzer and a coverage tool for your own content. It finds the run that throws, the fight
 that never ends, the card that is never playable and the enemy move that never fires, none of
 which a single test would reach.
-
-`sim` has no tab in the Godot addon's editor dock, so a Godot project installs the command-line
-tool to run it; [The command](#the-command) says how, and how to point it at the game's content.
 
 ## A scenario
 
@@ -216,14 +213,12 @@ screen: a modifier written as `modify damage where tag:attack` would have reache
 share of the damage, and that share is a large one.
 
 **How large is the bot's doing.** Burn is 37.6% of what the cautious bot's plays dealt and 48.2% of
-what the patient bot's dealt, over the same 500 seeds and the same content. So the share is a
-number about a bot as much as about the deck, and neither figure should be quoted on its own. That
+what the patient bot's dealt, over the same 500 seeds and the same content. That
 no hit of Burn carried `attack` is the content's, and it holds for both.
 
 **What it does not prove.** It does not say that those were the plays to make. Which cards were
 played, and how often, is the bot's doing, so the *mix* in the table moves with the bot even
-though every amount in it is your content's. That is why there is one meter per bot rather than
-one for the report, and why it sits inside the bot's block.
+though every amount in it is your content's.
 
 **What the tool cannot judge, it names.** When content asks the player to choose part way through
 an effect (`choose`, `discover`), a bot has nothing to decide it with: it looks one play ahead,
@@ -266,10 +261,6 @@ they are true of the content whoever plays.
 is worth. Both were tried and measured while this was designed, and both moved the answer by tens
 of points with no principled way to choose the setting. That would make the report an argument
 about the setting rather than about the content.
-
-**A scenario never plays a card itself.** `play`, `cast`, `end turn` and `tick` belong to a test: a
-line choosing a card by hand would fight the bot. `realtime` is out for the same reason: when to
-act in continuous time is the game's own frame loop.
 
 **`sim` cannot play a real-time game and refuses to try.** A bot plays a scenario by deciding what
 to do and then ending the turn, and content whose ruleset says `clock ticks` has no turn to end: the
@@ -336,10 +327,6 @@ is the only comparison the tool makes.
 cantrip sim content --against ../old-content       # before and after a change
 cantrip sim content --name Tall --against content --against-name Wide     # two decks
 ```
-
-Both sides are played by one command, on purpose. Two separate runs of `sim` could differ in the
-bot, the first seed, the turn limit or the run count, and any of those differences would land in
-the numbers with nothing to say so.
 
 ### What it prints, in the order it is worth reading
 
