@@ -3,8 +3,7 @@
 What goes wrong, what it means, and what to do about it. Most of this page comes from two people
 building whole games on Cantrip from the published docs alone and writing down every place they
 got stuck: [reference/FINDINGS.md](../reference/FINDINGS.md) and
-[realtime/FINDINGS.md](../realtime/FINDINGS.md). Nearly everything they hit has been fixed. What is
-left is the part that cannot be fixed, only explained. This page explains it.
+[realtime/FINDINGS.md](../realtime/FINDINGS.md). Nearly everything they hit has been fixed.
 
 > These docs describe the `main` branch, which can be ahead of the latest release. The changelog's [Unreleased](../CHANGELOG.md#unreleased) section lists what that release lacks, and each release's own docs are in [its tag](https://github.com/AGomnes/Cantrip/tags).
 
@@ -114,10 +113,10 @@ These are the ones a new project meets, in roughly the order it meets them.
 
 ### Indentation
 
-The language decides where a block ends by how deep a line is, and counts a tab as four columns. A
-line indented under a plain statement, or a dedent that lines up with no block, is one error that
-says so, and the rest of the declaration still loads. Fix the first one and re-run rather than
-reading a cascade.
+The language decides where a block ends by how deep a line is, and counts a tab as up to the next
+multiple of four. A line indented under a plain statement, or a dedent that lines up with no
+block, is one error that says so, and the rest of the declaration still loads. Fix the first one
+and re-run rather than reading a cascade.
 
 The Godot dock never writes a tab, and indents at the width the buffer already uses.
 
@@ -131,7 +130,7 @@ differ, a folder lints clean and the game fails, or the reverse.
 - A **Godot game** loads `res://content` unless the node's `ContentFolder` says otherwise, and only
   files Godot has *imported*. See [The content is not there](#the-content-is-not-there).
 - **Verbs, names and functions your game supplies in C#** do not exist for the tool. It reports
-  them as CT301, CT302 or CT304. `--suppress CT301,CT302` is the answer, and
+  them as CT301, CT302 or CT304. `LintOptions.HostVerbs`, `HostEvents` and `HostNames` are the answer, or `--suppress CT301,CT302,CT304` for the tool, and
   [Verbs written in C#](csharp.md#verbs-written-in-c) is the fuller one.
 
 ---
@@ -271,9 +270,11 @@ reach half the enemies, for ever, and nothing warns: lint knows the board's dept
 check that a `range` can span it (`reference/FINDINGS.md` #8). Do the arithmetic once, write it in
 a comment, and pin both ends with a test. `OutOfRange` now says when it has happened.
 
-A `test` block cannot assert a refusal: `play` fails the test when a card cannot be played. So
-the way to test an exclusion today is to play the card with no target and check which one it
-picked.
+A `test` block cannot assert a refusal: `play` fails the test when a card cannot be played, and
+`cast` fails it when an ability is still cooling or has nothing in reach. For an ability, ask
+instead of attempting: `expect not leader.is_ready(Bulwark)` for the cooldown, and
+`expect not leader.can_use(Bulwark)` for reach as well. For a card's targeting rule, play it with
+no target and check which one it picked.
 
 ---
 
@@ -281,8 +282,7 @@ picked.
 
 ### A stall
 
-`cantrip sim` calls a battle that reaches the turn limit a **stall** and fails the command. It is
-the single most useful thing the simulator finds, and it is nearly always one of four things:
+`cantrip sim` calls a battle that reaches the turn limit a **stall** and fails the command. It is nearly always one of four things:
 
 - **Nothing can reach.** A `range` that cannot span the board, or a summon standing where no card
   or ability of yours can touch it. See above.
@@ -360,15 +360,14 @@ snake_case alias.
 GDScript compiles nothing until the line runs, so a method that does not exist is a runtime error
 the first time that code path is taken, not a build error.
 
-If the name used to exist: **`GetHand()` was removed in 1.0.** It was exactly
-`GetZone(PlayerId(), "hand")`, and the moment a party exists it has no single right answer. Write
-`GetZone(PlayerId(), "hand")`, or `GetZone(<member id>, "hand")` for a hero.
+If the name used to exist: **`GetHand()` was removed in 1.0**, because the moment a party exists
+"the hand" has no single right answer. Write `GetZone(PlayerId(), "hand")`, which is all it ever
+was, or `GetZone(<member id>, "hand")` for a hero.
 
 ### The node publishes every method it has
 
 Godot's source generator publishes every ordinary method of a `[GlobalClass]` to script, whatever
-its C# accessibility says. That is why `CantripRuntime` has no private helpers: a private helper
-there would be a method your game can call and this addon has promised to keep. If you are
+its C# accessibility says, so no helper method may be added to `CantripRuntime`: a private helper there would be a method your game can call and this addon has promised to keep. If you are
 extending the addon, helpers belong on `RunLoop`, `VariantMap` or `GodotContentLoader`.
 
 The practical consequence for a game: if you find a method on the node that is not in
@@ -408,8 +407,7 @@ Settings > Plugins**; the Output panel says `Cantrip: dock ready, ...` when it h
   a file that was deleted, delete the project's `.godot` folder and re-import. It is a cache; it is
   rebuilt. This is the first thing to try for anything that looks impossible.
 - **The addon was never assembled.** In this repository, `reference/godot` and `realtime/godot` are
-  Godot projects with no addon and no content of their own: `bash reference/godot/assemble.sh`
-  copies both into place. Both folders are gitignored, so a fresh clone has neither and the project
+  Godot projects with no addon and no content of their own, and each has an `assemble.sh` of its own: `bash reference/godot/assemble.sh` and `bash realtime/godot/assemble.sh`. Both folders are gitignored, so a fresh clone has neither and the project
   will not open properly until the script has run.
 
 ### The addon and the library disagree

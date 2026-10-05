@@ -71,6 +71,7 @@ Everything a battle screen draws comes from the live state:
 | What the content says about it | `entity.Definition`, an `EntityDefinition`: `HasTag`, `Word` for a word such as `rarity rare`, `ReadString` for a quoted string, and `Stats` for the numbers as written |
 | Candidates for a reward screen | `content.Pool("card")`, filtered with `HasTag` or `Word` |
 | The same entity later, even in a restored game | its `Id`, with `runtime.State.Find(id)` |
+| Where an actor stands | `entity.Lane` and `entity.Rank`, both from 0, or `entity.Slot` for the pair (see [The board](#the-board)) |
 | The whole state as one number, for checking that two runs agree | `runtime.State.ComputeHash()`, a `ulong`; the Godot node prints it as `ComputeHash().ToString("x16")` |
 
 For example:

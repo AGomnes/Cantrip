@@ -673,7 +673,9 @@ board "Train"
 
 `group in group` intersects, so `enemies in within(target, 2)` is the splash of a blast. Everything else is an ordinary `where` over `it.lane` and `it.rank`: a spear that hits the one behind is `enemies where it.lane == target.lane and it.rank == target.rank + 1`. There is no cone, no beam and no template, because a lane *is* the beam on a facing board.
 
-**Reach.** `range 1` on a card, an ability or an enemy's move (`move "Swing" range 1:`) is melee; `range 2..3` is a bow that cannot shoot point blank. It is measured with `distance` between whoever is using the action and the candidate, and it is decided in exactly one place, so a reach rule means the same thing for a card and for an enemy's move. See [Targets](#targets).
+**Reach.** A `range` is measured with `distance` between whoever is using the action and the
+candidate, so a reach rule means the same thing on a card, on an ability and in an enemy's move.
+See [Targets](#targets).
 
 **Moving.** Movement is a member write, and there is no movement verb:
 
@@ -790,7 +792,13 @@ The scope is matched against the event's target, whatever the event. So `on owne
 
 **Ordering.** Listeners for the same event run by priority (higher first), then play order (the order their entities became active), then the active side first, then registration order. The ruleset can reorder the first three.
 
-**One is a group of one.** `.count`, `.size`, `.length`, `.first`, `.last`, `.empty` and `.any` work on a single entity as they do on a group: the count is 1, `.first` and `.last` are the entity itself. It reads the other way too: a group answers `.lane` and `.rank` for the first of them, so a group of one says where its one actor stands. That is what makes `choose` safe to read either way. `choose 1 from hand as picked` binds an entity while `choose 2` binds a group, and `picked.first` used to fall through to "a stat nothing has" and read 0 on the one-card path.
+**One is a group of one.** `.count`, `.size`, `.length`, `.first`, `.last`, `.empty` and `.any`
+work on a single entity as they do on a group: the count is 1, `.first` and `.last` are the entity
+itself. It reads the other way too: a group answers `.lane` and `.rank` for the first of them, so
+a group of one says where its one actor stands. That is what makes `choose` safe to read either
+way: `choose 1 from hand as picked` binds an entity while `choose 2` binds a group, and
+`picked.first` reads the same on both. The binding follows how many were actually chosen, so
+`choose 2` from a hand of one binds an entity too.
 
 **Joining mid-event.** A listener that becomes active while an event is being handled hears that event's after timing. A status applied by a card's effect hears the `card_played` of that same card, and a minion listening `on created(kind:actor)` hears its own creation. Where that is not wanted, leave the listener's own cause out with a filter: `on created(kind:actor, not target:self):`, or `not card:Reverb` for the card that applied the status. A `power` card is the exception, since it only becomes active after its `card_played` has finished.
 
@@ -881,7 +889,9 @@ relic "Choirmaster's Baton"
 | `range` | whoever is reaching, or the card or ability doing the reaching |
 | any stat | whoever holds the stat |
 
-So `modify damage of party: +2` is "the party deals 2 more" and `modify damage_taken of party: +2` is "the party takes 2 more"; `modify damage of enemies: +2` is "the enemies hit 2 harder" and `modify damage_taken of enemies: +2` is "the enemies take 2 more". The channel says which end, the group says who, and the two are never the same question.
+So `modify damage of party: +2` is "the party deals 2 more" and `modify damage_taken of party: +2`
+is "the party takes 2 more"; `modify damage of enemies: +2` is "the enemies hit 2 harder" and
+`modify damage_taken of enemies: +2` is "the enemies take 2 more".
 
 The group is read from the modifier owner's side, so `of enemies` on the player's relic always means the player's enemies, whoever is acting. A `where` on the group reads stats from the one that matched (`hp > 20`, `it.has(tag:devout)`) but tests qualifiers such as `tag:` and `source:` against the value being computed, like a `where` on the modifier.
 
@@ -1117,7 +1127,10 @@ A bare name resolves in this order: local variables (`let` bindings, `for each` 
 | `revive`, `grant` | `to` |
 | `destroy`, `discard`, `exhaust`, `cancel`, `log`, `play`, `replay`, `use` | none |
 
-The grammar knows thirteen clause words, four of which (`at`, `over`, `against` and `using`) no built-in verb reads. They stay reserved so that a verb a game registers in C# can read them, and so that a built-in verb handed one can name the word that works: `apply Poison 3 at target` says to write `to`. Three spellings of one clause would be language to learn and content to keep consistent, for nothing, so they are not synonyms.
+The grammar knows thirteen clause words, four of which (`at`, `over`, `against` and `using`) no
+built-in verb reads. They stay reserved so that a verb a game registers in C# can read them, and
+so that a built-in verb handed one can name the word that works: `apply Poison 3 at target` says
+to write `to`.
 
 **A flag after a comma is not a clause** and is never checked: `, ignore block`, `, free`, `, top`, `, weighted`, and whatever a game's own verb reads. Only the verbs above are held to the table. A verb content declares, or one a game registers, reads what it likes.
 
@@ -1195,7 +1208,7 @@ card "Havoc"
       exhaust played
 ```
 
-`, free` plays it without paying. It changes what is **paid**, never what the card **sees**: a `cost 2` card played free still has `cost 2`, and an X-cost card played free binds `x` to what the payer has and spends nothing. The `card_played` event's `amount` is what was actually paid, which is 0 for a free play, so "gain 1 hp per energy spent" stays honest. Paid is the default, because the free version already exists (`replay`), and a `play` that were always free would leave "play it and make them pay for it" unwritable.
+`, free` plays it without paying. It changes what is **paid**, never what the card **sees**: a `cost 2` card played free still has `cost 2`, and an X-cost card played free binds `x` to what the payer has and spends nothing. The `card_played` event's `amount` is what was actually paid, which is 0 for a free play, so "gain 1 hp per energy spent" stays honest.
 
 **A refusal the rules allow is not an error.** An empty pile, a Curse, a cost the payer cannot afford, no legal target, a card already in `play` or `powers`: nothing happens, `played` is `none`, and the trace says so. That is what lets "play the top card of your draw pile" be written once and not crash the first time the top card is a Curse. `played` is bound before anything else, so the name always exists.
 

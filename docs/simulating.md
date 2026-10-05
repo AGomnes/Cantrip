@@ -138,12 +138,13 @@ any of them. A position is scored on hp alone (one and a half times the party's,
 enemies'), taken after the enemies have answered, so a block that stopped a hit shows up as hp the
 player still has.
 
-**A party takes its turn a member at a time.** Each bot asks every member that still has a step,
-plays with it and passes, and the turn ends when the last one has. Under
-[`turns: initiative`](language.md#the-turn) that is the only way the round moves at all. A game with
-no `hero` in it has a party of one, is never passed, and plays the run it always did, to the seed.
-The `hp lost` column is the party's health between them, so a fight the heroes are losing while
-the leader stands untouched reads as the loss it is.
+**A party takes its turn a member at a time.**
+[samples/party/sim.cantrip](../samples/party/sim.cantrip) is one. Each bot asks every member that
+still has a step, plays with it and passes, and the turn ends when the last one has. Under
+[`turns: initiative`](language.md#the-turn) that is the only way the round moves at all. A game
+with no `hero` in it has a party of one, is never passed, and plays the run it always did, to the
+seed. The `hp lost` column is the party's health between them, so a fight the heroes are losing
+while the leader stands untouched reads as the loss it is.
 
 **They are wrong in the same direction.** All three share that one way of weighing a position, so
 they all undervalue a card that draws, a card that gives energy, a move to a safer rank, and anything else that pays off
@@ -361,11 +362,10 @@ that decided nothing does.
 
 ### What it still will not tell you
 
-It will not tell you the change is **good**. The bots weigh the party's hp against the enemies',
-so they are wrong in a known direction about a card that draws and about anything that pays off
-several turns later; a change these numbers like may be the change that made the game duller. The
-honest reading of a comparison is *this bot finished more runs of this scenario*, and the block
-about what the content allows is the part that is true whoever plays.
+It will not tell you the change is **good**. The bots are wrong in the direction
+[The bots](#the-bots) names; a change these numbers like may be the change that made the game
+duller. The honest reading of a comparison is *this bot finished more runs of this scenario*, and
+the block about what the content allows is the part that is true whoever plays.
 
 **A comparison never changes the exit code.** It is a reading, not a check. What fails `cantrip
 sim` is what always failed it, in the content the command was pointed at: a run that threw, a
