@@ -129,7 +129,7 @@ func _ready() -> void:
 # A card button in your scene calls this; an End turn button calls rules.EndTurn().
 func _on_card_pressed(card: int) -> void:
 	var target: int = worm if rules.GetTargetMode(card) == "enemy" else 0
-	print(rules.Play(card, target))               # played, cannot_afford, out_of_range...
+	print(rules.Play(card, target))               # played, cannot_afford, invalid_target...
 
 func _on_effect_event(effect_event: Dictionary) -> void:
 	print(effect_event["name"])                   # damaged, gained_block, status_applied...
@@ -169,7 +169,7 @@ runtime.AddRelic("Kindling");
 Entity worm = runtime.SpawnEnemy("Jaw Worm");
 
 runtime.StartBattle();
-ActionResult result = runtime.Play("Fireball", worm);   // Played, CannotAfford, OutOfRange...
+ActionResult result = runtime.Play("Fireball", worm);   // Played, CannotAfford, InvalidTarget...
 runtime.EndTurn();
 ```
 
