@@ -1,6 +1,6 @@
 # The Acolyte's book. One hand and one energy pool, held by the leader; any member may perform a
-# play, so the cost comes out of the leader's pool and everything else — the damage, the tags,
-# `source` — is the performer's.
+# play, so the cost comes out of the leader's pool and everything else (the damage, the tags,
+# `source`) is the performer's.
 
 card "Censer"
   cost 1

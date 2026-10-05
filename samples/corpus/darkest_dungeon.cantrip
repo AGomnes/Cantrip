@@ -19,7 +19,7 @@ card "Dread"
 
 # --- 2. ref affliction at 100 stress --------------------------------------------------------
 # A threshold on a custom stat's own change event, which is the only way to notice a resource
-# crossing a line rather than polling it. Declared as an `item`, which behaves like a relic —
+# crossing a line rather than polling it. Declared as an `item`, which behaves like a relic,
 # though a test has to grant it with `relic`, since there is no `item` setup verb.
 
 status "Afflicted"
@@ -73,7 +73,7 @@ actor "Zealot"
 # Works. A skill's reach is written on the skill, as a `where` on its own `target` line: `it` is
 # the candidate, and ranks count from zero, so the front two ranks are `it.rank <= 1`.
 # It used to be `modify targetable of enemies where card:Pike, it.rank > 1: set 0`, which made
-# the card name itself — the qualifier compares names and there is no `card:self`, so without that
+# the card name itself: the qualifier compares names and there is no `card:self`, so without that
 # the limit would have applied to every card played while this one sat in hand. Reach is still a
 # property of the board rather than of the skill, so a hero's own rank does not enter into it.
 

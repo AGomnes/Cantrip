@@ -31,7 +31,7 @@ card Fireball
 
 ## Install
 
-You need the **.NET edition of Godot 4.6.x** (tested on 4.6.1 and 4.6.2) and the **.NET SDK 8 or later**, even if your game is all GDScript; you will not write any C#. A GDScript-only project first needs a C# solution: Project → Tools → C# → Create C# solution.
+You need the **.NET edition of Godot 4.6.x** (tested on 4.6.1 and 4.6.2) and the **.NET SDK 8 or later**, even if your game is all GDScript; you will not write any C#. A GDScript-only project first needs a C# solution: Project > Tools > C# > Create C# solution.
 
 Exporting a .NET game has limits of Godot's own, and a game on the .NET edition is a .NET game however it is written: not to the web at all, and to Android and iOS only experimentally, as [C# platform support](https://docs.godotengine.org/en/4.6/tutorials/scripting/c_sharp/index.html#c-platform-support) in Godot's documentation explains. With Cantrip, only a Linux x64 export has been tried; [Platforms](https://github.com/AGomnes/Cantrip/blob/main/docs/stability.md#platforms) lists what has and has not.
 
@@ -40,7 +40,7 @@ Exporting a .NET game has limits of Godot's own, and a game on the .NET edition 
    ```
    dotnet add package Cantrip.Core --version <the version in plugin.cfg>
    ```
-3. Build the C# project, with the editor's Build button or `dotnet build`, then enable *Cantrip* in Project Settings → Plugins.
+3. Build the C# project, with the editor's Build button or `dotnet build`, then enable *Cantrip* in Project Settings > Plugins.
 4. Put your `.cantrip` files in `res://content` and add a `CantripRuntime` node to a scene.
 
 The full guide is [docs/godot.md](https://github.com/AGomnes/Cantrip/blob/main/docs/godot.md) in the main repository: installing step by step, a first battle in GDScript that runs as written, a reference for every method of the node and every dictionary it returns, and player choices, rewards and upgrades between battles, saving and exports. [Troubleshooting](https://github.com/AGomnes/Cantrip/blob/main/docs/troubleshooting.md#godot) is what to read when one of those does not go as written.

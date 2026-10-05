@@ -1,4 +1,4 @@
-# The party. The leader — the Acolyte — is made by the host with `CreatePlayer` and holds the
+# The party. The leader, the Acolyte, is made by the host with `CreatePlayer` and holds the
 # run: the deck, the relics, the gold and the party's energy. These two start beside him; the
 # Ferryman is recruited at a shrine, part-way down.
 

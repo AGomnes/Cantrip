@@ -21,9 +21,9 @@ findings below are that one fact seen from nine directions.
 line saying what happened; the findings themselves are left as they were written, because they are
 the record of why these things changed. The game in `realtime/` no longer carries any of the
 workarounds below: where one is quoted, the file it was quoted from now says the natural thing.
-The headline was answered directly — a tick runtime takes no turns, raises no turn events, counts
-no turn number, and refuses every turn-shaped call — and real time came out of experimental in the
-same round.
+The headline was answered directly: a tick runtime takes no turns, raises no turn events,
+counts no turn number, and refuses every turn-shaped call. Real time came out of experimental
+in the same round.
 
 ---
 
@@ -137,7 +137,7 @@ behaved exactly as one on the leader did. The party design's worry -- that `Pass
 game simply never calls them. What it needs instead is for those calls to *say no*.
 
 **Fixed, all of it.** `EndTurn`, `Pass`, `CanAct` and `ActiveMember` throw
-`InvalidOperationException` on a tick runtime, with a message naming `Tick()` — the mirror of
+`InvalidOperationException` on a tick runtime, with a message naming `Tick()`, the mirror of
 what `Tick` has always said on a turn runtime. `StartBattle` no longer starts a turn on a tick
 clock: no `turn_start`, no `turn_end`, and `State.Turn` stays at 0 for the whole fight, which is
 what CT335 has told authors all along. The opening hand is still dealt, because a hand is not a
@@ -201,9 +201,9 @@ telegraph, the pattern, the phase, `at` targeting, and the separation between "w
 **Fixed at lint, kept in the engine.** Nothing here is made to work under ticks: a `move` is what
 an enemy does when its turn comes round, and a real-time game has no turn to give it. What was
 wrong was the silence. Every one of these is now error **CT337** when the ruleset says
-`clock ticks` — `move`, `pattern`, `phase`, `stacking duration`, `decay ... on turn_end`,
+`clock ticks`: `move`, `pattern`, `phase`, `stacking duration`, `decay ... on turn_end`,
 `until turn_end:`, `next turn:`, `once per turn`, `reset_on turn_start`, and a `turn_start` or
-`turn_end` listener — and each message names the real-time shape of the same idea, which for a
+`turn_end` listener. Each message names the real-time shape of the same idea, which for a
 move is `on every <n>s:` and for a phase is a filter on a listener of its own. The last line of
 every one offers `clock turns`, because "this is really a turn game" is always a legitimate
 answer. `Intent` is left alone: it is rolled from moves, and with no move to roll from there is
@@ -242,7 +242,7 @@ carries a comment saying why, because nothing would have told me.
 to ship, in exactly the shape 1.0 is promoting.
 
 **Fixed.** CT326 reads a listener on an `enemy`, a `card` or an `ability` as well as the three
-bodies it already read, and its message says which — "`player` in an enemy's listener means the
+bodies it already read, and its message says which: "`player` in an enemy's listener means the
 party's leader". A `relic`'s and a `status`'s listeners are deliberately left out: `player` is
 documented as the right word there and a shipped decision names the three bodies, so widening to
 those two would be a language change rather than closing the hole the real-time round found.
@@ -254,7 +254,7 @@ would have told me now says the opposite.
 finding's own reasoning left open: a real-time enemy's behaviour is listeners, and so is damage
 over time, so `status "Burn" / on every 2s: deal 5 to player` was the same silent wrong answer
 one declaration to the left. It is CT326 on a `status` and a `relic` listener too, with one
-exception — a listener *about its own owner*, meaning an event scoped to the holder
+exception: a listener *about its own owner*, meaning an event scoped to the holder
 (`on owner.turn_start:`, `on self.damaged:`) or a run-level event whose only actor is the leader
 (`battle_start`, `battle_end`, `obtained`). The exception is what turns the rule from a list of
 five places into a sentence: **`player` is refused wherever a member could be meant.** A carried
@@ -312,8 +312,8 @@ to: the fight that never ends, the ability that is never usable, the content tha
 real-time game gets none of that and is told everything is fine.
 
 **Fixed by refusing, and that is the judgement.** Making `sim` tick would mean inventing a bot
-policy for continuous time — how long to wait, when a cooldown is worth saving, what "a turn" even
-means for a stall limit — and that is a second tool and a design round, not a fix. The one thing
+policy for continuous time: how long to wait, when a cooldown is worth saving, what "a turn"
+even means for a stall limit. That is a second tool and a design round, not a fix. The one thing
 the report would then be about is the policy, which is the argument `sim` was built to avoid
 having. So it refuses: `ScenarioRunner.Run` and `Replay` throw on content whose ruleset says
 `clock ticks`, `cantrip sim` prints one sentence and exits 2, and a `scenario` written in
@@ -365,7 +365,7 @@ string-executing workaround also means a typo in a lane number is a `DslExceptio
 rather than a compile error.
 
 **Both fixed.** `SpawnEnemy` raises `created`, the same event `create` raises, with the enemy as
-both source and target — so `on created(target:self): self.rank = 3` on the enemy's own
+both source and target, so `on created(target:self): self.rank = 3` on the enemy's own
 declaration works, and so does a relic that hears anything entering the fight. It is an
 announcement rather than a gate: the actor is already in the game, so a `before created:` listener
 cannot cancel a spawn the game has decided on. And `CardRuntime.Place(actor, lane, rank)` is
@@ -460,8 +460,8 @@ problem exists.
 
 **Fixed with one ruleset setting and one call.** `ends: called` in the ruleset turns off the
 winning half of the end-of-battle check: an empty board is then just an empty board, and the
-battle runs until the party falls — which is the rules' own answer and the same in every game — or
-until the game says otherwise with `runtime.EndBattle(won)` (`rules.EndBattle(won)` on the node).
+battle runs until the party falls, which is the rules' own answer and the same in every game,
+or until the game says otherwise with `runtime.EndBattle(won)` (`rules.EndBattle(won)` on the node).
 `ends: last_enemy` is the default and is exactly what every game has always had, so no existing
 content or sample moves a byte. It was chosen over an "endless" flag because the question a wave
 game is really asking is *who decides*, and the answer is the game above the fight; and over a
@@ -512,7 +512,7 @@ and that half cannot be tested.
 
 **Fixed by asking rather than attempting.** Content has two new methods: `who.is_ready(Ability)`
 is whether that ability's cooldown has run out, and `who.can_use(Ability)` also asks whether its
-owner is alive and there is somebody in reach — the same two questions `IsReady` and `CanUse`
+owner is alive and there is somebody in reach. Those are the two questions `IsReady` and `CanUse`
 answer in C#, so a test, a UI and content all read one rule. They are two rather than one because
 "still cooling" and "nothing to aim at" are different answers and a real-time game says different
 things about them. An ability the actor does not have is a runtime error naming it rather than a
@@ -564,7 +564,7 @@ all, and the only way to build one today is to find an undocumented stat.
 **Both fixed with a call each.** `runtime.AbilitiesOf(owner)` lists what an actor is carrying, in
 the order they were granted, so no game has to learn that an ability is an entity in
 `Zones.Attached` with `Kind == EntityKind.Ability`. `runtime.ReadyIn(ability)` is how much longer
-it has to wait, **in clock units** — ticks here, turns on a turn clock — and is 0 both when the
+it has to wait, **in clock units** (ticks here, turns on a turn clock), and is 0 both when the
 ability is ready and when it has never been used, so "absent" reads as ready without the caller
 knowing that `ready_at` does not exist yet. It is clock units rather than seconds because the core
 does not know what a second is on a turn clock; the Godot node, which does, has
@@ -649,14 +649,13 @@ back on load. It works and it is a thing every real-time Godot game will have to
 **How bad.** Moderate to high. Cheap to fix -- one method -- and every single real-time Godot game
 needs it.
 
-**Fixed, with two methods rather than one.** `GetTicks()` is the game's own clock in clock units —
-the tick-clock answer to `GetTurn()` — and `GetSeconds()` is the same number in seconds, for the
-"18 / 45 seconds" read-out every real-time game draws. Both read the runtime's clock, which is the
-one a save brings back, and godot.md says in as many words that `TickDriver.TotalTicks()` is the
-driver's count and that the two disagree after a restore. `emberline.gd`'s `elapsed_ticks`, the
-addition on every `Ticked` and the careful write into its own save file are all gone: `seconds()`
-is `int(rules.GetSeconds())`.
-
+**Fixed, with two methods rather than one.** `GetTicks()` is the game's own clock in clock units
+(the tick-clock answer to `GetTurn()`), and `GetSeconds()` is the same number in seconds, for
+the "18 / 45 seconds" read-out every real-time game draws. Both read the runtime's clock, which
+is the one a save brings back, and godot.md says in as many words that `TickDriver.TotalTicks()`
+is the driver's count and that the two disagree after a restore. `emberline.gd`'s
+`elapsed_ticks`, the addition on every `Ticked` and the careful write into its own save file are
+all gone: `seconds()` is `int(rules.GetSeconds())`.
 ---
 
 ## 12. `Engine.time_scale` does not work, so a Cantrip game cannot be sped up or slowed down
@@ -699,7 +698,7 @@ is the one thing the tick clock exists to prevent. godot.md has a **Running fast
 section that says outright that `Engine.time_scale` has no effect, that
 `Engine.physics_ticks_per_second` has none either, that raising the runtime's `TicksPerSecond`
 changes the game rather than its speed, and that driving `Tick(count)` yourself is how a
-fast-forward, a slow motion or a 2× option is built — with the four lines that do it. It is also
+fast-forward, a slow motion or a 2x option is built, with the four lines that do it. It is also
 in stability.md's known limitations, because "there is no speed control" is a thing to find before
 you build a replay viewer. `emberline.gd` keeps pumping `Tick(1)` under `--emberline-auto`, which
 is now the documented path rather than a workaround.
@@ -752,7 +751,7 @@ and moderate for the doc contradiction, which is one sentence denying a feature 
 alternative was to implement it, and it was considered and turned down: the resource an ability
 would spend is reset by `turn_start`, which never fires on a tick clock (CT337 refuses
 `reset_on turn_start` for that reason), so an implemented `cost` would give a real-time game one
-poolful per battle and then nothing — a worse silence than the one it replaced. The honest
+poolful per battle and then nothing, a worse silence than the one it replaced. The honest
 sentence is that an ability's price is the seconds it makes you wait, and it is now in
 csharp.md, in language.md's ability section, and in the diagnostic. A game that wants a
 regenerating resource keeps one itself and refills it from an `on every <n>s:`; stability.md's
@@ -804,8 +803,8 @@ that never comes off -- is a balance bug a designer will chase for a long time.
 each names what to write instead: `stacking intensity` or `stacking none` with a `for <n>s` where
 the status is applied, `in <n>s:` for `next turn:`, `until <n>s:` for `until turn_end:`,
 `once per battle` for `once per turn`, and an `on every <n>s:` listener for a resource that has to
-refill. The rule a designer had to learn from nowhere — "every status in a real-time game must
-carry its own `for`" — is now a sentence the linter says where the status is declared. The two
+refill. The rule a designer had to learn from nowhere, "every status in a real-time game must carry
+its own `for`", is now a sentence the linter says where the status is declared. The two
 rows that are not declarations are left as they are and documented instead: energy is reset by
 `turn_start`, which does not fire, and the hand is dealt at `StartBattle` and not at a turn start,
 so a real-time deckbuilder still gets its opening hand and refills it from its own content. The
@@ -839,7 +838,7 @@ notice the damage arriving in slabs.
 
 **Kept.** Deferred as design work rather than a fix: a jitter, a phase offset and an
 `on every 2s after 1s:` are three different features, and the one that is right depends on whether
-a game wants its squad spread deterministically or randomly — a choice that belongs in a round
+a game wants its squad spread deterministically or randomly, a choice that belongs in a round
 where somebody has a squad to spread. Nothing about it is a wrong answer today, and it does not
 affect the surface 1.0 is promising, so it costs nothing to leave. A game that wants it spawns on
 consecutive ticks, or gives each member a randomised `in <n>s:` warm-up. Emberline's schedule is
@@ -885,7 +884,7 @@ makes somebody recognise what they are watching.
 **Four fixed, two kept.**
 
 - **A verb called command-style.** Kept. `hold(leader, 1)` is a parse error with three messages,
-  none of which mentions verbs, and that is worth improving — but the fix is in the parser's
+  none of which mentions verbs, and that is worth improving, but the fix is in the parser's
   recovery rather than in real time, and guessing "you meant a verb" from `(` after a name would
   fire on every genuine function call written with a bad argument. Deferred, with the note that
   language.md's only verb example takes one argument and so distinguishes nothing; a second
@@ -901,8 +900,8 @@ makes somebody recognise what they are watching.
   error rather than a refusal the game can act on, and swallowing it would hide an authoring bug
   from the REPL and from tests. csharp.md says it throws.
 - **`Entity.Get` returns a `Num` that will not cast to `long`.** Fixed: `Num.ToLong()` is there
-  beside `ToInt()` and `ToDouble()`, with a remark saying why a cast cannot be made to work — a
-  `Num` is fixed-point and not a `long` in disguise — and which of the three to reach for.
+  beside `ToInt()` and `ToDouble()`, with a remark saying why a cast cannot be made to work (a
+  `Num` is fixed-point and not a `long` in disguise) and which of the three to reach for.
 - **`GameState.Assign` throws for a slot off the board.** Fixed by making it not the call a host
   reaches for: `CardRuntime.Place` is the documented seam, it refuses an off-board slot with an
   `ArgumentException` naming the board's own shape, and it runs the move through `moved` so
@@ -1023,7 +1022,7 @@ put them:
    deleted from Emberline.
 5. The tooling tells the truth. `sim` refuses a `clock ticks` folder and CT338 says so at lint.
 6. Lint checks machinery as well as units. CT337, twelve shapes, each naming what to write
-   instead — and it was as valuable as this document predicted.
+   instead, and it was as valuable as this document predicted.
 7. CT326 looks inside listeners, on an enemy, a card and an ability.
 
 What is still not promised, and is written into stability.md rather than glossed over: there is no

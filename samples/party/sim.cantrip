@@ -5,7 +5,7 @@
 # What the report checks is the bottom two lines: nothing throws, and no run reaches the turn
 # limit. `wins`, `hp_left` and `turns` are printed and not checked, here more than anywhere else:
 # every bot weighs the party's hp against the enemies', and three members make that heuristic worse
-# rather than better — it will spend the Vestal's heal on whoever is nearest to dead, with no idea
+# rather than better: it will spend the Vestal's heal on whoever is nearest to dead, with no idea
 # that keeping her alive is what wins the fight.
 #
 # The `hp lost` column is the party's health between them, which is what makes it worth reading

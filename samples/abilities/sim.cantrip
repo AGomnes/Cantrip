@@ -2,7 +2,7 @@
 # abilities on cooldowns, so this is what `cantrip sim` has to keep working for a turn-based
 # roguelike rather than a deckbuilder.
 #
-# Nothing here rolls a die — the Ghast cycles its moves — so every run goes the same way, and the
+# Nothing here rolls a die (the Ghast cycles its moves), so every run goes the same way, and the
 # report says so rather than pretending that 200 runs measured more than one.
 #
 # It also reports that Screech never fires: the Ghast is wounded before its turn comes round, and

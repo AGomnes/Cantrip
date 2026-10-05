@@ -1,6 +1,6 @@
 # The tower, played many times by a bot: the same five floors as the tests, stated once and
 # fought over and over. `cantrip sim samples/slice` reports what the content allows, whatever the
-# bot did — whether anything threw, whether a fight ever failed to end, whether every card was
+# bot did: whether anything threw, whether a fight ever failed to end, whether every card was
 # ever playable and whether every enemy move fired. See docs/simulating.md.
 #
 # Run:  dotnet run --project src/Cantrip.Cli -- sim samples/slice

@@ -35,7 +35,7 @@ card "Lash"
 
 # Who may speak the words is an ordinary filter on the performer, and it needs no new syntax:
 # `event.source` in a `card_played` listener is the member that played the card. (`source` on its
-# own is the listening entity — the relic — which is the rule for every listener and not something
+# own is the listening entity, the relic, which is the rule for every listener and not something
 # the party changed.)
 relic "Rite of Office"
   on card_played(card:Cleanse):

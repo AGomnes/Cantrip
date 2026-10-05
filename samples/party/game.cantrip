@@ -28,7 +28,7 @@ status "Taunt"
   stacking none
 
   # The whole of a taunt: while this is on somebody, nobody else on their side may be aimed at by
-  # the other side. It is the same line Hearthstone's Taunt uses in samples/corpus, unchanged —
+  # the other side. It is the same line Hearthstone's Taunt uses in samples/corpus, unchanged,
   # which is the point, because a party member is an ordinary actor and needed no new mechanism.
   modify targetable of allies where source:enemies, not it.has(Taunt): set 0
 
@@ -110,7 +110,7 @@ hero "Scout"
 
 # Ethereal, so the test below watches the hand being emptied and nothing else. An ordinary card
 # would go to the discard pile, be shuffled back when the Scout drew from an empty pile, and land
-# in its hand again — which would hide the discard rather than show it.
+# in its hand again, which would hide the discard rather than show it.
 card "Dart"
   cost 0
   target enemy

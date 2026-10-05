@@ -2,8 +2,8 @@
 # Names are our own. Classification and notes: docs/coverage.md.   Tests: dota2.tests.cantrip.
 
 # The corpus is one library, so the first board declared here is the one every file in it is
-# played on. That one is written out to be exactly the board content gets when it declares none —
-# one lane, no floor — so nothing else in the corpus moves. The arena below is the second, and
+# played on. That one is written out to be exactly the board content gets when it declares none
+# (one lane, no floor), so nothing else in the corpus moves. The arena below is the second, and
 # only the tests that name it are fought on it.
 
 board "Open ground"
@@ -71,7 +71,7 @@ relic "War Banner"
 
 # --- 5. ref cooldown reduction ------------------------------------------------------------------
 # `cooldown` is a modifier channel, so an item can shorten what every ability of its holder waits.
-# Written on the ability instead, it would shorten only that one — the division `cost` makes between
+# Written on the ability instead, it would shorten only that one: the division `cost` makes between
 # a card and its owner's cards. Modifiers see the cooldown already converted into clock units, so
 # `x0.5` means half whether the ability says `4s` or `2 turns`.
 
@@ -90,7 +90,7 @@ relic "Arcane Vestments"
 # reaches a stealthed unit and a shielded one, which is the rule these games have.
 #
 # A game whose fight happens in continuous space writes `within(target, 5m)` instead, with the
-# unit, and its own host answers that — unchanged, and the reason both spellings live under one
+# unit, and its own host answers that: unchanged, and the reason both spellings live under one
 # word.
 
 ability "Crystal Nova"

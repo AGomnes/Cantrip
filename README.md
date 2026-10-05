@@ -102,7 +102,7 @@ Cantrip is written and maintained by one person. Feedback is the most useful thi
 
 ### In a Godot game
 
-You need the **.NET edition** of Godot 4.6 and the .NET SDK 8 or later. A project written entirely in GDScript also needs a C# solution in it, which Project → Tools → C# → Create C# solution writes: the addon is C# source, because Godot finds scripts by path inside the project's own assembly, so only the library underneath can be a package. You write none of that C# yourself.
+You need the **.NET edition** of Godot 4.6 and the .NET SDK 8 or later. A project written entirely in GDScript also needs a C# solution in it, which Project > Tools > C# > Create C# solution writes: the addon is C# source, because Godot finds scripts by path inside the project's own assembly, so only the library underneath can be a package. You write none of that C# yourself.
 
 Put `addons/cantrip` in the project, from any of three places: the editor's AssetLib tab, once Cantrip is listed there; the zip on any [release](https://github.com/AGomnes/Cantrip/releases), whose root is `addons/cantrip`; or [AGomnes/cantrip-godot](https://github.com/AGomnes/cantrip-godot), the mirror each release copies the addon to in the layout the Asset Library installs from. Then add the rules engine, at the version in the addon's `plugin.cfg` rather than leaving the version off, which may fetch a release newer than the addon you have:
 
@@ -110,7 +110,7 @@ Put `addons/cantrip` in the project, from any of three places: the editor's Asse
 dotnet add package Cantrip.Core --version <the version in plugin.cfg>
 ```
 
-Build, enable the plugin in Project Settings → Plugins, and put your `.cantrip` files under `res://content`; [Installing](docs/godot.md#installing) is the same thing step by step, with what each mistake looks like. A `CantripRuntime` node then runs battles, and hands everything to your scripts as ids and dictionaries, with [samples/basic/content.cantrip](samples/basic/content.cantrip) in `res://content` for its Strike, Defend, Fireball, Kindling and Jaw Worm:
+Build, enable the plugin in Project Settings > Plugins, and put your `.cantrip` files under `res://content`; [Installing](docs/godot.md#installing) is the same thing step by step, with what each mistake looks like. A `CantripRuntime` node then runs battles, and hands everything to your scripts as ids and dictionaries, with [samples/basic/content.cantrip](samples/basic/content.cantrip) in `res://content` for its Strike, Defend, Fireball, Kindling and Jaw Worm:
 
 ```gdscript
 extends Node

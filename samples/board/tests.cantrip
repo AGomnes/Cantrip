@@ -37,7 +37,7 @@ test "board a freed slot is filled by the next summon"
   expect allies.count == 3
 
   # Two Imps have the same hp, and the tie breaks on where they stand, so this is the one in slot
-  # 1 — leaving a hole with a survivor behind it, which is the case the old rule got wrong.
+  # 1, leaving a hole with a survivor behind it, which is the case the old rule got wrong.
   kill lowest allies
   expect allies.count == 2
   expect allies.last.rank == 2
@@ -193,7 +193,7 @@ test "board a status makes everything melee"
   expect enemy2.hp == 16
 
 # An enemy move reaches as far as it says. The player is two steps from the Reaver and the Imp on
-# the front slot is one, so the swing goes at the Imp — the same reach rule the card asked, from
+# the front slot is one, so the swing goes at the Imp: the same reach rule the card asked, from
 # the other side of the board.
 test "board a move swings at whoever it can reach"
   player hp 40
@@ -324,7 +324,7 @@ test "board a braced unit refuses to be moved"
   expect enemy1.rank == 2
 
 # A group of one answers where it stands like the one it holds. `created.rank` used to read 0
-# while `created.first.rank` read 2 — the same actor, two answers, and no message about it.
+# while `created.first.rank` read 2: the same actor, two answers, and no message about it.
 test "board a group of one says where it stands"
   player hp 40
   player energy 9

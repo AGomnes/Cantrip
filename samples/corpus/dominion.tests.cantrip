@@ -1,7 +1,7 @@
 # Tests for dominion.cantrip. Player: 80 hp, 3 energy, seed 1. Plain enemies have 10 hp.
 # One thing to know: these cards cost coins, and coins reset to nothing at the start of a turn,
 # so coins are granted with a statement rather than in setup, because setup runs before the
-# battle starts and the turn_start reset would wipe them. Actions and buys need no such help —
+# battle starts and the turn_start reset would wipe them. Actions and buys need no such help:
 # their declarations establish them.
 # Each test also avoids depending on which card the chooser picks, by offering identical
 # candidates or only one.

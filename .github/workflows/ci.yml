@@ -105,8 +105,8 @@ jobs:
       - name: DSL tests (samples/board)
         run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- test samples/board
 
-      # And played a hundred times by each bot, so that a board which stalled one — a floor with no
-      # room making a card do nothing, for ever — fails this step rather than shipping.
+      # And played a hundred times by each bot, so that a board which stalled one (a floor with no
+      # room making a card do nothing, for ever) fails this step rather than shipping.
       - name: Simulate samples/board
         run: dotnet run --project src/Cantrip.Cli -c Release --no-build -- sim samples/board --runs 100
 

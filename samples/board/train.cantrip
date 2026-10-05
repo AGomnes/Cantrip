@@ -52,7 +52,7 @@ actor "Imp"
 
 # A Sentinel makes the units beside it hit harder. `adjacent` is one step away on its own side, so
 # on this board that is the unit in front of it, the unit behind it, and the units on the floors to
-# either side — whatever the board's shape says is one step.
+# either side: whatever the board's shape says is one step.
 actor "Sentinel"
   hp 12
   attack 2
@@ -98,7 +98,7 @@ enemy "Crawler"
 
 # A brood mother puts her young on her own floor, and stops when it is full. Nothing in this
 # declaration says how many fit: the board does, and a summon that has nowhere to stand is turned
-# away — `created` comes back empty and the trace says which floor was full.
+# away: `created` comes back empty and the trace says which floor was full.
 enemy "Brood Mother"
   hp 24
   attack 3

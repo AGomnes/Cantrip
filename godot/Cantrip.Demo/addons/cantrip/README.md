@@ -15,7 +15,7 @@ Godot resolves scripts by file path inside your project's own assembly.
 The full install guide, with what to check first and what to expect at each step, is
 https://github.com/AGomnes/Cantrip/blob/main/docs/godot.md. In short:
 
-1. If your project has no C# solution, create one: Project → Tools → C# → Create C# solution.
+1. If your project has no C# solution, create one: Project > Tools > C# > Create C# solution.
 2. Copy `addons/cantrip/` into your project. Until step 3, a build fails with errors about the
    `Cantrip` namespace; that is expected.
 3. Add the rules engine from NuGet, in the folder with your `.csproj`. The version must match this
@@ -28,7 +28,7 @@ https://github.com/AGomnes/Cantrip/blob/main/docs/godot.md. In short:
 4. **Build the C# project before enabling the plugin**, with the editor's Build button or
    `dotnet build`. Until the assembly exists, Godot cannot load a C# plugin and the addon's nodes
    are missing, with nothing in the log to say why.
-5. Enable *Cantrip* in Project Settings → Plugins.
+5. Enable *Cantrip* in Project Settings > Plugins.
 6. Put your `.cantrip` files in `res://content` and add a `CantripRuntime` node to a scene.
 
 ## What you get

@@ -163,8 +163,8 @@ status "Echo"
     stacks -1
 
 # --- 11. ref Reaper: heal for the unblocked damage dealt -----------------------------------
-# `into` binds what the attack actually landed — past block, and only what a dying enemy could
-# still take — so the card simply heals that.
+# `into` binds what the attack actually landed (past block, and only what a dying enemy could
+# still take), so the card simply heals that.
 
 card "Soul Reap"
   cost 2

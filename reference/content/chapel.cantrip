@@ -1,4 +1,4 @@
-# The Drowned Chapel — the reference game for Cantrip 1.0.
+# The Drowned Chapel: the reference game for Cantrip 1.0.
 #
 # A party of three descends seven floors of a flooded chapel: five fights, a shrine and a
 # vestry. The battles are Cantrip's; the floors, the gold, the shop, the rewards and the save
@@ -45,7 +45,7 @@ board "Chapel"
 # The nave the Antiphonary sits in: a rank deeper than the rest of the chapel, so the boss's own
 # aisle has room for a second Tooth standing behind it. Changing boards leaves anybody who still
 # fits where they stand, so the party keeps its places from the fight before and only what is
-# placed next — the boss, and what it summons — feels the extra rank. Two boards, so the game has
+# placed next (the boss, and what it summons) feels the extra rank. Two boards, so the game has
 # to say which fight is fought where: `StartBattle(board:)` in C#, `StartBattleOn` in GDScript.
 board "Nave"
   lanes 2
