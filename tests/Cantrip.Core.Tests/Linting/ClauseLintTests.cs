@@ -200,8 +200,8 @@ namespace Cantrip.Tests.Linting
         }
 
         /// <summary>
-        /// Four of the thirteen clause words are read by no built-in verb. That is deliberate — they
-        /// exist for verbs a game registers — and this states it, so the day one of them is wired up
+        /// Four of the thirteen clause words are read by no built-in verb. That is deliberate: they
+        /// exist for verbs a game registers, and this states it, so the day one of them is wired up
         /// the decision is made again on purpose.
         /// </summary>
         [Fact]

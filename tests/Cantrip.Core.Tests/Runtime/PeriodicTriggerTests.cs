@@ -5,7 +5,7 @@ using static Cantrip.Tests.Runtime.RuntimeTestKit;
 namespace Cantrip.Tests.Runtime
 {
     /// <summary>
-    /// `on every 1s:` — a trigger the clock pumps rather than an event anything raises.
+    /// `on every 1s:`: a trigger the clock pumps rather than an event anything raises.
     /// </summary>
     public sealed class PeriodicTriggerTests
     {

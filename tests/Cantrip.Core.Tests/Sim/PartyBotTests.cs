@@ -79,7 +79,7 @@ scenario ""Two heroes and a dummy""
 
         /// <summary>
         /// The trap this nearly fell into: the last member's pass ends the turn, and the next
-        /// round's members are waiting again at once — so a bot that simply kept asking played a
+        /// round's members are waiting again at once, so a bot that simply kept asking played a
         /// whole battle inside one turn and the runner counted it as one. It showed up in
         /// <c>cantrip sim samples/party</c> as a party losing a three-enemy fight in "1.0 turns",
         /// and the turn count above is what says the bot stops at the end of the turn it was given.

@@ -9,7 +9,7 @@ namespace Cantrip.Tests.Docs
     /// <summary>
     /// Types and members that were public only because a test or the simulator needed them. After
     /// 1.0 every public name is a promise, so these are internal and reached through
-    /// InternalsVisibleTo instead — which is why this test can still name them at compile time and
+    /// InternalsVisibleTo instead, which is why this test can still name them at compile time and
     /// has to ask reflection whether they are public.
     /// </summary>
     public sealed class InternalSurfaceTests
@@ -42,7 +42,7 @@ namespace Cantrip.Tests.Docs
             Assert.DoesNotContain(typeof(Interpreter).GetMethods(BindingFlags.Public | BindingFlags.Instance),
                 m => m.Name == method);
 
-            // Still there, still called by the runtime — just not something a game may lean on.
+            // Still there, still called by the runtime: just not something a game may lean on.
             Assert.Contains(typeof(Interpreter).GetMethods(BindingFlags.NonPublic | BindingFlags.Instance),
                 m => m.Name == method);
         }

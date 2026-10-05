@@ -12,7 +12,7 @@ namespace Cantrip.Tests.Language
     /// <remarks>
     /// A test could say what an ability does and never that it may not be used yet: <c>cast</c>
     /// fails the test outright when the ability is on cooldown (<c>NotReady</c>) or has nothing
-    /// legal to aim at (<c>InvalidTarget</c>), and there was no predicate in content either —
+    /// legal to aim at (<c>InvalidTarget</c>), and there was no predicate in content either:
     /// <c>leader.is_ready(Bulwark)</c> was <c>runtime error: Unknown method 'is_ready'</c>. In a
     /// game whose whole design is about what you may not do yet, that is half the test surface
     /// missing, and the workaround was to write the test inside out: cast at nobody and check

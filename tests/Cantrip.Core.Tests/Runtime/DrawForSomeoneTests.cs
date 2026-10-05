@@ -58,7 +58,7 @@ namespace Cantrip.Tests.Runtime
         /// <summary>
         /// Why the test above kills an ally rather than the last enemy. Winning a battle sweeps the
         /// hand back into the draw pile, so a card drawn on the way to that win is found where it
-        /// started — which reads exactly like a draw that never happened.
+        /// started, which reads exactly like a draw that never happened.
         /// </summary>
         [Fact]
         public void Winning_a_battle_puts_the_hand_back_in_the_draw_pile()

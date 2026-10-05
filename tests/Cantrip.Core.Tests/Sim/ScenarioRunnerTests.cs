@@ -259,7 +259,7 @@ scenario ""What never happens""
 
         /// <summary>
         /// A curse is never playable on purpose, so it is not a finding. It used to be the headline
-        /// of the report, above both bots' tables — the one line in the one report meant to hold
+        /// of the report, above both bots' tables: the one line in the one report meant to hold
         /// whoever plays that could never be acted on and would never go away.
         /// </summary>
         [Fact]
@@ -326,7 +326,7 @@ scenario ""Two of them""
         /// <summary>
         /// A card made part way through a turn and played from the hand it was made into. Reading
         /// the hand only at the start of a turn never sees it, so the report would say it never
-        /// reached a hand and was never playable — both false, and both said in the block that is
+        /// reached a hand and was never playable: both false, and both said in the block that is
         /// supposed to hold whoever plays. The engine's own events are what settle it.
         /// </summary>
         [Fact]

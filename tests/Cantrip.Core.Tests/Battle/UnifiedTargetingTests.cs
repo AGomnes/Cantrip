@@ -269,7 +269,7 @@ namespace Cantrip.Tests.Battle
             Assert.Equal(14, squire.GetInt("hp"));
         }
 
-        // `target … where` on a card, a move and an ability ---------------------------------------
+        // `target ... where` on a card, a move and an ability ---------------------------------------
 
         [Fact]
         [Trait("Regression", "target-where-filter-ignored")]
@@ -376,7 +376,7 @@ namespace Cantrip.Tests.Battle
             runtime.StartBattle(shuffle: false, drawOpeningHand: false);
             runtime.Execute("deal 25 to target", target: beta);
 
-            // Nobody is choosing, so the target is rolled — but only from those the card may reach.
+            // Nobody is choosing, so the target is rolled, but only from those the card may reach.
             Assert.Equal(ActionResult.Played, runtime.Play("Cascade"));
             Assert.Equal(30, alpha.GetInt("hp"));
             Assert.Equal(0, beta.GetInt("hp"));

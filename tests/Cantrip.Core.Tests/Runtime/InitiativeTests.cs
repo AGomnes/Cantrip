@@ -9,7 +9,7 @@ namespace Cantrip.Tests.Runtime
 {
     /// <summary>
     /// <c>turns: initiative</c>: one order over both sides, each combatant's <c>turn_start</c> and
-    /// <c>turn_end</c> at its own step, and the round — which is still one <c>turn</c> — ending when
+    /// <c>turn_end</c> at its own step, and the round, which is still one <c>turn</c>, ending when
     /// every living combatant has taken one.
     /// </summary>
     /// <remarks>
@@ -84,7 +84,7 @@ namespace Cantrip.Tests.Runtime
 
         /// <summary>
         /// Under <c>order: position</c> the whole party comes first and then the enemies, which is
-        /// the order <c>turns: sides</c> runs them in — so the only thing initiative changes there
+        /// the order <c>turns: sides</c> runs them in, so the only thing initiative changes there
         /// is where each combatant's own turn events fall.
         /// </summary>
         [Fact]
@@ -225,7 +225,7 @@ namespace Cantrip.Tests.Runtime
 
         /// <summary>
         /// <c>EndTurn</c> is <c>Pass</c> for everyone here too: whoever of ours has not acted gives
-        /// their step up, and the round still runs to its end around them — the enemies take theirs.
+        /// their step up, and the round still runs to its end around them: the enemies take theirs.
         /// </summary>
         [Fact]
         public void Ending_the_turn_passes_everyone_who_has_not_acted()
@@ -366,7 +366,7 @@ namespace Cantrip.Tests.Runtime
         }
 
         /// <summary>
-        /// A summoned minion is an ally and not a member, so nobody is asked what it does — but it
+        /// A summoned minion is an ally and not a member, so nobody is asked what it does, but it
         /// still takes a step of its own, which is how a minion that attacks from its own
         /// <c>turn_end</c> attacks. Before this the round stopped on it and waited forever for a
         /// pass that only a member can give.
@@ -406,7 +406,7 @@ namespace Cantrip.Tests.Runtime
 
         /// <summary>
         /// The invariant the whole mode is checked against: with one member and one enemy, a round
-        /// of <c>initiative</c> is a turn of <c>sides</c> — same turn number, same clock, same hp
+        /// of <c>initiative</c> is a turn of <c>sides</c>: same turn number, same clock, same hp
         /// on both sides, over four rounds.
         /// </summary>
         [Fact]

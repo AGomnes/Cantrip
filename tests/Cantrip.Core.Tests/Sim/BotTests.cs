@@ -19,7 +19,7 @@ namespace Cantrip.Tests.Sim
     {
         /// <summary>
         /// The fight is over on the first turn, so the Idol never once moves. A bot that looks
-        /// ahead does end the turn — in a trial, where the Idol stares back — and that stare must
+        /// ahead does end the turn, in a trial, where the Idol stares back, and that stare must
         /// not reach the report, or "every move fired" becomes true of any content at all.
         /// </summary>
         [Fact]

@@ -12,7 +12,7 @@ namespace Cantrip.Tests.Runtime
     /// </summary>
     /// <remarks>
     /// <c>choose 1 from hand as picked</c> binds an entity while <c>choose 2</c> binds a group, so
-    /// <c>picked.first</c> fell through to "a stat nothing has" and read 0 — and only on the
+    /// <c>picked.first</c> fell through to "a stat nothing has" and read 0, and only on the
     /// one-card path, which is the path an author tries last. Binding a group for one instead would
     /// have broken every line that reads <c>picked.name</c> or <c>picked.hp</c>, so the group words
     /// answer for a single entity rather than the other way round.
@@ -109,7 +109,7 @@ namespace Cantrip.Tests.Runtime
         /// <summary>
         /// The things a group can be asked that are not numbers. <c>created.zone</c> printed 0 and
         /// <c>created.controller.name</c> failed with "`0` has no property `name`", because both
-        /// fell through to the stat sum, where a stat nothing has is 0 — the same trap this class
+        /// fell through to the stat sum, where a stat nothing has is 0: the same trap this class
         /// exists to close, on the members nobody had added.
         /// </summary>
         [Fact]

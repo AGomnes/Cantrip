@@ -314,7 +314,7 @@ namespace Cantrip.Tests.Linting
         public void Every_scenario_setup_verb_is_also_a_test_verb()
         {
             // A scenario's setup word has to mean something everywhere it is legal. That is either
-            // because a test registers it too, or — as `grant` does — because it is a rule verb and
+            // because a test registers it too, or, as `grant` does, because it is a rule verb and
             // so means one thing in content, in a test and in a scenario alike.
             var rules = new CardRuntime(new ContentLibrary());
             var unknown = Scenario.SetupVerbs

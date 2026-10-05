@@ -14,7 +14,7 @@ namespace Cantrip.Tests.Linting
     /// </summary>
     /// <remarks>
     /// All four lines read as if they would make or change something already here. They do not: at
-    /// runtime each is an error or, for <c>transform</c>, a statement that does nothing at all — and
+    /// runtime each is an error or, for <c>transform</c>, a statement that does nothing at all, and
     /// <c>replay</c> was worse than either, running the printed effect for free. The message says
     /// what to write rather than guessing at a spelling.
     /// </remarks>
@@ -244,7 +244,7 @@ namespace Cantrip.Tests.Linting
 
         /// <summary>
         /// Each verb binds its own participle, and the linter has to know them: without that, the
-        /// line that reads the result — the line an author writes most — draws CT302 on content that
+        /// line that reads the result, the line an author writes most, draws CT302 on content that
         /// is correct. <c>discovered</c> was missing too, and is fixed in the same list.
         /// </summary>
         [Fact]
@@ -280,7 +280,7 @@ namespace Cantrip.Tests.Linting
         }
 
         /// <summary>
-        /// In a scenario, <c>play</c> is CT301 — a scenario states the fight and a bot plays it — so
+        /// In a scenario, <c>play</c> is CT301, a scenario states the fight and a bot plays it, so
         /// CT320 keeps quiet rather than arguing with a message that already says where the line belongs.
         /// </summary>
         [Fact]

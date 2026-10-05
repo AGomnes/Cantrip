@@ -8,8 +8,8 @@ namespace Cantrip.Tests.Runtime
 {
     /// <summary>
     /// The party: more than one actor on the player's side that the game asks for input. The
-    /// promise every test here is really about is that a party of one — which is every game written
-    /// before this existed — behaves exactly as it did, so each new rule is checked against both
+    /// promise every test here is really about is that a party of one, which is every game written
+    /// before this existed, behaves exactly as it did, so each new rule is checked against both
     /// shapes rather than only the new one.
     /// </summary>
     public sealed class PartyTests
@@ -270,7 +270,7 @@ namespace Cantrip.Tests.Runtime
         }
 
         /// <summary>
-        /// Nobody draws here, so what is left in the hand afterwards is only what the turn’s end did
+        /// Nobody draws here, so what is left in the hand afterwards is only what the turn's end did
         /// with it. With a hand size the Vestal would draw its own discarded card straight back and
         /// the test would pass whether or not the hand had ever been emptied.
         /// </summary>
@@ -331,7 +331,7 @@ namespace Cantrip.Tests.Runtime
             Assert.True(runtime.CanUse(smite));
 
             // With nothing to aim at, an ability that needs somebody is refused rather than run at
-            // nobody — which is also what UseAbility answers.
+            // nobody, which is also what UseAbility answers.
             runtime.Execute("kill enemy", target: enemy);
             Assert.False(runtime.CanUse(smite));
         }
@@ -428,7 +428,7 @@ namespace Cantrip.Tests.Runtime
 
         /// <summary>
         /// Format 3 is not published, so the party's fields were added to it rather than starting a
-        /// format 4. A save that lists no party is therefore not an old format to migrate — it is a
+        /// format 4. A save that lists no party is therefore not an old format to migrate: it is a
         /// party of one, which is what it was.
         /// </summary>
         [Fact]

@@ -13,7 +13,7 @@ namespace Cantrip.Tests.Runtime
     /// </summary>
     /// <remarks>
     /// The workaround it replaces is <c>destroy</c> plus <c>create</c>, which loses the id, the slot
-    /// and — for a generic <c>actor</c> — the side. What survives here is the whole point: anything
+    /// and, for a generic <c>actor</c>, the side. What survives here is the whole point: anything
     /// holding the entity, from a test's <c>enemy2</c> to a C# reference a game caches, still holds
     /// the same object, now wearing the new name.
     /// </remarks>
@@ -78,7 +78,7 @@ namespace Cantrip.Tests.Runtime
 
         /// <summary>
         /// One event, raised once. Statuses leave silently, because a variable number of cancellable
-        /// events — each able to destroy the host half way through — is not something content could
+        /// events, each able to destroy the host half way through, is not something content could
         /// reason about. <c>destroy</c> already sheds its attachments the same way.
         /// </summary>
         [Fact]
@@ -124,7 +124,7 @@ namespace Cantrip.Tests.Runtime
 
         /// <summary>
         /// The committed work checks again that the entity is still here, and marks the event
-        /// cancelled when it is not — so the after phase never claims a transform that did not happen.
+        /// cancelled when it is not, so the after phase never claims a transform that did not happen.
         /// </summary>
         [Fact]
         public void A_before_listener_that_destroys_the_target_leaves_nothing_half_transformed() => Passes(Polymorph + """
@@ -529,7 +529,7 @@ namespace Cantrip.Tests.Runtime
         /// The precondition <c>transform</c> breaks, and the reason its fix belongs in this change.
         /// <see cref="CardRuntime.Attempt"/> restores a snapshot every time a deferred choice is
         /// raised, and <c>GameState.Restore</c> used to reuse an existing instance only when the name
-        /// matched as well as the id — which silently assumed a name never changes. A game with a
+        /// matched as well as the id, which silently assumed a name never changes. A game with a
         /// real chooser would be handed a stale, removed object while the runtime held a new one.
         /// </summary>
         [Fact]
@@ -572,7 +572,7 @@ namespace Cantrip.Tests.Runtime
 
             Assert.Equal(ActionResult.ChoicePending, runtime.Play(card, ogre));
 
-            // The action rolled back, so the game is where it was — and the caller's reference is
+            // The action rolled back, so the game is where it was, and the caller's reference is
             // still the game's entity, not an abandoned instance beside it.
             Assert.Same(ogre, runtime.State.Find(ogreId));
             Assert.Equal("Ogre", ogre.Name);
@@ -674,7 +674,7 @@ namespace Cantrip.Tests.Runtime
         /// <summary>
         /// The new thing starts at the beginning of its own pattern. Without the reset, a Drummer
         /// that had already taken its first turn would arrive as a Piper part way through the Piper's
-        /// cycle — a move the player was never shown, chosen by the old definition's bookkeeping.
+        /// cycle: a move the player was never shown, chosen by the old definition's bookkeeping.
         /// </summary>
         [Fact]
         public void The_pattern_starts_again_in_the_new_definition() => Passes("""

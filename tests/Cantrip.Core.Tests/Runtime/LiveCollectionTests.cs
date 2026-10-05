@@ -10,8 +10,8 @@ namespace Cantrip.Tests.Runtime
     /// <summary>
     /// <see cref="Entity.Tags"/> and <see cref="Entity.Attached"/> used to hand out the entity's own
     /// collections, typed as read-only. Casting one back and mutating it changed the game without
-    /// telling the state, so the modifier cache — which is keyed on tags and dropped only when the
-    /// state says it moved — went on serving the old number.
+    /// telling the state, so the modifier cache, which is keyed on tags and dropped only when the
+    /// state says it moved, went on serving the old number.
     /// </summary>
     public sealed class LiveCollectionTests
     {

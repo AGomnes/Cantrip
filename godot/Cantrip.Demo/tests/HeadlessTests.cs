@@ -373,7 +373,7 @@ namespace Cantrip.GodotAdapter.Demo
             Check("as is an id that names nobody", rules.CounterOf(999999, "Burn") == 0);
 
             // How a leader gets a speed under `order: speed`, where an actor with none reads 0 and
-            // takes its step last — and the leader's step is when the party's hand is drawn.
+            // takes its step last, and the leader's step is when the party's hand is drawn.
             Check("a stat can be written", rules.SetStat(player, "gold", 12) == 12 && rules.GetStat(player, "gold") == 12);
             Check("and changed by an amount", rules.ChangeStat(player, "gold", -5) == -5 && rules.GetStat(player, "gold") == 7);
             Check("a resource's own bounds still hold", rules.SetStat(player, "hp", 9999) < 9999 && rules.GetStat(player, "hp") == rules.GetStat(player, "max_hp"));
@@ -1523,7 +1523,7 @@ namespace Cantrip.GodotAdapter.Demo
         /// can implement only what it has an opinion about and a member added in a later release
         /// does not break one written today. That rests on the runtime dispatching a default
         /// interface member, which the unit tests prove on .NET 9 and this proves inside the engine
-        /// a game actually ships on — Godot's own .NET runtime, on net8.0.
+        /// a game actually ships on: Godot's own .NET runtime, on net8.0.
         /// </summary>
         private void DefaultInterfaceMembersDispatchInThisEngine()
         {

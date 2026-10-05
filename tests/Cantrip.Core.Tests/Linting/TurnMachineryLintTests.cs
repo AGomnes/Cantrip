@@ -13,7 +13,7 @@ namespace Cantrip.Tests.Linting
     /// </summary>
     /// <remarks>
     /// CT325 already knew the stated clock and checked lengths against it, so <c>2 turns</c> in a
-    /// <c>clock ticks</c> game was an error — while a <c>move</c>, a <c>pattern</c>, a
+    /// <c>clock ticks</c> game was an error, while a <c>move</c>, a <c>pattern</c>, a
     /// <c>phase</c>, a <c>stacking duration</c> and a <c>next turn:</c> in the same file linted
     /// with zero errors, zero warnings and zero notes and then did nothing for ever. The language
     /// checked the unit an author wrote and not the machinery they used, so

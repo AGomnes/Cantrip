@@ -20,7 +20,7 @@ namespace Cantrip.Tests.Snapshots
     /// change what this test means. Neither file is ever edited: a later release adds its own pair
     /// beside them, and this file gets a case for it. If this test fails, a save that some player
     /// has on disk no longer loads, which is the thing docs/stability.md says cannot happen after
-    /// 1.0 — so the change that broke it is the thing to reconsider, not this test.
+    /// 1.0, so the change that broke it is the thing to reconsider, not this test.
     /// <para>
     /// The save is taken mid-battle with two kinds of work waiting in it: a <c>next turn:</c> block
     /// from <c>Prepare</c>, which is found again by the address and hash the save records, and an

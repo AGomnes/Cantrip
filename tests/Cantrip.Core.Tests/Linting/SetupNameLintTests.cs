@@ -64,7 +64,7 @@ namespace Cantrip.Tests.Linting
         [InlineData("  deck Strike, Strke\n", "strke", "Strike", "No card named `strke` is defined. Did you mean `Strike`?")]
         [InlineData("  relic Anchr\n", "Anchr", "Anchor", "No relic or item named `Anchr` is defined. Did you mean `Anchor`?")]
         // `grant` is a rule verb now rather than one only a test had, so its refusal arrives in
-        // the shape every other rule verb’s does — named by its verb, and still the same
+        // the shape every other rule verb's does: named by its verb, and still the same
         // sentence about the same word.
         [InlineData("  grant Zapp\n", "Zapp", "Zap", "runtime error: `grant`: no ability named `Zapp` is defined. Did you mean `Zap`?")]
         [InlineData("  enemy hp 10\n  play Strik on enemy\n", "Strik", "Strike", "No card named `Strik` is defined. Did you mean `Strike`?")]

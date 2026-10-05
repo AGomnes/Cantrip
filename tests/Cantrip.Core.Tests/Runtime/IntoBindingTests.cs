@@ -9,7 +9,7 @@ namespace Cantrip.Tests.Runtime
     /// either side of the line.
     /// </summary>
     /// <remarks>
-    /// The number that matters is what landed, which is rarely what was asked for — block absorbs
+    /// The number that matters is what landed, which is rarely what was asked for: block absorbs
     /// some of it, modifiers change it, and a dying target cannot take the rest.
     /// </remarks>
     public sealed class IntoBindingTests

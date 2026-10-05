@@ -11,7 +11,7 @@ namespace Cantrip.Tests.Runtime
     /// <remarks>
     /// Guessing is the state of the art being replaced. "Block became 0" is how the corpus detects
     /// the turn-start reset, and its own note admits that only holds while nothing else sets block
-    /// to 0 — a property of today's engine rather than of the rule being written.
+    /// to 0: a property of today's engine rather than of the rule being written.
     /// </remarks>
     public sealed class ResetMarkerTests
     {

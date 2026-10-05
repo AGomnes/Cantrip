@@ -319,7 +319,7 @@ namespace Cantrip.Tests.Linting
 
         /// <summary>
         /// On a facing board the two sides never stand on one slot, so `range 0` at an enemy is a
-        /// card that can be pointed at nobody — and `range 1` is the spelling that was meant.
+        /// card that can be pointed at nobody, and `range 1` is the spelling that was meant.
         /// </summary>
         [Fact]
         public void A_range_of_nought_at_an_enemy_reaches_nobody()

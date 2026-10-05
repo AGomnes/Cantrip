@@ -13,8 +13,8 @@ namespace Cantrip.Tests.Runtime
     /// <c>damage_taken</c>. It used to be the query's subject on every channel, so on <c>damage</c>
     /// an <c>of</c> group was matched against the one being hit while the bare form was matched
     /// against the one swinging. The two spellings that read as widenings of each other were scoped
-    /// to opposite ends of the same hit, and <c>modify damage of party: +2</c> — the line a party
-    /// game is most likely to want — matched nothing at all and said nothing about it.
+    /// to opposite ends of the same hit, and <c>modify damage of party: +2</c>, the line a party
+    /// game is most likely to want, matched nothing at all and said nothing about it.
     /// </remarks>
     public sealed class ModifierScopeTests
     {

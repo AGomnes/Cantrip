@@ -12,7 +12,7 @@ namespace Cantrip.Tests.Runtime
     /// <remarks>
     /// The free part is exactly why the argument has to be something in the game. <c>replay Strike</c>
     /// read as if it repeated a Strike and instead ran the printed effect with no card, no cost and no
-    /// play behind it — the free lunch <c>copy</c>, <c>play</c> and <c>transform</c> were all closed
+    /// play behind it: the free lunch <c>copy</c>, <c>play</c> and <c>transform</c> were all closed
     /// against, left open in the one verb whose whole business is "again, for nothing".
     /// </remarks>
     public sealed class ReplayVerbTests

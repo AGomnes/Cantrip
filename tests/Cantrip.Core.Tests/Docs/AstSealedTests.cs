@@ -10,8 +10,8 @@ namespace Cantrip.Tests.Docs
     /// <summary>
     /// The syntax tree is the interpreter's own vocabulary, not an extension point. A node type the
     /// library has never heard of has no behaviour: executing one throws "Cannot execute ...". So
-    /// the abstract bases cannot be derived from outside the library — their constructors are
-    /// <c>private protected</c> — and every node that does exist is sealed.
+    /// the abstract bases cannot be derived from outside the library, their constructors are
+    /// <c>private protected</c>, and every node that does exist is sealed.
     /// </summary>
     public sealed class AstSealedTests
     {

@@ -10,8 +10,8 @@ namespace Cantrip.Tests.Runtime
     /// <c>fallen</c>: the dead of a side, beside <c>party</c> and <c>allies</c>.
     /// </summary>
     /// <remarks>
-    /// Nothing could name a corpse before this word, so <c>revive</c> — a verb that exists because
-    /// <c>heal</c> refuses a dead target, deliberately and permanently — had no argument content
+    /// Nothing could name a corpse before this word, so <c>revive</c> (a verb that exists because
+    /// <c>heal</c> refuses a dead target, deliberately and permanently) had no argument content
     /// could write. <c>target ally</c> and <c>target any</c> both want somebody living,
     /// <c>allies</c> and <c>party</c> leave the dead out by design, and
     /// <c>everyone where zone:dead</c> binds nobody. The in-combat raise every party roguelite ships

@@ -59,7 +59,7 @@ public sealed class ChapelSave
 /// This is the one thing a published game has to do differently, and it is four lines. Reflection
 /// -based <c>JsonSerializer.Serialize(value, options)</c> works perfectly in a normal build and
 /// throws <c>Reflection-based serialization has been disabled for this application</c> the first
-/// time a trimmed or AOT-published build saves — which is to say, after the player has already
+/// time a trimmed or AOT-published build saves, which is to say, after the player has already
 /// finished a floor. Naming the root type here makes the trimmer keep every property of
 /// <c>GameSnapshot</c> that it reaches, and makes the serializer use the generated code instead.
 /// </para>

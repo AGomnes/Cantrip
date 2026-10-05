@@ -7,7 +7,7 @@ namespace Cantrip.Tests.Runtime
     /// <summary>
     /// A runtime subscribes to its clock when it is built. Two runtimes given the same clock both
     /// hear every tick, so the one a game has finished with goes on expiring statuses and running
-    /// scheduled work on a game nobody is playing — and the clock keeps it alive while it does.
+    /// scheduled work on a game nobody is playing, and the clock keeps it alive while it does.
     /// <see cref="CardRuntime.Dispose"/> is how a game lets go.
     /// </summary>
     public sealed class RuntimeDisposeTests

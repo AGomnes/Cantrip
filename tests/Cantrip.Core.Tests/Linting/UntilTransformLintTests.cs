@@ -9,7 +9,7 @@ namespace Cantrip.Tests.Linting
 {
     /// <summary>
     /// CT321: a <c>transform</c> inside an <c>until</c> block. <c>until</c> puts back what it did, and
-    /// a transform cannot be put back — the stats, the statuses and the spent <c>once per ...</c>
+    /// a transform cannot be put back: the stats, the statuses and the spent <c>once per ...</c>
     /// windows are gone.
     /// </summary>
     public sealed class UntilTransformLintTests
@@ -58,7 +58,7 @@ namespace Cantrip.Tests.Linting
 
         /// <summary>
         /// A <c>next turn:</c> or <c>in N turns:</c> block runs later, on its own, with none of the
-        /// <c>until</c>'s undo scope — so it is not inside the block and is not reported.
+        /// <c>until</c>'s undo scope, so it is not inside the block and is not reported.
         /// </summary>
         [Theory]
         [InlineData("next turn:")]

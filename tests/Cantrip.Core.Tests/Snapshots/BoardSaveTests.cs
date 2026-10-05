@@ -9,7 +9,7 @@ namespace Cantrip.Tests.Snapshots
 {
     /// <summary>
     /// Format 3 carries the board: everyone's lane beside their rank, and the board's name and
-    /// shape. A save is self-describing, so a game whose content has moved on still loads — except
+    /// shape. A save is self-describing, so a game whose content has moved on still loads: except
     /// where the board it was played on has been reshaped under an actor's feet.
     /// </summary>
     public sealed class BoardSaveTests
@@ -180,7 +180,7 @@ namespace Cantrip.Tests.Snapshots
 
         /// <summary>
         /// A format 2 reader is told it cannot read this, rather than reading it and putting every
-        /// actor in lane 0 — which is what the minimum reader is for.
+        /// actor in lane 0, which is what the minimum reader is for.
         /// </summary>
         [Fact]
         public void A_format_3_save_says_it_needs_a_format_3_reader()
@@ -251,7 +251,7 @@ namespace Cantrip.Tests.Snapshots
         /// <summary>
         /// Reshapes the Floor board, and insists that it happened. A plain <c>Replace</c> here is a
         /// trap: a raw string literal keeps the line endings the source file was checked out with,
-        /// so a pattern written with <c>\n</c> misses entirely on a CRLF checkout — and the test then
+        /// so a pattern written with <c>\n</c> misses entirely on a CRLF checkout, and the test then
         /// goes on with the board unpatched, which is a different game rather than a failure. That
         /// cost one red CI run on Windows where Linux and the author's own machine were green.
         /// </summary>

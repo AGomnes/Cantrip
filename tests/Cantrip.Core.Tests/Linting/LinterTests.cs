@@ -72,7 +72,7 @@ namespace Cantrip.Tests.Linting
         /// <summary>
         /// <c>play</c> is the one word that is both a test verb and a rule verb, so it is no longer
         /// unknown outside a test: <c>play Strike</c> in a card effect is CT320, which says the same
-        /// thing more exactly — a card cannot be played out of content, only out of a pile.
+        /// thing more exactly: a card cannot be played out of content, only out of a pile.
         /// </summary>
         [Fact]
         public void Test_verbs_are_only_known_inside_tests()

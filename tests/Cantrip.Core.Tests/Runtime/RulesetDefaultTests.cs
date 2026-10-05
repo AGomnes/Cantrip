@@ -8,7 +8,7 @@ namespace Cantrip.Tests.Runtime
     /// <summary>
     /// A fresh ruleset is a method call, not a property. As a property it read like a shared
     /// settings object, so <c>Ruleset.Default.HandSize = 99</c> set a field on an instance nobody
-    /// kept and was silently discarded — while the C# guide tells games to set ruleset properties.
+    /// kept and was silently discarded, while the C# guide tells games to set ruleset properties.
     /// </summary>
     public sealed class RulesetDefaultTests
     {

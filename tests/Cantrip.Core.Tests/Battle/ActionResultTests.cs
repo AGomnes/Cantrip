@@ -199,7 +199,7 @@ namespace Cantrip.Tests.Battle
         /// An empty side is <see cref="ActionResult.NoTarget"/> rather than
         /// <see cref="ActionResult.InvalidTarget"/>: nothing was filtered out and nothing was too far
         /// away, there is simply nobody there. It used to be the same word as a taunt and a filter,
-        /// and the two mean opposite things to a game — one is usually a bug in its own loop.
+        /// and the two mean opposite things to a game, one is usually a bug in its own loop.
         /// </summary>
         [Fact]
         public void NoTarget_when_no_enemy_is_left_to_target()

@@ -26,8 +26,8 @@
     <!--
       The engine is safe to trim, and says so, so a published game's trimmer removes what its game
       does not use instead of keeping the whole assembly. It is warranted rather than hopeful:
-      nothing in Cantrip.Core reflects over its own types — the snapshot is plain data by design
-      and the interpreter dispatches on syntax nodes, not on names — and the only reflection a
+      nothing in Cantrip.Core reflects over its own types (the snapshot is plain data by design
+      and the interpreter dispatches on syntax nodes, not on names) and the only reflection a
       trimmer could take is one read of this assembly's own version attribute, which every save
       records. A test asserts that read still works in the published binary, because nothing else
       would notice if it stopped. `tools/publish-check.sh` publishes the reference game trimmed and

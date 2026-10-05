@@ -99,7 +99,7 @@ namespace Cantrip.Tests.Runtime
         /// <summary>
         /// Inheriting the original's zone is the attractive wrong answer: it would put a second live
         /// power into <c>powers</c> that nobody played, and a copy of an exhausted card where nothing
-        /// can reach it. One rule — where a new one would go — covers every zone, including the ones
+        /// can reach it. One rule, where a new one would go, covers every zone, including the ones
         /// a game adds later.
         /// </summary>
         [Fact]
@@ -203,7 +203,7 @@ namespace Cantrip.Tests.Runtime
 
         /// <summary>
         /// <c>created</c> fires for a copy, carrying <c>copy_of</c>, which is also what makes the
-        /// original count as involved — so <c>on created(self)</c> on the original hears its own
+        /// original count as involved, so <c>on created(self)</c> on the original hears its own
         /// copying. That is deliberate, and it is in the sharp edges.
         /// </summary>
         [Fact]
@@ -474,7 +474,7 @@ namespace Cantrip.Tests.Runtime
 
         /// <summary>
         /// A quoted name is text, not a definition, and text is not something in the game either.
-        /// Without this it would evaluate to no entities at all and copy nothing, silently — which is
+        /// Without this it would evaluate to no entities at all and copy nothing, silently, which is
         /// exactly the failure the language exists to refuse.
         /// </summary>
         [Fact]

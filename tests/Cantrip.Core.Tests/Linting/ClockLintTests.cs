@@ -15,7 +15,7 @@ namespace Cantrip.Tests.Linting
     /// </summary>
     /// <remarks>
     /// The two halves used to fail differently and neither said so. <c>on every 1s:</c> in a turn
-    /// game registered nothing at all, in silence — the listener simply never ran — while
+    /// game registered nothing at all, in silence, the listener simply never ran, while
     /// <c>apply Weak 1 for 3s</c> in the same game threw the day that line was reached.
     /// </remarks>
     public sealed class ClockLintTests

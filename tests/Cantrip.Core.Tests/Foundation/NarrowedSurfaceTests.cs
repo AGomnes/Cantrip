@@ -20,7 +20,7 @@ namespace Cantrip.Tests.Foundation
         /// and unimplementable: <c>Interpreter</c> is the only implementer, implements both members
         /// explicitly, and the setter had already been made internal because a null there stopped
         /// every modifier applying in silence. Left public at 1.0 it would have carried an interface's
-        /// whole freeze cost — a member added in 1.x breaks every implementation — for a surface
+        /// whole freeze cost, a member added in 1.x breaks every implementation, for a surface
         /// nobody outside the library can implement, and it is not one of the four seams
         /// <c>docs/stability.md</c> promises may grow a member with a default.
         /// </summary>
@@ -63,8 +63,8 @@ namespace Cantrip.Tests.Foundation
         /// <summary>
         /// And the reason it had to move: a <c>targetable</c> rule written with <c>card:</c> matches an
         /// <em>ability</em> being aimed, because the query carries whichever of the two is in hand.
-        /// The DSL word stays <c>card:</c> — frozen content vocabulary, and right in the case content
-        /// overwhelmingly writes — while the C# member says what it really holds.
+        /// The DSL word stays <c>card:</c>, frozen content vocabulary, and right in the case content
+        /// overwhelmingly writes, while the C# member says what it really holds.
         /// </summary>
         [Fact]
         public void The_query_carries_an_ability_which_is_why_the_member_is_not_called_Card()

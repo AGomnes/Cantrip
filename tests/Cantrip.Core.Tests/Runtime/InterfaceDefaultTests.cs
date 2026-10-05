@@ -9,8 +9,8 @@ using Xunit;
 namespace Cantrip.Tests.Runtime
 {
     /// <summary>
-    /// The four seams a game implements — <see cref="IEffectHost"/>, <see cref="IGameClock"/>,
-    /// <see cref="IChoiceProvider"/> and <see cref="IDescriptionLocalizer"/> — give their members
+    /// The four seams a game implements (<see cref="IEffectHost"/>, <see cref="IGameClock"/>,
+    /// <see cref="IChoiceProvider"/> and <see cref="IDescriptionLocalizer"/>) give their members
     /// default implementations, so a game writes only the part it has an opinion about and a member
     /// added in a later release cannot break it. These pin the defaults themselves: each type here
     /// implements the smallest thing the compiler will accept.

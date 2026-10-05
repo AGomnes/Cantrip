@@ -249,8 +249,8 @@ namespace Cantrip.Tests.Runtime
             """);
 
         /// <summary>
-        /// The guard pinned rather than incidental: with a fresh chain per play — what
-        /// <c>PlayCore</c> does when nothing threads the caller's through — the same content runs the
+        /// The guard pinned rather than incidental: with a fresh chain per play (what
+        /// <c>PlayCore</c> does when nothing threads the caller's through) the same content runs the
         /// whole pile out instead of one extra card.
         /// </summary>
         [Fact]
@@ -291,7 +291,7 @@ namespace Cantrip.Tests.Runtime
         }
 
         /// <summary>
-        /// Direct recursion stops at <c>max_call_depth</c> with a message that names what happened —
+        /// Direct recursion stops at <c>max_call_depth</c> with a message that names what happened,
         /// not a stack overflow, and not the 100,000-step budget, which would say nothing useful.
         /// </summary>
         [Fact]
@@ -355,7 +355,7 @@ namespace Cantrip.Tests.Runtime
         /// <summary>
         /// The test verb and the rule verb are told apart by <em>where the line is written</em>. A
         /// content verb takes its context from its caller, so a dynamic check reads the same call two
-        /// ways depending on who started it — and gets this case wrong.
+        /// ways depending on who started it, and gets this case wrong.
         /// </summary>
         [Fact]
         public void A_content_verb_holding_play_is_the_rules_verb_from_a_test_line_and_from_a_card() => Passes("""
@@ -431,7 +431,7 @@ namespace Cantrip.Tests.Runtime
 
         /// <summary>
         /// The decisive one. <c>TryResolveTarget</c> consults the chooser when a <c>target enemy</c>
-        /// card arrives with no target and more than one enemy is alive — which, under the real
+        /// card arrives with no target and more than one enemy is alive, which, under the real
         /// game's <see cref="DeferredChooser"/>, would raise a targeting dialog in the middle of "play
         /// the top card of your draw pile". An automatic play rolls instead, and never asks.
         /// </summary>
@@ -550,7 +550,7 @@ namespace Cantrip.Tests.Runtime
         /// <summary>
         /// A choice inside a played card's effect uses the machinery unchanged: only the outermost
         /// call arms the rollback, so the whole outer action goes back and replays once the answer
-        /// arrives — the nested play included.
+        /// arrives: the nested play included.
         /// </summary>
         [Fact]
         public void A_choice_inside_a_nested_play_rolls_the_whole_outer_action_back_and_replays_it()
@@ -725,7 +725,7 @@ namespace Cantrip.Tests.Runtime
         /// <summary>
         /// Mayhem: "at the start of your turn, play the top card of your draw pile". The effect's own
         /// target is inherited only where the card could really be pointed at it, and in a listener it
-        /// usually cannot be — <c>turn_start</c> is about the actor whose turn started — so handing
+        /// usually cannot be, <c>turn_start</c> is about the actor whose turn started, so handing
         /// that to a <c>target enemy</c> card would refuse the play and nothing would say so.
         /// </summary>
         [Fact]

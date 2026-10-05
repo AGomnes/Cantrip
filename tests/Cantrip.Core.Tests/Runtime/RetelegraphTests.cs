@@ -9,7 +9,7 @@ namespace Cantrip.Tests.Runtime
     /// move its new phase just unlocked, instead of the one it had already committed to.
     /// </summary>
     /// <remarks>
-    /// It is opt-in because it trades away a guarantee worth keeping — ordinarily the intent shown
+    /// It is opt-in because it trades away a guarantee worth keeping: ordinarily the intent shown
     /// during the player's turn is exactly the move that follows. These tests pin both sides of
     /// that: the boss that asks, and the boss that does not.
     /// </remarks>

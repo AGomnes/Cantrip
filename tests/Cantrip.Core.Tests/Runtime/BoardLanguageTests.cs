@@ -167,7 +167,7 @@ namespace Cantrip.Tests.Runtime
         /// <summary>
         /// A group of one answers where it stands like the one it holds. It used to fall through to
         /// the stat table, where nothing has a rank, so `created.rank` read 0 while
-        /// `created.first.rank` read 2 — the same actor, two answers, and no message about it.
+        /// `created.first.rank` read 2: the same actor, two answers, and no message about it.
         /// </summary>
         [Fact]
         public void A_group_of_one_answers_its_lane_and_rank()
@@ -210,7 +210,7 @@ namespace Cantrip.Tests.Runtime
 
         /// <summary>
         /// Reach has its own refusal. Until 1.0, a card that could not reach was
-        /// <c>InvalidTarget</c> — the same word as a taunt, the card's own filter and an empty side —
+        /// <c>InvalidTarget</c>: the same word as a taunt, the card's own filter and an empty side,
         /// and reach is the one of the four a player can do something about. Splitting it later would
         /// have <em>narrowed</em> <c>InvalidTarget</c>, so a game that wrote
         /// <c>if (result == InvalidTarget) ShowOutOfRangeHint()</c> would have kept compiling and

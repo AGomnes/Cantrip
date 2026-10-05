@@ -78,7 +78,7 @@ namespace Cantrip.Tests.Runtime
         /// <summary>
         /// The refusal must not name a resource the card is not priced in. It was
         /// <c>NotEnoughEnergy</c> until 1.0, and <c>"not_enough_energy"</c> in Godot, so a card priced
-        /// <c>cost 2 bones</c> refused with the word <c>energy</c> — a lie today, in every game with a
+        /// <c>cost 2 bones</c> refused with the word <c>energy</c>: a lie today, in every game with a
         /// second resource, and unfixable once the enum and the word are a promise.
         /// </summary>
         [Fact]

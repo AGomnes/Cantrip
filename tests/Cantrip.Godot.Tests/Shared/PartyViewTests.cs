@@ -11,7 +11,7 @@ namespace Cantrip.GodotAdapter.Tests.Shared
     {
         /// <summary>
         /// The kit's content with a second member in it, and the Jaw Worm's <c>deal 11 to player</c>
-        /// rewritten as <c>to target</c> — which is what CT326 exists to insist on the moment a
+        /// rewritten as <c>to target</c>, which is what CT326 exists to insist on the moment a
         /// game declares a <c>hero</c>, because <c>player</c> in an enemy move means the leader and
         /// would hit him however the intent was telegraphed.
         /// </summary>
@@ -44,7 +44,7 @@ hero ""Scout""
 
         /// <summary>
         /// Whether somebody has acted is a fact about the game rather than about the entity, so it
-        /// is false without one — a view read from a choice's options, or from a debug dump between
+        /// is false without one: a view read from a choice's options, or from a debug dump between
         /// battles, does not claim the whole party is still waiting.
         /// </summary>
         [Fact]

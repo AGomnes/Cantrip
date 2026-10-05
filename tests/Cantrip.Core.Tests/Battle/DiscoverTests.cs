@@ -195,7 +195,7 @@ namespace Cantrip.Tests.Battle
 
         /// <summary>
         /// The other half: a chooser written before the member existed, which answers entity choices
-        /// and nothing else, still runs, and still gets the first candidate — now from the interface's
+        /// and nothing else, still runs, and still gets the first candidate: now from the interface's
         /// own default rather than from a type test that could not see it.
         /// </summary>
         [Fact]

@@ -13,7 +13,7 @@ namespace Cantrip.Tests.Linting
     /// </summary>
     /// <remarks>
     /// <c>apply Slow 40%</c> dropped the unit and applied forty stacks, while the card's generated
-    /// text said "Apply 40% Slow" — text a player reads, stating a percentage nothing in the engine
+    /// text said "Apply 40% Slow": text a player reads, stating a percentage nothing in the engine
     /// implements. A percentage is a fraction to multiply by; there is no percentage of a stack.
     /// </remarks>
     public sealed class PercentageLintTests

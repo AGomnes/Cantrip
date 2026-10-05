@@ -11,8 +11,8 @@ namespace Cantrip.Tests.Sim
     /// seeds, over two versions of the content.
     /// </summary>
     /// <remarks>
-    /// The thing being tested is not that two numbers differ — two runs of <c>sim</c> already
-    /// gave that — but that the difference is <em>paired</em>: which seeds changed hands, and
+    /// The thing being tested is not that two numbers differ, two runs of <c>sim</c> already
+    /// gave that, but that the difference is <em>paired</em>: which seeds changed hands, and
     /// which way. A level is a fact about the bot and cannot be quoted; the count of seeds that
     /// came out differently under one bot, holding the seeds still, is a fact about the change.
     /// </remarks>

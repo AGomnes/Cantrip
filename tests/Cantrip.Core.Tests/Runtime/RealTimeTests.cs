@@ -13,7 +13,7 @@ namespace Cantrip.Tests.Runtime
     /// </summary>
     /// <remarks>
     /// <c>EndTurn()</c> ran a whole turn cycle, every enemy's telegraphed move included, in a game
-    /// with no turns — so a front end that left its <b>End turn</b> button wired up, which is the
+    /// with no turns, so a front end that left its <b>End turn</b> button wired up, which is the
     /// default in every sample and every doc snippet, gave the player a button that fired every
     /// enemy's move at once for free. <c>turn_start</c> fired at <c>StartBattle</c> while the
     /// diagnostic whose whole job is to explain how real time differs from turns told authors it

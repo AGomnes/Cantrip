@@ -96,7 +96,7 @@ namespace Cantrip.Tests.Linting
         /// <c>hero "Cleric" / on damaged: block 2 to player</c> blocked the <em>leader</em> whenever
         /// the Cleric was damaged, quietly, in the one declaration a party game has most of. The rule
         /// is every body on every declaration now, so an <c>actor</c> and a <c>keyword</c> are in too,
-        /// and so are a <c>modify</c> line and a <c>target … where</c> filter.
+        /// and so are a <c>modify</c> line and a <c>target ... where</c> filter.
         /// </summary>
         [Theory]
         [Trait("Regression", "ct326-was-a-list-of-places-with-holes")]
@@ -169,7 +169,7 @@ namespace Cantrip.Tests.Linting
         /// leaving it to omission. A verb has no owner, so neither <c>self</c> nor <c>owner</c> exists
         /// inside one and its <c>target</c> is whatever its caller bound: there is no word CT326 could
         /// name, and it is an error rather than a warning precisely because it can always name one.
-        /// <c>player</c> in a verb is often right, too — a run's own pool — and the body that calls it
+        /// <c>player</c> in a verb is often right, too, a run's own pool, and the body that calls it
         /// is checked, which is where the leader-or-member decision is actually written. Severity may
         /// rise in a 1.x release, so a verb can still be warned about later; naming the wrong word now
         /// could not be taken back.
@@ -231,7 +231,7 @@ namespace Cantrip.Tests.Linting
         /// <summary>
         /// A status's listener is where a real-time enemy's whole behaviour lives, and where damage
         /// over time is spelled on any clock. <c>deal 5 to player</c> there burns the leader rather
-        /// than whoever the status is on, every tick, in silence — which is the exact shape CT326
+        /// than whoever the status is on, every tick, in silence, which is the exact shape CT326
         /// exists to refuse.
         /// </summary>
         [Theory]

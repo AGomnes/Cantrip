@@ -216,7 +216,7 @@ namespace Cantrip.Tests.Runtime
         /// Hearthstone's Dire Wolf Alpha, which <c>docs/coverage.md</c> lists as <em>Works</em>: it
         /// buffs the minions beside it. A minion summoned after a neighbour died used to land one
         /// past the highest live slot, so with a survivor standing behind the hole it went two slots
-        /// further out and got nothing — a card listed as working, silently not working, with no
+        /// further out and got nothing: a card listed as working, silently not working, with no
         /// message anywhere. At 802530c the last two assertions here read "Expected: 3, Actual: 5".
         /// </summary>
         [Fact]
@@ -389,7 +389,7 @@ namespace Cantrip.Tests.Runtime
 
         /// <summary>
         /// Monster Train's floor capacity, with no new concept: a summon into a full lane makes
-        /// nothing, binds <c>created</c> empty and says so in the trace — a refusal, the way
+        /// nothing, binds <c>created</c> empty and says so in the trace: a refusal, the way
         /// <c>play</c> on an empty pile is, rather than an error that stops the card.
         /// </summary>
         [Fact]

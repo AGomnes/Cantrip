@@ -13,9 +13,9 @@ namespace Cantrip.Tests.Sim
     /// <c>EndTurn</c> fifty times. The clock was a <c>TickClock</c> and nothing ever ticked it, so
     /// <c>Now</c> stayed at 0 for the whole run: every <c>on every</c> listener was silent, every
     /// ability used once never came back, and no battle could end. The report was printed in full
-    /// and read as a finding about the content — "40 battles reached the turn limit and never
+    /// and read as a finding about the content: "40 battles reached the turn limit and never
     /// ended", 50.0 turns in a game with no turns, and 0.0 hp lost against enemies dealing
-    /// seventeen damage every three seconds — at exit 0. A tool that quietly gets the answer wrong
+    /// seventeen damage every three seconds: at exit 0. A tool that quietly gets the answer wrong
     /// is worse than one that refuses.
     /// </remarks>
     public sealed class RealTimeRefusalTests
