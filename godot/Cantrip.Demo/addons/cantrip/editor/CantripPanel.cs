@@ -152,8 +152,8 @@ namespace Cantrip.GodotAdapter
             if (_status == null || _workspace == null) return;
 
             _status.Text = _workspace.IsLoaded
-                ? $"{_workspace.Files.Count} file(s), {Definitions()} definition(s) · " +
-                  $"{_workspace.ErrorCount} error(s), {_workspace.WarningCount} warning(s), {_workspace.NoteCount} note(s) · {_workspace.Fingerprint}"
+                ? $"{_workspace.Files.Count} file(s), {Definitions()} definition(s); " +
+                  $"{_workspace.ErrorCount} error(s), {_workspace.WarningCount} warning(s), {_workspace.NoteCount} note(s); {_workspace.Fingerprint}"
                 : "Not loaded yet.";
         }
 

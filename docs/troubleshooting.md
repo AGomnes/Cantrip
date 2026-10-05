@@ -192,8 +192,7 @@ nothing, loads clean and lints clean. Two lines of defence: a `test` with an `ex
 you meant, and `--trace`, where a `damaged` event with no `amount=` is the tell.
 
 On a *group*, `count`, `size`, `length`, `first`, `last`, `empty`, `any`, `lane`, `rank`, `name`,
-`zone`, `controller` and stats all answer; anything else falls through to 0. `created.first.zone`
-is what `created.zone` was reaching for.
+`zone`, `controller` and stats all answer; anything else falls through to 0.
 
 ### The clock decides which declarations are live
 

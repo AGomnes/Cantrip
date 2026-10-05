@@ -292,7 +292,7 @@ namespace Cantrip.GodotAdapter
             text.Append('\n');
 
             text.Append("[color=#8d94a3]").Append(Level(description.Level));
-            text.Append(entity == null ? " · printed values" : " · live values");
+            text.Append(entity == null ? ", printed values" : ", live values");
             text.Append("[/color]\n\n");
 
             text.Append(Segments(description)).Append('\n');
