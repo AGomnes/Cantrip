@@ -50,7 +50,7 @@ What a GDScript project takes on by using it:
 2. **Add the rules engine** from NuGet, in the folder with your `.csproj`, at the same version as
    the addon (the addon's is in its `plugin.cfg`):
    ```
-   dotnet add package Cantrip.Core --version 1.0.0
+   dotnet add package Cantrip.Core --version 1.0.1
    ```
    Without `--version`, `dotnet add package Cantrip.Core` installs the newest stable, which may be a
 later 1.x than your addon.

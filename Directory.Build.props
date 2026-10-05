@@ -17,7 +17,7 @@
       The one place the release version lives. The release workflow refuses a tag that disagrees,
       and a test holds the Godot addon's plugin.cfg to the same version.
     -->
-    <VersionPrefix>1.0.0</VersionPrefix>
+    <VersionPrefix>1.0.1</VersionPrefix>
   </PropertyGroup>
 
   <PropertyGroup Label="Package metadata">

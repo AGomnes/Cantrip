@@ -11,6 +11,10 @@ When a release changes any of the following, its section says so under that name
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [1.0.1] - 2026-10-05
+
 Documentation, one lint fix, and the last two symbols that were not on a keyboard. Nothing in the language, the save format or what a seed plays out as has changed since 1.0.0.
 
 ### Changed
