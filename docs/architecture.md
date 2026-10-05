@@ -15,7 +15,7 @@ A game extends Cantrip through these seams, without changing the library:
 | Names or functions the rules cannot know | Implement `IEffectHost.TryResolveName` or `TryCall`; every member has a default, so `EffectHostBase` is a convenience rather than a requirement. See [The host](csharp.md#the-host). |
 | Presentation | `IEffectHost.OnEvent` sees every resolved event. See [Presenting events in a frame loop](csharp.md#presenting-events-in-a-frame-loop). |
 | A decision maker | Implement `IChoiceProvider`. Its `Choose` answers entity choices and its `ChooseDefinition` answers offers such as `discover`; both have defaults, so implement only what you decide. A UI uses `DeferredChooser`; see [Player choices](csharp.md#player-choices). |
-| A clock | Implement `IGameClock`, advance it from the engine's fixed step, and pass it in `RuntimeOptions.Clock`. |
+| A clock | A real-time game passes a `TickClock` in `RuntimeOptions.Clock` and advances it with `CardRuntime.Tick`; implement `IGameClock` only for a clock neither it nor `TurnClock` gives you. It has to match the content's `clock` declaration or the constructor throws. See [Real time](csharp.md#real-time). |
 | Translations | Implement `IDescriptionLocalizer` or subclass `EnglishDescriptions`, and pass it to `DescriptionBuilder`. Every member defaults to null, which falls back to the content's own text and the built-in English. |
 | Lint rules for your game | Pass `LintOptions` with host verbs, events and names, or suppress codes. |
 | Content tests that use your verbs or host | Set `DslTestRunner.ConfigureRuntime` to register them on each test's runtime, and `DslTestRunner.CreateHost` to give each test a host. See [Verbs written in C#](csharp.md#verbs-written-in-c). |
@@ -31,13 +31,13 @@ The rest of this page describes the library's insides, for anyone reading or cha
                       └───────────┴──── Tools ───┘   (Linter, Descriptions, DslTestRunner, cantrip)
 ```
 
-Everything lives in `Cantrip.Core`, which references no engine. `Cantrip.Cli` is a thin command-line wrapper.
+Everything lives in `Cantrip.Core`, which references no engine. `Cantrip.Cli` is a thin command-line wrapper, and `Cantrip.Sim` is the scenario runner, bots and meter that ship inside it as `cantrip sim`.
 
 | Namespace | Responsibility |
 |---|---|
 | `Cantrip` | `Num` (fixed-point), `Rng`, shared enums, `CardRuntime` |
 | `Cantrip.Syntax` | `Lexer`, `Parser`, AST nodes, `AstPrinter`, `AstWalker` |
-| `Cantrip.Content` | `ContentLibrary`, `EntityDefinition`, `VerbDefinition`, `ResourceRule` |
+| `Cantrip.Content` | `ContentLibrary`, `EntityDefinition`, `VerbDefinition`, `ResourceRule`, `BoardShape` |
 | `Cantrip.Runtime` | `GameState`, `Entity`, `EventBus`, `ModifierPipeline`, clocks, `TraceLog`, snapshots, `Interpreter` |
 | `Cantrip.Linting` | `Linter` |
 | `Cantrip.Descriptions` | `DescriptionBuilder`, localization |
@@ -48,7 +48,7 @@ Everything lives in `Cantrip.Core`, which references no engine. `Cantrip.Cli` is
 
 The lexer turns indentation into `Indent` and `Dedent` tokens, so the parser never guesses where a block ends. It lexes `tag:fire` as one token (only for a closed set of qualifier prefixes, which is what keeps it apart from a block's colon), and `x1.5` as multiplication.
 
-The parser is recursive descent. Its main design choice is that **it knows nothing about verbs**: a statement is a verb name, positional arguments, named clauses (`to`, `from`, `for`...) and trailing flags. Verb implementations interpret those. That is what lets content and games add verbs without touching the grammar.
+The parser is recursive descent and **knows nothing about verbs**: a statement is a verb name, positional arguments, named clauses (`to`, `from`, `for`...) and trailing flags. Verb implementations interpret those. That is what lets content and games add verbs without touching the grammar.
 
 Errors are collected, not thrown, with recovery to the end of the line or block, so a file with several mistakes reports all of them. Nesting deeper than 256 levels is a diagnostic rather than a stack overflow.
 
@@ -74,13 +74,14 @@ A new part of a listener's `on` line, such as another modifier after `once per .
 
 ### Adding a verb
 
-The parser knows nothing about verbs, so a new one introduces no AST node and the list above does not apply to it. Three other places have to learn about it:
+The parser knows nothing about verbs, so a new one introduces no AST node and the list above does not apply to it. Four other places have to learn about it:
 
 | Place | What goes wrong when it is missed |
 |---|---|
 | `Interpreter.RegisterVerb` | nothing runs the verb |
-| `BuiltinEvents.VerbEvents` | `IsKnownVerb` is that table, so the linter calls the verb unknown (CT301). This one fails loudly: `BuiltinEventsTests.The_verb_catalogue_matches_the_registered_verbs` walks every registered verb and refuses any the table does not list |
+| `BuiltinEvents.VerbEvents` | the event graph does not know what the verb raises, so CT306 stops seeing cycles through it and the CT322 refusal cannot name it as the verb that really raises the event. This one fails loudly: `BuiltinEventsTests.The_verb_catalogue_matches_the_registered_verbs` walks every registered verb and refuses any the table does not list |
 | `Linter.Facts.VisitStatement` | a clause that binds a name is not recorded there, so every use of the bound name warns CT302 |
+| `BuiltinClauses.ByVerb` | CT323 skips the verb, so a named clause it does not read is dropped in silence again. Built-in verbs only: a verb a game or content adds reads whatever clauses it likes |
 
 `attack` and `discover` were added this way. The `into` clause is what taught the third row its lesson: it shipped without being recorded, every use of the name it bound warned, and the corpus lint caught it only because that folder had been clean all along.
 
@@ -92,9 +93,9 @@ The parser knows nothing about verbs, so a new one introduces no AST node and th
 
 ## Runtime
 
-**`GameState`** holds all rules state: entities, zones, activation, history counters, scheduled work, the clock and the RNG. It carries a `Version` that every mutation increments; caches compare against it instead of tracking dependencies. Presentation state never lives here.
+**`GameState`** holds all rules state: entities, zones, activation, the board and where each actor stands, the party and the turn order, history counters, scheduled work, the clock and the RNG. It carries a `Version` that every mutation increments; caches compare against it instead of tracking dependencies. Presentation state never lives here.
 
-**Entities.** Actors, cards, relics, statuses and keywords are all `Entity`. A status is an entity attached to its host, with `stacks` as an ordinary stat. An entity's listeners and modifiers are registered while it is **active**, which depends on its zone: actors on the board, cards in hand (powers only once played), relics in the relics zone, statuses while their host is active.
+**Entities.** Actors, cards, relics, items, abilities, statuses and keywords are all `Entity`. A status is an entity attached to its host, with `stacks` as an ordinary stat. An entity's listeners and modifiers are registered while it is **active**, which depends on its zone: actors on the board, cards in hand (powers only once played), relics and items in the relics zone or on the board, statuses, keywords and abilities while their host is active.
 
 **`EventBus`** stores listeners by event name and answers which ones hear an event, in the ruleset's deterministic order. It executes nothing.
 
@@ -104,9 +105,9 @@ The parser knows nothing about verbs, so a new one introduces no AST node and th
 
 **`TraceLog`** records steps with parent ids when enabled, and costs one branch per recording site when not.
 
-**Snapshots.** `GameState.Capture` produces plain data. Scheduled blocks are stored by content address (`card:Prepare/effect/0.body`), not object reference, so a save stays valid across processes, and beside each address goes a hash of the block's statements that leaves out where they were written. An address is a position within its definition, so when an edit has put other statements there, `Restore` looks for the hashed ones elsewhere in that definition, and refuses the save if they are gone (see [Save and load](csharp.md#save-and-load)). A block that `Execute` scheduled is stored with the statements `Execute` ran, which `Restore` parses again. A listener's limit window and `on every` timer are recorded in a similar way: by the listener's position among its definition's `on` blocks, and a hash of the listener in two parts, its `on` line and its body. `Restore` gives each record back to the unchanged listener, at its position or wherever it has moved, or else to the listener at its position if that one has the same `on` line and another body; otherwise it drops the record and that listener starts afresh, so a record never goes to a listener with a different `on` line. Because saves hold these hashes, changing what `BlockHash` writes for an existing node or listener, or the tree the parser builds from the same text, turns away every save with work waiting and can start used limits afresh: treat it as a change to the save format. `Restore` looks up every definition and block the snapshot needs before it tears anything down, then rebuilds entities, zones and scheduled work, re-registers listeners and modifiers in creation order, and matches the listener records to them. Restoring into the same game reuses the entity instances whose ids match, so an `Entity` the game is holding stays the same object; anything the snapshot does not mention is marked removed.
+**Snapshots.** `CardRuntime.Capture` produces plain data. Scheduled blocks are stored by content address (`card:Prepare/effect/0.body`), not object reference, so a save stays valid across processes, and beside each address goes a hash of the block's statements that leaves out where they were written. An address is a position within its definition, so when an edit has put other statements there, `Restore` looks for the hashed ones elsewhere in that definition, and refuses the save if they are gone (see [Save and load](csharp.md#save-and-load)). A block that `Execute` scheduled is stored with the statements `Execute` ran, which `Restore` parses again. A listener's limit window and `on every` timer are recorded in a similar way: by the listener's position among its definition's `on` blocks, and a hash of the listener in two parts, its `on` line and its body. `Restore` gives each record back to the unchanged listener, at its position or wherever it has moved, or else to the listener at its position if that one has the same `on` line and another body; otherwise it drops the record and that listener starts afresh. Because saves hold these hashes, changing what `BlockHash` writes for an existing node or listener, or the tree the parser builds from the same text, turns away every save with work waiting and can start used limits afresh: treat it as a change to the save format. `Restore` looks up every definition and block the snapshot needs before it tears anything down, then rebuilds entities, zones and scheduled work, re-registers listeners and modifiers in creation order, and matches the listener records to them. Restoring into the same game reuses the entity instances whose ids match, so an `Entity` the game is holding stays the same object; anything the snapshot does not mention is marked removed.
 
-**Hot reload.** `ContentLibrary` replaces exactly what a file contributed, and `CardRuntime.ApplyContentChanges` then points every live entity at the definition now loaded under its kind and name, re-registering its listeners and modifiers. A stat the game has changed keeps its value, because editing a card's cost must not heal an enemy mid-fight; a stat still at the definition's old number takes the new one. Listener limit windows and `on every` timers are recorded before the listeners are dropped and matched to the new ones as a restore matches them.
+**Hot reload.** `CardRuntime.ApplyContentChanges` points every live entity at the definition now loaded under its kind and name, re-registering its listeners and modifiers. A stat the game has changed keeps its value, because editing a card's cost must not heal an enemy mid-fight; a stat still at the definition's old number takes the new one. Listener limit windows and `on every` timers are recorded before the listeners are dropped and matched to the new ones as a restore matches them.
 
 **Player choices.** A UI cannot answer a `choose` while the interpreter is inside it, so `DeferredChooser` throws instead of guessing. `CardRuntime` wraps each top-level action: it snapshots first, keeping scheduled blocks and definitions as objects rather than addresses and names because this snapshot never leaves the process, and on a pending choice it abandons queued work, restores, truncates the trace and reports the choice. Answering replays the same action with the answers in order. The rollback is exact, so the replay follows the identical path, and host notifications are buffered for the attempt so presentation only ever sees events that really happened.
 
@@ -119,8 +120,11 @@ The parser knows nothing about verbs, so a new one introduces no AST node and th
 | `Interpreter.cs` | statements, assignments, content verb calls, scheduling, modifier scope evaluation |
 | `Interpreter.Expressions.cs` | names, members, calls, operators, selectors, qualifier tests |
 | `Interpreter.Events.cs` | `Raise`, dispatch, filters, loop protection, limits, the work queue |
-| `Interpreter.Actions.cs` | the primitives: `ChangeStat`, `ApplyStatus`, `DealDamage`, `Kill`, `Draw`, `MoveCard`, `Create`, decay, until-reverts, intents |
+| `Interpreter.Actions.cs` | the primitives: `ChangeStat`, `ApplyStatus`, `DealDamage`, `Kill`, `Revive`, `Draw`, `MoveCard`, `MoveActor`, `Create`, decay, until-reverts, intents |
 | `Interpreter.Verbs.cs` | the built-in verb table |
+| `Interpreter.Targeting.cs` | `TargetRule`, legal targets, reach, and the verdicts behind `OutOfRange` and `NoTarget` |
+| `Interpreter.Stepping.cs` | `PendingTrigger`, `TriggerBreakpoints`, and resolving the queue one trigger at a time |
+| `Interpreter.Snapshot.cs` | the chain counter and `HasPendingWork`: the interpreter's own part of a save |
 
 ### Execution model
 
@@ -138,11 +142,11 @@ Raise(event, action):
   host.OnEvent(event)                 (held until the action completes, under DeferredChooser)
 ```
 
-`CardRuntime` wraps every top-level operation (play, a turn phase, `Execute`) in `Run`, which starts a new causal chain, resets the step budget, drains the queue, and drops queued work if the operation fails. Nothing else is undone on a failure: what the operation changed before it stays changed, as [When content fails at runtime](csharp.md#when-content-fails-at-runtime) describes.
+`CardRuntime` wraps every top-level operation (play, an ability use, a turn phase, a tick, `Execute`) in `Run`, which starts a new causal chain, resets the step budget, drains the queue, and drops queued work if the operation fails. Nothing else is undone on a failure: what the operation changed before it stays changed, as [When content fails at runtime](csharp.md#when-content-fails-at-runtime) describes.
 
 ### Playing Fireball
 
-1. `CardRuntime.Play` checks energy through `CostOf` (the `cost` channel) and resolves the target.
+1. `CardRuntime.Play` checks the cost through `CostOf` (the `cost` channel) and resolves the target.
 2. It raises `card_played`. The committed step pays the cost and moves the card to `play`.
 3. The action runs the effect block. `deal 6 to target` calls `DealDamage`, which computes the amount through the `damage` channel (Pyromancer's Codex multiplies it), then `damage_taken`, then raises `damaged`. Frozen's `on owner.damaged(tag:fire)` is queued.
 4. `if target.dead: draw 1` reads the state that step 3 already changed.
@@ -154,14 +158,14 @@ Each queued trigger carries its `Chain`: an immutable list of the listeners that
 
 ## Determinism
 
-- `Num` is a 64-bit fixed-point value with six decimal places. Multiplication splits integer and fractional parts so no intermediate overflows for values up to about plus or minus 1 million. The arithmetic is unchecked, so a result beyond about plus or minus 9.2 trillion wraps round silently, with no error; [Numbers](stability.md#numbers) gives the limits.
+- `Num` is a 64-bit fixed-point value with six decimal places. Multiplication splits integer and fractional parts so no intermediate overflows for values up to about plus or minus 1 million. The arithmetic is unchecked, so a result beyond about plus or minus 9.2 trillion wraps round silently; [Numbers](stability.md#numbers) gives the limits.
 - `Rng` is xoshiro256** seeded through splitmix64, with rejection sampling for bounded values. Its full state is saved in snapshots.
 - Anything that could depend on hash order is sorted: listener candidates, resource resets, zone and history hashing.
-- `GameState.ComputeHash` covers entities, zones, RNG, clock, history, scheduled work and listener limits. A waiting block counts by the hash of its statements rather than the place it was written, so a save restored after a patch that moved the block hashes like the game that was saved. Tests play a hundred random battles twice each, and play a battle side by side with a saved-and-restored copy of itself, comparing hashes after every step.
+- `GameState.ComputeHash` covers entities, zones, the board and where each actor stands, who is in the party and who has acted, RNG, clock, history, scheduled work and listener limits. A waiting block counts by the hash of its statements rather than the place it was written, so a save restored after a patch that moved the block hashes like the game that was saved. Tests play a hundred random battles twice each, and play a battle side by side with a saved-and-restored copy of itself, comparing hashes after every step.
 
 ## Tools
 
-**Linter.** Walks every body (effects, listeners, modifiers, verbs, tests) with an `AstWalker`, gathers global facts (verbs, stats, tags, emitted and listened events), then checks each body and the event graph. `BuiltinEvents` is the single catalogue of built-in events and which verbs raise them; unit tests keep it in step with the sources.
+**Linter.** Walks every body (effects, listeners, modifiers, verbs, tests, scenarios) with an `AstWalker`, gathers global facts (verbs, stats, tags, emitted and listened events), then checks each body and the event graph. `BuiltinEvents` is the single catalogue of built-in events and which verbs raise them; unit tests keep it in step with the sources.
 
 **Descriptions.** One walk over a definition both writes the automatic text and names each value (`damage`, `damage2`, `Poison`...), which is what links a writer's placeholders to the effect. Live descriptions evaluate values without side effects (anything involving ranges or `random` is shown symbolically) and pass them through the same modifier queries the rules use.
 

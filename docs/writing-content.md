@@ -1,8 +1,8 @@
 # Writing content
 
-> These docs describe the `main` branch, which can be ahead of the latest release. The changelog's [Unreleased](../CHANGELOG.md#unreleased) section lists what that release lacks, and each release's own docs are in [its tag](https://github.com/AGomnes/Cantrip/tags).
+> These docs describe the `main` branch, which can be ahead of the latest release. Each release's own docs are in [its tag](https://github.com/AGomnes/Cantrip/tags), and the [changelog](../CHANGELOG.md) says what each release changed.
 
-This guide is for whoever writes a game's cards, statuses, relics and enemies. It needs no C#. It builds a card, a status, a relic and an enemy whose moves change at half health, each with a test, and explains each idea the first time it appears. Then come the commands you will use all day, a sandbox for trying single lines, and [recipes](#recipes) for common card-game mechanics.
+This guide is for whoever writes a game's cards, statuses, relics and enemies. It needs no C#. It builds a card, a status, a relic and an enemy whose moves change at half health, each with a test. Then come the commands, the REPL, and [recipes](#recipes) for common card-game mechanics.
 
 If your game is in Godot, the checking and the testing happen inside the editor: the addon's Cantrip dock lints your files, runs your tests and previews your card text, so almost nothing here needs a command line. You write the files in the dock's Source tab, which lints them as you type and saves with Ctrl+S, or in a text editor of your own if you would rather. [7. In Godot](#7-in-godot) says what each of its tabs does, and [godot.md](godot.md) is the guide to the addon itself.
 
@@ -32,7 +32,7 @@ Run the commands below from that folder, or any folder inside it. Any text edito
 
 Make a folder called `tutorial` with two empty files in it, `game.cantrip` and `tests.cantrip`. If you have done the quickstart, keep this folder apart from its `content` folder: a folder loads as one game, and both define a Strike.
 
-In Godot a separate folder is not enough, because the editor dock reads every `.cantrip` file in the project. Work through the tutorial in a Godot project of its own, or point the dock at the tutorial alone: under Project Settings, with Advanced Settings switched on, add the setting `cantrip/content/folder` with the value `res://tutorial`, then press the dock's Reload button. The setting changes only what the dock reads, not what the game loads; remove it when you are done, and press Reload again.
+In Godot a separate folder is not enough, because the editor dock reads every `.cantrip` file in the project. Work through the tutorial in a Godot project of its own, or point the dock at the tutorial alone: under Project Settings, with Advanced Settings switched on, add the setting `cantrip/content/folder` with the value `res://tutorial`, then press the dock's Reload button. The running game reads it too, because a `CantripRuntime` with an empty `ContentFolder` loads that setting; remove it when you are done, and press Reload again.
 
 The finished files are in [samples/recipes/tutorial](../samples/recipes/tutorial).
 
@@ -178,7 +178,7 @@ enemy "Bog Troll"
   pattern cycle Thrash, Club, Guard
 ```
 
-- Each `move` is a named block. Inside it, `player` is the player, and `block 6` goes to the enemy itself.
+- Each `move` is a named block. Inside it, `player` is the player, and `block 6` goes to the enemy itself. `player` is the right word only while your side is one actor: content that declares a `hero` writes `target` here instead, and `player` in a move is error CT326. See [The party](language.md#the-party). `player` is the right word only while your side is one actor: content that declares a `hero` must write `target` here instead, and `player` in a move is error CT326. See [The party](language.md#the-party).
 - The move the enemy will make next is its **intent**, shown to the player during their turn. It is chosen when the battle starts and again after each enemy turn.
 - `pattern cycle Thrash, Club, Guard` goes through the moves in that order and then loops.
 - `phase Enraged when hp <= max_hp / 2` names a **phase**, a stage of the enemy's behaviour, with the condition that turns it on. The condition is checked whenever damage takes some of the enemy's hp, and whenever its next move is chosen. Hp lost in other ways, such as `lose 5 hp`, is noticed only when the next move is chosen. `move Thrash phase Enraged` can only be chosen while the Troll is Enraged; a move with no phase can always be chosen.
@@ -228,7 +228,7 @@ test "Crossing half health changes the next move, not the one shown"
 | `dotnet cantrip lint tutorial` | Checks the files: unknown names, misspelt verbs, a listener on an event nothing raises or written without `on`, a `{placeholder}` in card text that matches nothing, and more. It reports errors, warnings and notes. |
 | `dotnet cantrip validate tutorial` | Reports only errors, leaving out the linter's warnings and notes. |
 | `dotnet cantrip describe tutorial` | Prints the rules text of every definition, generated or written with `text:`, or of one with `--name "Venom Dart"`. |
-| `dotnet cantrip sim tutorial` | Plays the `scenario` blocks hundreds of times with a bot, and reports what the content allowed: a run that threw, a fight that never ended, a card that was never playable, an enemy move that never fired. The tutorial has no scenario yet, so it says so; [Simulating](simulating.md) shows how to write one. |
+| `dotnet cantrip sim tutorial` | Plays the `scenario` blocks hundreds of times with two bots, and reports what the content allowed: a run that threw, a fight that never ended, a card that was never playable, an enemy move that never fired. The tutorial has no scenario yet, so it says so; [Simulating](simulating.md) shows how to write one. |
 
 In Godot the dock does three of these: its Problems tab is `lint`, its Tests tab is `test`, and its Preview tab is `describe`. `sim` and the REPL have no tab, so they need the command-line tool.
 
@@ -274,11 +274,11 @@ Most lines show a statement (`[verb]`), an event, or a listener that heard one (
 Some habits make tests easier to live with:
 
 - **One comparison per `expect`.** `expect enemy.hp == 15 and player.energy == 2` fails with `expected (enemy.hp == 15) and (player.energy == 2)` and no values. A test also stops at its first failing `expect`.
-- **Setup comes first.** The lines `enemy`, `player`, `hand`, `deck`, `discard_pile`, `relic`, `seed`, `answer`, `realtime` and `grant`, and a `setup:` block, run before the battle starts; it starts at the first other line. Starting the player's turn resets block and energy, so `player block 5` is gone by the first `expect`. Write `block 5` after the setup lines instead.
+- **Setup comes first.** The lines `enemy`, `hero`, `player`, `hand`, `deck`, `discard_pile`, `relic`, `board`, `seed`, `answer`, `realtime` and `grant`, and a `setup:` block, run before the battle starts; it starts at the first other line. Starting the player's turn resets block and energy, so `player block 5` is gone by the first `expect`. Write `block 5` after the setup lines instead. `realtime N` gives the test a tick clock, and `tick N` is how time passes in one; see [Tests](language.md#tests).
 - **Cards go where you put them.** `deck Strike, Defend` puts cards in the draw pile and `hand` in the hand. A test does not shuffle or draw an opening hand.
-- **A test is one battle.** It cannot show something that resets between battles, and it cannot check that a card is refused, because `play` fails the test when a card cannot be played.
+- **A test is one battle.** It cannot show something that resets between battles, and it cannot check that a play or a cast was refused, because `play` fails the test when a card cannot be played and `cast` fails it when an ability is still cooling; ask instead, with `expect not leader.is_ready(Bulwark)`.
 - **Choices are answered with `answer`.** `answer "Defend"` picks Defend at the next choice. With no answer queued, the first option is taken.
-- **`log` shows only in the trace.** With `--trace`, a failing test's trace has a `[log]` line under each `log` statement that ran, with the values it wrote. A passing test prints no trace, so there use an `expect` that shows the value. `log` also prints in the [REPL](#6-trying-lines-in-the-repl).
+- **`log` shows only in the trace.** With `--trace`, a failing test's trace has a `[log]` line under each `log` statement that ran, with the values it wrote. In a passing test, use an `expect` that shows the value instead. `log` also prints in the [REPL](#6-trying-lines-in-the-repl).
 
 The full list of test verbs is under [Tests](language.md#tests).
 
@@ -364,7 +364,7 @@ Once the Cantrip addon is enabled, the Godot editor has a Cantrip dock at the bo
 
 A file you save in the dock is loaded and linted straight away, and so is one saved elsewhere, once Godot notices it. A `.cantrip` file added or deleted outside the editor joins or leaves the content the same way. **Reload** re-reads the `cantrip/` project settings and reads every file again from scratch; it keeps your unsaved buffers. A running game picks up changed files when it reloads its content, which the game's own code starts, for example from a debug key. See [The editor dock](godot.md#the-editor-dock) and [Hot reload](godot.md#hot-reload).
 
-`sim` and the REPL are the two commands with no tab. To play a scenario hundreds of times with a bot, install the command-line tool beside the game as [Before you start](#before-you-start) shows, and run `dotnet cantrip sim content` in the project folder; [Simulating](simulating.md) covers it.
+`sim` and the REPL are the two commands with no tab. To play a scenario hundreds of times with two bots, install the command-line tool beside the game as [Before you start](#before-you-start) shows, and run `dotnet cantrip sim content` in the project folder; [Simulating](simulating.md) covers it.
 
 ## Recipes
 
@@ -522,7 +522,7 @@ test "Each hit of a multi-hit move uses one Parry"
   expect not player.has(Parry)
 ```
 
-- `before_damaged` runs before the damage lands, and can change `event.amount`. `owner.` in front of the event limits it to hits on the status's host, and `(source:enemies)` to hits from enemies. A scope in front of an event is always matched against the event's target, so on a relic `on owner.card_played` would hear cards played at the player, not by them; for the cards the player plays, write `on card_played`.
+- `before_damaged` runs before the damage lands, and can change `event.amount`. `owner.` in front of the event limits it to hits on the status's host, and `(source:enemies)` to hits from enemies. A scope in front of an event is always matched against the event's target, so on a relic `on owner.card_played` would hear cards played at the player, not by them; for the cards its holder plays, write `on card_played(source:owner)`, since plain `on card_played` hears every card anybody plays.
 - The Troll's Guard turn does not use a stack, because nothing hits. Each hit of a multi-hit move uses one.
 - Damage rounds down, so a hit of 7 becomes 3.
 - Write `cancel` instead of the `event.amount` line to stop the hits entirely.
@@ -579,7 +579,7 @@ test "Insight draws two and is exhausted"
 
 `hand`, `draw`, `discard` and `exhaust` name the player's piles, and `count` counts what is in one. When the draw pile runs out, `draw` shuffles the discard pile into it.
 
-Write `tags exhaust`. On a line of its own, `exhaust` is a property that nothing reads, so the card goes to the discard pile as usual; `lint` warns about it (CT316). The same goes for the other tags with behaviour of their own: `retain`, `ethereal`, `unplayable`, `power` and `attack`. File: [draw-and-exhaust.cantrip](../samples/recipes/draw-and-exhaust.cantrip).
+Write `tags exhaust`. On a line of its own, `exhaust` is a property that nothing reads, so the card goes to the discard pile as usual; `lint` warns about it (CT316). The same goes for the other tags with behaviour of their own: `retain`, `ethereal`, `unplayable`, `power` and `attack` under a card, and `buff` or `debuff` under a status. File: [draw-and-exhaust.cantrip](../samples/recipes/draw-and-exhaust.cantrip).
 
 ### A relic that works at the start of each turn
 
@@ -776,7 +776,7 @@ More in [Built-in verbs](language.md#built-in-verbs). File: [discover.cantrip](.
 
 ### Copy a card as it is now
 
-`create Slash` makes a Slash as it is *printed*. `copy picked` makes one as it *is*, with the buff it was given this battle and the cost it was discounted to. That is the difference between the two verbs, and it is usually the one you want:
+`create Slash` makes a Slash as it is *printed*. `copy picked` makes one as it *is*, with the buff it was given this battle and the cost it was discounted to. `copy` is usually the one you want:
 
 ```
 status Sharpened
@@ -854,8 +854,8 @@ test "Havoc plays the top card for nothing"
 ```
 
 - `played` is the card, or **`none`** when it was not played: an empty pile, an unplayable Curse, a cost the player cannot afford, no legal target. None of those is an error, which is what lets one line cover them all.
-- A card that needs a target and was not given one has one **rolled** for it. Nobody is ever asked, because a targeting dialog in the middle of "play the top card of your draw pile" is not what the card means.
-- `replay` is the other verb, and it is not a play: it resolves an effect again, for free, leaving the card where it is and raising no `card_played`.
+- A card that needs a target and was not given one has one **rolled** for it. Nobody is ever asked.
+- `replay` is the other verb, and it is not a play: see [section 6](#6-trying-lines-in-the-repl).
 
 More in [Built-in verbs](language.md#built-in-verbs). File: [play-a-card-from-a-pile.cantrip](../samples/recipes/play-a-card-from-a-pile.cantrip).
 
@@ -1023,8 +1023,11 @@ The [language reference](language.md) has the full rules for each idea used here
 | verbs such as `deal`, `discover` and `into` | [Built-in verbs](language.md#built-in-verbs) |
 | rules text and placeholders | [Descriptions](language.md#descriptions) |
 | test verbs, and what a test cannot do | [Tests](language.md#tests) |
-| scenarios, and playing them many times with a bot | [Scenarios](language.md#scenarios), [Simulating](simulating.md) |
+| scenarios, and playing them many times with two bots | [Scenarios](language.md#scenarios), [Simulating](simulating.md) |
 | the order of a turn | [How a battle runs](language.md#how-a-battle-runs) |
+| a party of heroes, `leader`, `fallen`, `revive`, `turns:`, `order:` | [The party](language.md#the-party) |
+| lanes and ranks, `range`, `within`, moving a unit | [Boards](language.md#boards) |
+| abilities, cooldowns in seconds, `clock ticks` | [Abilities and real time](language.md#abilities-and-real-time) |
 
 For more worked content with tests, [samples/basic](../samples/basic) has small examples of many features, and [samples/slice](../samples/slice) is the content of a small five-floor roguelite, including the Archmage, a boss with two phases.
 

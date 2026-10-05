@@ -134,7 +134,7 @@ Three of them, and two play by default.
 |---|---|---|
 | `cautious` | Tries every legal play and ability through the engine: it captures the game, makes the play, ends the turn so the enemies answer, scores what is left, and rolls back. It then makes the best play it found, and stops when ending the turn scores as well as anything it could do. | The default. It plays a fight the way a careful player might, so a run reaches the later floors. |
 | `patient` | The same, scoring two turns out instead of one. | To disagree. A card that does nothing this turn and a lot next turn is invisible to the cautious bot and obvious to this one. |
-| `random` | Plays legal cards and abilities at random until it can play no more. | The floor, and the fastest way to fuzz: it tries nothing first, so it is eight to eleven times quicker than the other two. |
+| `random` | Plays legal cards and abilities at random until it can play no more. | The floor, and the fastest way to fuzz: it tries nothing first, so it is three to nine times quicker than the other two. |
 
 None of them knows a card, status, ability or enemy by name, so new content needs no change to
 any of them. A position is scored on hp alone (one and a half times the party's, less the
@@ -149,7 +149,7 @@ The `hp lost` column is the party's health between them, so a fight the heroes a
 the leader stands untouched reads as the loss it is.
 
 **They are wrong in the same direction.** All three share that one way of weighing a position, so
-they all undervalue a card that draws, a card that gives energy, and anything else that pays off
+they all undervalue a card that draws, a card that gives energy, a move to a safer rank, and anything else that pays off
 several turns later. Two of them agreeing is therefore not evidence that either is right. What it
 does show is where they *disagree*, and that is worth reading: on `samples/slice`, the patient bot
 finishes the Archmage a turn sooner and 3.4 hp better off, and wins 3.2 points more of its runs.
@@ -242,8 +242,7 @@ It is larger than it looks: over 200 runs of the slice, the plays the cautious b
 back raise about 1.18 million events, thirteen times the 91 thousand in the play that counted.
 Counted, every number above would be an order of magnitude too big. The check is one the engine can
 make on its own: for every actor, the damage counted less the healing counted has to be the hp that
-actor actually lost, read back from the engine's own `hp`. A test runs that over both sample folders
-with each bot on every build, and it fails loudly if the switch is ever wrong. With the flag removed
+actor actually lost, read back from the engine's own `hp`. A test runs that on every build, over the slice with each of the three bots and over `samples/abilities` with the cautious one, and it fails if the switch is ever wrong. With the flag removed
 the player on one seed of the slice "lost 60 hp" while the meter claimed 2160.
 
 ## What it will not tell you
@@ -275,8 +274,7 @@ act in continuous time is the game's own frame loop.
 **`sim` cannot play a real-time game and refuses to try.** A bot plays a scenario by deciding what
 to do and then ending the turn, and content whose ruleset says `clock ticks` has no turn to end: the
 clock would stand at zero for the whole run, so every `on every` listener would be silent, every
-ability used once would never come back, and no battle could end. The command refuses such a folder
-with one sentence, and a `scenario` written in `clock ticks` content is error CT338 at lint. Cover a
+ability used once would never come back, and no battle could end. The command refuses such a folder, and a `scenario` written in `clock ticks` content is error CT338 at lint. Cover a
 real-time game with [`test` blocks](language.md#tests) instead, which have `realtime <rate>` and
 `tick <n>`; [realtime/content/tests.cantrip](../realtime/content/tests.cantrip) is eighteen of them.
 
@@ -290,7 +288,7 @@ cantrip sim <path>... [options]
 |---|---|---|
 | `--name <text>` | | Only scenarios whose name contains the text. |
 | `--runs N` | the `runs` line, else 100 | Play each scenario N times, whatever it asks for. |
-| `--seed S` | 1 | The first seed. Run *n* uses S + *n*, so the same command plays the same runs on any machine. |
+| `--seed S` | 1 | The first seed. Runs use S, S+1, ..., so the same command plays the same runs on any machine. |
 | `--bot <name>` | `both` | `cautious`, `patient`, `random`, or `both` for the cautious and patient bots together. |
 | `--turn-limit N` | 50 | Turns one battle may take before the run counts as a stall. |
 | `--watch SEED` | | Play one run of one scenario, with the first bot, and print every statement, turn and play, instead of the report. |
@@ -300,7 +298,7 @@ cantrip sim <path>... [options]
 
 **Two bots cost about twice as long as one**, because each one plays every run. On one core of a
 laptop (an Intel Core Ultra 5 125U), the slice's 500 runs take about 30 seconds with both, about
-14 with `--bot cautious`, about 19 with `--bot patient` and under 2 with `--bot random`. So
+14 with `--bot cautious`, about 19 with `--bot patient` and about 2 with `--bot random`. So
 `--bot cautious` roughly halves it, and `--bot random` is the one to reach for when what you want
 is to fuzz content rather than see it played.
 
@@ -319,7 +317,7 @@ dotnet cantrip sim content
 
 Exit codes: **0** every run finished and every checked expectation held; **1** the content has
 errors, there was no scenario to play, a run threw, a battle reached the turn limit, or an
-expectation failed; **2** the command line was wrong.
+expectation failed; **2** the command line was wrong, or `sim` will not play this content: it says `clock ticks`, or the `--against` baseline does.
 
 On a build server, one line is usually enough:
 
@@ -329,7 +327,7 @@ dotnet cantrip sim samples/slice --runs 100
 
 ## Comparing two things
 
-A level cannot be quoted, and the page above says so four times. A *difference* between two levels
+A level cannot be quoted. A *difference* between two levels
 can, as long as nothing but the content moved: the same bot, playing run *n* from seed *n* on both
 sides, with the same turn limit and the same number of runs. That is what `--against` does, and it
 is the only comparison the tool makes.
@@ -454,7 +452,7 @@ sort of thing this tool is for.
 
 Both bots win it in five turns for six hp, and both would still report Screech as never fired. Each
 of them ends a turn dozens of times while deciding what to do, in trials where the Ghast does move.
-But a trial is not play, and the first block counts only what was played.
+But a trial is not play.
 
 ## Where next
 

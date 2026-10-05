@@ -45,13 +45,12 @@ The severities are not decoration:
 
 | | Means |
 |---|---|
-| **error** | The content is wrong. `lint`, `validate` and `test` all exit 1. |
+| **error** | The content is wrong. `lint` and `validate` exit 1. A four-digit error from reading the files stops `test` too; a three-digit error from the linter does not, so a misspelt verb fails a test only when the test runs it. |
 | **warning** | Almost certainly not what you meant, but it runs. Exit 0 unless `--warnings-as-errors`. |
 | **note** | Worth knowing. Never fails anything. |
 
 **Run `lint` with `--warnings-as-errors` in CI.** A warning nobody fails on is a warning everybody
-scrolls past; every sample folder in this repository is clean under it, which is what lets a new
-warning mean something.
+scrolls past.
 
 ### A runtime error
 
@@ -90,14 +89,13 @@ $ dotnet cantrip test content --trace
        | [verb] expect  @ content/c.cantrip:17:3
 ```
 
-Read it for what is **missing**. Above, `deal` ran and no `damaged` event came out of it, which is
-the whole answer: the amount was zero. A listener that did not fire is not in the tree; a listener
+Read it for what is **missing**, and for what an event does not carry. Above, `deal` raised `damaged` with no `amount=`, which is the whole answer: a zero amount is left out of the entry. A listener that did not fire is not in the tree; a listener
 that fired twice is in it twice, indented under whatever caused each one.
 
 `#2` and `#3` are entity ids, and they are stable across a save and restore, so an id in a trace is
 the same actor as that id in a save file or a bug report.
 
-From C#, `runtime.State.Trace.FormatTree()` is the same text, and `ComputeHash()` beside it is how
+From C#, `runtime.State.Trace.FormatTree()` is the same text, and `runtime.State.ComputeHash()` is how
 two games are compared. [What a battle screen reads](csharp.md#what-a-battle-screen-reads) has the call.
 
 ---
@@ -142,8 +140,7 @@ differ, a folder lints clean and the game fails, or the reverse.
 
 ## It loaded, it ran, and it did the wrong thing
 
-This is the dangerous class, and the one most of Cantrip's diagnostics exist to prevent. If the
-rules did something you did not write, look here before looking for an engine bug.
+If the rules did something you did not write, look here before looking for an engine bug.
 
 ### `player` in a party game
 
@@ -195,7 +192,7 @@ diagnostic table says which clauses each built-in verb reads.
 
 `target.frobnicate` is "a stat nothing has", which is `0`. `deal target.frobnicate to target` deals
 nothing, loads clean and lints clean. Two lines of defence: a `test` with an `expect` on the number
-you meant, and `--trace`, where a `deal` that raised no `damaged` event is the tell.
+you meant, and `--trace`, where a `damaged` event with no `amount=` is the tell.
 
 On a *group*, `count`, `size`, `length`, `first`, `last`, `empty`, `any`, `lane`, `rank`, `name`,
 `zone`, `controller` and stats all answer; anything else falls through to 0. `created.first.zone`
@@ -205,7 +202,7 @@ is what `created.zone` was reaching for.
 
 Under `clock ticks` there are no turns, so a `move`, a `pattern`, a `phase`, a
 `stacking duration` counted in turns, a `decay ... on turn_end`, an `until turn_end:` or a
-`next turn:` is dead content. All twelve shapes are **CT337**, an error, naming what to write
+`next turn:` is dead content. All ten shapes are **CT337**, an error, naming what to write
 instead (usually `on every <n>s:` or `in <n>s:`). **CT335** is the other half: a turn order stated
 in a game with no turns. A real-time enemy's whole behaviour is listeners.
 
@@ -215,7 +212,7 @@ in a game with no turns. A real-time enemy's whole behaviour is listeners.
 ### A relic's or status's listener heard the wrong turn
 
 An unscoped listener on a status or relic hears only its own controller's `turn_start` and
-`turn_end`. To hear the holder's own, scope it: `on owner.turn_start:`. To hear anyone's, filter it.
+`turn_end`. To hear the holder's own, scope it: `on owner.turn_start:`. To hear anyone's, scope it to everybody: `on any.turn_start:`.
 
 ### A hero's abilities are registered against the clock that exists when `AddHero` runs
 
@@ -267,16 +264,14 @@ call `LegalTargets(action)` and read the list:
 3. **The list holds fewer actors than you expected, and nothing is out of range.** A `targetable`
    rule somewhere is speaking for them.
 
-The engine does not name which of those two it was; `WhyNotTargetable` is not a thing yet, and
-adding it later is additive, so it can arrive in a 1.x release.
+The engine does not name which of those two it was; `WhyNotTargetable` is not a thing yet.
 
 **Range is still the one that surprises people.** On a `facing` board the distance across the sides
 is `a.rank + b.rank + 1`, so on a 2x2 board your back rank to their back rank is **three** steps and
 `range 1..2` cannot make it. A card printed `range 1..2` on a board two ranks deep can be unable to
 reach half the enemies, for ever, and nothing warns: lint knows the board's depth but does not yet
 check that a `range` can span it (`reference/FINDINGS.md` #8). Do the arithmetic once, write it in
-a comment, and pin both ends with a test. `OutOfRange` now says when it has happened, which is the
-difference between an hour and a minute.
+a comment, and pin both ends with a test. `OutOfRange` now says when it has happened.
 
 A `test` block cannot assert a refusal: `play` fails the test when a card cannot be played. So
 the way to test an exclusion today is to play the card with no target and check which one it
@@ -311,8 +306,7 @@ At run time the ruleset protects you: `LoopProtection.OncePerChain` is the defau
 stops a chain that will not settle. A skipped listener is in the trace with the reason
 (`skipped ...: already in this chain`), which is the fastest way to see it.
 
-Going past the step limit is a `RuntimeError` like any other, so the action is half done and the
-right recovery is a snapshot.
+Going past the step limit is a `RuntimeError`, so the recovery is the snapshot above.
 
 ### A wave game that ends the moment the board is empty
 
@@ -507,7 +501,7 @@ found` *after* compiling everything, which reads like a failure of your code and
 ## Still stuck
 
 - **A failing `test` block is the best bug report there is**: it is both the description and the
-  proof. [Tests](language.md#tests) is three lines long.
+  proof. A test can be three lines; [Tests](language.md#tests) has the shape.
 - `dotnet cantrip --version` names the exact build, commit included. In a Godot project without the
   tool, give the version in `addons/cantrip/plugin.cfg` and the `Cantrip.Core` version in your
   `.csproj`.
