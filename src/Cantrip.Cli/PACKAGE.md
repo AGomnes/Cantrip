@@ -32,7 +32,7 @@ dotnet cantrip --version
 
 A path is a file or a folder; a folder loads every `.cantrip` file under it. `--suppress` takes comma-separated diagnostic codes, such as `CT306,CT310`, or `CT301` for verbs your game registers in C#. It leaves out warnings and notes from loading the files too, but never an error from loading.
 
-Exit codes: 0 success, 1 content errors, failing tests, or a `sim` run that threw, stalled or failed an expectation, 2 bad usage. `lint` fails only on errors, and prints its warnings but still exits 0, unless it is given `--warnings-as-errors`: then a warning fails it too, which is what a build server wants. Notes never fail it.
+Exit codes: 0 success, 1 content errors, failing tests, or a `sim` run that threw, stalled or failed an expectation, 2 bad usage or content `sim` will not play, which is content whose ruleset says `clock ticks`. `lint` fails only on errors, and prints its warnings but still exits 0, unless it is given `--warnings-as-errors`: then a warning fails it too, which is what a build server wants. Notes never fail it.
 
 Each message starts with the file, line and column, then its level and a code such as `CT302`. [Diagnostics](https://github.com/AGomnes/Cantrip/blob/main/docs/language.md#diagnostics) in the language reference lists every code, with what it means and the usual fix. [Simulating](https://github.com/AGomnes/Cantrip/blob/main/docs/simulating.md) covers `sim`: what a scenario says, what the report measures and what it refuses to claim.
 

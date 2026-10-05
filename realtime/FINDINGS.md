@@ -1,6 +1,6 @@
 # Building a real-time game on Cantrip: what hurt
 
-Notes kept while building `realtime/` -- *Emberline* -- from the docs alone, as a user would:
+Notes kept while building `realtime/`, *Emberline*, from the docs alone, as a user would:
 `README.md`, `docs/language.md`, `docs/csharp.md`, `docs/godot.md`, `docs/writing-content.md`,
 `docs/simulating.md`, `docs/coverage.md`, `docs/stability.md`, the `samples/` folder and
 `reference/`. Engine or addon source was read only where noted, and **each time that is a finding
@@ -59,13 +59,13 @@ var clock = new TickClock(20);
 var runtime = new CardRuntime(content, new RuntimeOptions { Clock = clock, Seed = seed });
 ```
 
-**To the engine's great credit, that compiled first time** -- `TickClock` is in `Cantrip.Runtime`,
+**To the engine's great credit, that compiled first time**: `TickClock` is in `Cantrip.Runtime`,
 which is one of the three namespaces csharp.md's own `using` block already lists, and its one
 constructor argument is the tick rate. The design is guessable. It is just not written down.
 
 What is *not* guessable is what the argument means for content. `cooldown 6s` converts through the
 runtime's rate, so `new TickClock(20)` and `new TickClock(60)` are two different games from the
-same content -- and the only place that is said is docs/godot.md's table entry for the node's
+same content, and the only place that is said is docs/godot.md's table entry for the node's
 `TicksPerSecond` export, which a non-Godot game never reads.
 
 **Workaround shipped.** `realtime/host/Emberline.cs` carries a comment saying what the docs do
@@ -87,8 +87,8 @@ a save carries. `Emberline.cs`'s comment saying what the docs do not is gone, be
 
 ## 2. Every turn-shaped call still works on a tick runtime, and `EndTurn` really does run a turn
 
-**Trying to do.** Find out what a party costs in real time -- which of the party calls a
-real-time game may use and which it must stay away from.
+**Trying to do.** Find out what a party costs in real time, which of the party calls a real-time
+game may use and which it must stay away from.
 
 **Expected from the docs.** language.md's CT325/CT335 entries are the only statement anywhere
 about how turns and ticks relate, and CT335 says it plainly:
@@ -106,13 +106,13 @@ about how turns and ticks relate, and CT335 says it plainly:
 | `CanAct(member)` | answers `true` |
 | `ActiveMember` | answers the leader |
 | `Pass(member)` | accepted, no error |
-| `EndTurn()` | raises `turn_end`, `turn_start`, `turn_end`, `turn_start` -- the party's turn *and the enemies' whole turn* -- and moves `State.Turn` from 1 to 2 |
+| `EndTurn()` | raises `turn_end`, `turn_start`, `turn_end`, `turn_start` (the party's turn *and the enemies' whole turn*) and moves `State.Turn` from 1 to 2 |
 | `State.Turn` | counts turns that nothing in a real-time game ever takes |
 
 None of these refuses, warns or logs. `EndTurn` on a tick runtime runs a complete turn cycle,
 including every enemy's telegraphed move, inside a game that has no turns. A front end that leaves
-an **End turn** button wired up -- which is the default in every sample, every doc snippet and the
-addon's own demo -- gives the player a button that fires every enemy's move at once for free.
+an **End turn** button wired up (which is the default in every sample, every doc snippet and the
+addon's own demo) gives the player a button that fires every enemy's move at once for free.
 
 This also means `turn_start` fires exactly once in a real-time battle, at `StartBattle` and never
 again, which is the mechanism behind #14.
@@ -132,8 +132,8 @@ turn API is inert under ticks and leave it wired up.
 **The good news buried in it:** a party *works* under ticks. `AddHero` returns a member, the
 member stands on the board, its `abilities` line grants abilities with their own cooldowns, it
 takes damage, `party` and `allies` answer, `Party` lists it, and every ability I gave a hero
-behaved exactly as one on the leader did. The party design's worry -- that `Pass`, `CanAct` and
-`ActiveMember` would have to throw on a tick runtime -- turns out not to bite, because a real-time
+behaved exactly as one on the leader did. The party design's worry, that `Pass`, `CanAct` and
+`ActiveMember` would have to throw on a tick runtime, turns out not to bite, because a real-time
 game simply never calls them. What it needs instead is for those calls to *say no*.
 
 **Fixed, all of it.** `EndTurn`, `Pass`, `CanAct` and `ActiveMember` throw
@@ -171,13 +171,13 @@ enemies' turn:
 | `move "Clutch" at lowest hp enemies:` | never aims at anybody |
 | `entity.Intent` / `DescribeIntent` | **rolls once at `StartBattle` and then reads for ever**, telegraphing a move that will never happen |
 
-The last row is the nasty one. `Intent` is not empty in a real-time game -- it is populated,
+The last row is the nasty one. `Intent` is not empty in a real-time game: it is populated,
 plausible and permanently wrong. A UI that draws the telegraph, which is the single most
 recommended thing in the enemy documentation, shows the player a lie for the whole fight.
 
 And **lint says nothing.** Content whose ruleset says `clock ticks` and which declares `move`,
 `pattern` and `phase` blocks that can never run lints with zero errors, zero warnings and zero
-notes. A `2 turns` in the same file is error CT325 -- so the language checks the *unit* a designer
+notes. A `2 turns` in the same file is error CT325, so the language checks the *unit* a designer
 writes and not the *machinery* they used.
 
 The only thing left is `on every <n>s:` on the enemy declaration, which does work, and works well.
@@ -210,7 +210,7 @@ answer. `Intent` is left alone: it is rolled from moves, and with no move to rol
 nothing to be wrong about. `TurnMachineryLintTests` has all twelve; against `d869e54` each fails
 with `expected one CT337 saying "..." , got:` and an empty list.
 
-### 3a. CT326 -- the party's safety net -- does not look inside a listener
+### 3a. CT326, the party's safety net, does not look inside a listener
 
 This is the sharp edge. CT326 exists to stop an enemy writing `deal 5 to player` in a party game,
 because that would quietly hit the leader however carefully the rules had settled on somebody
@@ -295,7 +295,7 @@ The hold, as a scenario
 
 Read that table as a developer would. `hp lost 0.0` against three enemies that between them deal
 seventeen damage every three seconds. `50.0 turns` in a game with no turns. And "40 battles
-reached the turn limit and never ended" presented as a **finding about the content** -- under the
+reached the turn limit and never ended" presented as a **finding about the content**: under the
 heading "What the content allows, whatever the bot did", which is the one part of the report that
 is meant to hold whoever plays.
 
@@ -331,7 +331,7 @@ and the CI file still say there is no `sim` step, and now say the tool agrees.
 **Trying to do.** Spawn a wave every two seconds, walking in at the back rank.
 
 **Expected from the docs.** `created` is documented as "target was created by `create`, `copy` or
-`shuffle <card>`", so I expected `SpawnEnemy` to raise it too -- a spawn is the most obviously
+`shuffle <card>`", so I expected `SpawnEnemy` to raise it too: a spawn is the most obviously
 "created" thing there is. And the board documentation says an actor is moved by writing
 `target.rank = 0`.
 
@@ -353,11 +353,11 @@ and the CI file still say there is no `sim` step, and now say the tool agrees.
 
   There is a `State.Assign(actor, lane, rank)` on the public surface, but it is in no document, and
   it throws an `ArgumentOutOfRangeException` rather than refusing, so it is not a seam a host
-  should lean on. (Found by reflecting over the assembly -- see #9.)
+  should lean on. (Found by reflecting over the assembly: see #9.)
 
-**Workaround shipped.** `realtime/content/places.cantrip` declares three verbs -- `hold`, `arrive`
-and `loom` -- and the host, the Godot front end and all sixteen tests call them through `Execute`
-or as ordinary statements. It is the least bad shape: the rule stays in content, and there is one
+**Workaround shipped.** `realtime/content/places.cantrip` declares three verbs, `hold`, `arrive`
+and `loom`, and the host, the Godot front end and all sixteen tests call them through `Execute` or
+as ordinary statements. It is the least bad shape: the rule stays in content, and there is one
 definition of "walks in from the back".
 
 **How bad.** High. Two independent gaps that meet on the most common action in the genre. The
@@ -390,9 +390,9 @@ and godot.md says "lay the party out by `(lane, rank)`". Nothing says how the en
 slots.
 
 **What happened.** On a 3x5 board, three party members are placed at `(0,0)`, `(0,1)` and `(0,2)`
--- one lane, stacked in depth -- and so is a wave of three enemies. The party stands in a queue.
-For a turn game on a two-rank board that is fine; for anything where the lanes mean something it
-is never what the game wants, and there is no setting for it.
+(one lane, stacked in depth), and so is a wave of three enemies. The party stands in a queue. For a
+turn game on a two-rank board that is fine; for anything where the lanes mean something it is
+never what the game wants, and there is no setting for it.
 
 Writing a place that is taken **swaps** the two actors rather than refusing. That is documented
 between the lines (`reference/FINDINGS.md` calls a swap "its own inverse") and it is a reasonable
@@ -429,7 +429,7 @@ first hour with a board, and it says both halves: the single-file fill and the s
 **Expected from the docs.** "A battle ends when no party member is alive or no enemy is left
 alive". Reasonable, and correct for a turn game.
 
-**What happened.** In a wave game the board is empty every few seconds by design -- the keepers
+**What happened.** In a wave game the board is empty every few seconds by design: the keepers
 clear one wave and the next is two seconds away. The moment the last one dies `Won` turns true,
 `battle_end` is raised, every status that is not `persistent` is stripped, every card goes back to
 its draw pile and `InBattle` is false. The first run of Emberline ended at **two seconds**, having
@@ -450,12 +450,12 @@ enemy "The Dark"
 spawned before `StartBattle`, parked on rank 4 where no wave ever walks, and filtered out of
 `Enemies` everywhere in the host and the front end so it never appears in a UI or an autopilot's
 reckoning. It works, and `modify targetable: set 0` on an actor declaration is a nice piece of
-language -- but it is a decoy propping the fight open, and every count, every `deal to enemies`
-and every "is the board clear" question in the game has to remember it is there.
+language, but it is a decoy propping the fight open, and every count, every `deal to enemies` and
+every "is the board clear" question in the game has to remember it is there.
 
 **How bad.** Severe, and the closest thing in this round to "this makes the game impossible". A
-wave defence, a survival mode, a horde mode and an endless arena -- most of what people build on a
-tick clock -- all need this or something like it, and nothing in the documentation hints that the
+wave defence, a survival mode, a horde mode and an endless arena, most of what people build on a
+tick clock, all need this or something like it, and nothing in the documentation hints that the
 problem exists.
 
 **Fixed with one ruleset setting and one call.** `ends: called` in the ruleset turns off the
@@ -492,7 +492,7 @@ only be tested from the side that succeeds. There is no `ready` predicate in con
 when an ability is not ready, so the reduction is shown the other way round"), so it is known; it
 is just not in the list of what a test cannot do.
 
-**Workaround shipped.** Three of Emberline's sixteen tests are written inside out -- two enemies,
+**Workaround shipped.** Three of Emberline's sixteen tests are written inside out: two enemies,
 one reachable and one not, `cast` with no target, then check which one it picked:
 
 ```
@@ -503,8 +503,8 @@ test "Backdraft reaches two ranks and no further"
   expect enemy1.hp == 16
 ```
 
-It works and it reads worse, and it cannot express "this ability is not ready" at all -- only
-"three seconds later it is".
+It works and it reads worse, and it cannot express "this ability is not ready" at all: only "three
+seconds later it is".
 
 **How bad.** High, and higher in real time than in turns. A turn game's tests are mostly about what
 an effect *does*; a real-time game's design is almost entirely about what you *may not do yet*,
@@ -527,15 +527,15 @@ that could not have been written at all. Against `d869e54` all four
 
 ## 9. A real-time UI needs two numbers, and neither is documented
 
-**Trying to do.** Draw a row of ability buttons with cooldown sweeps -- the entire interface of a
+**Trying to do.** Draw a row of ability buttons with cooldown sweeps: the entire interface of a
 real-time game.
 
 **What happened.** Two separate holes.
 
 **Listing an actor's abilities.** From C# there is no documented way. csharp.md lists the zones as
 "`Hand`, and likewise `Draw`, `Discard`, `Exhaust`, `Powers` and `Relics`"; none holds an ability.
-`GrantAbility` is not in csharp.md at all, and the package's shipped XML documentation -- what an
-IDE shows -- names only `GrantAbility`, `UseAbility` and `EntityDefinition.Abilities`.
+`GrantAbility` is not in csharp.md at all, and the package's shipped XML documentation, what an
+IDE shows, names only `GrantAbility`, `UseAbility` and `EntityDefinition.Abilities`.
 
 I read the engine's public surface with reflection to find the answer, which is that an ability is
 an entity in `Zones.Attached` with `Kind == EntityKind.Ability`:
@@ -545,15 +545,15 @@ runtime.State.ZoneOf(who, Zones.Attached).Where(e => e.Kind == EntityKind.Abilit
 ```
 
 `Zones.Attached` is not in csharp.md's list either. The Godot node does the right thing here --
-`GetEntity(id)["abilities"]` is documented and returns exactly the ids a button row needs -- so
+`GetEntity(id)["abilities"]` is documented and returns exactly the ids a button row needs, so
 this is a gap in the C# guide rather than in the engine.
 
 **Seconds left on a cooldown.** Neither surface has a documented answer. `IsReady` and `CanUse`
 answer yes or no; nothing answers "1.4 seconds". The number does exist: once an ability has been
 used it carries a stat called `ready_at`, the absolute tick it comes back at, and
 `(ready_at - clock.Now) / ticksPerSecond` is the sweep. It is in no document, in C# or in
-GDScript, and it **does not exist before the first use** -- `StatNames` on a fresh ability is
-`cooldown` alone -- so a UI must treat "absent" as "ready" and not as "0 seconds left".
+GDScript, and it **does not exist before the first use**: `StatNames` on a fresh ability is
+`cooldown` alone, so a UI must treat "absent" as "ready" and not as "0 seconds left".
 
 **Workaround shipped.** `Emberline.CooldownLeft` in C# and `_cooldown_text` in GDScript, both with
 a comment saying the stat is undocumented.
@@ -583,7 +583,7 @@ Against `d869e54` both tests fail to compile.
 `TickDriver` as `Driver` before the node enters the tree, both have a `TicksPerSecond`, `Running`
 pauses, `MaxCatchUp` caps the catch-up, and a game may call `Tick(count)` itself.
 
-**What happened.** It worked, first try, and it is well built -- see #17. But:
+**What happened.** It worked, first try, and it is well built: see #17. But:
 
 **Nothing else in the repository uses it.** `TickDriver` and `RealTime` appear in exactly four
 files: the addon's own `CantripRuntime.cs` and `TickDriver.cs`, and two core unit test files about
@@ -597,7 +597,7 @@ one path a Godot real-time game must take has, before this round, been run by no
 |---|---|---|
 | `Ticked(count)` | a signal, emitted after each frame's ticks have run | **no** |
 | `TotalTicks()` | ticks since the last reset | **no** |
-| `DroppedTicks()` | ticks abandoned to `MaxCatchUp` -- time the game skipped | **no** |
+| `DroppedTicks()` | ticks abandoned to `MaxCatchUp`: time the game skipped | **no** |
 | `Reset()` | clears the carried remainder and counters, "as after loading a save" | **no** |
 | `Running`, `MaxCatchUp`, `TicksPerSecond` | | yes |
 
@@ -632,7 +632,7 @@ and that `Reset` leaves the game's clock alone.
 
 **Expected from the docs.** The node has `GetTurn()` for a turn game. I expected the equivalent.
 
-**What happened.** There is none. `CantripRuntime` exposes no clock read-out at all -- not a tick
+**What happened.** There is none. `CantripRuntime` exposes no clock read-out at all, not a tick
 count, not a seconds count, nothing. The nearest things are both wrong for the job:
 
 - an event's `time` field, which only exists when something happened;
@@ -646,7 +646,7 @@ clock is inside the node and there is no door.
 every `Ticked`, and is careful to write it into its own save file beside the rules' save and put it
 back on load. It works and it is a thing every real-time Godot game will have to invent.
 
-**How bad.** Moderate to high. Cheap to fix -- one method -- and every single real-time Godot game
+**How bad.** Moderate to high. Cheap to fix, one method, and every single real-time Godot game
 needs it.
 
 **Fixed, with two methods rather than one.** `GetTicks()` is the game's own clock in clock units
@@ -681,9 +681,9 @@ cannot raise `driver.TicksPerSecond` to go faster, because the runtime forces th
 own rate at `_Ready` (with a warning) precisely so `cooldown 6s` cannot mean two lengths of time.
 
 So on the documented path there is **no game speed control at all**: no fast-forward, no
-slow-motion, no bullet time, no "2x speed" option, no speeding a replay up. The escape hatch is the
-one line in godot.md that reads like an afterthought -- "A game can also call `Tick(count)`
-itself" -- which turns out to be the only way to make a real-time game run at any speed but one.
+slow-motion, no bullet time, no "2x speed" option, no speeding a replay up. The escape hatch is
+the one line in godot.md that reads like an afterthought, "A game can also call `Tick(count)`
+itself", which turns out to be the only way to make a real-time game run at any speed but one.
 
 **Workaround shipped.** `emberline.gd` uses the driver when a person is playing and pumps
 `rules.Tick(1)` from `_process` under `--emberline-auto`, which takes the CI run from 45.5 seconds
@@ -732,8 +732,8 @@ designer gets a free ability and a number that reads like a rule.
 
 The consequence for the genre is larger than the bug: **a real-time game has no resource at all.**
 Cards need a turn to refill energy (see #14), and abilities cannot cost anything, so the only
-limiter a real-time game has is the cooldown. Mana, rage, focus, heat, a charge that builds --
-none of it can gate an action. Emberline is built around that limit; a game that needs a resource
+limiter a real-time game has is the cooldown. Mana, rage, focus, heat, a charge that builds, none
+of it can gate an action. Emberline is built around that limit; a game that needs a resource
 cannot be.
 
 **Also.** csharp.md's sentence "An ability has no cost **and does not settle its own target**, so
@@ -744,8 +744,8 @@ reach. I relied on it in every test and in both front ends.
 
 **Workaround shipped.** No ability in Emberline has a `cost`, and the design has no resource.
 
-**How bad.** Moderate for the ignored clause -- it is `reference/FINDINGS.md` #5 in a new place --
-and moderate for the doc contradiction, which is one sentence denying a feature that exists.
+**How bad.** Moderate for the ignored clause (it is `reference/FINDINGS.md` #5 in a new place) and
+moderate for the doc contradiction, which is one sentence denying a feature that exists.
 
 **Refused at lint, and that is the decision.** `cost` on an `ability` is error **CT339**. The
 alternative was to implement it, and it was considered and turned down: the resource an ability
@@ -785,9 +785,9 @@ language is quietly dead:
 | the hand | drawn once at `StartBattle`, never again |
 
 `lint` reports none of it, **even with `clock ticks` stated**. `apply Chill 3` on a tick clock is a
-permanent Chill, with no error, no warning and no note. The one thing that does work is `for <n>s`,
-which is checked and correct, so the rule a designer has to learn -- and learn from nowhere -- is
-"every status in a real-time game must carry its own `for`".
+permanent Chill, with no error, no warning and no note. The one thing that does work is
+`for <n>s`, which is checked and correct, so the rule a designer has to learn, and learn from
+nowhere, is "every status in a real-time game must carry its own `for`".
 
 CT325 shows the shape of the fix already exists: the linter knows the stated clock and checks
 lengths against it. It just does not check machinery against it.
@@ -796,8 +796,8 @@ lengths against it. It just does not check machinery against it.
 `intensity` and is always applied with a `for <n>s`; the file's header comment says why, because
 nothing else would.
 
-**How bad.** High. It is a large, silent, load-bearing surface, and the failure mode -- a debuff
-that never comes off -- is a balance bug a designer will chase for a long time.
+**How bad.** High. It is a large, silent, load-bearing surface, and the failure mode, a debuff
+that never comes off, is a balance bug a designer will chase for a long time.
 
 **Fixed, by #3's answer.** Every row of that table is error **CT337** now, and the message for
 each names what to write instead: `stacking intensity` or `stacking none` with a `for <n>s` where
@@ -819,7 +819,7 @@ diagnostic rather than apologising for its absence.
 
 **What happened.** `on every 2s:` is relative to **when the listener registered**, which is good
 news and better than the alternative: an enemy spawned at tick 7 fires at 27, 47, 67, and one
-spawned at tick 0 fires at 20, 40, 60. Firing does not drift either -- a listener whose due tick
+spawned at tick 0 fires at 20, 40, 60. Firing does not drift either: a listener whose due tick
 falls inside a multi-tick `Tick(n)` fires at that call and keeps its original schedule, so
 `Tick(3)` twenty times and `Tick(1)` sixty times give the same times. Both of those are exactly
 right.
@@ -874,7 +874,7 @@ makes somebody recognise what they are watching.
   it. The rule is real and correct; it lives in a comment in a sample rather than in language.md.
 - **CT310 (`verb X is never used`) counts uses in content only.** A verb that exists for the host
   to call through `Execute` is reported as unused. It is a note, so `--warnings-as-errors` still
-  passes, and the right answer for `loom` was to write a test that calls it -- which was worth
+  passes, and the right answer for `loom` was to write a test that calls it, which was worth
   doing anyway, so no harm done.
 - **README.md's first line** says Cantrip is "a rules language and rules engine for the combat in
   single-player, **turn-based** games". A user looking for a real-time engine stops reading there,
@@ -957,7 +957,7 @@ makes somebody recognise what they are watching.
   on the hero` and `Board "Hold" (3 lanes, 3 ranks) has no lane 0, rank 4` both said the fix.
 - **The `TickDriver` itself.** Driving from `_PhysicsProcess` only, ignoring the frame delta,
   refusing to let the driver's rate disagree with the runtime's, and stopping itself after an
-  exception rather than repeating the same failure sixty times a second -- four good decisions, all
+  exception rather than repeating the same failure sixty times a second: four good decisions, all
   of them in the source with reasons. It deserves documentation and a test, not a rewrite.
 
 **Kept, every one of them, and the good parts are what the repair was built on.** Nothing in this
@@ -971,7 +971,7 @@ load-bearing in Emberline, since the decoy it propped up is gone.
 
 ## 18. Is real time ready to be called stable in 1.0?
 
-**No.** Not because it is broken -- the engine underneath is better than the documentation around
+**No.** Not because it is broken: the engine underneath is better than the documentation around
 it, and the two hardest things, determinism and saving a running clock, already work. It is not
 ready because a 1.0 promise is a promise about a *surface*, and the real-time surface is half
 missing and half wrong.
@@ -990,7 +990,7 @@ What "stable" would have to mean, and what stands in the way:
    belongs before 1.0 rather than after.
 4. **A wave game would have to be possible without a decoy.** #7 is a hole under most of the
    genre: survival, horde, endless arena, tower defence.
-5. **The tooling would have to tell the truth.** #4 -- `sim` refusing a `clock ticks` folder with
+5. **The tooling would have to tell the truth.** #4: `sim` refusing a `clock ticks` folder with
    one sentence would be a strict improvement over what it prints now, and is a ten-line change.
 6. **Lint would have to check machinery as well as units.** CT325 already knows the stated clock.
    A `move`, a `pattern`, a `phase`, a `stacking duration`, a `decay ... on turn_end`, an

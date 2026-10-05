@@ -1,6 +1,6 @@
 # Building the reference game on Cantrip: what hurt
 
-Notes kept while building `reference/` -- *The Drowned Chapel* -- from the docs alone, as a user
+Notes kept while building `reference/`, *The Drowned Chapel*, from the docs alone, as a user
 would: `README.md`, `docs/language.md`, `docs/csharp.md`, `docs/godot.md`,
 `docs/writing-content.md`, `docs/simulating.md`, `docs/coverage.md` and `samples/`.
 Engine source was read only where noted, and each time that is a finding of its own.
@@ -20,7 +20,7 @@ workarounds below: where one is quoted, the file it was quoted from now says the
 ## 1. A runtime call from a `BattleEnded` handler crashes the game with a stack overflow
 
 **Trying to do.** Give the party gold when a battle is won, from the Godot node's `BattleEnded`
-signal -- the one signal whose name says a battle has just ended.
+signal: the one signal whose name says a battle has just ended.
 
 **Expected from the docs.** godot.md, Signals: "`BattleEnded(won: bool)` | The action that won or
 lost the battle **has finished**". And Between battles gives the handler and the follow-up as two
@@ -104,9 +104,8 @@ the leader:
 
 So on the `damage` channel, `of <group>` is matched against the damage's **target**, while the
 bare form is matched against the **source**. The two spellings that look like widenings of each
-other are scoped to opposite ends of the same hit. `modify damage of party: +2` -- the most
-natural line anyone will write in a party game -- is **silently inert**: no error, no warning, no
-lint note.
+other are scoped to opposite ends of the same hit. `modify damage of party: +2`, the most natural
+line anyone will write in a party game, is **silently inert**: no error, no warning, no lint note.
 
 `damage_taken of allies`, `max_hp of allies` and `max_hp of party` all work, because for those
 channels the value really does belong to the target, which is why the trap stays invisible until
@@ -149,7 +148,7 @@ shortens every ability its holder has".
 
 **What happened.** `modify cooldown: x50%` on a relic shortens the **leader's** granted abilities
 and nothing a `hero` owns. None of `of party`, `of allies` or `of everyone` reaches a hero's
-ability either -- `of everyone` works on `damage` but not here. So the relic every roguelite has,
+ability either: `of everyone` works on `damage` but not here. So the relic every roguelite has,
 "your abilities recharge faster", cannot be written for a party at all.
 
 Verified both ways: with no `hero` declared, `modify cooldown: x50%` on a relic does halve the
@@ -183,7 +182,7 @@ now, and the `Quickened` status is gone.
 
 ## 4. Nothing in content can name a dead ally, so `revive` cannot be spelled
 
-**Trying to do.** `ability "Last Rites"` -- bring a fallen hero back at 8 hp.
+**Trying to do.** `ability "Last Rites"`: bring a fallen hero back at 8 hp.
 
 **Expected from the docs.** language.md, Death and revival: "`heal` refuses a dead target,
 deliberately and permanently, so bringing one back is its own verb: `revive <who> [N]`". A verb
@@ -208,9 +207,9 @@ test binds each `hero` line to its own name, which makes the gap look shallower 
 `runtime.Revive(entity, hp)` between battles, from the roster the host keeps in C# anyway. No card
 and no ability in the game revives.
 
-**How bad.** Severe for the genre -- every party roguelite has an in-combat raise -- and the
-clearest "cannot express at all" of the round. The natural spelling would have been a `target
-fallen` word, or `fallen` as a group name beside `party` and `allies`.
+**How bad.** Severe for the genre: every party roguelite has an in-combat raise, and the clearest
+"cannot express at all" of the round. The natural spelling would have been a `target fallen` word,
+or `fallen` as a group name beside `party` and `allies`.
 
 **Fixed.** `fallen` is a group name beside `party` and `allies`: the dead of the running side, in
 the order they fell. `revive fallen.first 8` and `choose 1 from fallen as who` both work, and
@@ -243,7 +242,7 @@ silently ignored. From the trace, with `log created.first.controller.name`:
 
 `to leader`, `to target`, `to enemies`, `to enemies.first` and `onto leader` all give the same
 answer: controller E1, zone discard. That is worse than an error, because language.md is emphatic
-that "a clause a verb does not read is error **CT323** -- at lint and at run -- because a dropped
+that "a clause a verb does not read is error **CT323**, at lint and at run, because a dropped
 clause is a card that reads as one thing and does another." `create` *does* read `to`; it just
 does not read it for this.
 
@@ -265,7 +264,7 @@ It works, and the player sees a status they cannot act on appear and vanish for 
 natural spelling would have been `create Brine into discard to leader` doing what it says.
 
 **How bad.** High. It is a mechanic in three of the nine games docs/coverage.md re-creates, it is
-not listed as a gap there, and the workaround is not discoverable -- nothing in the docs suggests
+not listed as a gap there, and the workaround is not discoverable: nothing in the docs suggests
 that who *runs* a `create` decides whose pile it lands in.
 
 **Fixed: `to` works.** `into` is the pile and `to` is whose, which is what `to` means for every
@@ -303,8 +302,8 @@ the way to finish creating the player, and a reader of csharp.md would not find 
 spelling would have been `hero` working for the leader too, or `CreatePlayer` taking the name of a
 `hero` declaration.
 
-**Fixed.** `runtime.SetStat(leader, "speed", 6)` -- a typed call that does exactly what content's
-`speed = 6` does, bounds and `<stat>_changed` included -- with `ChangeStat` beside it for
+**Fixed.** `runtime.SetStat(leader, "speed", 6)`: a typed call that does exactly what content's
+`speed = 6` does, bounds and `<stat>_changed` included, with `ChangeStat` beside it for
 `gain`/`lose`. It is documented in the party table in `docs/csharp.md`, next to `CreatePlayer`
 rather than three sections away, and the Godot node has both. That also answers 7(c): the shop
 spends gold with `ChangeStat(Leader, "gold", -amount)` instead of interpolating a statement.
@@ -330,7 +329,7 @@ twice, once in C# and once in GDScript, against the same content:
 **The division is right.** Nothing in the run code wanted to be content and nothing in the content
 wanted to be code. A map is not a rule, and writing `battle Crawler` in a scenario next to
 `heal 12` is already as far as a rules language should go. The `scenario` block reaching exactly
-that far -- statements between fights, and no map -- is a good line.
+that far (statements between fights, and no map) is a good line.
 
 **Four things cost real effort, all of them about the boundary rather than the split.**
 
@@ -372,7 +371,7 @@ public ChapelSave Save() => new ChapelSave
 ```
 
 This is the right shape and the docs never show it. csharp.md's `SaveFile` has `Fingerprint` and
-`Game` and nothing else, which is a save for a game with no run above the battle -- that is, for
+`Game` and nothing else, which is a save for a game with no run above the battle: that is, for
 no roguelite at all. One extra field in that example, with one sentence, would have saved an hour
 of deciding whether I was missing an API.
 
@@ -381,8 +380,8 @@ and why the file is a pair.
 
 **(c) Gold is on the leader, and the purse is the run's.** `gold` is a built-in resource, a relic
 earns it inside a battle (`on killed(target:enemies): gain 2 gold`) and the shop spends it outside
-one. That is a genuinely good seam -- the run gets a currency that saves and restores for free.
-But there is no C# call that changes a stat, so the shop writes DSL text from C#:
+one. That is a genuinely good seam, the run gets a currency that saves and restores for free. But
+there is no C# call that changes a stat, so the shop writes DSL text from C#:
 
 ```csharp
 private void Spend(int amount) => runtime.Execute($"lose {amount} gold");
@@ -411,9 +410,9 @@ game's, which is right: Cantrip does not know what an upgrade is.
 
 **What it did not cost.** Carrying the party between battles is free and exactly right: hp, max
 hp, the deck, exhausted cards, relics, `once per run` limits and `persistent` statuses all come
-across with no code at all, and `Benediction` -- a status flagged `persistent` -- turned out to be
-the cleanest run-level reward in the game. `StartBattle` after `SpawnEnemy` is the whole of "the
-next encounter". That half of the boundary is finished.
+across with no code at all, and `Benediction`, a status flagged `persistent`, turned out to be the
+cleanest run-level reward in the game. `StartBattle` after `SpawnEnemy` is the whole of "the next
+encounter". That half of the boundary is finished.
 
 
 ---
@@ -427,7 +426,7 @@ it could not kill them, and the Godot self-play ran to turn 576 before its step 
 
 Nothing caught it beforehand:
 
-- **Lint** knows the board's depth -- it reports CT327 for a rank that could never be a slot --
+- **Lint** knows the board's depth: it reports CT327 for a rank that could never be a slot,
   but says nothing about a `range` that cannot span the board its own side stands on.
 - **`cantrip sim`** would have caught it as a stall, and did not, because the scenario bought
   Aspersion (which prints no range) by fiat, while the deck a player actually held did not.
@@ -499,7 +498,7 @@ turn number and the state hash"), stability.md says the test suite does it, godo
 node's `StateHash()`. **csharp.md never says what to call.** `runtime.State.Hash()` does not
 exist; searching the guide for "hash" finds only prose.
 
-I found it by reading `godot/Cantrip.Demo/addons/cantrip/runtime/CantripRuntime.cs` -- the first
+I found it by reading `godot/Cantrip.Demo/addons/cantrip/runtime/CantripRuntime.cs`: the first
 time in this build that the docs failed and the source had to answer:
 
 ```csharp
@@ -530,11 +529,12 @@ with it by declaring exactly one board.
 
 **How bad.** Moderate for a Godot game with a train or a corridor, invisible otherwise.
 
-**Fixed.** `StartBattleOn(board, shuffle, draw_opening_hand)` -- a method of its own, not a third
-argument, because a C# default is not a default in GDScript and a third parameter would have broken
-every game that already calls `StartBattle`, at parse time. `docs/godot.md` has a
-[Boards](../docs/godot.md#boards) section now. This game declares a second board, the Nave, and both
-halves of it name one: `StartBattle(board:)` in C#, `StartBattleOn` in GDScript. `board` is also a
+**Fixed.** `StartBattleOn(board, shuffle, draw_opening_hand)`, a method of its own, not a third
+argument, because a C# default is not a default in GDScript and a third parameter would have
+broken every game that already calls `StartBattle`, at parse time. `docs/godot.md` has a
+[Boards](../docs/godot.md#boards) section now. This game declares a second board, the Nave, and
+both halves of it name one: `StartBattle(board:)` in C#, `StartBattleOn` in GDScript. `board` is
+also a
 `scenario` verb now, so `cantrip sim` plays the fight on the board the game plays it on.
 
 ---
@@ -542,9 +542,9 @@ halves of it name one: `StartBattle(board:)` in C#, `StartBattleOn` in GDScript.
 ## 12. `GetStat` does not answer a status's counter, and the node has no `CounterOf`
 
 In content, `Warden.Fervour` is the number of Fervour stacks. In C#, `entity.CounterOf("Fervour")`
-is documented. In GDScript, `GetStat(warden, "Fervour")` does not answer it -- "0 both when the id
-is unknown and when the entity has no such stat" is true, and a status is not a stat -- and there
-is no `CounterOf` on the node. The only route is to walk the entity dictionary:
+is documented. In GDScript, `GetStat(warden, "Fervour")` does not answer it, "0 both when the id
+is unknown and when the entity has no such stat" is true, and a status is not a stat, and there is
+no `CounterOf` on the node. The only route is to walk the entity dictionary:
 
 ```gdscript
 func _counter(id: int, status: String) -> int:
@@ -555,7 +555,7 @@ func _counter(id: int, status: String) -> int:
 
 `GetEntity` builds every stat, every tag and every status to answer one number, in a function a
 status bar calls once per member per frame. It is written up, in the `statuses` table, so this is
-an ergonomics gap rather than a wrong answer -- but a check I wrote from the DSL's own vocabulary
+an ergonomics gap rather than a wrong answer, but a check I wrote from the DSL's own vocabulary
 failed silently against 0, which is exactly the shape of bug that ships.
 
 **How bad.** Moderate. Every Godot game with statuses writes this helper.
@@ -572,7 +572,7 @@ helper.
 
 Every fight in the chapel could run for ever, because our side has heals and block and theirs has
 a fixed number: `cantrip sim` found three battles at the turn limit on the first run. The fix is
-the standard one -- the enemies get stronger -- and it is two lines:
+the standard one, the enemies get stronger, and it is two lines:
 
 ```
   on every 3 turns:
@@ -585,7 +585,7 @@ declaration, no template, no mixin and no "apply this to every enemy". The alter
 - A relic. Relics belong to the leader, and there is no enemy equivalent.
 - A status applied at battle start. Nothing in content runs at battle start except a listener on
   something that already exists, so it needs an owner, and the only always-present owner is the
-  leader -- from which nothing can reach the other side's cooldowns or stats generally (#2, #3).
+  leader: from which nothing can reach the other side's cooldowns or stats generally (#2, #3).
 - The host. `ApplyStatus` on every enemy after `StartBattle` works, and then the scenario cannot
   do it, so `cantrip sim` no longer plays the game the host plays.
 
@@ -611,7 +611,7 @@ One listener, paired with itself, whose body is `gain 2 gold`. It is a note rath
 so `--warnings-as-errors` still passes, but a folder where several relics earn gold on a kill
 prints one of these each and teaches the reader to ignore CT306.
 
-**How bad.** Low, and cosmetic -- but noise in a linter is how a real warning gets missed.
+**How bad.** Low, and cosmetic, but noise in a linter is how a real warning gets missed.
 
 **Fixed.** `gain`, `lose` and `change` cover a resource and a status with one word, so the verb
 table has to list a death and a status applied for all three; CT306 now reads the word the line
@@ -629,8 +629,8 @@ actually names, and only `hp` kills. `reference/content` lints clean, and so doe
   **Fixed:** it is `long`, which is what the Godot node's own export already was. The reference
   host writes `Seed = seed`.
 - **`CardRuntime.Player` is nullable.** csharp.md writes `runtime.Player` bare in five places. In a
-  project with `<Nullable>enable</Nullable>` -- which this repository's own
-  `Directory.Build.props` sets, with `WarningsAsErrors=nullable` -- every one of those is a build
+  project with `<Nullable>enable</Nullable>`, which this repository's own
+  `Directory.Build.props` sets, with `WarningsAsErrors=nullable`: every one of those is a build
   error. The reference host has a `private Entity Leader => runtime.Player!;` for exactly this.
   **Fixed:** `Player` is not nullable. Before `CreatePlayer` it throws, with a message naming the
   call to make, and `HasPlayer` is the question for the few lines where that is genuinely in doubt.
@@ -642,10 +642,10 @@ actually names, and only `hp` kills. `reference/content` lints clean, and so doe
   and reads `discard`. The fall-through to 0 for an unknown member on a group is the same trap
   language.md's "One is a group of one" paragraph describes fixing for `.first`.
   **Fixed:** `zone`, `controller` and `name` answer for a group the way `lane` and `rank` already
-  did -- from the first of them.
+  did, from the first of them.
 - **`cantrip sim` reports an `unplayable` card as a finding.** "1 card(s) were held but never
   playable: Brine" is the headline block, above the bots' tables, for a card tagged
-  `curse, unplayable` -- which is never being playable on purpose. The one report in the tool that
+  `curse, unplayable`, which is never being playable on purpose. The one report in the tool that
   is meant to hold whoever plays now has a line in it that will never go away.
   **Fixed:** a card tagged `unplayable` is left out of that finding. Everything else about the
   block is unchanged.
@@ -679,8 +679,8 @@ actually names, and only `hp` kills. `reference/content` lints clean, and so doe
 - **Telegraphed targets.** `move "Clutch" at lowest hp enemies:` plus a Taunt written as an
   ordinary `targetable` modifier, and `intent_target` recomputed on every read, is the whole of a
   party game's readability for nine words of content. It worked first time, in the DSL, in C# and
-  through the Godot node, and `DescribeIntent`'s `line` -- `"Clutch -> Cantor: Deal 6 damage and
-  apply 1 Soaked."` -- is a finished UI string.
+  through the Godot node, and `DescribeIntent`'s `line`, `"Clutch -> Cantor: Deal 6 damage and
+  apply 1 Soaked."`, is a finished UI string.
 - **The board.** Two axes, five selectors, movement as a member write, and `until` reverting a
   move because a slot is two integers. `target.rank = 0` being the whole of a hook, and a swap
   being its own inverse, is a design decision that paid for itself three times in this game.

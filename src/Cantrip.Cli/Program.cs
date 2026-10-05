@@ -58,7 +58,8 @@ sim options:
                      thing. With --name it pairs two decks stated in one folder
 
 exit codes: 0 success, 1 content errors, failing tests, a run that threw, a battle that hit the
-turn limit or a failed expectation (or lint warnings, with --warnings-as-errors), 2 bad usage";
+turn limit or a failed expectation (or lint warnings, with --warnings-as-errors), 2 bad usage or
+content sim will not play, which is content whose ruleset says `clock ticks`";
 
         private static int Main(string[] args)
         {

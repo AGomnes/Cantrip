@@ -20,7 +20,7 @@ hero who did not get up.
 ```
 dotnet run --project src/Cantrip.Cli -- lint reference/content --warnings-as-errors
 dotnet run --project src/Cantrip.Cli -- test reference/content
-dotnet run --project src/Cantrip.Cli -- sim  reference/content
+dotnet run --project src/Cantrip.Cli -- sim reference/content
 
 dotnet run --project reference/host -- --seed 7      # one descent, told as it happens
 dotnet run --project reference/host -- --check       # the run CI checks, with the save test
